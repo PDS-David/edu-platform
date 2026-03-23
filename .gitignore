@@ -8,3 +8,7 @@ build/
 "EAC LEARNING PLATFORM - CREDENTIALS.txt"  "database/paystack-recovery-codes.txt" 
 "EAC LEARNING PLATFORM - CREDENTIALS.txt" 
 "database/paystack-recovery-codes.txt" 
+
+EAC LEARNING PLATFORM - CREDENTIALS.txt
+database/paystack-recovery-codes.txt
+database/*.dump
