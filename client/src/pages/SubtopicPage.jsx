@@ -1,0 +1,698 @@
+// client/src/pages/SubtopicPage.jsx
+// AI Buddy subtopic page — exact replica
+// URL: /student/subtopic/:subtopicId?tab=resources|practice|quiz
+// Three tabs: Resources | Practice Questions (MCQ/Smart Answers/Structured) | Quiz
+//
+// FIX v1.1: Replaced raw axios with api instance from services/api.js
+//   - Removed: import axios, const API, const authHeader
+//   - Added:   import api
+//   - Response shape updated: api interceptor returns response.data directly,
+//     so responses are already { success, data, ... }
+
+import { useState, useEffect, useRef } from 'react';
+import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import VideoPlayer from '../components/VideoPlayer';
+import {
+  ChevronLeft, ChevronRight, Loader2,
+  CheckCircle, XCircle, Lightbulb, Sparkles,
+  BookOpen, FileText, HelpCircle,
+  Upload, Sigma,
+} from 'lucide-react';
+import TopNav from '../components/TopNav';
+import AIChatWidget from '../components/AIChatWidget';
+import QuizTab from '../components/QuizTab';
+import api from '../services/api';
+
+const LABELS = ['01', '02', '03', '04', '05'];
+
+function TickIcon() {
+  return (
+    <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+      <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+function TabDot({ completed }) {
+  return (
+    <span className={`w-4 h-4 rounded-full border-2 inline-flex items-center justify-center shrink-0 ${
+      completed ? 'border-teal-500 bg-teal-500' : 'border-gray-300'
+    }`}>
+      {completed && <TickIcon />}
+    </span>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RESOURCES TAB
+// ═══════════════════════════════════════════════════════════════════════════════
+function ResourcesTab({ subtopicId, subtopic, subtopicName, onComplete }) {
+  const [resources,    setResources]    = useState([]);
+  const [loading,      setLoading]      = useState(true);
+  const [activeRes,    setActiveRes]    = useState(null);
+  const [notes,        setNotes]        = useState(null);
+  const [notesLoading, setNotesLoading] = useState(false);
+
+  // Fetch stored notes on mount
+  useEffect(() => {
+    api.get('/notes', { params: { subtopic_id: subtopicId } })
+      .then(r => {
+        if (r.data?.length > 0) setNotes(r.data[0].content_html);
+      })
+      .catch(() => {});
+  }, [subtopicId]);
+
+  const handleGenerateNotes = async () => {
+    setNotesLoading(true);
+    try {
+      // api interceptor returns response.data directly
+      const r = await api.post('/ai/notes/generate', {
+        subject_id: subtopic?.subject_id,
+        topic_name: subtopicName,
+      });
+      setNotes(r.notes);
+    } catch {} finally { setNotesLoading(false); }
+  };
+
+  useEffect(() => {
+    api.get('/resources', { params: { subtopic_id: subtopicId } })
+      .then(r => setResources(r.data || []))
+      .catch(() => setResources([]))
+      .finally(() => setLoading(false));
+  }, [subtopicId]);
+
+  const handleOpen = async (res) => {
+    setActiveRes(res);
+    try {
+      await api.post(`/subtopics/${subtopicId}/progress`, { task: 'resources' });
+      onComplete('resources');
+    } catch { /* ignore */ }
+  };
+
+  const typeIcon   = (type) => type === 'video' ? '🎥' : type === 'audio' ? '🔊' : '📄';
+  const formatSize = (bytes) => {
+    if (!bytes) return '';
+    return bytes < 1024 * 1024 ? `${Math.round(bytes / 1024)} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+  const formatDuration = (secs) => {
+    if (!secs) return '';
+    return `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+  };
+
+  if (loading) return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-teal-400" /></div>;
+
+  if (resources.length === 0) return (
+    <div className="text-center py-12 text-gray-400">
+      <div className="text-4xl mb-3">📂</div>
+      <p className="text-sm">No resources uploaded yet for this subtopic.</p>
+      <p className="text-xs mt-1">Check back soon!</p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-3">
+      {notesLoading && (
+        <div className="flex items-center gap-2 text-sm text-teal-600 py-2">
+          <Loader2 size={14} className="animate-spin" /> Generating revision notes…
+        </div>
+      )}
+      {!notes && !notesLoading && (
+        <button onClick={handleGenerateNotes}
+          className="flex items-center gap-2 text-sm text-teal-600 border border-teal-300 px-4 py-2 rounded-xl hover:bg-teal-50 mb-4">
+          <Sparkles size={14} /> Generate AI Revision Notes
+        </button>
+      )}
+      {notes && (
+        <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 mb-4 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+          <p className="font-semibold text-blue-700 text-xs uppercase tracking-wide mb-2 flex items-center gap-1">
+            <Sparkles size={12} /> AI Revision Notes
+          </p>
+          {notes}
+        </div>
+      )}
+      {resources.map(res => (
+        <div key={res.id} className="bg-white rounded-xl border border-gray-100 p-4">
+          <div className="flex items-center gap-3 mb-3">
+            <span className="text-2xl">{typeIcon(res.resource_type)}</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-gray-800 truncate">{res.title}</p>
+              <p className="text-xs text-gray-400">
+                {res.resource_type}
+                {res.duration_seconds ? ` · ${formatDuration(res.duration_seconds)}` : ''}
+                {res.file_size_bytes  ? ` · ${formatSize(res.file_size_bytes)}`       : ''}
+              </p>
+            </div>
+            {res.resource_type === 'video' && (
+              <button onClick={() => handleOpen(res)}
+                className="bg-teal-500 hover:bg-teal-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+                Play
+              </button>
+            )}
+            {res.resource_type === 'audio' && (
+              <button onClick={() => handleOpen(res)}
+                className="border border-teal-500 text-teal-600 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-teal-50 transition-colors">
+                Listen
+              </button>
+            )}
+            {(res.resource_type === 'document' || res.resource_type === 'pdf') && (
+              <div className="flex gap-2">
+                <a href={res.file_url} target="_blank" rel="noreferrer" onClick={() => handleOpen(res)}
+                  className="border border-gray-200 text-gray-600 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">
+                  View
+                </a>
+                <a href={res.file_url} download
+                  className="bg-gray-100 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-gray-200 transition-colors">
+                  ↓
+                </a>
+              </div>
+            )}
+          </div>
+          {activeRes?.id === res.id && res.resource_type === 'video' && (
+            <div className="mt-2 rounded-xl overflow-hidden">
+              <VideoPlayer videoId={res.id} />
+            </div>
+          )}
+          {activeRes?.id === res.id && res.resource_type === 'audio' && (
+            <audio controls className="w-full mt-2"
+              src={`${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}${res.file_url}`} />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PRACTICE QUESTIONS TAB
+// ═══════════════════════════════════════════════════════════════════════════════
+function PracticeTab({ subtopicId, subjectId, onComplete }) {
+  const [subTab,    setSubTab]    = useState('mcq');
+  const [questions, setQuestions] = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [current,   setCurrent]   = useState(0);
+  const [phase,     setPhase]     = useState('quiz');
+  const [score,     setScore]     = useState(0);
+  const [dismissed, setDismissed] = useState(
+    () => localStorage.getItem('smart_tooltip_dismissed') === '1'
+  );
+
+  const loadQuestions = async (type) => {
+    setLoading(true);
+    setCurrent(0);
+    setScore(0);
+    setPhase('quiz');
+    try {
+      const params = { count: 8, question_sub_type: type };
+      if (subjectId) params.subject_id = subjectId;
+      // api interceptor returns response.data directly
+      const r = await api.get('/questions/random', { params });
+      setQuestions(r.data || []);
+    } catch {
+      setQuestions([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { loadQuestions(subTab); }, [subTab, subtopicId]); // eslint-disable-line
+
+  const handleAnswer = async (wasCorrect) => {
+    if (wasCorrect) setScore(s => s + 1);
+    if (current + 1 >= questions.length) {
+      setPhase('done');
+      try {
+        await api.post(`/subtopics/${subtopicId}/progress`, { task: 'practice' });
+        onComplete('practice');
+      } catch { /* ignore */ }
+    } else {
+      setCurrent(c => c + 1);
+    }
+  };
+
+  const subTabs = [
+    { id: 'mcq',        label: 'MCQ Questions',        ai: false },
+    { id: 'smart',      label: 'Smart Answers',         ai: true  },
+    { id: 'structured', label: 'Structured Questions',  ai: true  },
+  ];
+
+  return (
+    <div className="bg-[#f5f7f5] -mx-4 px-4 min-h-screen pt-1">
+      <div className="flex gap-2 mb-5">
+        {subTabs.map(t => (
+          <button key={t.id} onClick={() => setSubTab(t.id)}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-colors ${
+              subTab === t.id ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-100'
+            }`}>
+            {t.label}
+            {t.ai && <span className="text-[9px] font-bold text-teal-400">✦</span>}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-teal-400" /></div>
+      ) : questions.length === 0 ? (
+        <div className="text-center py-12 text-gray-400">
+          <div className="text-4xl mb-3">📝</div>
+          <p className="text-sm">No {subTab} questions available yet for this subtopic.</p>
+        </div>
+      ) : phase === 'done' ? (
+        <CompletionCard score={score} total={questions.length} onRetry={() => loadQuestions(subTab)} onTakeQuiz={() => {}} />
+      ) : subTab === 'mcq' ? (
+        <MCQQuestion key={questions[current]?.id} question={questions[current]}
+          questionNumber={current + 1} totalQuestions={questions.length}
+          onAnswer={handleAnswer} onPrev={current > 0 ? () => setCurrent(c => c - 1) : null} />
+      ) : subTab === 'smart' ? (
+        <OpenAnswerQuestion key={questions[current]?.id} question={questions[current]}
+          questionNumber={current + 1} totalQuestions={questions.length} type="smart"
+          dismissed={dismissed}
+          onDismiss={() => { setDismissed(true); localStorage.setItem('smart_tooltip_dismissed', '1'); }}
+          onNext={() => handleAnswer(null)} onPrev={current > 0 ? () => setCurrent(c => c - 1) : null} />
+      ) : (
+        <StructuredQuestion key={questions[current]?.id} question={questions[current]}
+          questionNumber={current + 1} totalQuestions={questions.length}
+          onNext={() => handleAnswer(null)} onPrev={current > 0 ? () => setCurrent(c => c - 1) : null} />
+      )}
+    </div>
+  );
+}
+
+// ─── MCQ Question ──────────────────────────────────────────────────────────────
+function MCQQuestion({ question, questionNumber, totalQuestions, onAnswer, onPrev }) {
+  const [selected,    setSelected]    = useState(null);
+  const [result,      setResult]      = useState(null);
+  const [submitting,  setSubmitting]  = useState(false);
+  const [shownHints,  setShownHints]  = useState(0);
+  const [aiExplain,   setAiExplain]   = useState('');
+  const [explainLoad, setExplainLoad] = useState(false);
+  const startTime = useRef(Date.now());
+
+  useEffect(() => {
+    setSelected(null); setResult(null);
+    setShownHints(0); setAiExplain('');
+    startTime.current = Date.now();
+  }, [question?.id]);
+
+  const staticHints = question?.hints || [];
+
+  const handleSubmit = async () => {
+    if (!selected || submitting || result) return;
+    setSubmitting(true);
+    try {
+      // api interceptor returns response.data directly
+      const res = await api.post(`/questions/${question.id}/answer`, {
+        selected_option_id: selected,
+        time_taken_ms:      Date.now() - startTime.current,
+      });
+      setResult(res);
+      setExplainLoad(true);
+      api.post('/ai/explain', { question_id: question.id, selected_option_id: selected })
+        .then(r => { if (r.success) setAiExplain(r.explanation); })
+        .catch(() => {})
+        .finally(() => setExplainLoad(false));
+    } catch { alert('Failed to submit. Try again.'); }
+    finally  { setSubmitting(false); }
+  };
+
+  const diffBadge = { easy: 'bg-green-500', medium: 'bg-amber-500', hard: 'bg-red-500' };
+
+  const optStyle = (optId) => {
+    if (!result) return selected === optId ? 'border-teal-400 bg-teal-50' : 'border-gray-200 hover:border-teal-300 cursor-pointer';
+    const isCorrect  = result.correct_options?.some(c => c.id === optId);
+    const isSelected = selected === optId;
+    if (isCorrect)                return 'border-teal-400 bg-teal-50';
+    if (isSelected && !isCorrect) return 'border-red-300 bg-red-50';
+    return 'border-gray-100 opacity-60';
+  };
+
+  return (
+    <div className="pb-24">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="px-5 pt-4 flex items-center gap-2">
+          <span className="text-xs text-gray-500 font-medium bg-gray-100 px-2.5 py-1 rounded-full">Question {questionNumber}</span>
+          {question.difficulty && (
+            <span className={`text-xs text-white font-bold px-2.5 py-1 rounded-full ${diffBadge[question.difficulty] || 'bg-gray-400'}`}>
+              {question.difficulty.toUpperCase()}
+            </span>
+          )}
+          {question.marks && (
+            <span className="text-xs text-white font-bold px-2.5 py-1 rounded-full bg-gray-800">{question.marks} Mark(s)</span>
+          )}
+        </div>
+        <div className="px-5 py-4">
+          <p className="text-gray-900 font-medium text-sm leading-relaxed">{question.question_text}</p>
+        </div>
+        <div className="px-5 pb-4 space-y-2">
+          {question.options?.map((opt, i) => (
+            <button key={opt.id} onClick={() => !result && setSelected(opt.id)} disabled={!!result}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${optStyle(opt.id)}`}>
+              <span className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 bg-gray-100 text-gray-500">{LABELS[i]}</span>
+              <span className="text-sm text-gray-800 flex-1">{opt.option_text}</span>
+              {result && result.correct_options?.some(c => c.id === opt.id) && <CheckCircle size={14} className="text-teal-500 shrink-0" />}
+              {result && selected === opt.id && !result.correct_options?.some(c => c.id === opt.id) && <XCircle size={14} className="text-red-400 shrink-0" />}
+            </button>
+          ))}
+        </div>
+
+        {staticHints.length > 0 && !result && (
+          <div className="px-5 pb-4">
+            {staticHints.slice(0, shownHints).map((hint, i) => (
+              <div key={i} className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-2">
+                <p className="text-xs font-semibold text-amber-700 mb-1">Hint {i + 1}</p>
+                <p className="text-xs text-amber-800 leading-relaxed">{hint}</p>
+              </div>
+            ))}
+            {shownHints < staticHints.length && (
+              <button onClick={() => setShownHints(s => s + 1)}
+                className="flex items-center gap-1.5 text-xs text-amber-600 hover:text-amber-700 font-medium">
+                <Lightbulb size={12} />
+                {shownHints === 0 ? 'Get a hint' : `Next hint (${staticHints.length - shownHints} remaining)`}
+              </button>
+            )}
+          </div>
+        )}
+
+        {result && (
+          <>
+            <div className={`mx-5 mb-3 rounded-xl px-3 py-2.5 flex items-center gap-2 text-xs ${
+              result.is_correct ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'
+            }`}>
+              {result.is_correct
+                ? <><CheckCircle size={14} /><span className="font-semibold">Correct! Well done.</span></>
+                : <><XCircle    size={14} /><span className="font-semibold">Incorrect. See the correct answer above.</span></>}
+            </div>
+            <div className="mx-5 mb-4 bg-blue-50 border border-blue-100 rounded-xl p-3">
+              <p className="text-xs font-semibold text-blue-700 mb-1.5 flex items-center gap-1.5"><Sparkles size={12} /> AI Explanation</p>
+              {explainLoad
+                ? <div className="flex items-center gap-2 text-xs text-blue-400"><Loader2 size={12} className="animate-spin" /> Generating explanation…</div>
+                : <p className="text-xs text-blue-700 leading-relaxed">{aiExplain || result.explanation || 'No explanation available.'}</p>}
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-4 py-3 flex items-center justify-between z-50">
+        <div className="max-w-3xl mx-auto w-full flex items-center justify-between">
+          <span className="text-sm text-gray-500">{questionNumber} of {totalQuestions}</span>
+          <div className="flex items-center gap-2">
+            {!result ? (
+              <button onClick={handleSubmit} disabled={!selected || submitting}
+                className="bg-teal-500 hover:bg-teal-600 disabled:bg-gray-200 disabled:text-gray-400 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-colors flex items-center gap-2">
+                {submitting && <Loader2 size={14} className="animate-spin" />}
+                {submitting ? 'Checking…' : 'Submit'}
+              </button>
+            ) : (
+              <button onClick={() => onAnswer(result.is_correct)}
+                className="bg-teal-500 hover:bg-teal-600 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-colors">
+                {questionNumber < totalQuestions ? 'Next Question' : 'Finish'}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Open Answer (Smart Answers) ───────────────────────────────────────────────
+function OpenAnswerQuestion({ question, questionNumber, totalQuestions, dismissed, onDismiss, onNext, onPrev }) {
+  const [answer,  setAnswer]  = useState('');
+  const [result,  setResult]  = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleAIMarker = async () => {
+    if (!answer.trim()) return;
+    setLoading(true);
+    try {
+      const r = await api.post('/ai/explain', {
+        question_id:      question.id,
+        selected_option_id: null,
+        typed_answer:     answer,
+      });
+      setResult(r.explanation || 'AI feedback submitted.');
+    } catch { setResult('AI marking not available. Continue to next question.'); }
+    finally  { setLoading(false); }
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="px-5 pt-4 flex items-center gap-2">
+        <span className="text-xs text-gray-500 font-medium bg-gray-100 px-2.5 py-1 rounded-full">Question {questionNumber}</span>
+        {question.marks && <span className="text-xs text-white font-bold px-2.5 py-1 rounded-full bg-gray-800">{question.marks} Mark(s)</span>}
+      </div>
+      <div className="px-5 py-4">
+        <p className="text-sm font-medium text-gray-900 leading-relaxed">{question.question_text}</p>
+      </div>
+      {!dismissed && (
+        <div className="mx-5 mb-3 bg-gray-900 text-white rounded-xl p-3 flex items-start gap-3">
+          <span className="text-xl shrink-0">🤖</span>
+          <div className="flex-1">
+            <p className="text-xs leading-relaxed">Upon submission, you'll receive a detailed analysis of your answer and personalised feedback to help you improve! 🚀</p>
+          </div>
+          <button onClick={onDismiss} className="text-gray-400 hover:text-white text-lg shrink-0">×</button>
+        </div>
+      )}
+      <div className="px-5 pb-4">
+        <div className="relative">
+          <textarea value={answer} onChange={e => setAnswer(e.target.value)} placeholder="Type your answer here"
+            className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm text-gray-800 resize-none focus:outline-none focus:border-teal-400 min-h-[120px]" />
+          <div className="absolute bottom-3 right-3 flex gap-2">
+            <button className="w-7 h-7 rounded-full bg-purple-500 flex items-center justify-center text-white hover:bg-purple-600"><Upload size={12} /></button>
+            <button className="w-7 h-7 rounded-full bg-green-500 flex items-center justify-center text-white hover:bg-green-600"><Sigma size={12} /></button>
+          </div>
+        </div>
+        {result && (
+          <div className="mt-3 bg-blue-50 border border-blue-100 rounded-xl p-3">
+            <p className="text-xs font-semibold text-blue-700 mb-1 flex items-center gap-1"><Sparkles size={12} /> AI Feedback</p>
+            <p className="text-xs text-blue-700 leading-relaxed">{result}</p>
+          </div>
+        )}
+      </div>
+      <div className="px-5 pb-5 flex items-center gap-3">
+        {onPrev && <button onClick={onPrev} className="border-2 border-gray-200 text-gray-600 font-semibold px-4 py-2.5 rounded-xl text-sm hover:bg-gray-50">← Prev</button>}
+        <button onClick={result ? onNext : handleAIMarker} disabled={loading || (!result && !answer.trim())}
+          className="flex-1 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-200 disabled:text-gray-400 text-white font-semibold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2">
+          {loading && <Loader2 size={14} className="animate-spin" />}
+          {result ? 'Next Question' : loading ? 'Marking…' : 'AI Marker ✦'}
+        </button>
+        <span className="text-xs text-gray-400 shrink-0">{questionNumber} of {totalQuestions}</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Structured Question ───────────────────────────────────────────────────────
+function StructuredQuestion({ question, questionNumber, totalQuestions, onNext, onPrev }) {
+  const [answers, setAnswers] = useState({});
+  const parts = question.sub_parts || [{ label: '(i)', text: question.question_text, marks: question.marks || 3 }];
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="px-5 pt-4 flex items-center gap-2">
+        <span className="text-xs text-gray-500 font-medium bg-gray-100 px-2.5 py-1 rounded-full">Question {questionNumber}</span>
+        {question.difficulty && <span className="text-xs text-white font-bold px-2.5 py-1 rounded-full bg-red-500">{question.difficulty.toUpperCase()}</span>}
+        {question.marks && <span className="text-xs text-white font-bold px-2.5 py-1 rounded-full bg-gray-800">{question.marks} Mark(s)</span>}
+      </div>
+      {question.stem && <div className="px-5 py-3 text-xs text-gray-600 leading-relaxed bg-gray-50 mx-5 mt-3 rounded-xl">{question.stem}</div>}
+      <div className="px-5 py-4 space-y-5">
+        {parts.map((part, i) => (
+          <div key={i}>
+            <div className="flex items-start gap-3 mb-2">
+              <span className="text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded-md shrink-0">{part.label}</span>
+              <p className="text-sm text-gray-800 flex-1 leading-relaxed">{part.text}</p>
+              <span className="text-xs text-gray-400 shrink-0">{part.marks} Mark(s)</span>
+            </div>
+            <div className="relative">
+              <textarea value={answers[i] || ''} onChange={e => setAnswers(a => ({ ...a, [i]: e.target.value }))}
+                placeholder="Type your answer here ..." className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm resize-none focus:outline-none focus:border-teal-400 min-h-[100px]" />
+              <div className="absolute bottom-3 right-3 flex gap-2">
+                <button className="w-6 h-6 rounded-full bg-purple-500 flex items-center justify-center text-white"><Upload size={10} /></button>
+                <button className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white"><Sigma size={10} /></button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="px-5 pb-5 flex items-center gap-3">
+        {onPrev && <button onClick={onPrev} className="border-2 border-gray-200 text-gray-600 font-semibold px-4 py-2.5 rounded-xl text-sm hover:bg-gray-50">← Prev</button>}
+        <button onClick={onNext} className="flex-1 bg-teal-500 hover:bg-teal-600 text-white font-semibold py-2.5 rounded-xl text-sm">Submit</button>
+        <span className="text-xs text-gray-400 shrink-0">{questionNumber} of {totalQuestions}</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Practice Completion Card ──────────────────────────────────────────────────
+function CompletionCard({ score, total, onTakeQuiz, onRetry }) {
+  const pct = Math.round((score / total) * 100);
+  return (
+    <div className="bg-teal-50 border border-teal-100 rounded-2xl p-8 text-center">
+      <div className="text-4xl mb-3">🤩</div>
+      <h3 className="text-lg font-bold text-teal-600 mb-2">Keep Going, You're Almost There!</h3>
+      <p className="text-sm text-gray-600 mb-1">
+        Nice job! 🎉 Now, take the quiz and get{' '}
+        <span className="text-teal-600 font-medium">detailed feedback</span> on every answer with our{' '}
+        <span className="text-teal-600 font-medium">AI-powered marking scheme</span>. Let's level up! 🚀
+      </p>
+      <p className="text-xs text-gray-400 mb-6">Score: {score}/{total} ({pct}%)</p>
+      <button onClick={onTakeQuiz}
+        className="bg-teal-500 hover:bg-teal-600 text-white font-semibold px-8 py-3 rounded-xl text-sm transition-colors">
+        Take me to Quiz
+      </button>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAIN SUBTOPIC PAGE
+// ═══════════════════════════════════════════════════════════════════════════════
+export default function SubtopicPage() {
+  const { subtopicId }  = useParams();
+  const [searchParams]  = useSearchParams();
+  const { user }        = useAuth();
+  const navigate        = useNavigate();
+
+  const [subtopic,  setSubtopic]  = useState(null);
+  const [adjacent,  setAdjacent]  = useState({ previous: null, next: null });
+  const [progress,  setProgress]  = useState({ resources_completed: false, practice_completed: false, quiz_completed: false });
+  const [loading,   setLoading]   = useState(true);
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'resources');
+
+  // ── Load subtopic data ─────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!subtopicId) return;
+    setLoading(true);
+    Promise.all([
+      api.get(`/subtopics/${subtopicId}`),
+      api.get(`/subtopics/${subtopicId}/adjacent`),
+    ])
+      .then(([subRes, adjRes]) => {
+        // api interceptor returns response.data directly
+        setSubtopic(subRes.data);
+        setAdjacent(adjRes.data || { previous: null, next: null });
+      })
+      .catch(err => console.error('SubtopicPage load error:', err))
+      .finally(() => setLoading(false));
+  }, [subtopicId]);
+
+  // ── Load progress ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!user || !subtopicId) return;
+    api.get(`/subtopics/${subtopicId}/progress`)
+      .then(r => { if (r.success) setProgress(r.data); })
+      .catch(() => {});
+  }, [user, subtopicId]);
+
+  // ── Update tab from URL ────────────────────────────────────────────────────
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab) setActiveTab(tab);
+  }, [searchParams]);
+
+  const handleTabComplete = (task) => {
+    setProgress(p => ({ ...p, [`${task}_completed`]: true }));
+  };
+
+  if (loading) return (
+    <div className="min-h-screen bg-gray-50"><TopNav />
+      <div className="flex justify-center pt-24"><Loader2 className="w-8 h-8 text-teal-400 animate-spin" /></div>
+    </div>
+  );
+
+  const isQuizTab     = activeTab === 'quiz';
+  const subtopicName  = subtopic?.name         || 'Subtopic';
+  const subjectName   = subtopic?.subject_name || '';
+  const topicName     = subtopic?.topic_name   || '';
+  const examBoardName = subtopic?.exam_board_name || '';
+
+  return (
+    <div className={`min-h-screen ${isQuizTab ? 'bg-[#0a4a3f]' : 'bg-gray-50'}`}>
+      <TopNav />
+
+      {/* Sub-topic navigation bar */}
+      <div className={`sticky top-14 z-40 border-b ${isQuizTab ? 'bg-[#0a4a3f] border-white/10' : 'bg-white border-gray-100'}`}>
+        <div className="max-w-3xl mx-auto px-4 py-2.5 flex items-center gap-4">
+          <div className="flex items-center gap-2 shrink-0">
+            <span className={`text-sm font-semibold truncate max-w-[150px] ${isQuizTab ? 'text-white' : 'text-gray-800'}`}>
+              {subtopicName.length > 20 ? subtopicName.slice(0, 20) + '...' : subtopicName}
+            </span>
+            <button onClick={() => adjacent.previous && navigate(`/student/subtopic/${adjacent.previous.id}?tab=${activeTab}`)}
+              disabled={!adjacent.previous}
+              className={`p-1 rounded-md transition-colors ${adjacent.previous ? 'hover:bg-gray-100 text-gray-500' : 'text-gray-300 cursor-not-allowed'} ${isQuizTab ? 'text-white/60 hover:bg-white/10' : ''}`}>
+              <ChevronLeft size={16} />
+            </button>
+            <button onClick={() => adjacent.next && navigate(`/student/subtopic/${adjacent.next.id}?tab=${activeTab}`)}
+              disabled={!adjacent.next}
+              className={`p-1 rounded-md transition-colors ${adjacent.next ? 'hover:bg-gray-100 text-gray-500' : 'text-gray-300 cursor-not-allowed'} ${isQuizTab ? 'text-white/60 hover:bg-white/10' : ''}`}>
+              <ChevronRight size={16} />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-1 flex-1 justify-center">
+            {[
+              { id: 'resources', label: 'Resources',          icon: BookOpen,   key: 'resources_completed' },
+              { id: 'practice',  label: 'Practice Questions', icon: HelpCircle, key: 'practice_completed'  },
+              { id: 'quiz',      label: 'Quiz',               icon: FileText,   key: 'quiz_completed'      },
+            ].map(tab => {
+              const done     = progress[tab.key];
+              const Icon     = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                    isActive
+                      ? isQuizTab ? 'text-white border-b-2 border-white' : 'text-gray-900 border-b-2 border-gray-900'
+                      : isQuizTab ? 'text-white/60 hover:text-white' : 'text-gray-400 hover:text-gray-600'
+                  }`}>
+                  <TabDot completed={done} />
+                  <span className="hidden sm:inline">{tab.label}</span>
+                  <span className="sm:hidden">{tab.label.split(' ')[0]}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className={`flex items-center gap-1.5 shrink-0 text-xs ${isQuizTab ? 'text-white/70' : 'text-gray-400'}`}>
+            <div className={`w-5 h-5 rounded-full border-2 ${isQuizTab ? 'border-white/50' : 'border-gray-300'}`} />
+            <div className="hidden sm:flex flex-col leading-tight">
+              <span className="font-semibold">
+                {[progress.resources_completed, progress.practice_completed, progress.quiz_completed].filter(Boolean).length * 33}% Complete
+              </span>
+              <span>
+                {3 - [progress.resources_completed, progress.practice_completed, progress.quiz_completed].filter(Boolean).length} tasks remaining
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Breadcrumb */}
+      {!isQuizTab && (
+        <div className="max-w-3xl mx-auto px-4 pt-3">
+          <nav className="flex items-center gap-1 text-xs text-gray-400 flex-wrap">
+            <Link to="/student/dashboard" className="hover:text-teal-600">Home</Link>
+            <span>›</span><span>{examBoardName}</span>
+            <span>›</span><span>{subjectName}</span>
+            <span>›</span><span>{topicName}</span>
+            <span>›</span><span className="text-teal-600 font-medium">{subtopicName}</span>
+          </nav>
+        </div>
+      )}
+
+      {/* Tab content */}
+      <div className={`max-w-3xl mx-auto px-4 ${isQuizTab ? 'py-6' : 'py-5'}`}>
+        {activeTab === 'resources' && (
+          <ResourcesTab subtopicId={subtopicId} subtopic={subtopic} subtopicName={subtopicName} onComplete={handleTabComplete} />
+        )}
+        {activeTab === 'practice' && (
+          <PracticeTab subtopicId={subtopicId} subjectId={subtopic?.subject_id} onComplete={handleTabComplete} />
+        )}
+        {activeTab === 'quiz' && (
+          <QuizTab subtopicId={subtopicId} subtopic={subtopic} onQuizComplete={() => handleTabComplete('quiz')} />
+        )}
+      </div>
+
+      <AIChatWidget subjectName={subjectName} subtopicName={subtopicName} />
+    </div>
+  );
+}
