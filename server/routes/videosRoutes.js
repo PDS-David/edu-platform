@@ -284,8 +284,8 @@ router.get('/key/:keyId', protect, async (req, res) => {
 // Serve the HLS playlist file.
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/stream/:id/master.m3u8', protect, async (req, res) => {
-  const videoId = parseInt(req.params.id);
-  if (isNaN(videoId)) return res.status(400).json({ success: false, error: 'Invalid video ID' });
+  const videoId = req.params.id;
+  if (!isValidUUID(videoId)) return res.status(400).json({ success: false, error: 'Invalid video ID' });
 
   try {
     const rows = await sequelize.query(
@@ -329,8 +329,8 @@ router.get('/stream/:id/master.m3u8', protect, async (req, res) => {
 // NOTE: This MUST stay below /key/:keyId and /stream/:id/... (FIX 1)
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/:id', protect, async (req, res) => {
-  const videoId = parseInt(req.params.id);
-  if (isNaN(videoId)) {
+  const videoId = req.params.id;
+  if (!isValidUUID(videoId)) {
     return res.status(400).json({ success: false, error: 'Invalid video ID' });
   }
 
@@ -394,10 +394,10 @@ router.get('/:id', protect, async (req, res) => {
 // Body: { current_position_seconds, total_watched_seconds, watch_percentage }
 // ─────────────────────────────────────────────────────────────────────────────
 router.post('/:id/progress', protect, async (req, res) => {
-  const videoId   = parseInt(req.params.id);
+  const videoId   = req.params.id;
   const studentId = req.user.id;
 
-  if (isNaN(videoId)) {
+  if (!isValidUUID(videoId)) {
     return res.status(400).json({ success: false, error: 'Invalid video ID' });
   }
 
@@ -461,10 +461,10 @@ router.post('/:id/progress', protect, async (req, res) => {
 // Get saved progress for resume.
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/:id/progress', protect, async (req, res) => {
-  const videoId   = parseInt(req.params.id);
+  const videoId   = req.params.id;
   const studentId = req.user.id;
 
-  if (isNaN(videoId)) {
+  if (!isValidUUID(videoId)) {
     return res.status(400).json({ success: false, error: 'Invalid video ID' });
   }
 
@@ -499,9 +499,9 @@ router.get('/:id/progress', protect, async (req, res) => {
 // Delete video record and all HLS files. Admin only.
 // ─────────────────────────────────────────────────────────────────────────────
 router.delete('/:id', protect, async (req, res) => {
-  const videoId = parseInt(req.params.id);
+  const videoId = req.params.id;
 
-  if (isNaN(videoId)) {
+  if (!isValidUUID(videoId)) {
     return res.status(400).json({ success: false, error: 'Invalid video ID' });
   }
   if (req.user.role !== 'admin') {

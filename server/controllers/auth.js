@@ -40,6 +40,10 @@ const register = async (req, res) => {
       return res.status(400).json({ success: false, error: 'User with this email already exists' });
     }
 
+    if (password.length < 8) {
+      return res.status(400).json({ success: false, error: 'Password must be at least 8 characters' });
+    }
+
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
@@ -67,12 +71,23 @@ const register = async (req, res) => {
         );
 
         // Grant access to JAMB (default board) for the trial period
-        await db.query(
-          `INSERT INTO student_exam_types (student_id, exam_board_id, is_active, expires_at)
-           VALUES ($1, '5f36f69f-078e-4a4f-951a-200d7f2c6623', true, $2)
-           ON CONFLICT (student_id, exam_board_id) DO NOTHING`,
-          { bind: [user.id, trialExpiry.toISOString()], type: QueryTypes.INSERT }
+        // Look up JAMB dynamically so the UUID survives re-seeds
+        const jambResult = await db.query(
+          `SELECT id FROM exam_boards WHERE UPPER(code) = 'JAMB' LIMIT 1`,
+          { type: QueryTypes.SELECT }
         );
+
+        if (jambResult.length > 0) {
+          const jambBoardId = jambResult[0].id;
+          await db.query(
+            `INSERT INTO student_exam_types (student_id, exam_board_id, is_active, expires_at)
+             VALUES ($1, $2, true, $3)
+             ON CONFLICT (student_id, exam_board_id) DO NOTHING`,
+            { bind: [user.id, jambBoardId, trialExpiry.toISOString()], type: QueryTypes.INSERT }
+          );
+        } else {
+          console.warn('[register] Free trial: JAMB exam board not found in exam_boards table — skipping student_exam_types insert');
+        }
       } catch (trialErr) {
         console.warn('[register] Free trial activation failed:', trialErr.message);
         // Non-fatal — user is still registered
@@ -367,8 +382,8 @@ const resetPassword = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Invalid or missing reset details' });
     }
 
-    if (newPassword.length < 6) {
-      return res.status(400).json({ success: false, error: 'Password must be at least 6 characters' });
+    if (newPassword.length < 8) {
+      return res.status(400).json({ success: false, error: 'Password must be at least 8 characters' });
     }
 
     // Hash the incoming token to compare with stored hash
