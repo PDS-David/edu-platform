@@ -1,0 +1,161 @@
+convert_from,code,name
+What is the role of ribosomes in a cell?,BIO-101,JAMB/UTME
+What is the powerhouse of the cell?,BIO-101,JAMB/UTME
+Which blood group is the universal donor?,BIO-101,JAMB/UTME
+What is the process by which plants make food?,BIO-101,JAMB/UTME
+How many chambers does the human heart have?,BIO-101,JAMB/UTME
+What does SWOT stand for in business analysis?,BUS-101,JAMB/UTME
+Explain the concept of economies of scale,BUS-101,JAMB/UTME
+What is the purpose of a balance sheet?,BUS-101,JAMB/UTME
+What is the difference between a sole trader and a partnership?,BUS-101,JAMB/UTME
+What type of business is owned by shareholders?,BUS-101,JAMB/UTME
+What is the atomic number of Carbon?,CHEM-101,JAMB/UTME
+Which gas is produced when zinc reacts with dilute HCl?,CHEM-101,JAMB/UTME
+What is the pH of a neutral solution at 25°C?,CHEM-101,JAMB/UTME
+Balance this equation: Fe + O₂ → Fe₂O₃,CHEM-101,JAMB/UTME
+Calculate the molar mass of H₂SO₄,CHEM-101,JAMB/UTME
+What does CPU stand for?,CS-101,JAMB/UTME
+What is the time complexity of binary search?,CS-101,JAMB/UTME
+What does HTML stand for?,CS-101,JAMB/UTME
+What is the binary equivalent of decimal 10?,CS-101,JAMB/UTME
+Which of these is NOT a programming language?,CS-101,JAMB/UTME
+Explain the concept of price elasticity of demand,ECON-101,JAMB/UTME
+What does GDP stand for?,ECON-101,JAMB/UTME
+Which of the following is an example of a public good?,ECON-101,JAMB/UTME
+"When supply increases and demand remains constant, price will?",ECON-101,JAMB/UTME
+What is opportunity cost?,ECON-101,JAMB/UTME
+"Choose the word that best completes: ""She was _____ by the complexity of the problem""",ENG-101,JAMB/UTME
+"What is the plural of ""phenomenon""?",ENG-101,JAMB/UTME
+Which of these sentences is grammatically correct?,ENG-101,JAMB/UTME
+"Identify the figure of speech: ""The wind whispered through the trees""",ENG-101,JAMB/UTME
+"Choose the word closest in meaning to ""benevolent""",ENG-101,JAMB/UTME
+What is the value of log₁₀(1000)?,MATH-101,JAMB/UTME
+"If 2x + 3 = 11, what is the value of x?",MATH-101,JAMB/UTME
+"If sin θ = 3/5, find cos θ",MATH-101,JAMB/UTME
+Solve for x: x² - 5x + 6 = 0,MATH-101,JAMB/UTME
+A circle has radius 7cm. What is its area? (π = 22/7),MATH-101,JAMB/UTME
+A body moves with velocity 20 m/s for 5 seconds. What distance does it cover?,PHY-101,JAMB/UTME
+What is the SI unit of force?,PHY-101,JAMB/UTME
+What is the refractive index of a medium if light travels at 2×10⁸ m/s in it?,PHY-101,JAMB/UTME
+Calculate the kinetic energy of a 2kg object moving at 10 m/s,PHY-101,JAMB/UTME
+What type of wave is sound?,PHY-101,JAMB/UTME
+Explain the process of DNA replication,BIO-101-NECO,NECO
+What is the basic unit of life?,BIO-101-NECO,NECO
+Which organ produces insulin?,BIO-101-NECO,NECO
+What is the difference between aerobic and anaerobic respiration?,BIO-101-NECO,NECO
+What is ecological succession?,BIO-101-NECO,NECO
+What is the difference between gross profit and net profit?,BUS-101-NECO,NECO
+What is a business plan?,BUS-101-NECO,NECO
+Explain the importance of record keeping in business,BUS-101-NECO,NECO
+What is working capital?,BUS-101-NECO,NECO
+What are the functions of management?,BUS-101-NECO,NECO
+Explain Le Chatelier's principle with an example,CHEM-101-NECO,NECO
+What is the difference between an atom and a molecule?,CHEM-101-NECO,NECO
+What type of reaction is: acid + base → salt + water?,CHEM-101-NECO,NECO
+Which element has symbol Fe?,CHEM-101-NECO,NECO
+What is the chemical formula of water?,CHEM-101-NECO,NECO
+What is the difference between hardware and software?,CS-101-NECO,NECO
+What does LAN stand for?,CS-101-NECO,NECO
+What is an operating system?,CS-101-NECO,NECO
+Explain how the internet works,CS-101-NECO,NECO
+What is a recursive function?,CS-101-NECO,NECO
+What are the factors of production?,ECON-101-NECO,NECO
+What is a budget deficit?,ECON-101-NECO,NECO
+Analyse the impact of foreign direct investment on a developing economy,ECON-101-NECO,NECO
+Explain demand-pull inflation,ECON-101-NECO,NECO
+What is the difference between fixed and variable costs?,ECON-101-NECO,NECO
+What is a metaphor? Give an example,ENG-101-NECO,NECO
+Write a summary of a given passage in your own words,ENG-101-NECO,NECO
+What is a noun?,ENG-101-NECO,NECO
+"Identify the subject in: ""The tall man ran quickly""",ENG-101-NECO,NECO
+"What is the difference between ""affect"" and ""effect""?",ENG-101-NECO,NECO
+"Find the equation of a line with slope 2 passing through (1, 3)",MATH-101-NECO,NECO
+Solve: 3x - 7 = 2x + 4,MATH-101-NECO,NECO
+What is the LCM of 12 and 18?,MATH-101-NECO,NECO
+Find the area of a rectangle with length 8cm and width 5cm,MATH-101-NECO,NECO
+"What is the median of: 3, 5, 7, 9, 11?",MATH-101-NECO,NECO
+What is the formula for work done?,PHY-101-NECO,NECO
+What is the speed of light in vacuum?,PHY-101-NECO,NECO
+Explain the photoelectric effect,PHY-101-NECO,NECO
+A stone is dropped from a height of 80m. How long does it take to reach the ground? (g=10m/s²),PHY-101-NECO,NECO
+What happens to resistance when temperature increases in a conductor?,PHY-101-NECO,NECO
+Describe the structure and function of the kidney,BIO-101-OLEVEL,O-Levels
+What is the function of chlorophyll?,BIO-101-OLEVEL,O-Levels
+What is the difference between veins and arteries?,BIO-101-OLEVEL,O-Levels
+Explain the nitrogen cycle,BIO-101-OLEVEL,O-Levels
+What is the difference between mitosis and meiosis?,BIO-101-OLEVEL,O-Levels
+Analyse the impact of technology on modern business operations,BUS-101-OLEVEL,O-Levels
+What is the difference between a product and a service?,BUS-101-OLEVEL,O-Levels
+What is cash flow?,BUS-101-OLEVEL,O-Levels
+What is the role of a manager in a business?,BUS-101-OLEVEL,O-Levels
+What is a break-even point?,BUS-101-OLEVEL,O-Levels
+What is a covalent bond?,CHEM-101-OLEVEL,O-Levels
+Describe the industrial production of ammonia (Haber Process),CHEM-101-OLEVEL,O-Levels
+What is chromatography used for?,CHEM-101-OLEVEL,O-Levels
+What gas is produced when copper reacts with concentrated H₂SO₄?,CHEM-101-OLEVEL,O-Levels
+What is the difference between an element and a compound?,CHEM-101-OLEVEL,O-Levels
+What is pseudocode?,CS-101-OLEVEL,O-Levels
+What is the difference between ROM and RAM?,CS-101-OLEVEL,O-Levels
+What is a flowchart?,CS-101-OLEVEL,O-Levels
+Design an algorithm to sort a list of numbers,CS-101-OLEVEL,O-Levels
+What is a Boolean expression?,CS-101-OLEVEL,O-Levels
+Explain the concept of comparative advantage,ECON-101-OLEVEL,O-Levels
+What is a market economy?,ECON-101-OLEVEL,O-Levels
+Describe the role of the central bank in an economy,ECON-101-OLEVEL,O-Levels
+What causes unemployment?,ECON-101-OLEVEL,O-Levels
+What is the difference between needs and wants?,ECON-101-OLEVEL,O-Levels
+What is the difference between denotation and connotation?,ENG-101-OLEVEL,O-Levels
+Analyse the use of imagery in a given poem,ENG-101-OLEVEL,O-Levels
+What is an adjective?,ENG-101-OLEVEL,O-Levels
+"Change to indirect speech: He said ""I am tired""",ENG-101-OLEVEL,O-Levels
+What is the tone of a piece of writing?,ENG-101-OLEVEL,O-Levels
+Find the volume of a cylinder with radius 4cm and height 10cm,MATH-101-OLEVEL,O-Levels
+What is 15% of 200?,MATH-101-OLEVEL,O-Levels
+Expand: (x + 3)(x - 2),MATH-101-OLEVEL,O-Levels
+"If f(x) = 2x² - 3, find f(3)",MATH-101-OLEVEL,O-Levels
+Prove that the angles in a quadrilateral sum to 360°,MATH-101-OLEVEL,O-Levels
+What is nuclear fission? Give an example of its application,PHY-101-OLEVEL,O-Levels
+Calculate the equivalent resistance of two 6Ω resistors in parallel,PHY-101-OLEVEL,O-Levels
+What is total internal reflection?,PHY-101-OLEVEL,O-Levels
+What is the difference between mass and weight?,PHY-101-OLEVEL,O-Levels
+What is the formula for Ohm's law?,PHY-101-OLEVEL,O-Levels
+What is the role of auxins in plant growth?,BIO-101-WAEC,WAEC
+Describe the process of meiosis,BIO-101-WAEC,WAEC
+What is osmosis?,BIO-101-WAEC,WAEC
+What is the function of the nephron?,BIO-101-WAEC,WAEC
+Name the enzyme that breaks down starch in saliva,BIO-101-WAEC,WAEC
+What are the 4 Ps of marketing?,BUS-101-WAEC,WAEC
+What is the difference between profit and revenue?,BUS-101-WAEC,WAEC
+What is marketing?,BUS-101-WAEC,WAEC
+What is a limited liability company?,BUS-101-WAEC,WAEC
+Explain the role of entrepreneurship in economic development,BUS-101-WAEC,WAEC
+"Which of these is an oxidising agent: H₂, O₂, CO, N₂?",CHEM-101-WAEC,WAEC
+What type of bond exists in NaCl?,CHEM-101-WAEC,WAEC
+What is Avogadro's number?,CHEM-101-WAEC,WAEC
+Calculate the concentration of a solution containing 4g of NaOH in 500cm³ of water,CHEM-101-WAEC,WAEC
+Describe the process of electrolysis of brine,CHEM-101-WAEC,WAEC
+Describe how a bubble sort algorithm works,CS-101-WAEC,WAEC
+What is RAM used for?,CS-101-WAEC,WAEC
+What is the difference between a compiler and an interpreter?,CS-101-WAEC,WAEC
+Convert 255 from decimal to binary,CS-101-WAEC,WAEC
+What is a primary key in a database?,CS-101-WAEC,WAEC
+Explain how the multiplier effect works in an economy,ECON-101-WAEC,WAEC
+What is inflation?,ECON-101-WAEC,WAEC
+What is the law of diminishing returns?,ECON-101-WAEC,WAEC
+Differentiate between microeconomics and macroeconomics,ECON-101-WAEC,WAEC
+What are the functions of money?,ECON-101-WAEC,WAEC
+What is the difference between a phrase and a clause?,ENG-101-WAEC,WAEC
+What is a simile?,ENG-101-WAEC,WAEC
+Choose the correct preposition: She is good ___ mathematics,ENG-101-WAEC,WAEC
+"What is the passive voice of: ""The cat chased the mouse""?",ENG-101-WAEC,WAEC
+"Identify the clause type: ""Although it was raining, we went out""",ENG-101-WAEC,WAEC
+Simplify: 3(2x - 4) + 2(x + 5),MATH-101-WAEC,WAEC
+"Find the gradient of the line joining (2,3) and (4,7)",MATH-101-WAEC,WAEC
+The sum of angles in a triangle is?,MATH-101-WAEC,WAEC
+Evaluate: ⁵C₂,MATH-101-WAEC,WAEC
+Differentiate y = 3x² + 2x - 5 with respect to x,MATH-101-WAEC,WAEC
+State Newton's first law of motion,PHY-101-WAEC,WAEC
+Calculate the pressure at the bottom of a 10m deep water column (density = 1000 kg/m³),PHY-101-WAEC,WAEC
+"A transformer has 200 primary turns and 1000 secondary turns. If primary voltage is 50V, find secondary voltage",PHY-101-WAEC,WAEC
+What is the frequency of a wave with period 0.02s?,PHY-101-WAEC,WAEC
+What is the unit of electrical resistance?,PHY-101-WAEC,WAEC
