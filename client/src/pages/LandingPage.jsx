@@ -10,6 +10,7 @@ import {
   Mail, Phone, MapPin, Twitter, Facebook, Linkedin, Instagram,
 } from 'lucide-react';
 import branding from '../config/branding';
+import PublicNav from '../components/PublicNav';
 
 // ── Data ───────────────────────────────────────────────────────────────────────
 
@@ -74,61 +75,48 @@ export default function LandingPage() {
     <div className="min-h-screen bg-white font-sans">
 
       {/* ── NAV ─────────────────────────────────────────────────────────────── */}
-      <header className="bg-white border-b border-gray-100 sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+      <PublicNav
+        right={
+          <>
+            {/* Desktop nav links */}
+            <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-gray-600">
+              <a href="#features"     className="hover:text-blue-600 transition-colors">Features</a>
+              <a href="#subjects"     className="hover:text-blue-600 transition-colors">Subjects</a>
+              <Link to="/past-papers" className="hover:text-blue-600 transition-colors">Past Papers</Link>
+              <Link to="/pricing"     className="hover:text-blue-600 transition-colors">Pricing</Link>
+              <Link to="/login"       className="hover:text-blue-600 transition-colors">Login</Link>
+              <Link to="/register" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-xl transition-colors text-sm">
+                Start Free
+              </Link>
+            </nav>
+            {/* Mobile hamburger */}
+            <button onClick={() => setMenuOpen(o => !o)} className="md:hidden p-2 text-gray-500 hover:text-gray-700">
+              {menuOpen ? <X size={22} /> : <Menu size={22} />}
+            </button>
+          </>
+        }
+      >
+        {/* Mobile menu — rendered inside the header via children */}
+      </PublicNav>
 
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 shrink-0">
-            <div className="grid grid-cols-2 gap-0.5 w-5 h-5">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="w-2 h-2 rounded-sm bg-indigo-500" />
-              ))}
-            </div>
-            <span className="font-bold text-base">
-              <span className="text-indigo-600">EAC</span>
-              <span className="text-gray-700">buddy</span>
-            </span>
-            <span className="hidden sm:inline text-gray-300 text-lg font-light mx-1">|</span>
-            <span className="hidden sm:inline text-gray-500 text-sm">Learning Platform</span>
+      {/* Mobile dropdown menu */}
+      {menuOpen && (
+        <div className="md:hidden bg-white border-b border-gray-100 px-4 py-4 space-y-3 sticky top-14 z-40">
+          {['Features', 'Subjects'].map(s => (
+            <a key={s} href={`#${s.toLowerCase()}`} onClick={() => setMenuOpen(false)}
+              className="block text-sm font-medium text-gray-700 hover:text-blue-600 py-1">
+              {s}
+            </a>
+          ))}
+          <Link to="/past-papers" onClick={() => setMenuOpen(false)} className="block text-sm font-medium text-gray-700 py-1">Past Papers</Link>
+          <Link to="/pricing"  onClick={() => setMenuOpen(false)} className="block text-sm font-medium text-gray-700 py-1">Pricing</Link>
+          <Link to="/login"    onClick={() => setMenuOpen(false)} className="block text-sm font-medium text-gray-700 py-1">Login</Link>
+          <Link to="/register" onClick={() => setMenuOpen(false)}
+            className="block w-full text-center bg-blue-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm">
+            Start Free
           </Link>
-
-          {/* Desktop nav */}
-          <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-gray-600">
-            <a href="#features"      className="hover:text-blue-600 transition-colors">Features</a>
-            <a href="#subjects"      className="hover:text-blue-600 transition-colors">Subjects</a>
-            <Link to="/past-papers"  className="hover:text-blue-600 transition-colors">Past Papers</Link>
-            <Link to="/pricing"      className="hover:text-blue-600 transition-colors">Pricing</Link>
-            <Link to="/login"        className="hover:text-blue-600 transition-colors">Login</Link>
-            <Link to="/register" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-xl transition-colors text-sm">
-              Start Free
-            </Link>
-          </nav>
-
-          {/* Mobile hamburger */}
-          <button onClick={() => setMenuOpen(o => !o)} className="md:hidden p-2 text-gray-500 hover:text-gray-700">
-            {menuOpen ? <X size={22} /> : <Menu size={22} />}
-          </button>
         </div>
-
-        {/* Mobile menu */}
-        {menuOpen && (
-          <div className="md:hidden bg-white border-t border-gray-100 px-4 py-4 space-y-3">
-            {['Features','Subjects'].map(s => (
-              <a key={s} href={`#${s.toLowerCase()}`} onClick={() => setMenuOpen(false)}
-                className="block text-sm font-medium text-gray-700 hover:text-blue-600 py-1">
-                {s}
-              </a>
-            ))}
-            <Link to="/past-papers" onClick={() => setMenuOpen(false)} className="block text-sm font-medium text-gray-700 py-1">Past Papers</Link>
-            <Link to="/pricing"  onClick={() => setMenuOpen(false)} className="block text-sm font-medium text-gray-700 py-1">Pricing</Link>
-            <Link to="/login"    onClick={() => setMenuOpen(false)} className="block text-sm font-medium text-gray-700 py-1">Login</Link>
-            <Link to="/register" onClick={() => setMenuOpen(false)}
-              className="block w-full text-center bg-blue-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm">
-              Start Free
-            </Link>
-          </div>
-        )}
-      </header>
+      )}
 
       {/* ══════════════════════════════════════════════════════════════════════
           1. HERO

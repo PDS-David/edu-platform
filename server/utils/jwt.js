@@ -1,46 +1,30 @@
+'use strict';
+
+require('dotenv').config();
 const jwt = require('jsonwebtoken');
 
-/**
- * Generate JWT token
- * @param {string} userId - User ID
- * @param {string} role - User role
- * @returns {string} JWT token
- */
-const generateToken = (userId, role, expiry = process.env.JWT_EXPIRE || '7d') => {
-  return jwt.sign(
-    { id: userId, role },
-    process.env.JWT_SECRET,
-    { expiresIn: expiry }
-  );
+if (!process.env.JWT_SECRET) {
+  throw new Error('Missing JWT_SECRET in environment variables');
+}
+
+const generateToken = (payload) => {
+  return jwt.sign(payload, process.env.JWT_SECRET, {
+    expiresIn: '7d',
+    issuer: 'edu-platform',
+  });
 };
 
-/**
- * Verify JWT token
- * @param {string} token - JWT token
- * @returns {object} Decoded token payload
- */
 const verifyToken = (token) => {
-  try {
-    return jwt.verify(token, process.env.JWT_SECRET);
-  } catch (error) {
-    throw new Error('Invalid or expired token');
-  }
+  return jwt.verify(token, process.env.JWT_SECRET);
 };
 
-/**
- * Extract token from request header
- * @param {object} req - Express request object
- * @returns {string|null} JWT token or null
- */
 const extractToken = (req) => {
-  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-    return req.headers.authorization.split(' ')[1];
-  }
-  return null;
+  const header = req.headers.authorization;
+  if (!header) return null;
+
+  if (!header.startsWith('Bearer ')) return null;
+
+  return header.split(' ')[1];
 };
 
-module.exports = {
-  generateToken,
-  verifyToken,
-  extractToken
-};
+module.exports = { generateToken, verifyToken, extractToken };

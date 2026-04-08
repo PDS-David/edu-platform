@@ -16,6 +16,16 @@
 //      { success: false, error: '...' }, so err.error is the right field.
 //      We throw a plain { message } object so LoginPage/RegisterPage can read
 //      err.message cleanly without depending on Axios internals.
+//
+// FIX v1.2 (Bug 3):
+//   3. User shape inconsistency between login and page refresh fixed.
+//      After login the auth controller returns camelCase fields (firstName,
+//      lastName). After refresh /auth/me returns snake_case (first_name,
+//      last_name). Any component reading user.firstName would silently get
+//      undefined after a page refresh.
+//      Fix: normalizeUser() merges both casings so every consumer always
+//      gets BOTH forms — camelCase for convenience and snake_case for DB
+//      round-trips. Applied to every code path that sets the user object.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { createContext, useContext, useState, useEffect } from 'react';
@@ -23,6 +33,25 @@ import { authAPI } from '../services/api';
 import api from '../services/api';
 
 const AuthContext = createContext(null);
+
+// ── FIX v1.2: Normalize user object so both camelCase and snake_case fields
+// are always present, regardless of which endpoint returned the user.
+// login/register → auth controller → camelCase (firstName, lastName)
+// page refresh   → /auth/me        → snake_case (first_name, last_name)
+// After normalizeUser both forms coexist, so every component works correctly
+// on first load AND after refresh without defensive fallbacks.
+const normalizeUser = (u) => {
+  if (!u) return u;
+  return {
+    ...u,
+    // Ensure camelCase (from login) — fall back to snake_case (from /auth/me)
+    firstName: u.firstName ?? u.first_name ?? '',
+    lastName:  u.lastName  ?? u.last_name  ?? '',
+    // Ensure snake_case (for DB round-trips / API calls)
+    first_name: u.first_name ?? u.firstName ?? '',
+    last_name:  u.last_name  ?? u.lastName  ?? '',
+  };
+};
 
 export const AuthProvider = ({ children }) => {
   const [user,    setUser]    = useState(null);
@@ -54,8 +83,9 @@ export const AuthProvider = ({ children }) => {
         .get('/auth/me')
         .then(r => {
           if (r?.data) {
-            setUser(r.data);
-            localStorage.setItem('user', JSON.stringify(r.data));
+            const normalized = normalizeUser(r.data);
+            setUser(normalized);
+            localStorage.setItem('user', JSON.stringify(normalized));
           }
         })
         .catch(() => {
@@ -85,12 +115,13 @@ export const AuthProvider = ({ children }) => {
       });
 
       const { user, token } = response.data;
+      const normalizedUser  = normalizeUser(user);
 
       localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
-      setUser(user);
+      localStorage.setItem('user', JSON.stringify(normalizedUser));
+      setUser(normalizedUser);
 
-      return user;
+      return normalizedUser;
     } catch (err) {
       // FIX: api.js interceptor rejects with the backend's data object directly:
       // { success: false, error: 'Invalid credentials' }
@@ -121,12 +152,13 @@ export const AuthProvider = ({ children }) => {
       const response = await authAPI.register(userData);
 
       const { user, token } = response.data;
+      const normalizedUser  = normalizeUser(user);
 
       localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
-      setUser(user);
+      localStorage.setItem('user', JSON.stringify(normalizedUser));
+      setUser(normalizedUser);
 
-      return user;
+      return normalizedUser;
     } catch (err) {
       const message =
         err.error ||

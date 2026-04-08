@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, AlertCircle, CheckCircle, ArrowLeft } from 'lucide-react';
-import branding from '../config/branding';
+import PublicNav from '../components/PublicNav';
 
 const BG     = 'linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #4338ca 100%)';
 const BTN    = 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)';
@@ -35,12 +35,7 @@ const ForgotPassword = () => {
   return (
     <div className="min-h-screen flex flex-col" style={{ background: BG }}>
 
-      {/* Logo → home */}
-      <header className="w-full px-6 py-4 flex items-center">
-        <Link to="/" className="group" title="Back to Home">
-          <img src={branding.logo.main} alt={branding.platformName} className="h-10 w-auto object-contain transition-opacity group-hover:opacity-80" />
-        </Link>
-      </header>
+      <PublicNav />
 
       <div className="flex-1 flex items-center justify-center px-4 py-8">
         <div className="w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden flex" style={{ minHeight: '460px' }}>
@@ -68,10 +63,7 @@ const ForgotPassword = () => {
           <div className="flex-1 bg-white flex items-center justify-center px-8 py-10">
             <div className="w-full max-w-sm">
 
-              {/* Mobile logo */}
-              <div className="flex justify-center mb-6 md:hidden">
-                <img src={branding.logo.main} alt={branding.platformName} className="h-16 w-auto object-contain" />
-              </div>
+              {/* Mobile logo removed — PublicNav handles branding on all screen sizes */}
 
               {!submitted ? (
                 <>
@@ -133,7 +125,7 @@ const ForgotPassword = () => {
                   </p>
                   <p className="text-xs text-gray-400 mb-6">
                     Didn't receive it? Check your spam folder or{' '}
-                    <a href={`mailto:${branding.contact.email}`} className="underline" style={{ color: ACCENT }}>
+                    <a href="mailto:info@eac.edu.ng" className="underline" style={{ color: ACCENT }}>
                       contact support
                     </a>.
                   </p>

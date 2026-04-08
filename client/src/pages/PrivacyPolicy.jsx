@@ -1,22 +1,18 @@
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Lock } from 'lucide-react';
+import PublicNav from '../components/PublicNav';
 
 const PrivacyPolicy = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link to="/" className="flex items-center text-primary-600 hover:text-primary-700 font-medium">
-            <ArrowLeft className="w-5 h-5 mr-2" />
-            Back to Home
-          </Link>
-          <div className="flex items-center space-x-2 text-gray-500 text-sm">
+      <PublicNav
+        right={
+          <div className="flex items-center gap-2 text-gray-500 text-sm">
             <Lock className="w-4 h-4" />
             <span>Last updated: March 2026</span>
           </div>
-        </div>
-      </header>
+        }
+      />
 
       {/* Content */}
       <main className="max-w-4xl mx-auto px-4 py-12">

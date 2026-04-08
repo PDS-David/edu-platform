@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Eye, EyeOff, AlertCircle } from 'lucide-react';
-import branding from '../config/branding';
+import PublicNav from '../components/PublicNav';
 
 const LoginPage = () => {
   const [email,       setEmail]       = useState('');
@@ -49,16 +49,7 @@ const LoginPage = () => {
   return (
     <div className="min-h-screen flex flex-col" style={{ background: BG }}>
 
-      {/* ── Top nav — logo links home ── */}
-      <header className="w-full px-6 py-4 flex items-center">
-        <Link to="/" className="group" title="Back to Home">
-          <img
-            src={branding.logo.main}
-            alt={branding.platformName}
-            className="h-10 w-auto object-contain transition-opacity group-hover:opacity-80"
-          />
-        </Link>
-      </header>
+      <PublicNav />
 
       {/* ── Centered card ── */}
       <div className="flex-1 flex items-center justify-center px-4 py-8">
@@ -122,10 +113,7 @@ const LoginPage = () => {
           <div className="flex-1 bg-white flex items-center justify-center px-8 py-10">
             <div className="w-full max-w-sm">
 
-              {/* Mobile logo */}
-              <div className="flex justify-center mb-6 md:hidden">
-                <img src={branding.logo.main} alt={branding.platformName} className="h-16 w-auto object-contain" />
-              </div>
+              {/* Mobile logo - replaced by PublicNav on all screen sizes */}
 
               <h2 className="text-2xl font-bold text-gray-900 text-center mb-1">Sign In</h2>
               <p className="text-center text-gray-500 text-sm mb-7">

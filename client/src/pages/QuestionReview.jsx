@@ -6,14 +6,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
+import api from '../services/api';
 import {
   CheckCircle, XCircle, Clock, ChevronLeft, ChevronRight,
   User, Calendar, BookOpen, Tag, Loader, RefreshCw, AlertCircle,
+  ArrowLeft,
 } from 'lucide-react';
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-const authHeader = () => ({ Authorization: `Bearer ${localStorage.getItem('token')}` });
 
 const PAGE_SIZE = 10;
 
@@ -28,6 +28,7 @@ const OPTION_LABELS = ['A', 'B', 'C', 'D', 'E', 'F'];
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function QuestionReview() {
+  const navigate = useNavigate();
   const [questions, setQuestions] = useState([]);
   const [total,     setTotal]     = useState(0);
   const [offset,    setOffset]    = useState(0);
@@ -120,13 +121,21 @@ export default function QuestionReview() {
 
         {/* Header */}
         <div className="flex items-center justify-between mb-6 pt-2">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <Clock className="w-6 h-6 text-orange-500" /> Question Review Queue
-            </h1>
-            <p className="text-gray-500 text-sm mt-0.5">
-              {loading ? 'Loading…' : `${total} pending submission${total !== 1 ? 's' : ''}`}
-            </p>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate('/admin/dashboard')}
+              className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 border border-gray-200 rounded-xl px-3 py-2 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" /> Dashboard
+            </button>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                <Clock className="w-6 h-6 text-orange-500" /> Question Review Queue
+              </h1>
+              <p className="text-gray-500 text-sm mt-0.5">
+                {loading ? 'Loading…' : `${total} pending submission${total !== 1 ? 's' : ''}`}
+              </p>
+            </div>
           </div>
           <button
             onClick={() => fetchPending(offset)}

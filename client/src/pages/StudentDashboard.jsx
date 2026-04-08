@@ -208,7 +208,7 @@ export default function StudentDashboard() {
       const res = await api.post('/student/join-class', {
         join_code: joinCode.trim().toUpperCase(),
       });
-      setJoinMsg({ type: 'success', text: `Joined "${res.data?.class_name}"!` });
+      setJoinMsg({ type: 'success', text: `Joined "${res.class_name}"!` });
       setJoinCode('');
       setTimeout(() => { setJoinModal(false); setJoinMsg(null); }, 2000);
     } catch (err) {
@@ -286,7 +286,10 @@ export default function StudentDashboard() {
       .then(r => { if (r.success) setSummaryData(r.data); })
       .catch(() => {});
 
-    api.get(`/analytics/daily-study/${user.id}`)
+    // BUG FIX (Bug 4): /analytics/daily-study/:id does not exist in analyticsRoutes.js.
+    // Replaced with GET /analytics/daily-study (self, uses req.user.id internally)
+    // which is added as a new endpoint in analyticsRoutes.js.
+    api.get('/analytics/daily-study')
       .then(r => {
         if (r.success && r.data) {
           const now = new Date();
@@ -313,25 +316,28 @@ export default function StudentDashboard() {
       .then(r => {
         if (r.success) {
           const topics = r.data || [];
+          // BUG FIX (Bug 6): API returns { topic, accuracy_pct, attempt_count }
+          // but dashboard was reading t.correct_pct, t.name, t.attempts,
+          // t.last_attempted — none of which exist in the response.
           const strength = topics
-            .filter(t => t.correct_pct >= 70)
-            .sort((a, b) => b.correct_pct - a.correct_pct)
+            .filter(t => t.accuracy_pct >= 70)
+            .sort((a, b) => b.accuracy_pct - a.accuracy_pct)
             .map(t => ({
-              name:         t.name,
-              score_avg:    t.correct_pct,
-              attempts:     t.attempts,
-              last_attempt: t.last_attempted,
-              trend:        t.correct_pct >= 75 ? 'up' : null,
+              name:         t.topic,
+              score_avg:    t.accuracy_pct,
+              attempts:     t.attempt_count,
+              last_attempt: null,
+              trend:        t.accuracy_pct >= 75 ? 'up' : null,
             }));
           const weakness = topics
-            .filter(t => t.correct_pct < 50)
-            .sort((a, b) => a.correct_pct - b.correct_pct)
+            .filter(t => t.accuracy_pct < 50)
+            .sort((a, b) => a.accuracy_pct - b.accuracy_pct)
             .map(t => ({
-              name:         t.name,
-              score_avg:    t.correct_pct,
-              attempts:     t.attempts,
-              last_attempt: t.last_attempted,
-              trend:        t.correct_pct < 30 ? 'down' : null,
+              name:         t.topic,
+              score_avg:    t.accuracy_pct,
+              attempts:     t.attempt_count,
+              last_attempt: null,
+              trend:        t.accuracy_pct < 30 ? 'down' : null,
             }));
           setStrengthRows(strength);
           setWeaknessRows(weakness);
@@ -458,7 +464,7 @@ export default function StudentDashboard() {
                   </p>
                 </div>
                 <button
-                  onClick={() => navigate('/student/upload-answer')}
+                  onClick={() => navigate('/student/mark-image')}
                   className="flex items-center gap-1.5 bg-gray-900 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg hover:bg-gray-800 transition-colors shrink-0 relative"
                 >
                   Upload your Answer

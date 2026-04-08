@@ -10,6 +10,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import branding from '../config/branding';
 import { MessageSquare, ChevronDown, LogOut, Settings, Bell } from 'lucide-react';
 
 export default function TopNav() {
@@ -70,18 +71,40 @@ export default function TopNav() {
   return (
     <nav className="w-full bg-white border-b border-gray-100 sticky top-0 z-50 h-14 flex items-center px-4 md:px-6">
 
-      {/* Left — logo (CHANGE 4: blue EAC box) */}
-      <Link to="/" className="flex items-center gap-1 shrink-0">
-        <div className="grid grid-cols-2 gap-0.5 w-5 h-5 shrink-0 mr-1">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="w-2 h-2 rounded-sm bg-blue-600" />
-          ))}
-        </div>
-        <span style={{ background: '#2563eb' }} className="px-1.5 py-0.5 rounded text-white font-bold text-sm">EAC</span>
-        <span className="font-semibold text-gray-900 ml-0.5">buddy</span>
-        <span className="hidden sm:inline text-gray-300 mx-1 text-lg font-light">|</span>
-        <span className="hidden sm:inline text-gray-500 text-sm font-medium">Learning Platform</span>
-      </Link>
+      {/* Left — home button (four dots) + product logo + org logo */}
+      <div className="flex items-center gap-3 shrink-0">
+
+        {/* Four-dot grid = Home button (goes to landing page `/`) */}
+        <Link
+          to="/"
+          title="Go to Home"
+          className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-blue-50 transition-colors"
+        >
+          <div className="grid grid-cols-2 gap-0.5 w-5 h-5">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="w-2 h-2 rounded-sm bg-blue-600" />
+            ))}
+          </div>
+        </Link>
+
+        {/* EACbuddy — product logo (not a nav link) */}
+        <span className="flex items-center gap-1">
+          <span style={{ background: '#2563eb' }} className="px-1.5 py-0.5 rounded text-white font-bold text-sm">EAC</span>
+          <span className="font-semibold text-gray-900">buddy</span>
+          <span className="hidden sm:inline text-gray-300 mx-1 text-lg font-light">|</span>
+          <span className="hidden sm:inline text-gray-500 text-sm font-medium">Learning Platform</span>
+        </span>
+
+        {/* Divider */}
+        <span className="hidden md:block h-6 w-px bg-gray-200" />
+
+        {/* EAC org logo — visual brand, not a nav link */}
+        <img
+          src={branding.logo.main}
+          alt="Educational Advancement Centre"
+          className="hidden md:block h-7 w-auto object-contain"
+        />
+      </div>
 
       {/* Right */}
       <div className="ml-auto flex items-center gap-2 md:gap-3">

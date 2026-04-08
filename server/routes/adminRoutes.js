@@ -1,7 +1,14 @@
 // server/routes/adminRoutes.js
-// Admin-only endpoints:
-//   POST /api/admin/generate-questions  — AI question generation via Gemini
-//   GET  /api/admin/questions/pending-count — count of pending questions
+// Admin-only endpoints.
+//
+// PROMPT 1 CHANGES:
+//   - POST /api/admin/generate-questions now writes is_ai_generated = TRUE,
+//     ai_generation_source = 'gemini-2.0-flash', and concept_hint (if Gemini
+//     returns one) into the questions table.
+//   - Gemini prompt updated to optionally return a concept_hint per question.
+//   - concept_hint exposed in the generate-questions response so the admin UI
+//     can preview it without a round-trip.
+//   - All other endpoints are unchanged.
 
 const express    = require('express');
 const router     = express.Router();
@@ -21,12 +28,15 @@ const adminOnly = (req, res, next) => {
 const getGeminiModel = () => {
   const { GoogleGenerativeAI } = require('@google/generative-ai');
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  return genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  return genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/admin/generate-questions
 // Body: { subject_id, topic, exam_board, count, difficulty }
+//
+// PROMPT 1: Gemini now returns concept_hint per question.
+//           INSERT writes is_ai_generated=TRUE, ai_generation_source, concept_hint.
 // ─────────────────────────────────────────────────────────────────────────────
 router.post('/generate-questions', protect, adminOnly, async (req, res) => {
   const {
@@ -55,6 +65,7 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
   const subjectName = subjects[0].name;
 
   // ── Build Gemini prompt ───────────────────────────────────────────────────
+  // PROMPT 1: concept_hint added to the JSON shape so we can store it.
   const prompt = `Generate ${count} ${difficulty} ${exam_board} exam MCQ questions on the topic "${topic}" for Nigerian secondary school ${subjectName} students.
 
 Return ONLY a valid JSON array with no preamble, no markdown, no backticks. Each element must follow this exact shape:
@@ -68,6 +79,7 @@ Return ONLY a valid JSON array with no preamble, no markdown, no backticks. Each
       { "option_text": "...", "is_correct": false }
     ],
     "explanation": "...",
+    "concept_hint": "A short 1-sentence conceptual clue that helps a student understand WHY this answer is correct, without giving it away. E.g. 'Think about what happens to osmotic pressure when solute concentration increases.'",
     "marks": 1,
     "difficulty": "${difficulty}"
   }
@@ -78,6 +90,7 @@ Rules:
 - All four options must be distinct and plausible
 - Questions must be ${exam_board}-style — direct, factual, curriculum-aligned
 - explanation must state why the correct answer is right and others are wrong
+- concept_hint must be a single sentence, pedagogical, not a giveaway
 - Do NOT include numbering, preambles, or any text outside the JSON array`;
 
   try {
@@ -107,30 +120,39 @@ Rules:
     );
     const examBoardId = boardRows[0]?.id || null;
 
-        // ── Insert questions + options into DB ───────────────────────────────────
+    // ── Insert questions + options into DB ────────────────────────────────────
+    // PROMPT 1: is_ai_generated, ai_generation_source, concept_hint now persisted.
     let inserted = 0;
+    const insertedQuestions = [];
+
     for (const q of questions) {
       if (!q.question_text || !Array.isArray(q.options)) continue;
 
       const qResult = await sequelize.query(
         `INSERT INTO questions
            (id, question_text, difficulty, marks, topic, subject_id_uuid,
-            exam_board_id, exam_board, source, status, explanation, created_at, updated_at)
+            exam_board_id, exam_board, source, status, explanation,
+            is_ai_generated, ai_generation_source, concept_hint,
+            created_at, updated_at)
          VALUES
            (gen_random_uuid(), :question_text, :difficulty, :marks, :topic,
             :subject_id, :examBoardId, :exam_board, 'ai_generated', 'pending',
-            :explanation, NOW(), NOW())
+            :explanation,
+            TRUE, :ai_generation_source, :concept_hint,
+            NOW(), NOW())
          RETURNING id`,
         {
           replacements: {
-            question_text: q.question_text,
-            difficulty:    q.difficulty || difficulty,
-            marks:         q.marks      || 1,
+            question_text:       q.question_text,
+            difficulty:          q.difficulty || difficulty,
+            marks:               q.marks      || 1,
             topic,
             subject_id,
             examBoardId,
             exam_board,
-            explanation:   q.explanation || '',
+            explanation:         q.explanation  || '',
+            ai_generation_source: 'gemini-2.0-flash',
+            concept_hint:        q.concept_hint || null,
           },
           type: QueryTypes.INSERT,
         }
@@ -156,14 +178,22 @@ Rules:
           }
         );
       }
+
       inserted++;
+      insertedQuestions.push({
+        id:           questionId,
+        question_text: q.question_text,
+        concept_hint:  q.concept_hint || null,
+        difficulty:    q.difficulty || difficulty,
+      });
     }
 
     return res.status(200).json({
-      success:  true,
-      message:  `Generated ${questions.length}, inserted ${inserted} questions (status: pending)`,
+      success:   true,
+      message:   `Generated ${questions.length}, inserted ${inserted} questions (status: pending)`,
       generated: questions.length,
       inserted,
+      questions: insertedQuestions, // preview for admin UI
     });
 
   } catch (err) {
@@ -207,7 +237,6 @@ router.get('/subjects', protect, adminOnly, async (req, res) => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/admin/teacher-assignments
-// List all teacher→subject assignments with teacher and subject details.
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/teacher-assignments', protect, adminOnly, async (req, res) => {
   try {
@@ -236,8 +265,6 @@ router.get('/teacher-assignments', protect, adminOnly, async (req, res) => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/admin/teacher-assignments
-// Assign a teacher to a subject (with optional exam board).
-// Body: { teacher_id, subject_id, exam_board_id }
 // ─────────────────────────────────────────────────────────────────────────────
 router.post('/teacher-assignments', protect, adminOnly, async (req, res) => {
   const { teacher_id, subject_id, exam_board_id } = req.body;
@@ -271,7 +298,6 @@ router.post('/teacher-assignments', protect, adminOnly, async (req, res) => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DELETE /api/admin/teacher-assignments/:id
-// Soft-delete (deactivate) a teacher→subject assignment.
 // ─────────────────────────────────────────────────────────────────────────────
 router.delete('/teacher-assignments/:id', protect, adminOnly, async (req, res) => {
   const { id } = req.params;
@@ -289,7 +315,6 @@ router.delete('/teacher-assignments/:id', protect, adminOnly, async (req, res) =
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/admin/platform-stats
-// Returns platform-wide analytics. All queries run in parallel via Promise.all.
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/platform-stats', protect, adminOnly, async (req, res) => {
   try {
@@ -301,7 +326,6 @@ router.get('/platform-stats', protect, adminOnly, async (req, res) => {
       dailyActivity,
     ] = await Promise.all([
 
-      // ── Users ────────────────────────────────────────────────────────────────
       sequelize.query(
         `SELECT
            COUNT(*)::INTEGER                                                   AS total,
@@ -313,11 +337,11 @@ router.get('/platform-stats', protect, adminOnly, async (req, res) => {
         { type: QueryTypes.SELECT }
       ),
 
-      // ── Questions ────────────────────────────────────────────────────────────
       sequelize.query(
         `SELECT
            COUNT(*) FILTER (WHERE status = 'approved')::INTEGER AS total_approved,
            COUNT(*) FILTER (WHERE status = 'pending')::INTEGER  AS total_pending,
+           COUNT(*) FILTER (WHERE is_ai_generated = TRUE)::INTEGER AS total_ai_generated,
            (SELECT COUNT(*)::INTEGER FROM practice_attempts
             WHERE attempted_at > NOW() - INTERVAL '24 hours')   AS answered_today,
            (SELECT COUNT(*)::INTEGER FROM practice_attempts
@@ -326,7 +350,6 @@ router.get('/platform-stats', protect, adminOnly, async (req, res) => {
         { type: QueryTypes.SELECT }
       ),
 
-      // ── Revenue / Subscriptions ───────────────────────────────────────────────
       sequelize.query(
         `SELECT
            COUNT(*) FILTER (WHERE subscription_status = 'active')::INTEGER                                AS total_active_subs,
@@ -336,7 +359,6 @@ router.get('/platform-stats', protect, adminOnly, async (req, res) => {
         { type: QueryTypes.SELECT }
       ),
 
-      // ── Top 5 subjects by attempts last 30 days ───────────────────────────────
       sequelize.query(
         `SELECT
            s.name,
@@ -352,7 +374,6 @@ router.get('/platform-stats', protect, adminOnly, async (req, res) => {
         { type: QueryTypes.SELECT }
       ),
 
-      // ── Daily activity last 14 days ───────────────────────────────────────────
       sequelize.query(
         `SELECT
            DATE(attempted_at)::TEXT AS date,
@@ -378,6 +399,137 @@ router.get('/platform-stats', protect, adminOnly, async (req, res) => {
 
   } catch (err) {
     console.error('[GET /admin/platform-stats] Error:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/admin/send-weekly-digest
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/send-weekly-digest', protect, adminOnly, async (req, res) => {
+  try {
+    const scheduledJobs = require('../jobs/scheduledJobs');
+    if (typeof scheduledJobs.runWeeklyDigest === 'function') {
+      scheduledJobs.runWeeklyDigest().catch(e =>
+        console.error('[send-weekly-digest] background error:', e.message)
+      );
+    }
+    return res.json({ success: true, message: 'Weekly digest queued successfully.' });
+  } catch (err) {
+    console.error('[POST /admin/send-weekly-digest] Error:', err.message);
+    return res.status(500).json({ success: false, error: 'Failed to queue digest' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/admin/questions/pending
+// PROMPT 1: now includes is_ai_generated, ai_generation_source, concept_hint
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/questions/pending', protect, adminOnly, async (req, res) => {
+  const limit  = Math.min(parseInt(req.query.limit  || '10'), 50);
+  const offset = Math.max(parseInt(req.query.offset || '0'),  0);
+  try {
+    const [countRows, rows] = await Promise.all([
+      sequelize.query(
+        `SELECT COUNT(*)::INTEGER AS total FROM questions WHERE status = 'pending'`,
+        { type: QueryTypes.SELECT }
+      ),
+      sequelize.query(
+        `SELECT q.id, q.question_text, q.topic, q.difficulty, q.marks,
+                q.explanation, q.created_at, q.exam_board,
+                q.is_ai_generated, q.ai_generation_source, q.concept_hint,
+                s.name  AS subject_name,
+                eb.code AS exam_board_code,
+                eb.name AS exam_board_name,
+                u.first_name AS submitter_first_name,
+                u.last_name  AS submitter_last_name,
+                u.email      AS submitter_email,
+                json_agg(
+                  json_build_object(
+                    'id',          ao.id,
+                    'option_text', ao.option_text,
+                    'is_correct',  ao.is_correct
+                  ) ORDER BY ao.id
+                ) AS options
+         FROM questions q
+         LEFT JOIN subjects      s  ON s.id  = q.subject_id_uuid
+         LEFT JOIN exam_boards   eb ON eb.id = q.exam_board_id
+         LEFT JOIN users         u  ON u.id  = q.submitted_by
+         LEFT JOIN answer_options ao ON ao.question_id = q.id
+         WHERE q.status = 'pending'
+         GROUP BY q.id, s.name, eb.code, eb.name, u.first_name, u.last_name, u.email
+         ORDER BY q.created_at DESC
+         LIMIT :limit OFFSET :offset`,
+        { replacements: { limit, offset }, type: QueryTypes.SELECT }
+      ),
+    ]);
+    return res.json({
+      success: true,
+      total:   countRows[0]?.total || 0,
+      data:    rows,
+    });
+  } catch (err) {
+    console.error('[GET /admin/questions/pending] Error:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PUT /api/admin/questions/:id/review
+// ─────────────────────────────────────────────────────────────────────────────
+router.put('/questions/:id/review', protect, adminOnly, async (req, res) => {
+  const { action, feedback } = req.body;
+  const { id } = req.params;
+
+  if (!['approve', 'reject'].includes(action)) {
+    return res.status(400).json({ success: false, error: 'action must be approve or reject' });
+  }
+
+  try {
+    const newStatus = action === 'approve' ? 'approved' : 'rejected';
+    await sequelize.query(
+      `UPDATE questions
+       SET status = :status, updated_at = NOW()
+       WHERE id = :id`,
+      { replacements: { status: newStatus, id }, type: QueryTypes.UPDATE }
+    );
+    return res.json({ success: true, message: `Question ${newStatus}` });
+  } catch (err) {
+    console.error('[PUT /admin/questions/:id/review] Error:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /api/admin/questions/:id/approve
+// ─────────────────────────────────────────────────────────────────────────────
+router.patch('/questions/:id/approve', protect, adminOnly, async (req, res) => {
+  try {
+    await sequelize.query(
+      `UPDATE questions SET status = 'approved', updated_at = NOW() WHERE id = :id`,
+      { replacements: { id: req.params.id }, type: QueryTypes.UPDATE }
+    );
+    return res.json({ success: true, message: 'Question approved' });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DELETE /api/admin/questions/:id
+// ─────────────────────────────────────────────────────────────────────────────
+router.delete('/questions/:id', protect, adminOnly, async (req, res) => {
+  try {
+    await sequelize.query(
+      `DELETE FROM answer_options WHERE question_id = :id`,
+      { replacements: { id: req.params.id }, type: QueryTypes.DELETE }
+    );
+    await sequelize.query(
+      `DELETE FROM questions WHERE id = :id`,
+      { replacements: { id: req.params.id }, type: QueryTypes.DELETE }
+    );
+    return res.json({ success: true, message: 'Question deleted' });
+  } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
 });

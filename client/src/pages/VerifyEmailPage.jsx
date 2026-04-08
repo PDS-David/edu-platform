@@ -5,11 +5,9 @@
 
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import axios from 'axios';
+import api from '../services/api';
 import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
-import branding from '../config/branding';
-
-const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import PublicNav from '../components/PublicNav';
 
 const BG_GRADIENT = 'linear-gradient(135deg, #f0f4ff 0%, #e8eeff 50%, #f5f0ff 100%)';
 const BTN_ACTIVE  = 'linear-gradient(135deg, #4f46e5 0%, #6d28d9 100%)';
@@ -29,15 +27,15 @@ export default function VerifyEmailPage() {
       return;
     }
 
-    axios.post(`${API}/auth/verify-email`, { token, userId })
+    api.post('/auth/verify-email', { token, userId })
       .then(r => {
         setStatus('success');
-        setMessage(r.data.message || 'Email verified successfully.');
+        setMessage(r.message || 'Email verified successfully.');
       })
       .catch(err => {
         setStatus('error');
         setMessage(
-          err.response?.data?.error ||
+          err?.error ||
           'This verification link is invalid or has expired. Please register again.'
         );
       });
@@ -46,16 +44,7 @@ export default function VerifyEmailPage() {
   return (
     <div className="min-h-screen flex flex-col" style={{ background: BG_GRADIENT }}>
 
-      {/* Top nav */}
-      <header className="w-full px-6 py-4 flex items-center">
-        <Link to="/" className="flex items-center gap-2 group" title="Back to Home">
-          <img
-            src={branding.logo.main}
-            alt={branding.platformName}
-            className="h-10 w-auto object-contain transition-opacity group-hover:opacity-80"
-          />
-        </Link>
-      </header>
+      <PublicNav />
 
       {/* Card */}
       <div className="flex-1 flex items-center justify-center px-4 py-10">

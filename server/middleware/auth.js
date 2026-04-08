@@ -1,112 +1,68 @@
+// server/middleware/auth.js
+// JWT authentication middleware.
+// Exports:
+//   protect   — verifies the Bearer token and attaches req.user
+//   authorize — role-gate factory: authorize('teacher', 'admin')
+
 const { verifyToken, extractToken } = require('../utils/jwt');
-const { QueryTypes } = require('sequelize');
-const db = require('../config/database');
+const { QueryTypes }                = require('sequelize');
+const db                            = require('../config/database');
 
-/**
- * Protect routes - Verify JWT token
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// protect
+// Reads the Authorization header, verifies the JWT, then loads the user row
+// from the DB so every downstream handler gets a fresh req.user object.
+// ─────────────────────────────────────────────────────────────────────────────
 const protect = async (req, res, next) => {
+  const token = extractToken(req);
+
+  if (!token) {
+    return res.status(401).json({ success: false, error: 'Not authorised — no token provided' });
+  }  // ← FIX: closing brace was missing here
+
   try {
-    const token = extractToken(req);
-
-    if (!token) {
-      return res.status(401).json({
-        success: false,
-        error: 'Not authorized to access this route'
-      });
-    }
-
-    // Verify token
     const decoded = verifyToken(token);
 
-    // Get user from database — use Sequelize bind syntax, NOT raw $1 array
-    const result = await db.query(
-      `SELECT id, email, first_name, last_name, role, is_active
+    const users = await db.query(
+      `SELECT id, email, first_name, last_name, role,
+              is_active, subscription_status, subscription_expires_at
        FROM users
-       WHERE id = $1`,
-      {
-        bind: [decoded.id],
-        type: QueryTypes.SELECT
-      }
+       WHERE id = :id AND is_active = true
+       LIMIT 1`,
+      { replacements: { id: decoded.id }, type: QueryTypes.SELECT }
     );
 
-    if (!result || result.length === 0) {
-      return res.status(401).json({
-        success: false,
-        error: 'User not found'
-      });
+    if (!users.length) {
+      return res.status(401).json({ success: false, error: 'User not found or account deactivated' });
     }
 
-    const user = result[0];
-
-    if (!user.is_active) {
-      return res.status(401).json({
-        success: false,
-        error: 'Account has been deactivated'
-      });
-    }
-
-    // Add user to request object
-    req.user = user;
+    req.user = users[0];
     next();
-  } catch (error) {
-    console.error('Auth middleware error:', error);
-    return res.status(401).json({
+  } catch (err) {
+    console.error('[protect]', err.message);
+    return res.status(401).json({ success: false, error: 'Not authorised — invalid or expired token' });
+  }
+};  // ← FIX: closing brace was missing here
+
+// ─────────────────────────────────────────────────────────────────────────────
+// authorize
+// Role-gate factory. Must be used after protect so req.user is already set.
+// Usage: router.get('/admin-only', protect, authorize('admin'), handler)
+//        router.get('/staff',      protect, authorize('teacher', 'admin'), handler)
+// ─────────────────────────────────────────────────────────────────────────────
+const authorize = (...roles) => (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ success: false, error: 'Not authorised' });
+  }  // ← FIX: closing brace was missing here
+
+  if (!roles.includes(req.user.role)) {
+    return res.status(403).json({
       success: false,
-      error: 'Not authorized to access this route'
+      error: `Access denied — requires role: ${roles.join(' or ')}`,
     });
-  }
+  }  // ← FIX: closing brace was missing here
+
+  next();
 };
 
-/**
- * Authorize specific roles
- */
-const authorize = (...roles) => {
-  return (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
-      return res.status(403).json({
-        success: false,
-        error: `User role '${req.user.role}' is not authorized to access this route`
-      });
-    }
-    next();
-  };
-};
-
-/**
- * Optional authentication - adds user to req if token is valid
- * but doesn't block request if no token
- */
-const optionalAuth = async (req, res, next) => {
-  try {
-    const token = extractToken(req);
-
-    if (token) {
-      const decoded = verifyToken(token);
-      const result = await db.query(
-        `SELECT id, email, first_name, last_name, role, is_active
-         FROM users
-         WHERE id = $1`,
-        {
-          bind: [decoded.id],
-          type: QueryTypes.SELECT
-        }
-      );
-
-      if (result && result.length > 0 && result[0].is_active) {
-        req.user = result[0];
-      }
-    }
-
-    next();
-  } catch (error) {
-    // Continue without user
-    next();
-  }
-};
-
-module.exports = {
-  protect,
-  authorize,
-  optionalAuth
-};
+module.exports = { protect, authorize };

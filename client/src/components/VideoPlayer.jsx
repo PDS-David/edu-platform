@@ -16,13 +16,11 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Hls from 'hls.js';
-import axios from 'axios';
+import api from '../services/api';
 import {
   Play, Pause, Volume2, VolumeX, Maximize, Minimize,
   RotateCcw, Loader2, AlertTriangle, CheckCircle2, Lock
 } from 'lucide-react';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 // ── Format seconds → MM:SS or HH:MM:SS ───────────────────────────────────────
 const formatTime = (secs) => {
@@ -69,12 +67,12 @@ export default function VideoPlayer({ videoId, onComplete }) {
       setError(null);
       try {
         const [videoRes, progressRes] = await Promise.all([
-          axios.get(`${API_URL}/videos/${videoId}`),
-          axios.get(`${API_URL}/videos/${videoId}/progress`),
+          api.get(`/videos/${videoId}`),
+          api.get(`/videos/${videoId}/progress`),
         ]);
 
-        setVideoData(videoRes.data.data);
-        const prog = progressRes.data.data;
+        setVideoData(videoRes.data);
+        const prog = progressRes.data;
         if (prog.current_position_seconds > 10) {
           setResumePos(prog.current_position_seconds);
           setShowResumeBanner(true);
@@ -83,10 +81,10 @@ export default function VideoPlayer({ videoId, onComplete }) {
         setWatchPct(prog.watch_percentage || 0);
 
       } catch (err) {
-        if (err?.response?.status === 403) {
+        if (err?.status === 403 || err?.statusCode === 403) {
           setAccessDenied(true);
         } else {
-          setError(err?.response?.data?.error || 'Failed to load video');
+          setError(err?.error || 'Failed to load video');
         }
       } finally {
         setLoading(false);
@@ -101,8 +99,7 @@ export default function VideoPlayer({ videoId, onComplete }) {
     if (!videoData || !videoRef.current) return;
 
     const video    = videoRef.current;
-    const streamUrl = `${API_URL}/videos/stream/${videoId}/master.m3u8`
-      .replace('/api/videos/stream', '/api/videos/stream'); // explicit
+    const streamUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/videos/stream/${videoId}/master.m3u8`;
 
     const initHls = () => {
       // Destroy previous instance
@@ -164,7 +161,7 @@ export default function VideoPlayer({ videoId, onComplete }) {
     const pct = Math.min((pos / dur) * 100, 100);
 
     try {
-      await axios.post(`${API_URL}/videos/${videoId}/progress`, {
+      await api.post(`/videos/${videoId}/progress`, {
         current_position_seconds: Math.round(pos),
         total_watched_seconds:    Math.round(pos),
         watch_percentage:         parseFloat(pct.toFixed(2)),

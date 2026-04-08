@@ -1,4 +1,0 @@
-const { analyticsLimiter } = require('../middleware/rateLimiter');
-
-// Apply to routes
-router.get('/student/:id', analyticsLimiter, async (req, res) => { ... });

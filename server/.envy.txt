@@ -1,0 +1,103 @@
+# EAC Learning Platform — Server Environment Variables
+#
+# HOW THIS FILE WORKS:
+# Every line is KEY=value. The server reads these at startup instead of
+# hardcoding secrets in .js files. Keep this file private — it is listed
+# in .gitignore and must never be pushed to GitHub.
+# After any change here, restart the server: Ctrl+C, then npm run dev
+
+# SERVER
+NODE_ENV=production
+PORT=5000
+
+# DATABASE (PostgreSQL)
+# DB_USER and DB_PASSWORD are the credentials for the "eduuser" role
+# you created in PostgreSQL. Check pgAdmin if unsure.
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=edu_platform
+DB_USER=eduuser
+DB_PASSWORD=EduPass123!
+DB_LOGGING=false
+
+postgresql://postgres.hrtodtvtelgyjkzdesmi:[YOUR-PASSWORD]@aws-1-eu-central-1.pooler.supabase.com:6543/postgres
+
+# AUTHENTICATION
+# JWT_SECRET signs login tokens. Must be at least 32 characters.
+# Generate a strong one: node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+# The value below is fine for development. Replace it before going live.
+JWT_SECRET=b403c3bff2d44e40e50dedd58df08199e93fc27cc647a49e7f813c4943f41606553d77dc4a12cf80e447bbf88a9be295333b93a64d2ae930e58e19c22eea6c89
+JWT_EXPIRE=7d
+
+# GEMINI AI (Google)
+# How to get this key:
+#   1. Go to https://aistudio.google.com and sign in
+#   2. Click "Get API key" — it generates a key like AIzaSy...
+#   3. Paste it below (no quotes needed)
+# The server uses this key whenever a student asks for a hint or explanation.
+# Google charges per request; the free tier covers development use.
+# Rotate this key (generate a new one) when you go to production.
+GEMINI_API_KEY=AIzaSyBH4ZSS6L3SnSpi_zD_n8MHbDnUbhVnUZY
+GEMINI_MODEL=gemini-2.5-flash-lite
+
+
+
+# PAYMENTS (Paystack)
+# You have two separate keys in your Paystack dashboard:
+#   PAYSTACK_SECRET_KEY      — Settings > API Keys > Secret Key
+#   PAYSTACK_WEBHOOK_SECRET  — Settings > Webhooks > Signing Secret
+# These must be DIFFERENT values. The webhook secret is not the same as
+# the secret key. If your dashboard shows the same value for both, generate
+# a new webhook secret from the Webhooks section.
+# Keys below are test keys (sk_test_) — no real money, safe for development.
+PAYSTACK_SECRET_KEY=sk_test_2f47c88c92d24fff3f31b5c65bbe4625ad116695
+PAYSTACK_WEBHOOK_SECRET=sk_test_b11cc9836159a67866d98aab8037e3ef4f75223c
+
+# EMAIL (Gmail SMTP)
+# The app sends emails (welcome, password reset, receipts) via your Gmail.
+# How to get your app password:
+#   1. Google Account > Security > 2-Step Verification (enable it first)
+#   2. Google Account > Security > App passwords
+#   3. Select "Mail", click Generate — you get a 16-character password
+#   4. Paste that password (without spaces) as EMAIL_PASS below
+# EMAIL_FROM is the display name shown in the "From" field.
+# The old SMTP_* variables have been removed — EMAIL_* is the only set used.
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USER=info@eac.edu.ng
+EMAIL_PASS=your_16_character_gmail_app_password_here
+EMAIL_FROM=EACbuddy <noreply@eacbuddy.com>
+
+# CORS — which frontend URL the server allows to connect
+# Keep CLIENT_URL as your local Vite dev server during development.
+# Set PROD_CLIENT_URL to your real domain when you deploy.
+CLIENT_URL=http://localhost:5173
+PROD_CLIENT_URL=
+
+# PROD_CLIENT_URL=https://yourdomain.com
+# SERVER_BASE_URL=https://api.yourdomain.com
+
+
+# Used by the video encryption service to build the HLS key URL.
+# Change to your real domain in production.
+SERVER_BASE_URL=http://localhost:5000
+
+
+REDIS_URL=redis://127.0.0.1:6379
+
+
+
+
+# RATE LIMITING
+# 900000 ms = 15 minutes. Max 100 requests per 15 min per IP globally.
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX_REQUESTS=1000
+
+# ADMIN IP WHITELIST
+# Only IP addresses listed here can reach /api/admin routes.
+# Even a stolen admin password cannot access admin endpoints from an unlisted IP.
+# How to find your IP: visit https://whatismyipaddress.com
+# Format: comma-separated, no spaces. Example: 105.112.10.44,102.89.23.11
+# Leave empty during development (whitelist is disabled when empty).
+# Fill this in before going live.
+ADMIN_WHITELIST_IPS=102.89.82.84

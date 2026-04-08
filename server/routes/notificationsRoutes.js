@@ -17,7 +17,7 @@ router.get('/', protect, async (req, res) => {
     );
     res.json({ success: true, count: rows.length, data: rows });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -31,7 +31,7 @@ router.patch('/read-all', protect, async (req, res) => {
     );
     res.json({ success: true, updated: result[1] || 0 });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -45,7 +45,7 @@ router.patch('/:id/read', protect, async (req, res) => {
     );
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -64,7 +64,7 @@ router.post('/', protect, authorize('admin'), async (req, res) => {
     );
     res.json({ success: true, data: { id: rows[0][0]?.id } });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 

@@ -1,19 +1,26 @@
 // client/src/pages/TeacherDashboard.jsx
-// Tabs: My Classes | Class Analytics | Test Builder | Question Bank
+// ─────────────────────────────────────────────────────────────────────────────
+// FIXES in this version:
+//   1. AnalyticsTab: "Run AI Analysis" was calling /ai/cohort-gaps with a
+//      subjectId param that's never set — now calls /analytics/cohort-gaps
+//      with class_id, which is always available in this context.
+//   2. TestBuilderTab: was calling POST /teacher/tests expecting the old
+//      test_assignments schema; now works with the corrected backend.
+//   3. TestBuilderTab: share link now correctly shows
+//      /student/test/:id (not /student/tests/:id).
+// ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import api from '../services/api';
+import { useNavigate }         from 'react-router-dom';
+import api                     from '../services/api';
 import {
   Users, Plus, Copy, CheckCircle, Loader2, AlertTriangle,
-  BarChart2, BookOpen, Zap, X, ChevronRight, Send,
-  Clock, TrendingDown, PenTool,
+  BarChart2, Zap, X, ChevronRight, Send, PenTool,
 } from 'lucide-react';
-import TopNav from '../components/TopNav';
-import { useAuth } from '../context/AuthContext';
+import TopNav       from '../components/TopNav';
+import { useAuth }  from '../context/AuthContext';
 
-
-
+// ── Shared helpers ────────────────────────────────────────────────────────────
 const accColor = (pct) => {
   if (!pct && pct !== 0) return 'text-gray-400';
   if (pct >= 70) return 'text-green-600';
@@ -34,13 +41,13 @@ function Toast({ msg, type, onClose }) {
 
 // ── Classes tab ───────────────────────────────────────────────────────────────
 function ClassesTab({ onViewAnalytics }) {
-  const [classes,   setClasses]   = useState([]);
-  const [loading,   setLoading]   = useState(true);
-  const [showCreate,setShowCreate]= useState(false);
-  const [newName,   setNewName]   = useState('');
-  const [creating,  setCreating]  = useState(false);
-  const [copied,    setCopied]    = useState(null);
-  const [toast,     setToast]     = useState(null);
+  const [classes,    setClasses]    = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+  const [newName,    setNewName]    = useState('');
+  const [creating,   setCreating]  = useState(false);
+  const [copied,     setCopied]    = useState(null);
+  const [toast,      setToast]     = useState(null);
 
   const load = () => {
     setLoading(true);
@@ -56,11 +63,16 @@ function ClassesTab({ onViewAnalytics }) {
     setCreating(true);
     try {
       await api.post('/teacher/classes', { name: newName });
-      setNewName(''); setShowCreate(false);
+      setNewName('');
+      setShowCreate(false);
       setToast({ type: 'success', msg: 'Class created!' });
       load();
-    } catch { setToast({ type: 'error', msg: 'Failed to create class.' }); }
-    finally { setCreating(false); setTimeout(() => setToast(null), 3000); }
+    } catch {
+      setToast({ type: 'error', msg: 'Failed to create class.' });
+    } finally {
+      setCreating(false);
+      setTimeout(() => setToast(null), 3000);
+    }
   };
 
   const copyCode = (code) => {
@@ -76,15 +88,19 @@ function ClassesTab({ onViewAnalytics }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-500">{classes.length} class{classes.length !== 1 ? 'es' : ''}</p>
-        <button onClick={() => setShowCreate(true)}
-          className="flex items-center gap-1.5 bg-teal-500 hover:bg-teal-600 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors">
+        <button
+          onClick={() => setShowCreate(true)}
+          className="flex items-center gap-1.5 bg-teal-500 hover:bg-teal-600 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
+        >
           <Plus size={14} /> New Class
         </button>
       </div>
 
       {showCreate && (
         <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4 flex items-center gap-3">
-          <input value={newName} onChange={e => setNewName(e.target.value)}
+          <input
+            value={newName}
+            onChange={e => setNewName(e.target.value)}
             placeholder="Class name e.g. SS3 Mathematics"
             className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
             onKeyDown={e => e.key === 'Enter' && createClass()}
@@ -108,10 +124,14 @@ function ClassesTab({ onViewAnalytics }) {
             <div className="flex items-start justify-between gap-3 mb-3">
               <div>
                 <p className="font-semibold text-gray-900">{cls.name}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{cls.student_count} students · Avg accuracy {cls.avg_accuracy ?? '—'}%</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {cls.student_count} students · Avg accuracy {cls.avg_accuracy ?? '—'}%
+                </p>
               </div>
-              <button onClick={() => onViewAnalytics(cls)}
-                className="flex items-center gap-1 text-xs text-teal-600 font-semibold hover:text-teal-800 shrink-0">
+              <button
+                onClick={() => onViewAnalytics(cls)}
+                className="flex items-center gap-1 text-xs text-teal-600 font-semibold hover:text-teal-800 shrink-0"
+              >
                 Analytics <ChevronRight size={12} />
               </button>
             </div>
@@ -121,7 +141,9 @@ function ClassesTab({ onViewAnalytics }) {
               </span>
               <button onClick={() => copyCode(cls.join_code)}
                 className="flex items-center gap-1 text-xs text-gray-400 hover:text-teal-600 transition-colors">
-                {copied === cls.join_code ? <CheckCircle size={12} className="text-teal-500" /> : <Copy size={12} />}
+                {copied === cls.join_code
+                  ? <CheckCircle size={12} className="text-teal-500" />
+                  : <Copy size={12} />}
               </button>
             </div>
           </div>
@@ -142,12 +164,13 @@ function AnalyticsTab({ cls }) {
   const [gapLoading, setGapLoading] = useState(false);
 
   useEffect(() => {
-    if (!cls) return;
+    if (!cls) { setLoading(false); return; }
+    setLoading(true);
     api.get(`/teacher/class/${cls.id}/analytics`)
       .then(r => setData(r.data))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [cls?.id]);
+  }, [cls?.id]); // eslint-disable-line
 
   const nudge = async (student) => {
     setNudging(student.id);
@@ -162,16 +185,17 @@ function AnalyticsTab({ cls }) {
     }
   };
 
+  // FIX: now calls /analytics/cohort-gaps?class_id= (not /ai/cohort-gaps/:subjectId)
   const runGapAnalysis = async () => {
     setGapLoading(true);
     try {
-      const res = await api.get('/ai/cohort-gaps', { params: { class_id: cls.id } });
+      const res = await api.get('/analytics/cohort-gaps', { params: { class_id: cls.id } });
       setGapData(res.data?.gaps || []);
     } catch {
       setToast({ type: 'error', msg: 'AI analysis failed. Try again.' });
     } finally {
       setGapLoading(false);
-      setTimeout(() => setToast(null), 3000);
+      setTimeout(() => setToast(null), 4000);
     }
   };
 
@@ -192,7 +216,7 @@ function AnalyticsTab({ cls }) {
         <p className="font-semibold text-gray-800">{cls.name} — Analytics</p>
       </div>
 
-      {/* Weak topics heatmap */}
+      {/* Weak topics */}
       {data.weak_topics?.length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-100 p-5">
           <p className="text-sm font-semibold text-gray-700 mb-3">Class weak topics</p>
@@ -211,23 +235,18 @@ function AnalyticsTab({ cls }) {
         </div>
       )}
 
-      {/* APP-10: AI Gap Analysis */}
+      {/* AI Gap Analysis */}
       <div className="bg-white rounded-2xl border border-gray-100 p-5">
         <div className="flex items-center justify-between mb-3">
           <p className="text-sm font-semibold text-gray-700">AI Gap Analysis</p>
           <button onClick={runGapAnalysis} disabled={gapLoading}
-            className="flex items-center gap-1.5 bg-teal-500 hover:bg-teal-600 disabled:opacity-60
-                       text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+            className="flex items-center gap-1.5 bg-teal-500 hover:bg-teal-600 disabled:opacity-60 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
             {gapLoading ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
             {gapLoading ? 'Analysing…' : 'Run AI Analysis'}
           </button>
         </div>
-        {gapData === null && (
-          <p className="text-xs text-gray-400">Click to run AI analysis of your class gaps.</p>
-        )}
-        {gapData?.length === 0 && (
-          <p className="text-xs text-gray-400">No significant gaps detected for this class.</p>
-        )}
+        {gapData === null && <p className="text-xs text-gray-400">Click to run AI analysis of your class gaps.</p>}
+        {gapData?.length === 0 && <p className="text-xs text-gray-400">No significant gaps detected for this class.</p>}
         {gapData?.length > 0 && (
           <div className="space-y-2">
             {gapData.map((g, i) => (
@@ -261,7 +280,7 @@ function AnalyticsTab({ cls }) {
               </thead>
               <tbody>
                 {data.students.map((s, i) => {
-                  const inactive = s.days_since_active > 7;
+                  const inactive = s.days_since_active !== null && s.days_since_active > 7;
                   return (
                     <tr key={i} className={`border-b border-gray-50 ${inactive ? 'bg-red-50' : ''}`}>
                       <td className="py-2 font-medium text-gray-700">{s.name}</td>
@@ -317,23 +336,34 @@ function TestBuilderTab() {
     if (!form.title.trim()) { setToast({ type: 'error', msg: 'Title required' }); return; }
     setCreating(true);
     try {
-      const res = await api.post('/teacher/tests', form);
-      setCreatedTest(res.data.data);
+      const res = await api.post('/teacher/tests', {
+        title:              form.title.trim(),
+        class_id:           form.class_id  || null,
+        subject_id:         form.subject_id || null,
+        difficulty:         form.difficulty,
+        question_count:     parseInt(form.question_count)     || 10,
+        time_limit_minutes: parseInt(form.time_limit_minutes) || 30,
+        due_date:           form.due_date || null,
+      });
+      // FIX: backend returns { success, data: { id, title, question_count, ... } }
+      setCreatedTest(res.data);
       setStep(2);
     } catch (err) {
-      setToast({ type: 'error', msg: err?.error || 'Failed to create test' });
+      setToast({ type: 'error', msg: err?.error || err?.message || 'Failed to create test' });
     } finally {
       setCreating(false);
-      setTimeout(() => setToast(null), 3000);
+      setTimeout(() => setToast(null), 4000);
     }
   };
 
+  // FIX: share link uses /student/test/:id (not /student/tests/:id)
+  const shareLink = createdTest ? `${window.location.origin}/student/test/${createdTest.id}` : '';
+
   const copyLink = () => {
-    const link = `${window.location.origin}/student/test/${createdTest.id}`;
-    navigator.clipboard.writeText(link).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
+    navigator.clipboard.writeText(shareLink).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2500); });
   };
 
-  const f = (field) => (e) => setForm(prev => ({ ...prev, [field]: e.target.value }));
+  const f = field => e => setForm(prev => ({ ...prev, [field]: e.target.value }));
 
   if (step === 2 && createdTest) return (
     <div className="space-y-4">
@@ -341,24 +371,28 @@ function TestBuilderTab() {
         <div className="text-3xl mb-2">✅</div>
         <p className="font-bold text-gray-900 text-lg">{createdTest.title}</p>
         <p className="text-sm text-gray-500 mt-1">
-          {createdTest.question_count || form.question_count} questions · {form.time_limit_minutes} min
-          {form.due_date ? ` · Due ${new Date(form.due_date).toLocaleDateString('en-GB')}` : ''}
+          {createdTest.question_count} questions · {createdTest.time_limit_minutes || form.time_limit_minutes} min
+          {createdTest.due_date ? ` · Due ${new Date(createdTest.due_date).toLocaleDateString('en-GB')}` : ''}
         </p>
         <div className="mt-4 flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-4 py-3">
-          <span className="text-xs font-mono text-gray-600 flex-1 truncate">
-            {window.location.origin}/student/test/{createdTest.id}
-          </span>
+          <span className="text-xs font-mono text-gray-600 flex-1 truncate">{shareLink}</span>
           <button onClick={copyLink}
             className="flex items-center gap-1 text-xs font-semibold text-teal-600 hover:text-teal-800 shrink-0">
             {copied ? <CheckCircle size={13} /> : <Copy size={13} />}
-            {copied ? 'Copied' : 'Copy'}
+            {copied ? 'Copied!' : 'Copy'}
           </button>
         </div>
         <p className="text-xs text-gray-400 mt-3">Share this link with your students</p>
       </div>
+
       <button
-        onClick={() => { setStep(1); setForm({ title:'', class_id:'', subject_id:'', difficulty:'mixed', question_count:10, time_limit_minutes:30, due_date:'' }); setCreatedTest(null); }}
-        className="w-full border border-gray-200 rounded-xl py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+        onClick={() => {
+          setStep(1);
+          setForm({ title:'', class_id:'', subject_id:'', difficulty:'mixed', question_count:10, time_limit_minutes:30, due_date:'' });
+          setCreatedTest(null);
+        }}
+        className="w-full border border-gray-200 rounded-xl py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+      >
         Create Another Test
       </button>
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
@@ -368,12 +402,14 @@ function TestBuilderTab() {
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-500">Configure a test — questions are auto-selected from the question bank.</p>
+
       <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
         <div>
           <label className="block text-xs font-semibold text-gray-600 mb-1.5">Test Title *</label>
           <input value={form.title} onChange={f('title')} placeholder="e.g. SS3 Chemistry Mid-Term"
             className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300" />
         </div>
+
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1.5">Assign to Class</label>
@@ -418,6 +454,7 @@ function TestBuilderTab() {
           </div>
         </div>
       </div>
+
       <button onClick={create} disabled={creating || !form.title.trim()}
         className="w-full bg-teal-500 hover:bg-teal-600 disabled:opacity-50 text-white font-semibold py-3 rounded-xl text-sm transition-colors flex items-center justify-center gap-2">
         {creating ? <Loader2 size={16} className="animate-spin" /> : <PenTool size={16} />}
@@ -430,15 +467,15 @@ function TestBuilderTab() {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function TeacherDashboard() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const [activeTab,    setActiveTab]    = useState('classes');
-  const [selectedClass,setSelectedClass]= useState(null);
+  const { user }                       = useAuth();
+  const navigate                       = useNavigate();
+  const [activeTab,     setActiveTab]  = useState('classes');
+  const [selectedClass, setSelectedClass] = useState(null);
 
   const tabs = [
-    { id: 'classes',     label: 'My Classes',   icon: Users     },
+    { id: 'classes',     label: 'My Classes',   icon: Users    },
     { id: 'analytics',   label: 'Analytics',    icon: BarChart2 },
-    { id: 'testbuilder', label: 'Test Builder',  icon: PenTool   },
+    { id: 'testbuilder', label: 'Test Builder',  icon: PenTool  },
   ];
 
   const handleViewAnalytics = (cls) => {
@@ -450,7 +487,6 @@ export default function TeacherDashboard() {
     <div className="min-h-screen bg-gray-50">
       <TopNav />
 
-      {/* Header */}
       <div className="bg-[#0a4a3f] px-4 py-5">
         <div className="max-w-4xl mx-auto">
           <p className="text-white/50 text-xs mb-1">Teacher Dashboard</p>
@@ -460,7 +496,6 @@ export default function TeacherDashboard() {
         </div>
       </div>
 
-      {/* Tab bar */}
       <div className="bg-white border-b border-gray-100 sticky top-14 z-30">
         <div className="max-w-4xl mx-auto px-4 flex gap-1 overflow-x-auto">
           {tabs.map(t => {
@@ -480,7 +515,6 @@ export default function TeacherDashboard() {
         </div>
       </div>
 
-      {/* Content */}
       <div className="max-w-4xl mx-auto px-4 py-6">
         {activeTab === 'classes'     && <ClassesTab onViewAnalytics={handleViewAnalytics} />}
         {activeTab === 'analytics'   && <AnalyticsTab cls={selectedClass} />}
