@@ -6,7 +6,7 @@ services:
     rootDir: server
     buildCommand: npm install
     startCommand: node server.js
-    instance_type: free
+
     envVars:
       - key: NODE_ENV
         value: production
@@ -91,7 +91,7 @@ services:
     rootDir: client
     buildCommand: npm install && npm run build
     staticPublishPath: dist
-    instance_type: free
+
     envVars:
       # Set this to your backend URL after eacbuddy-api is deployed
       # e.g. https://eacbuddy-api.onrender.com
