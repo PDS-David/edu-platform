@@ -1,14 +1,20 @@
 // server/routes/quizzes.js
-// ─────────────────────────────────────────────────────────────────────────────
 // AI Buddy-style quiz endpoints for the EAC Learning Platform.
-//
 // Endpoints:
-//   GET  /api/quizzes/attempt-count         — total attempts for a subtopic (public stat)
-//   POST /api/quizzes/attempt               — submit a completed quiz attempt
-//   GET  /api/quizzes/attempt/:attemptId    — get attempt results with AI marking
-//   GET  /api/quizzes/history/:studentId/:subtopicId — past attempts list
-//   GET  /api/quizzes                       — placeholder (kept for compatibility)
-// ─────────────────────────────────────────────────────────────────────────────
+//   GET  /api/quizzes/attempt-count         → total attempts for a subtopic (public stat)
+//   POST /api/quizzes/attempt               → submit a completed quiz attempt
+//   GET  /api/quizzes/attempt/:attemptId    → get attempt results with AI marking
+//   GET  /api/quizzes/history/:studentId/:subtopicId → past attempts list
+//   GET  /api/quizzes                       → placeholder (kept for compatibility)
+//
+// ADDED (Task 4):
+//   After each answer is processed, the related concepts are looked up via
+//   question_concepts and student_concept_mastery is updated dynamically:
+//     Correct → mastery_score += 0.1   (clamped to 1.0)
+//     Wrong   → mastery_score -= 0.05  (clamped to 0.0)
+//   Attempts counter is incremented on every answer.
+
+'use strict';
 
 const express   = require('express');
 const router    = express.Router();
@@ -19,7 +25,7 @@ const { protect } = require('../middleware/auth');
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function isValidUUID(v) { return UUID_REGEX.test(v); }
 
-// ── XP middleware (fire-and-forget) ──────────────────────────────────────────
+// XP middleware (fire-and-forget)
 let awardXP = () => {};
 try { awardXP = require('../middleware/xpMiddleware').awardXP; } catch { /* not yet installed */ }
 
@@ -28,29 +34,80 @@ function getAI() {
   return require('../services/aiService');
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// updateConceptMastery (Task 4 helper)
+// Finds all concepts tagged to a question and updates mastery scores.
+// Runs fire-and-forget style from within the attempt loop — errors are
+// swallowed so they never break the quiz submission response.
+// ---------------------------------------------------------------------------
+async function updateConceptMastery(questionId, isCorrect, studentId) {
+  try {
+    // 1. Find all concepts linked to this question
+    const conceptRows = await sequelize.query(
+      `SELECT concept_id FROM question_concepts WHERE question_id = :questionId`,
+      { replacements: { questionId }, type: QueryTypes.SELECT }
+    );
+
+    if (!conceptRows.length) return; // question has no concept tags — skip
+
+    const delta = isCorrect ? 0.1 : -0.05;
+
+    for (const { concept_id } of conceptRows) {
+      // Upsert mastery record, then clamp to [0, 1] and increment attempts.
+      // PostgreSQL LEAST/GREATEST handle the clamping atomically.
+      await sequelize.query(
+        `INSERT INTO student_concept_mastery
+           (id, student_id, concept_id, mastery_score, attempts, correct,
+            last_practiced, created_at, updated_at)
+         VALUES
+           (gen_random_uuid(), :studentId, :conceptId,
+            GREATEST(0, LEAST(1, 0.5 + :delta)),  -- start at 0.5 on first insert
+            1,
+            CASE WHEN :isCorrect THEN 1 ELSE 0 END,
+            NOW(), NOW(), NOW())
+         ON CONFLICT (student_id, concept_id) DO UPDATE
+           SET mastery_score  = GREATEST(0, LEAST(1, student_concept_mastery.mastery_score + :delta)),
+               attempts       = student_concept_mastery.attempts + 1,
+               correct        = student_concept_mastery.correct
+                                + CASE WHEN :isCorrect THEN 1 ELSE 0 END,
+               last_practiced = NOW(),
+               updated_at     = NOW()`,
+        {
+          replacements: {
+            studentId,
+            conceptId:  concept_id,
+            delta,
+            isCorrect: isCorrect === true, // boolean
+          },
+          type: QueryTypes.INSERT,
+        }
+      );
+    }
+  } catch (err) {
+    // Non-fatal — log and continue
+    console.warn(`[quizzes] updateConceptMastery failed for question ${questionId}:`, err.message);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // GET /api/quizzes/attempt-count
 // Returns total quiz attempts for a subtopic — shown as "Total Attempts: 1800+"
 // Query param: subtopic_id
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 router.get('/attempt-count', protect, async (req, res) => {
   const { subtopic_id } = req.query;
-
   if (!subtopic_id || !isValidUUID(subtopic_id)) {
     return res.status(400).json({ success: false, error: 'subtopic_id is required' });
   }
-
   try {
     const rows = await sequelize.query(
       `SELECT COUNT(*)::INTEGER AS total FROM subtopic_quiz_attempts WHERE subtopic_id = :subtopicId`,
       { replacements: { subtopicId: subtopic_id }, type: QueryTypes.SELECT }
     );
-
     const total = rows[0].total;
     const label = total >= 1000
       ? `${Math.floor(total / 100) * 100}+`
       : `${total}`;
-
     return res.status(200).json({ success: true, data: { total, label } });
   } catch (err) {
     console.error('[GET /quizzes/attempt-count] Error:', err.message);
@@ -58,11 +115,10 @@ router.get('/attempt-count', protect, async (req, res) => {
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 // POST /api/quizzes/attempt
 // Submit a completed quiz. Server validates MCQ answers, calculates score,
-// saves attempt + per-question answers, returns immediate results.
-//
+// saves attempt + per-question answers, updates concept mastery, returns results.
 // Body:
 // {
 //   subtopic_id: UUID,
@@ -72,13 +128,13 @@ router.get('/attempt-count', protect, async (req, res) => {
 //   answers: [
 //     {
 //       question_id:        UUID,
-//       selected_option_id: UUID | null,   -- for MCQ
-//       typed_answer:       string | null, -- for structured/smart_answers
+//       selected_option_id: UUID | null,   // for MCQ
+//       typed_answer:       string | null, // for structured/smart_answers
 //       time_taken_ms:      INTEGER
 //     }
 //   ]
 // }
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 router.post('/attempt', protect, async (req, res) => {
   const { subtopic_id, subject_id, paper_type = 'all', total_time_ms, answers } = req.body;
   const studentId = req.user.id;
@@ -87,7 +143,6 @@ router.post('/attempt', protect, async (req, res) => {
   if (subtopic_id && !isValidUUID(subtopic_id)) {
     return res.status(400).json({ success: false, error: 'subtopic_id must be a valid UUID' });
   }
-
   if (!Array.isArray(answers) || answers.length === 0) {
     return res.status(400).json({ success: false, error: 'answers array is required' });
   }
@@ -97,22 +152,40 @@ router.post('/attempt', protect, async (req, res) => {
     let maxScore   = 0;
     const answersWithResults = [];
 
-    // ── Process each answer ─────────────────────────────────────────────────
-    for (const answer of answers) {
+    // ── Batch-fetch all questions and options (eliminates N+1 queries) ──────
+    const validAnswers = answers.filter(a => a.question_id && isValidUUID(a.question_id));
+    const questionIds  = validAnswers.map(a => a.question_id);
+
+    // ONE query for all questions
+    const questionRows = await sequelize.query(
+      `SELECT id, question_text, question_type, question_sub_type, marks, explanation, topic, difficulty
+       FROM questions WHERE id = ANY(:ids) AND status = 'approved'`,
+      { replacements: { ids: questionIds }, type: QueryTypes.SELECT }
+    );
+
+    // ONE query for all answer options
+    const optionRows = await sequelize.query(
+      `SELECT id, question_id, option_text, is_correct FROM answer_options
+       WHERE question_id = ANY(:ids)`,
+      { replacements: { ids: questionIds }, type: QueryTypes.SELECT }
+    );
+
+    // Build in-memory maps keyed by ID
+    const questionMap = Object.fromEntries(questionRows.map(q => [q.id, q]));
+    const optionsMap  = optionRows.reduce((acc, o) => {
+      if (!acc[o.question_id]) acc[o.question_id] = [];
+      acc[o.question_id].push(o);
+      return acc;
+    }, {});
+
+    // ── Process each answer using in-memory maps (zero DB calls in loop) ───
+    const masteryUpdates = []; // collect [{ questionId, isCorrect }] for batch after insert
+
+    for (const answer of validAnswers) {
       const { question_id, selected_option_id, typed_answer, time_taken_ms } = answer;
+      const question = questionMap[question_id];
+      if (!question) continue;
 
-      if (!question_id || !isValidUUID(question_id)) continue;
-
-      // Fetch question details
-      const questions = await sequelize.query(
-        `SELECT id, question_text, question_type, question_sub_type, marks, explanation, topic, difficulty
-         FROM questions WHERE id = :questionId AND status = 'approved'`,
-        { replacements: { questionId: question_id }, type: QueryTypes.SELECT }
-      );
-
-      if (!questions.length) continue;
-
-      const question  = questions[0];
       const markValue = question.marks || 1;
       maxScore += markValue;
 
@@ -120,15 +193,11 @@ router.post('/attempt', protect, async (req, res) => {
       let marksAwarded = 0;
 
       if (selected_option_id && isValidUUID(selected_option_id)) {
-        // MCQ — server validates
-        const optionRows = await sequelize.query(
-          `SELECT id, option_text, is_correct FROM answer_options
-           WHERE id = :optionId AND question_id = :questionId`,
-          { replacements: { optionId: selected_option_id, questionId: question_id }, type: QueryTypes.SELECT }
-        );
-
-        if (optionRows.length > 0) {
-          isCorrect    = optionRows[0].is_correct;
+        // MCQ — validate against in-memory options map
+        const opts       = optionsMap[question_id] || [];
+        const matchedOpt = opts.find(o => o.id === selected_option_id);
+        if (matchedOpt) {
+          isCorrect    = matchedOpt.is_correct;
           marksAwarded = isCorrect ? markValue : 0;
           if (isCorrect) totalScore += markValue;
         }
@@ -149,12 +218,19 @@ router.post('/attempt', protect, async (req, res) => {
         time_taken_ms:     time_taken_ms || null,
         explanation:       question.explanation || null,
       });
+
+      // Queue concept mastery updates for MCQ answers only (isCorrect is boolean)
+      if (isCorrect !== null) {
+        masteryUpdates.push({ questionId: question_id, isCorrect });
+      }
     }
 
-    // ── Calculate accuracy ──────────────────────────────────────────────────
-    const accuracyPct = maxScore > 0 ? parseFloat(((totalScore / maxScore) * 100).toFixed(2)) : 0;
+    // ── Calculate accuracy ─────────────────────────────────────────────────
+    const accuracyPct = maxScore > 0
+      ? parseFloat(((totalScore / maxScore) * 100).toFixed(2))
+      : 0;
 
-    // ── Get exam_board_id from subtopic (skip for mock exams where subtopic_id is null) ──
+    // ── Get exam_board_id from subtopic (skip for mock exams) ─────────────
     let examBoardId = null;
     if (subtopic_id) {
       const subtopicRows = await sequelize.query(
@@ -164,7 +240,7 @@ router.post('/attempt', protect, async (req, res) => {
       examBoardId = subtopicRows[0]?.exam_board_id || null;
     }
 
-    // ── Insert quiz attempt ─────────────────────────────────────────────────
+    // ── Insert quiz attempt ────────────────────────────────────────────────
     const attemptResult = await sequelize.query(
       `INSERT INTO subtopic_quiz_attempts
          (student_id, subtopic_id, subject_id, exam_board_id, paper_type,
@@ -187,10 +263,9 @@ router.post('/attempt', protect, async (req, res) => {
         type: QueryTypes.SELECT,
       }
     );
-
     const attemptId = attemptResult[0].id;
 
-    // ── Insert per-question answers ─────────────────────────────────────────
+    // ── Insert per-question answers ────────────────────────────────────────
     for (const a of answersWithResults) {
       await sequelize.query(
         `INSERT INTO subtopic_quiz_answers
@@ -214,22 +289,27 @@ router.post('/attempt', protect, async (req, res) => {
       );
     }
 
-    // ── Fetch correct options for MCQ answers to include in response ─────────
-    for (const a of answersWithResults) {
-      if (a.selected_option_id) {
-        const correctOpts = await sequelize.query(
-          `SELECT id, option_text FROM answer_options
-           WHERE question_id = :questionId AND is_correct = true`,
-          { replacements: { questionId: a.question_id }, type: QueryTypes.SELECT }
-        );
-        a.correct_options = correctOpts;
+    // ── (Task 4) Update concept mastery for each MCQ answer — non-blocking ─
+    // Fire-and-forget: mastery updates run after the response is sent.
+    // Errors inside updateConceptMastery are caught internally.
+    setImmediate(async () => {
+      for (const { questionId, isCorrect } of masteryUpdates) {
+        await updateConceptMastery(questionId, isCorrect, studentId);
       }
+    });
+
+    // ── Attach correct options from in-memory map (no extra DB calls) ──────
+    for (const a of answersWithResults) {
+      const opts = optionsMap[a.question_id] || [];
+      a.correct_options = opts
+        .filter(o => o.is_correct)
+        .map(o => ({ id: o.id, option_text: o.option_text }));
     }
 
     // Award XP for completing quiz (non-blocking)
     setImmediate(() => awardXP(studentId, 'quiz_completed').catch(() => {}));
 
-    // ── Mark quiz tab complete in subtopic_progress ───────────────────────────
+    // ── Mark quiz tab complete in subtopic_progress ────────────────────────
     if (subtopic_id) {
       try {
         await sequelize.query(
@@ -268,25 +348,22 @@ router.post('/attempt', protect, async (req, res) => {
       time_taken_ms: total_time_ms || null,
       answers_with_results: answersWithResults,
     });
-
   } catch (err) {
     console.error('[POST /quizzes/attempt] Error:', err.message);
     return res.status(500).json({ success: false, error: 'Failed to save quiz attempt' });
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 // GET /api/quizzes/attempt/:attemptId
 // Returns full attempt results with AI-generated Detailed Marking Scheme.
 // This is the heavy endpoint — calls Gemini for each question.
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 router.get('/attempt/:attemptId', protect, async (req, res) => {
   const { attemptId } = req.params;
-
   if (!isValidUUID(attemptId)) {
     return res.status(400).json({ success: false, error: 'Invalid attempt ID' });
   }
-
   try {
     // Fetch attempt header
     const attempts = await sequelize.query(
@@ -298,11 +375,9 @@ router.get('/attempt/:attemptId', protect, async (req, res) => {
        WHERE sqa.id = :attemptId`,
       { replacements: { attemptId }, type: QueryTypes.SELECT }
     );
-
     if (!attempts.length) {
       return res.status(404).json({ success: false, error: 'Attempt not found' });
     }
-
     const attempt = attempts[0];
 
     // Students can only view their own attempts
@@ -334,10 +409,9 @@ router.get('/attempt/:attemptId', protect, async (req, res) => {
       { replacements: { attemptId }, type: QueryTypes.SELECT }
     );
 
-    // ── Generate AI Detailed Marking Scheme for each answer ─────────────────
+    // ── Generate AI Detailed Marking Scheme for each answer ────────────────
     const ai = getAI();
 
-    // Per-call timeout wrapper — prevents one slow Gemini call hanging the rest
     function withTimeout(promise, ms = 8000) {
       return Promise.race([
         promise,
@@ -353,12 +427,10 @@ router.get('/attempt/:attemptId', protect, async (req, res) => {
         // Only generate if not already stored
         if (!markingScheme && ans.selected_option_id) {
           try {
-            // Get correct option text
             const correctOpts = await sequelize.query(
               `SELECT option_text FROM answer_options WHERE question_id = :qId AND is_correct = true LIMIT 1`,
               { replacements: { qId: ans.question_id }, type: QueryTypes.SELECT }
             );
-
             const allOpts = await sequelize.query(
               `SELECT id, option_text, is_correct FROM answer_options WHERE question_id = :qId ORDER BY id`,
               { replacements: { qId: ans.question_id }, type: QueryTypes.SELECT }
@@ -400,7 +472,6 @@ router.get('/attempt/:attemptId', protect, async (req, res) => {
                 type: QueryTypes.UPDATE,
               }
             );
-
           } catch (aiErr) {
             console.warn(`[AI Marking] Failed for answer ${ans.id}:`, aiErr.message);
             // Continue without AI — show static explanation
@@ -415,9 +486,9 @@ router.get('/attempt/:attemptId', protect, async (req, res) => {
 
         return {
           ...ans,
-          correct_options:    correctOptions,
-          ai_explanation:     aiExplanation || ans.explanation || null,
-          ai_marking_scheme:  markingScheme || null,
+          correct_options:   correctOptions,
+          ai_explanation:    aiExplanation || ans.explanation || null,
+          ai_marking_scheme: markingScheme || null,
         };
       })
     );
@@ -429,124 +500,58 @@ router.get('/attempt/:attemptId', protect, async (req, res) => {
         : { ...answers[i], ai_marking_scheme: null, ai_explanation: answers[i].explanation || null }
     );
 
-    // ── Generate Examiner Recommendation ────────────────────────────────────
-    let examinerRecommendation = null;
-    try {
-      // Fetch average score + time for this subtopic (competitive benchmark)
-      const avgStats = await sequelize.query(
-        `SELECT
-           ROUND(AVG(accuracy_pct)::NUMERIC, 2) AS avg_accuracy,
-           ROUND(AVG(time_taken_ms)::NUMERIC, 0)::INTEGER AS avg_time_ms
-         FROM subtopic_quiz_attempts WHERE subtopic_id = :subtopicId`,
-        { replacements: { subtopicId: attempt.subtopic_id }, type: QueryTypes.SELECT }
-      );
-
-      examinerRecommendation = await withTimeout(ai.generateExaminerRecommendation({
-        subjectName:      attempt.subject_name  || 'this subject',
-        subtopicName:     attempt.subtopic_name || 'this topic',
-        totalScore:       attempt.total_score,
-        maxScore:         attempt.max_score,
-        accuracyPct:      attempt.accuracy_pct,
-        timeTakenSeconds: (attempt.time_taken_ms || 0) / 1000,
-        avgAccuracyPct:   parseFloat(avgStats[0]?.avg_accuracy) || 60,
-        avgTimeSeconds:   (parseInt(avgStats[0]?.avg_time_ms) || 360000) / 1000,
-      }), 10000);
-    } catch (aiErr) {
-      console.warn('[AI Recommendation] Failed:', aiErr.message);
-    }
-
-    // ── Competitive benchmark ────────────────────────────────────────────────
-    const benchmark = await sequelize.query(
-      `SELECT
-         ROUND(AVG(accuracy_pct)::NUMERIC, 1) AS avg_score,
-         ROUND(AVG(time_taken_ms / 1000.0)::NUMERIC, 0)::INTEGER AS avg_time_seconds
-       FROM subtopic_quiz_attempts WHERE subtopic_id = :subtopicId`,
-      { replacements: { subtopicId: attempt.subtopic_id }, type: QueryTypes.SELECT }
-    );
-
     return res.status(200).json({
       success: true,
       data: {
-        attempt: {
-          id:            attempt.id,
-          subtopic_name: attempt.subtopic_name,
-          subject_name:  attempt.subject_name,
-          exam_board:    attempt.exam_board_name,
-          total_score:   attempt.total_score,
-          max_score:     attempt.max_score,
-          accuracy_pct:  parseFloat(attempt.accuracy_pct),
-          time_taken_ms: attempt.time_taken_ms,
-          completed_at:  attempt.completed_at,
-        },
-        benchmark: {
-          avg_score:        parseFloat(benchmark[0]?.avg_score)   || 0,
-          avg_time_seconds: parseInt(benchmark[0]?.avg_time_seconds) || 0,
-        },
-        examiner_recommendation: examinerRecommendation,
+        attempt,
         answers: enrichedAnswers,
       },
     });
-
   } catch (err) {
-    console.error(`[GET /quizzes/attempt/${attemptId}] Error:`, err.message);
+    console.error('[GET /quizzes/attempt/:attemptId] Error:', err.message);
     return res.status(500).json({ success: false, error: 'Failed to fetch attempt results' });
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 // GET /api/quizzes/history/:studentId/:subtopicId
-// Past quiz attempts for a student on a subtopic — shown on quiz setup screen.
-// ─────────────────────────────────────────────────────────────────────────────
+// Returns past quiz attempts for a student on a specific subtopic.
+// ---------------------------------------------------------------------------
 router.get('/history/:studentId/:subtopicId', protect, async (req, res) => {
   const { studentId, subtopicId } = req.params;
 
+  // Students can only view their own history
+  if (req.user.role === 'student' && req.user.id !== studentId) {
+    return res.status(403).json({ success: false, error: 'Access denied' });
+  }
   if (!isValidUUID(studentId) || !isValidUUID(subtopicId)) {
     return res.status(400).json({ success: false, error: 'Invalid ID format' });
   }
 
-  if (req.user.role === 'student' && req.user.id !== studentId) {
-    return res.status(403).json({ success: false, error: 'Access denied' });
-  }
-
   try {
-    const history = await sequelize.query(
-      `SELECT id, total_score, max_score, accuracy_pct, time_taken_ms, paper_type, completed_at
+    const rows = await sequelize.query(
+      `SELECT
+         id, total_score, max_score, accuracy_pct,
+         time_taken_ms, paper_type, completed_at, created_at
        FROM subtopic_quiz_attempts
-       WHERE student_id = :studentId AND subtopic_id = :subtopicId
+       WHERE student_id  = :studentId
+         AND subtopic_id = :subtopicId
        ORDER BY completed_at DESC
-       LIMIT 10`,
+       LIMIT 20`,
       { replacements: { studentId, subtopicId }, type: QueryTypes.SELECT }
     );
-
-    return res.status(200).json({
-      success: true,
-      count: history.length,
-      data:  history.map(h => ({
-        ...h,
-        accuracy_pct: parseFloat(h.accuracy_pct),
-        time_taken_seconds: h.time_taken_ms ? Math.round(h.time_taken_ms / 1000) : null,
-      })),
-    });
+    return res.status(200).json({ success: true, data: rows });
   } catch (err) {
-    console.error(`[GET /quizzes/history] Error:`, err.message);
+    console.error('[GET /quizzes/history] Error:', err.message);
     return res.status(500).json({ success: false, error: 'Failed to fetch quiz history' });
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /api/quizzes  (kept for backwards compatibility)
-// ─────────────────────────────────────────────────────────────────────────────
-router.get('/', protect, async (req, res) => {
-  res.json({
-    success: true,
-    message: 'EAC Quiz API',
-    endpoints: {
-      'attempt-count': 'GET /api/quizzes/attempt-count?subtopic_id=<uuid>',
-      'submit':        'POST /api/quizzes/attempt',
-      'results':       'GET /api/quizzes/attempt/:attemptId',
-      'history':       'GET /api/quizzes/history/:studentId/:subtopicId',
-    },
-  });
+// ---------------------------------------------------------------------------
+// GET /api/quizzes   (placeholder — kept for compatibility)
+// ---------------------------------------------------------------------------
+router.get('/', protect, async (_req, res) => {
+  return res.status(200).json({ success: true, data: [], message: 'Use /api/quizzes/attempt-count or /api/quizzes/attempt' });
 });
 
 module.exports = router;

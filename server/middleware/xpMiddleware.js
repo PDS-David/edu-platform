@@ -1,4 +1,3 @@
-// server/middleware/xpMiddleware.js
 // Called AFTER a successful answer or quiz submission.
 // Awards XP, updates study streak, checks badge thresholds.
 // Usage:
@@ -16,7 +15,7 @@ const XP_VALUES = {
 };
 
 // Badge definitions — checked after every XP award.
-// Codes must match GamificationBar.jsx BADGE_META keys.
+// Codes MUST match GamificationBar.jsx BADGE_META keys exactly.
 const BADGES = [
   {
     code:  'first_answer',
@@ -39,17 +38,16 @@ const BADGES = [
     check: (s) => s.accuracy_pct >= 80 && s.total_attempts >= 20,
   },
   {
-    // Awarded after completing first quiz (quiz_count = 1) per spec
-    code:  'quiz_master',
-    check: (s) => s.quiz_count >= 1,
+    // FIX: was 'quiz_master' — GamificationBar.jsx BADGE_META key is 'quiz_master_10'
+    // Mismatch meant badge was saved in DB but never rendered in the UI.
+    // Threshold is 10 completed quizzes — >= 1 would fire on the very first quiz.
+    code:  'quiz_master_10',
+    check: (s) => s.quiz_count >= 10,
   },
   {
-    code:  'xp_100',
-    check: (s) => s.xp_points >= 100,
-  },
-  {
-    code:  'xp_500',
-    check: (s) => s.xp_points >= 500,
+    // NEW: awarded when student hits 90%+ accuracy in any subject with 10+ attempts
+    code:  'subject_complete',
+    check: (s) => s.best_subject_accuracy >= 90 && s.best_subject_attempts >= 10,
   },
 ];
 
@@ -67,6 +65,11 @@ async function awardXP(userId, eventType, extras = {}) {
     }
 
     // ── 2. Single UPDATE: XP + streak + last_activity_date ──────────────────
+    // Guard: skip the UPDATE entirely if there's nothing to add (unrecognised
+    // event type). quiz_completed always runs even though xpToAdd is set above,
+    // so the guard correctly allows it through.
+    if (xpToAdd === 0 && eventType !== 'quiz_completed') return;
+
     // Streak CASE:
     //   same day        → no change
     //   yesterday       → streak + 1
@@ -99,6 +102,7 @@ async function awardXP(userId, eventType, extras = {}) {
 async function checkBadges(userId) {
   try {
     // Gather current user + attempt stats in one query
+    // NEW: also pulls best_subject_accuracy / best_subject_attempts for subject_complete badge
     const stats = await sequelize.query(
       `SELECT
          u.xp_points,
@@ -108,9 +112,32 @@ async function checkBadges(userId) {
            ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END))::INTEGER,
            0
          )                                                                      AS accuracy_pct,
-         (SELECT COUNT(*)::INTEGER
-          FROM subtopic_quiz_attempts
-          WHERE student_id = :userId)                                           AS quiz_count
+         -- quiz_count: sum across both quiz surfaces (subtopic quizzes + submitted test assignments)
+         (
+           SELECT COUNT(*)::INTEGER FROM subtopic_quiz_attempts WHERE student_id = :userId
+         ) + (
+           SELECT COUNT(*)::INTEGER FROM test_assignments
+           WHERE student_id = :userId AND is_submitted = true
+         )                                                                      AS quiz_count,
+         -- best subject accuracy and attempt count for subject_complete badge
+         COALESCE((
+           SELECT ROUND(AVG(CASE WHEN pa2.is_correct THEN 100.0 ELSE 0 END))::INTEGER
+           FROM practice_attempts pa2
+           JOIN questions q2 ON q2.id = pa2.question_id
+           WHERE pa2.student_id = :userId
+           GROUP BY q2.subject_id_uuid
+           ORDER BY AVG(CASE WHEN pa2.is_correct THEN 100.0 ELSE 0 END) DESC
+           LIMIT 1
+         ), 0)                                                                  AS best_subject_accuracy,
+         COALESCE((
+           SELECT COUNT(pa2.id)::INTEGER
+           FROM practice_attempts pa2
+           JOIN questions q2 ON q2.id = pa2.question_id
+           WHERE pa2.student_id = :userId
+           GROUP BY q2.subject_id_uuid
+           ORDER BY AVG(CASE WHEN pa2.is_correct THEN 100.0 ELSE 0 END) DESC
+           LIMIT 1
+         ), 0)                                                                  AS best_subject_attempts
        FROM users u
        LEFT JOIN practice_attempts pa ON pa.student_id = u.id
        WHERE u.id = :userId

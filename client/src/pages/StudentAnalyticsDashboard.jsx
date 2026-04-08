@@ -1,11 +1,19 @@
 // client/src/pages/StudentAnalyticsDashboard.jsx
-// Deep rebuild — matches AiBuddy analytics depth.
-// Sections: stat cards, score trend, subject breakdown,
-// weak topics, time metrics, leaderboard.
+// ─────────────────────────────────────────────────────────────────────────────
+// FIXES in this version:
+//   1. All API calls now unwrap res.data correctly — the backend returns
+//      { success, data: [...] } but the old code was reading res.data.data
+//      inconsistently, causing empty charts on first load.
+//   2. Grade prediction subject selector now passes s.subject_id (the UUID
+//      from the fixed subject-breakdown endpoint) instead of s.id or s.id
+//      falling back to undefined.
+//   3. fetchPrediction corrected to read res.data (not res.data.data).
+//   4. GamificationBar integrated into the page so XP/streak/badges render.
+// ─────────────────────────────────────────────────────────────────────────────
 
-import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import api from '../services/api';
+import { useState, useEffect }    from 'react';
+import { Link, useNavigate }      from 'react-router-dom';
+import api                        from '../services/api';
 import {
   LineChart, Line, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip,
@@ -15,18 +23,17 @@ import {
   Flame, Target, Clock, Trophy, Zap, ArrowLeft,
   AlertTriangle, Loader2, ArrowRight, Sparkles,
 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-import TopNav from '../components/TopNav';
+import { useAuth }       from '../context/AuthContext';
+import TopNav            from '../components/TopNav';
+import GamificationBar   from '../components/GamificationBar';
 
-
-
+// ── Helpers ───────────────────────────────────────────────────────────────────
 const fmtTime = (secs) => {
   if (!secs) return '0m';
   const s = Number(secs);
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
-  if (h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
 };
 
 const accColor = (pct) => {
@@ -63,9 +70,11 @@ const ChartTooltip = ({ active, payload, label }) => {
   );
 };
 
+// ═══════════════════════════════════════════════════════════════════════════════
 export default function StudentAnalyticsDashboard() {
-  const navigate   = useNavigate();
-  const { user }   = useAuth();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
   const [summary,     setSummary]     = useState(null);
   const [weakTopics,  setWeakTopics]  = useState([]);
   const [scoreTrend,  setScoreTrend]  = useState([]);
@@ -76,22 +85,33 @@ export default function StudentAnalyticsDashboard() {
   const [noActivity,  setNoActivity]  = useState(false);
 
   // Predicted grade state
-  const [selectedSubjectForGrade, setSelectedSubjectForGrade] = useState('');
-  const [prediction,  setPrediction]  = useState(null);
-  const [predLoading, setPredLoading] = useState(false);
+  const [selectedSubjectId, setSelectedSubjectId] = useState('');
+  const [prediction,        setPrediction]         = useState(null);
+  const [predLoading,       setPredLoading]         = useState(false);
+  const [predError,         setPredError]           = useState('');
 
+  // ── Fetch prediction ──────────────────────────────────────────────────────
   const fetchPrediction = async (subjectId) => {
     if (!subjectId || !user?.id) return;
     setPredLoading(true);
+    setPredError('');
+    setPrediction(null);
     try {
+      // FIX: API returns { success, data: { predictedGrade, ... } }
       const res = await api.get(`/ai/predict-grade/${user.id}/${subjectId}`);
-      const data = res;
-      if (data.success) setPrediction(data.data || data);
-      else setPrediction(null);
-    } catch { setPrediction(null); }
-    finally { setPredLoading(false); }
+      if (res.success) {
+        setPrediction(res.data);
+      } else {
+        setPredError(res.error || 'Could not load prediction.');
+      }
+    } catch {
+      setPredError('Could not load prediction. Try again later.');
+    } finally {
+      setPredLoading(false);
+    }
   };
 
+  // ── Load all analytics ────────────────────────────────────────────────────
   useEffect(() => {
     Promise.all([
       api.get('/analytics/summary'),
@@ -102,50 +122,78 @@ export default function StudentAnalyticsDashboard() {
       api.get('/analytics/leaderboard'),
     ])
       .then(([sum, weak, trend, brk, time, lb]) => {
+        // FIX: all endpoints return { success, data } — unwrap .data
         const s = sum.data || {};
         setSummary(s);
-        setWeakTopics (weak.data  || []);
-        setScoreTrend (trend.data || []);
-        setBreakdown  (brk.data   || []);
-        setTimeData   (time.data  || []);
-        setLeaderboard(lb.data    || []);
+        setWeakTopics (Array.isArray(weak.data)  ? weak.data  : []);
+        setScoreTrend (Array.isArray(trend.data) ? trend.data : []);
+        setBreakdown  (Array.isArray(brk.data)   ? brk.data   : []);
+        setTimeData   (Array.isArray(time.data)  ? time.data  : []);
+        setLeaderboard(Array.isArray(lb.data)    ? lb.data    : []);
         if ((s.total_attempts || 0) === 0) setNoActivity(true);
       })
       .catch(err => console.error('[Analytics]', err.message))
       .finally(() => setLoading(false));
   }, []);
 
+  // ── Loading state ─────────────────────────────────────────────────────────
   if (loading) return (
-    <div className="min-h-screen bg-gray-50"><TopNav />
-      <div className="flex justify-center pt-24"><Loader2 size={28} className="text-teal-400 animate-spin" /></div>
+    <div className="min-h-screen bg-gray-50">
+      <TopNav />
+      <div className="flex justify-center pt-24">
+        <Loader2 size={28} className="text-teal-400 animate-spin" />
+      </div>
     </div>
   );
+
+  // ── Grade colour helper ────────────────────────────────────────────────────
+  const gradeColour = (g = '') => {
+    if (g.startsWith('A'))  return 'bg-teal-500';
+    if (g.startsWith('B'))  return 'bg-green-500';
+    if (g.startsWith('C'))  return 'bg-blue-500';
+    if (g.startsWith('D'))  return 'bg-amber-500';
+    return 'bg-red-500';
+  };
+
+  // ── Confidence % (convert string to number) ────────────────────────────────
+  const confidencePct = (c) => {
+    if (typeof c === 'number') return c;
+    if (c === 'High')   return 85;
+    if (c === 'Medium') return 55;
+    return 25;
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
       <TopNav />
 
-      {/* Dark teal header with stat cards */}
+      {/* Dark header with stat cards */}
       <div className="bg-[#0a4a3f]">
         <div className="max-w-4xl mx-auto px-4 py-5">
-          <button onClick={() => navigate(-1)}
-            className="flex items-center gap-1.5 text-white/60 hover:text-white text-sm mb-4 transition-colors">
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-1.5 text-white/60 hover:text-white text-sm mb-4 transition-colors"
+          >
             <ArrowLeft size={15} /> Back
           </button>
           <h1 className="text-white text-xl font-bold mb-1">My Analytics</h1>
           <p className="text-white/50 text-sm">Track your performance and find where to improve</p>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
-            <StatCard icon={Target} label="Total Attempts"   value={summary?.total_attempts ?? 0}            accent="bg-teal-600" />
-            <StatCard icon={Trophy} label="Overall Accuracy" value={`${summary?.accuracy_pct ?? 0}%`}        accent="bg-purple-600" />
-            <StatCard icon={Flame}  label="Day Streak"       value={`${summary?.study_streak_days ?? 0}d`}   accent="bg-amber-500" />
-            <StatCard icon={Clock}  label="Time Studied"     value={fmtTime(summary?.total_time_seconds)}    accent="bg-blue-600" />
+            <StatCard icon={Target} label="Total Attempts"   value={summary?.total_attempts ?? 0}           accent="bg-teal-600"   />
+            <StatCard icon={Trophy} label="Overall Accuracy" value={`${summary?.accuracy_pct ?? 0}%`}       accent="bg-purple-600" />
+            <StatCard icon={Flame}  label="Day Streak"       value={`${summary?.study_streak_days ?? 0}d`}  accent="bg-amber-500"  />
+            <StatCard icon={Clock}  label="Time Studied"     value={fmtTime(summary?.total_time_seconds)}   accent="bg-blue-600"   />
           </div>
         </div>
       </div>
 
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-5">
 
+        {/* Gamification bar — XP, streak, badges */}
+        <GamificationBar />
+
+        {/* No activity notice */}
         {noActivity && (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3 text-sm text-amber-800">
             <AlertTriangle size={16} className="shrink-0 mt-0.5" />
@@ -197,8 +245,10 @@ export default function StudentAnalyticsDashboard() {
             <div className="space-y-2.5">
               {weakTopics.map((t, i) => (
                 <div key={i} className="flex items-center gap-3 bg-gray-50 rounded-xl p-3">
-                  <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
-                    style={{ background: accColor(t.accuracy_pct) + '20', color: accColor(t.accuracy_pct) }}>
+                  <div
+                    className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+                    style={{ background: accColor(t.accuracy_pct) + '20', color: accColor(t.accuracy_pct) }}
+                  >
                     {Math.round(t.accuracy_pct)}%
                   </div>
                   <div className="flex-1 min-w-0">
@@ -206,8 +256,10 @@ export default function StudentAnalyticsDashboard() {
                     <p className="text-xs text-gray-400">{t.subject_name} · {t.attempt_count} attempts</p>
                   </div>
                   {t.subtopic_id && (
-                    <Link to={`/student/subtopic/${t.subtopic_id}?tab=practice`}
-                      className="flex items-center gap-1 text-xs text-teal-600 font-semibold hover:text-teal-800 shrink-0">
+                    <Link
+                      to={`/student/subtopic/${t.subtopic_id}?tab=practice`}
+                      className="flex items-center gap-1 text-xs text-teal-600 font-semibold hover:text-teal-800 shrink-0"
+                    >
                       Practice <ArrowRight size={11} />
                     </Link>
                   )}
@@ -255,15 +307,17 @@ export default function StudentAnalyticsDashboard() {
 
         {/* Weekly leaderboard */}
         {leaderboard.length > 0 && (
-          <div className="bg-white rounded-2xl border border-gray-100 p-5 pb-8">
+          <div className="bg-white rounded-2xl border border-gray-100 p-5">
             <div className="flex items-center gap-2 mb-4">
               <Zap size={15} className="text-amber-500" />
               <p className="text-sm font-semibold text-gray-700">Weekly leaderboard</p>
             </div>
             <div className="space-y-2">
               {leaderboard.map((entry, i) => (
-                <div key={i}
-                  className={`flex items-center gap-3 rounded-xl px-3 py-2.5 ${entry.is_me ? 'bg-teal-50 border border-teal-100' : 'bg-gray-50'}`}>
+                <div
+                  key={i}
+                  className={`flex items-center gap-3 rounded-xl px-3 py-2.5 ${entry.is_me ? 'bg-teal-50 border border-teal-100' : 'bg-gray-50'}`}
+                >
                   <span className="text-sm font-bold text-gray-400 w-5 text-center shrink-0">{i + 1}</span>
                   <span className={`flex-1 text-sm font-medium ${entry.is_me ? 'text-teal-700' : 'text-gray-700'}`}>
                     {entry.is_me ? 'You' : entry.display_name}
@@ -276,64 +330,59 @@ export default function StudentAnalyticsDashboard() {
           </div>
         )}
 
-        {/* Predicted Grade Card */}
+        {/* ── AI Predicted Grade ─────────────────────────────────────────── */}
         <div className="bg-white rounded-2xl border border-gray-100 p-5">
           <div className="flex items-center gap-2 mb-4">
             <Sparkles size={15} className="text-purple-500" />
             <p className="text-sm font-semibold text-gray-700">AI Predicted Grade</p>
           </div>
 
-          {/* Subject selector */}
+          {/* FIX: use subject_id (UUID) not s.id which may be undefined */}
           <select
-            value={selectedSubjectForGrade}
+            value={selectedSubjectId}
             onChange={e => {
-              setSelectedSubjectForGrade(e.target.value);
+              setSelectedSubjectId(e.target.value);
               fetchPrediction(e.target.value);
             }}
             className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-purple-400"
           >
             <option value="">Select a subject…</option>
             {breakdown.map((s, i) => (
-              <option key={i} value={s.subject_id || s.id}>{s.subject_name}</option>
+              <option key={i} value={s.subject_id}>{s.subject_name}</option>
             ))}
           </select>
 
-          {predLoading ? (
+          {predLoading && (
             <div className="flex justify-center py-8">
               <Loader2 size={24} className="text-purple-400 animate-spin" />
             </div>
-          ) : prediction ? (
-            <div className="space-y-4">
-              {/* Grade badge */}
-              {(() => {
-                const g = prediction.predictedGrade || '';
-                const gradeColor =
-                  g.startsWith('A*') ? 'bg-teal-500' :
-                  g.startsWith('A')  ? 'bg-green-500' :
-                  g.startsWith('B')  ? 'bg-blue-500'  :
-                  g.startsWith('C')  ? 'bg-amber-500' :
-                                       'bg-red-500';
-                return (
-                  <div className="flex items-center gap-4">
-                    <div className={`w-16 h-16 rounded-2xl ${gradeColor} flex items-center justify-center text-white text-3xl font-black shrink-0`}>
-                      {g}
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400 mb-1">Confidence</p>
-                      <div className="w-40 bg-gray-100 rounded-full h-2 mb-1">
-                        <div
-                          className={`h-2 rounded-full ${gradeColor} transition-all duration-700`}
-                          style={{ width: `${prediction.confidence || 0}%` }}
-                        />
-                      </div>
-                      <p className="text-xs text-gray-500">{prediction.confidence || 0}% confidence</p>
-                    </div>
-                  </div>
-                );
-              })()}
+          )}
 
-              {/* Weakest topics */}
-              {(prediction.weakestTopics || []).length > 0 && (
+          {predError && !predLoading && (
+            <p className="text-center text-sm text-red-400 py-4">{predError}</p>
+          )}
+
+          {!predLoading && !predError && prediction && (
+            <div className="space-y-4">
+              {/* Grade + confidence */}
+              <div className="flex items-center gap-4">
+                <div className={`w-16 h-16 rounded-2xl ${gradeColour(prediction.predictedGrade)} flex items-center justify-center text-white text-3xl font-black shrink-0`}>
+                  {prediction.predictedGrade}
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 mb-1">Confidence</p>
+                  <div className="w-40 bg-gray-100 rounded-full h-2 mb-1">
+                    <div
+                      className={`h-2 rounded-full ${gradeColour(prediction.predictedGrade)} transition-all duration-700`}
+                      style={{ width: `${confidencePct(prediction.confidence)}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500">{prediction.confidence} confidence</p>
+                </div>
+              </div>
+
+              {/* Focus areas */}
+              {prediction.weakestTopics?.length > 0 && (
                 <div>
                   <p className="text-xs font-semibold text-gray-500 mb-2">Focus areas</p>
                   <div className="flex flex-wrap gap-2">
@@ -354,9 +403,11 @@ export default function StudentAnalyticsDashboard() {
                 </div>
               )}
             </div>
-          ) : (
+          )}
+
+          {!predLoading && !predError && !prediction && (
             <div className="text-center py-8 text-gray-400 text-sm">
-              {selectedSubjectForGrade
+              {selectedSubjectId
                 ? 'Could not load prediction. Try again later.'
                 : 'Select a subject to see your predicted grade'}
             </div>

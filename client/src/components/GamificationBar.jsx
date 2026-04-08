@@ -1,4 +1,3 @@
-// client/src/components/GamificationBar.jsx
 // Drop this anywhere in StudentDashboard.jsx:
 //   import GamificationBar from '../components/GamificationBar';
 //   <GamificationBar />
@@ -33,13 +32,13 @@ export default function GamificationBar() {
 
   useEffect(() => {
     api.get('/analytics/summary')
-      .then(r => setData(r.data.data))
+      .then(r => setData(r.data))          // FIX: was r.data.data (api.js already unwraps once)
       .catch(() => {});
   }, []);
 
   useEffect(() => {
     api.get('/analytics/badges')
-      .then(r => setEarned((r.data.data || []).map(b => b.badge_code)))
+      .then(r => setEarned((r.data || []).map(b => b.badge_code)))  // FIX: was r.data.data
       .catch(() => {});
   }, []);
 

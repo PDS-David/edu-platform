@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Eye, EyeOff, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
-import branding from '../config/branding';
+import { Eye, EyeOff, ChevronDown, ChevronUp, AlertCircle, RefreshCw } from 'lucide-react';
+import PublicNav from '../components/PublicNav';
 import api from '../services/api';
 
 // ── Country codes ─────────────────────────────────────────────────────────────
@@ -30,12 +30,83 @@ const GRADE_MAP = {
   'Edexcel A Level':               ['Grade 11/Year 12', 'Grade 12/Year 13'],
   'Edexcel International A Level': ['Grade 11/Year 12', 'Grade 12/Year 13'],
   'WAEC/NECO (SSCE)':              ['SS1', 'SS2', 'SS3'],
+  'WAEC':                          ['SS1', 'SS2', 'SS3'],
+  'NECO':                          ['SS1', 'SS2', 'SS3'],
   'JAMB/UTME':                     ['SS3 / Year 13'],
+  'JAMB':                          ['SS3 / Year 13'],
   'Junior WAEC (BECE)':            ['JSS1', 'JSS2', 'JSS3'],
+  'BECE':                          ['JSS1', 'JSS2', 'JSS3'],
   'IELTS':                         ['All Levels'],
   'TOEFL':                         ['All Levels'],
   'SAT':                           ['Grade 11', 'Grade 12'],
 };
+
+// ── FIX A: Hardcoded fallback curricula used if the API call fails ─────────────
+// This means the Curriculum dropdown is ALWAYS populated, even offline.
+const FALLBACK_CURRICULA = [
+  { id: null, code: 'JAMB',   name: 'JAMB/UTME',           icon_emoji: '📚' },
+  { id: null, code: 'WAEC',   name: 'WAEC/NECO (SSCE)',     icon_emoji: '📚' },
+  { id: null, code: 'BECE',   name: 'Junior WAEC (BECE)',   icon_emoji: '📚' },
+  { id: null, code: 'CAMBAL', name: 'Cambridge A Level',    icon_emoji: '📚' },
+  { id: null, code: 'CAMBOL', name: 'Cambridge O Level',    icon_emoji: '📚' },
+  { id: null, code: 'AQAAL',  name: 'AQA A Level',          icon_emoji: '📚' },
+  { id: null, code: 'EDXAL',  name: 'Edexcel A Level',      icon_emoji: '📚' },
+  { id: null, code: 'IELTS',  name: 'IELTS',                icon_emoji: '📚' },
+  { id: null, code: 'TOEFL',  name: 'TOEFL',                icon_emoji: '📚' },
+  { id: null, code: 'SAT',    name: 'SAT',                  icon_emoji: '📚' },
+];
+
+// ── Resolve grade options for a curriculum ───────────────────────────────────
+// FIX: More robust matching — tries exact name, then code, then partial match,
+// then falls back to sensible defaults instead of generic Grade 1/2/3.
+function getGradeOptions(curriculum) {
+  if (!curriculum) return [];
+  const name = curriculum.name || '';
+  const code = (curriculum.code || '').toUpperCase();
+
+  // Exact name match
+  if (GRADE_MAP[name]) return GRADE_MAP[name];
+
+  // Code-based match
+  const codeMap = {
+    'JAMB': GRADE_MAP['JAMB/UTME'],
+    'WAEC': GRADE_MAP['WAEC/NECO (SSCE)'],
+    'NECO': GRADE_MAP['WAEC/NECO (SSCE)'],
+    'BECE': GRADE_MAP['Junior WAEC (BECE)'],
+    'IELTS': GRADE_MAP['IELTS'],
+    'TOEFL': GRADE_MAP['TOEFL'],
+    'SAT':   GRADE_MAP['SAT'],
+  };
+  if (codeMap[code]) return codeMap[code];
+
+  // Partial name match (case-insensitive)
+  const lowerName = name.toLowerCase();
+  if (lowerName.includes('jamb'))     return GRADE_MAP['JAMB/UTME'];
+  if (lowerName.includes('waec') || lowerName.includes('neco') || lowerName.includes('ssce'))
+    return GRADE_MAP['WAEC/NECO (SSCE)'];
+  if (lowerName.includes('junior') || lowerName.includes('bece') || lowerName.includes('jss'))
+    return GRADE_MAP['Junior WAEC (BECE)'];
+  if (lowerName.includes('cambridge') && lowerName.includes('primary'))
+    return GRADE_MAP['Cambridge Primary'];
+  if (lowerName.includes('cambridge') && (lowerName.includes('o level') || lowerName.includes('igcse')))
+    return GRADE_MAP['Cambridge O Level'];
+  if (lowerName.includes('cambridge') && lowerName.includes('pre'))
+    return GRADE_MAP['Cambridge Pre IGCSE'];
+  if (lowerName.includes('cambridge'))
+    return GRADE_MAP['Cambridge A Level'];
+  if (lowerName.includes('aqa'))
+    return GRADE_MAP['AQA A Level'];
+  if (lowerName.includes('edexcel') && lowerName.includes('international'))
+    return GRADE_MAP['Edexcel International A Level'];
+  if (lowerName.includes('edexcel'))
+    return GRADE_MAP['Edexcel A Level'];
+  if (lowerName.includes('ielts')) return GRADE_MAP['IELTS'];
+  if (lowerName.includes('toefl')) return GRADE_MAP['TOEFL'];
+  if (lowerName.includes('sat'))   return GRADE_MAP['SAT'];
+
+  // Sensible default for unknown curricula
+  return ['Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5', 'Year 6'];
+}
 
 // ── Country Code Picker ───────────────────────────────────────────────────────
 function CountryCodePicker({ selected, onChange }) {
@@ -83,7 +154,7 @@ function CountryCodePicker({ selected, onChange }) {
 }
 
 // ── Custom Dropdown ───────────────────────────────────────────────────────────
-function CustomDropdown({ value, options, onChange, disabled, placeholder }) {
+function CustomDropdown({ value, options, onChange, disabled, placeholder, loading }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -94,6 +165,11 @@ function CustomDropdown({ value, options, onChange, disabled, placeholder }) {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  // Close when disabled changes to true
+  useEffect(() => {
+    if (disabled) setOpen(false);
+  }, [disabled]);
 
   return (
     <div className="relative w-full" ref={ref}>
@@ -109,17 +185,22 @@ function CustomDropdown({ value, options, onChange, disabled, placeholder }) {
         `}
       >
         <span className={value ? 'text-gray-900 truncate' : 'text-gray-400'}>
-          {value || placeholder}
+          {loading ? 'Loading…' : (value || placeholder)}
         </span>
-        {open
-          ? <ChevronUp size={15} className="text-gray-400 shrink-0 ml-1" />
-          : <ChevronDown size={15} className="text-gray-400 shrink-0 ml-1" />
+        {loading
+          ? <svg className="animate-spin h-4 w-4 text-gray-400 shrink-0 ml-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            </svg>
+          : open
+            ? <ChevronUp size={15} className="text-gray-400 shrink-0 ml-1" />
+            : <ChevronDown size={15} className="text-gray-400 shrink-0 ml-1" />
         }
       </button>
       {open && options.length > 0 && (
         <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-56 overflow-y-auto">
           {options.map((opt, i) => {
-            const optLabel = opt.name || opt;
+            const optLabel = typeof opt === 'string' ? opt : (opt.name || String(opt));
             return (
               <button
                 key={i}
@@ -132,6 +213,12 @@ function CustomDropdown({ value, options, onChange, disabled, placeholder }) {
               </button>
             );
           })}
+        </div>
+      )}
+      {/* FIX: Show a message when dropdown is open but has no options */}
+      {open && options.length === 0 && (
+        <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl px-4 py-3">
+          <p className="text-sm text-gray-400 text-center">No options available</p>
         </div>
       )}
     </div>
@@ -154,6 +241,8 @@ const RegisterPage = () => {
   const [selectedGrade,      setSelectedGrade]      = useState('');
   const [curricula,          setCurricula]          = useState([]);
   const [loadingCurricula,   setLoadingCurricula]   = useState(true);
+  // FIX A: Track API failure so we can show the fallback list
+  const [usingFallback,      setUsingFallback]      = useState(false);
   const [error,              setError]              = useState('');
   const [loading,            setLoading]            = useState(false);
   const [termsAccepted,      setTermsAccepted]      = useState(false);
@@ -161,32 +250,56 @@ const RegisterPage = () => {
   const { register } = useAuth();
   const navigate      = useNavigate();
 
-  useEffect(() => {
+  // ── FIX A: Fetch curricula with fallback on failure ───────────────────────
+  const fetchCurricula = () => {
+    setLoadingCurricula(true);
+    setUsingFallback(false);
+
     api.get('/exam-boards')
-      .then(res => setCurricula(res.data || []))
-      .catch(() => setCurricula([]))
+      .then(res => {
+        // api.js interceptor returns response.data directly
+        // res = { success, count, data: [...boards] }
+        const boards = res.data || res || [];
+        if (Array.isArray(boards) && boards.length > 0) {
+          setCurricula(boards);
+          setUsingFallback(false);
+        } else {
+          // Empty response — use fallback
+          setCurricula(FALLBACK_CURRICULA);
+          setUsingFallback(true);
+        }
+      })
+      .catch(() => {
+        // API unreachable — use hardcoded fallback so user is never stuck
+        setCurricula(FALLBACK_CURRICULA);
+        setUsingFallback(true);
+      })
       .finally(() => setLoadingCurricula(false));
+  };
+
+  useEffect(() => {
+    fetchCurricula();
   }, []);
 
-  const gradeOptions = selectedCurriculum
-    ? (GRADE_MAP[selectedCurriculum.name] || ['Grade 1', 'Grade 2', 'Grade 3'])
-    : [];
+  // FIX: Use robust grade resolution instead of exact key lookup
+  const gradeOptions = getGradeOptions(selectedCurriculum);
 
   const handleChange = (e) =>
     setFormData(f => ({ ...f, [e.target.name]: e.target.value }));
 
   const handleCurriculumChange = (opt) => {
     setSelectedCurriculum(opt);
-    setSelectedGrade('');
+    setSelectedGrade(''); // reset grade whenever curriculum changes
   };
 
+  // FIX B: Password minimum aligned with backend (8 chars, not 6)
   const isReady =
-    formData.fullName.trim() &&
-    formData.email.trim() &&
-    formData.phone.trim() &&
-    formData.password.trim() &&
-    selectedCurriculum &&
-    selectedGrade &&
+    formData.fullName.trim().length > 0 &&
+    formData.email.trim().length > 0 &&
+    formData.phone.trim().length > 0 &&
+    formData.password.length >= 8 &&    // ← was >= 6, backend requires >= 8
+    selectedCurriculum !== null &&
+    selectedGrade !== '' &&
     termsAccepted;
 
   const handleSubmit = async (e) => {
@@ -194,23 +307,24 @@ const RegisterPage = () => {
     setError('');
 
     if (!selectedCurriculum) { setError('Please select a curriculum.'); return; }
-    if (!selectedGrade)       { setError('Please select a grade.'); return; }
-    if (formData.password.length < 6) { setError('Password must be at least 6 characters.'); return; }
+    if (!selectedGrade)       { setError('Please select your grade.'); return; }
+    // FIX B: Check aligned with backend minimum
+    if (formData.password.length < 8) { setError('Password must be at least 8 characters.'); return; }
 
     const nameParts = formData.fullName.trim().split(/\s+/);
     const firstName = nameParts[0] || '';
-    const lastName  = nameParts.slice(1).join(' ') || '';
+    const lastName  = nameParts.slice(1).join(' ') || firstName; // fallback: repeat first name if no surname
 
     setLoading(true);
     try {
       const user = await register({
         firstName,
         lastName,
-        email:             formData.email,
-        phone:             `${countryCode.dial}${formData.phone}`,
+        email:             formData.email.trim().toLowerCase(),
+        phone:             `${countryCode.dial}${formData.phone.trim()}`,
         password:          formData.password,
         role:              formData.role,
-        pendingExamBoards: [selectedCurriculum.id],
+        pendingExamBoards: selectedCurriculum.id ? [selectedCurriculum.id] : [],
         grade:             selectedGrade,
         terms_accepted:    true,
       });
@@ -219,50 +333,32 @@ const RegisterPage = () => {
       else if (user.role === 'teacher') navigate('/teacher/dashboard');
       else                              navigate('/admin/dashboard');
     } catch (err) {
-      setError(err.error || 'Registration failed. Please try again.');
+      // FIX C: AuthContext throws { message }, not { error }
+      // Handle both shapes defensively
+      setError(err.message || err.error || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  // EAC brand colors from the landing page
-  const BG_GRADIENT   = 'linear-gradient(135deg, #f0f4ff 0%, #e8eeff 50%, #f5f0ff 100%)';
-  const BTN_ACTIVE    = 'linear-gradient(135deg, #4f46e5 0%, #6d28d9 100%)';
-  const ACCENT        = '#6366f1'; // indigo-500
+  const BG_GRADIENT = 'linear-gradient(135deg, #f0f4ff 0%, #e8eeff 50%, #f5f0ff 100%)';
+  const BTN_ACTIVE  = 'linear-gradient(135deg, #4f46e5 0%, #6d28d9 100%)';
+  const ACCENT      = '#6366f1';
 
   return (
-    /* Full-screen background matching EAC landing page navy/indigo */
-    <div
-      className="min-h-screen flex flex-col"
-      style={{ background: BG_GRADIENT }}
-    >
-      {/* ── Top nav bar — logo links home (mirrors AI Buddy pattern) ── */}
-      <header className="w-full px-6 py-4 flex items-center">
-        <Link
-          to="/"
-          className="flex items-center gap-2 group"
-          title="Back to Home"
-        >
-          <img
-            src={branding.logo.main}
-            alt={branding.platformName}
-            className="h-10 w-auto object-contain transition-opacity group-hover:opacity-80"
-          />
-        </Link>
-      </header>
+    <div className="min-h-screen flex flex-col" style={{ background: BG_GRADIENT }}>
+      <PublicNav />
 
-      {/* ── Centered card spreads across the screen ── */}
       <div className="flex-1 flex items-center justify-center px-4 py-8">
         <div
           className="w-full max-w-5xl rounded-3xl shadow-2xl overflow-hidden flex"
           style={{ minHeight: '580px' }}
         >
-          {/* ── Left panel — tagline + illustration ── */}
+          {/* ── Left panel ── */}
           <div
             className="hidden md:flex flex-col justify-center items-start flex-1 px-10 py-12 relative"
             style={{ background: 'linear-gradient(160deg, #3730a3 0%, #4338ca 50%, #2563eb 100%)' }}
           >
-            {/* Decorative circles */}
             <div className="absolute top-0 right-0 w-48 h-48 rounded-full opacity-10"
               style={{ background: 'radial-gradient(circle, #818cf8, transparent)', transform: 'translate(30%, -30%)' }} />
             <div className="absolute bottom-0 left-0 w-40 h-40 rounded-full opacity-10"
@@ -278,33 +374,26 @@ const RegisterPage = () => {
               achieve exam success!
             </p>
 
-            {/* SVG illustration */}
             <div className="mt-8 w-64 xl:w-72 relative z-10">
               <svg viewBox="0 0 280 230" xmlns="http://www.w3.org/2000/svg" className="w-full drop-shadow-2xl">
-                {/* Laptop */}
                 <rect x="55" y="158" width="170" height="13" rx="5" fill="#7c3aed" opacity="0.9"/>
                 <rect x="70" y="90"  width="140" height="70" rx="6" fill="#4c1d95"/>
                 <rect x="74" y="94"  width="132" height="62" rx="4" fill="#1e1b4b"/>
                 <rect x="78" y="98"  width="124" height="54" rx="3" fill="#0f0a2e"/>
-                {/* Screen content */}
                 <rect x="82" y="102" width="60" height="8" rx="2" fill="#818cf8" opacity="0.8"/>
                 <rect x="82" y="114" width="40" height="5" rx="2" fill="#a78bfa" opacity="0.5"/>
                 <rect x="82" y="123" width="50" height="5" rx="2" fill="#a78bfa" opacity="0.4"/>
                 <rect x="82" y="132" width="35" height="5" rx="2" fill="#a78bfa" opacity="0.3"/>
-                {/* Atom */}
                 <circle cx="175" cy="122" r="14" fill="none" stroke="#818cf8" strokeWidth="1.5" opacity="0.7"/>
                 <circle cx="175" cy="122" r="4"  fill="#f472b6"/>
                 <ellipse cx="175" cy="122" rx="14" ry="5" fill="none" stroke="#c4b5fd" strokeWidth="1" opacity="0.6"/>
                 <ellipse cx="175" cy="122" rx="14" ry="5" fill="none" stroke="#c4b5fd" strokeWidth="1" opacity="0.6" transform="rotate(60 175 122)"/>
                 <ellipse cx="175" cy="122" rx="14" ry="5" fill="none" stroke="#c4b5fd" strokeWidth="1" opacity="0.6" transform="rotate(-60 175 122)"/>
-                {/* Test tubes */}
                 <rect x="130" y="115" width="14" height="34" rx="7" fill="#34d399" opacity="0.85"/>
                 <rect x="148" y="108" width="14" height="42" rx="7" fill="#f472b6" opacity="0.85"/>
                 <rect x="112" y="120" width="14" height="28" rx="7" fill="#fbbf24" opacity="0.85"/>
-                {/* Pipette */}
-                <rect x="164" y="88" width="6" height="28" rx="3" fill="#e2e8f0" opacity="0.9"/>
+                <rect x="164" y="88"  width="6"  height="28" rx="3" fill="#e2e8f0" opacity="0.9"/>
                 <polygon points="164,116 170,116 167,126" fill="#818cf8" opacity="0.9"/>
-                {/* Dots */}
                 <circle cx="100" cy="100" r="3"   fill="#f472b6" opacity="0.7"/>
                 <circle cx="210" cy="95"  r="2.5" fill="#818cf8" opacity="0.7"/>
                 <circle cx="95"  cy="145" r="2"   fill="#fbbf24" opacity="0.6"/>
@@ -329,6 +418,22 @@ const RegisterPage = () => {
                 <div className="mb-5 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
                   <p className="text-sm text-red-600">{error}</p>
+                </div>
+              )}
+
+              {/* FIX A: Offline / fallback notice with retry button */}
+              {usingFallback && !loadingCurricula && (
+                <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between gap-2">
+                  <p className="text-xs text-amber-700">
+                    Using offline curriculum list — some options may differ.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={fetchCurricula}
+                    className="flex items-center gap-1 text-xs text-amber-700 font-semibold hover:text-amber-900 shrink-0"
+                  >
+                    <RefreshCw size={12} /> Retry
+                  </button>
                 </div>
               )}
 
@@ -395,8 +500,9 @@ const RegisterPage = () => {
                     type={showPassword ? 'text' : 'password'}
                     value={formData.password}
                     onChange={handleChange}
-                    placeholder="Password"
+                    placeholder="Password (min 8 characters)"
                     required
+                    minLength={8}
                     className="w-full px-4 py-3 pr-11 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-colors"
                   />
                   <button
@@ -407,6 +513,12 @@ const RegisterPage = () => {
                   >
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
+                  {/* FIX B: Live password strength indicator */}
+                  {formData.password.length > 0 && formData.password.length < 8 && (
+                    <p className="text-xs text-amber-600 mt-1 ml-1">
+                      {8 - formData.password.length} more character{8 - formData.password.length !== 1 ? 's' : ''} needed
+                    </p>
+                  )}
                 </div>
 
                 {/* Curriculum & Grade */}
@@ -418,8 +530,9 @@ const RegisterPage = () => {
                     <CustomDropdown
                       placeholder="Curriculum"
                       value={selectedCurriculum?.name || ''}
-                      options={loadingCurricula ? [{ name: 'Loading…' }] : curricula}
+                      options={curricula}
                       onChange={handleCurriculumChange}
+                      loading={loadingCurricula}
                     />
                   </div>
                   <div className="relative flex-1">
@@ -430,8 +543,8 @@ const RegisterPage = () => {
                       placeholder="Grade"
                       value={selectedGrade}
                       options={gradeOptions}
-                      onChange={(opt) => setSelectedGrade(opt.name || opt)}
-                      disabled={!selectedCurriculum}
+                      onChange={(opt) => setSelectedGrade(typeof opt === 'string' ? opt : (opt.name || opt))}
+                      disabled={!selectedCurriculum || loadingCurricula}
                     />
                   </div>
                 </div>

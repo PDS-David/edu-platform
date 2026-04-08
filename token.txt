@@ -1,0 +1,22 @@
+curl -X POST http://localhost:5000/api/ai/chat ^
+-H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImE3Zjg5YjRlLWQzZjItNDk1NS04MjI3LWJkNWJkNjBmNDA5YSIsInJvbGUiOiJzdHVkZW50IiwiaWF0IjoxNzc1NjA0NTY5LCJleHAiOjE3NzYyMDkzNjksImlzcyI6ImVkdS1wbGF0Zm9ybSJ9.94urRvNi01uee-1OSUXq6pBdvgs-MbuGxY6PA-XY1vU" ^
+-H "Content-Type: application/json" ^
+-d "{\"message\":\"Explain photosynthesis\"}"
+ 
+
+curl -X POST http://localhost:5000/api/ai/chat ^
+-H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImE3Zjg5YjRlLWQzZjItNDk1NS04MjI3LWJkNWJkNjBmNDA5YSIsInJvbGUiOiJzdHVkZW50IiwiaWF0IjoxNzc1NjA0NTY5LCJleHAiOjE3NzYyMDkzNjksImlzcyI6ImVkdS1wbGF0Zm9ybSJ9.94urRvNi01uee-1OSUXq6pBdvgs-MbuGxY6PA-XY1vU
+-H "Content-Type: application/json" ^
+-d "{\"message\":\"Explain photosynthesis\"}"
+
+
+
+node -e "
+const jwt = require('jsonwebtoken');
+
+const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImE3Zjg5YjRlLWQzZjItNDk1NS04MjI3LWJkNWJkNjBmNDA5YSIsInJvbGUiOiJzdHVkZW50IiwiaWF0IjoxNzc1NTk4MzMxLCJleHAiOjE3NzYyMDMxMzEsImlzcyI6ImVkdS1wbGF0Zm9ybSJ9.DG91hSfBkRV371p2MplQtdvRPjeCkKqjT6kElxZ4ULE';
+const secret = process.env.JWT_SECRET;
+
+console.log('SECRET:', secret);
+console.log(jwt.verify(token, secret));
+"

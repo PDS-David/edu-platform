@@ -4,6 +4,7 @@ import { Menu, X, BookOpen, Search, AlertCircle, RefreshCw } from 'lucide-react'
 import ExamBoardSelector from '../components/ExamBoardSelector';
 import SubjectCard from '../components/SubjectCard';
 import branding from '../config/branding';
+import PublicNav from '../components/PublicNav';
 
 const SubjectCatalog = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -66,74 +67,33 @@ const SubjectCatalog = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
 
-      {/* ── Navbar (matches LandingPage exactly) ── */}
-      <nav className="fixed top-0 w-full bg-white/80 backdrop-blur-lg shadow-sm z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-20">
-
-            {/* Logo */}
-            <div className="flex items-center">
-              <Link to="/">
-                <img
-                  src={branding.logo.main}
-                  alt="EAC Learning Platform"
-                  className="h-14 w-auto object-contain"
-                />
-              </Link>
+      {/* ── Navbar ── */}
+      <PublicNav
+        right={
+          <>
+            <div className="hidden md:flex items-center gap-6 text-sm font-medium text-gray-600">
+              <Link to="/" className="hover:text-blue-600 transition-colors">Home</Link>
+              <Link to="/subjects" className="text-green-600 font-semibold border-b-2 border-green-600 pb-0.5">Subjects</Link>
+              <Link to="/login" className="hover:text-blue-600 transition-colors">Sign In</Link>
+              <Link to="/register" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-xl transition-colors text-sm">Get Started</Link>
             </div>
-
-            {/* Desktop Menu */}
-            <div className="hidden md:flex items-center space-x-8">
-              <Link to="/" className="text-gray-700 hover:text-primary-600 font-medium transition-colors">
-                Home
-              </Link>
-              <Link
-                to="/subjects"
-                className="text-green-600 font-semibold border-b-2 border-green-600 pb-0.5 transition-colors"
-              >
-                Subjects
-              </Link>
-              <Link to="/login" className="text-gray-700 hover:text-primary-600 font-medium transition-colors">
-                Sign In
-              </Link>
-              <Link to="/register" className="btn-primary">
-                Get Started
-              </Link>
-            </div>
-
-            {/* Mobile Menu Button */}
-            <button
-              className="md:hidden"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            <button className="md:hidden p-2 text-gray-500 hover:text-gray-700" onClick={() => setMobileMenuOpen(o => !o)}>
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
-          </div>
+          </>
+        }
+      />
+      {mobileMenuOpen && (
+        <div className="md:hidden bg-white border-b border-gray-100 sticky top-14 z-40 px-4 py-4 space-y-3">
+          <Link to="/" className="block text-sm font-medium text-gray-700 hover:text-blue-600">Home</Link>
+          <Link to="/subjects" className="block text-sm font-semibold text-green-600">Subjects</Link>
+          <Link to="/login" className="block text-sm font-medium text-gray-700 hover:text-blue-600">Sign In</Link>
+          <Link to="/register" className="block w-full text-center bg-blue-600 text-white font-semibold px-4 py-2.5 rounded-xl text-sm">Get Started</Link>
         </div>
-
-        {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <div className="md:hidden bg-white border-t">
-            <div className="px-4 py-4 space-y-3">
-              <Link to="/" className="block text-gray-700 hover:text-primary-600 font-medium">
-                Home
-              </Link>
-              <Link to="/subjects" className="block text-green-600 font-semibold">
-                Subjects
-              </Link>
-              <Link to="/login" className="block text-gray-700 hover:text-primary-600 font-medium">
-                Sign In
-              </Link>
-              <Link to="/register" className="block btn-primary text-center">
-                Get Started
-              </Link>
-            </div>
-          </div>
-        )}
-      </nav>
+      )}
 
       {/* ── Page Content ── */}
-      <main className="pt-28 pb-20 px-4">
+      <main className="pt-6 pb-20 px-4">
         <div className="max-w-7xl mx-auto">
 
           {/* ── Page Header ── */}

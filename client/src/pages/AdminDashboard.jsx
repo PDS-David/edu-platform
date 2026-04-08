@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import axios from 'axios';
+import { useNavigate, Link } from 'react-router-dom';
+import api from '../services/api';
 import {
   Users, School, BookOpen, Settings, LogOut,
   Plus, Pencil, Trash2, ChevronDown, ChevronRight,
@@ -8,20 +9,12 @@ import {
   UserCheck, ChevronUp, Sparkles, Zap
 } from 'lucide-react';
 import branding from '../config/branding';
+import TopNav from '../components/TopNav';
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Cell,
 } from 'recharts';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-
-// ── Axios instance that always sends the JWT token ────────────────────────────
-const authAxios = axios.create({ baseURL: API_URL });
-authAxios.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
 
 // ─── Reusable Modal ───────────────────────────────────────────────────────────
 const Modal = ({ title, onClose, children }) => (
@@ -83,10 +76,10 @@ const CatalogPanel = () => {
   const fetchTypes = async () => {
     setLoading(true);
     try {
-      const res = await authAxios.get('/catalog/types');
-      if (res.data?.success) setTypes(res.data.data);
+      const res = await api.get('/catalog/types');
+      if (res?.success) setTypes(res);
     } catch (err) {
-      const msg = err?.response?.status === 401
+      const msg = err?.status === 401
         ? 'Session expired — please log out and log back in'
         : 'Failed to load examination types';
       showToast(msg, 'error');
@@ -101,9 +94,9 @@ const CatalogPanel = () => {
   const fetchSubjects = async (typeId) => {
     setLoadingSubjects(prev => ({ ...prev, [typeId]: true }));
     try {
-      const res = await authAxios.get(`/catalog/types/${typeId}/subjects`);
-      if (res.data?.success) {
-        setTypeSubjects(prev => ({ ...prev, [typeId]: res.data.data }));
+      const res = await api.get(`/catalog/types/${typeId}/subjects`);
+      if (res?.success) {
+        setTypeSubjects(prev => ({ ...prev, [typeId]: res }));
       }
     } catch {
       showToast('Failed to load subjects', 'error');
@@ -168,16 +161,16 @@ const CatalogPanel = () => {
     setSaving(true);
     try {
       if (editingType) {
-        await authAxios.put(`/catalog/types/${editingType.id}`, typeForm);
+        await api.put(`/catalog/types/${editingType.id}`, typeForm);
         showToast('Examination type updated');
       } else {
-        await authAxios.post('/catalog/types', typeForm);
+        await api.post('/catalog/types', typeForm);
         showToast('Examination type created');
       }
       setShowTypeModal(false);
       fetchTypes();
     } catch (err) {
-      showToast(err?.response?.data?.error || 'Failed to save', 'error');
+      showToast(err?.error || 'Failed to save', 'error');
     } finally {
       setSaving(false);
     }
@@ -188,10 +181,10 @@ const CatalogPanel = () => {
     setSaving(true);
     try {
       if (editingSubject) {
-        await authAxios.put(`/catalog/subjects/${editingSubject.id}`, subjectForm);
+        await api.put(`/catalog/subjects/${editingSubject.id}`, subjectForm);
         showToast('Subject updated');
       } else {
-        await authAxios.post(`/catalog/types/${activeTypeId}/subjects`, subjectForm);
+        await api.post(`/catalog/types/${activeTypeId}/subjects`, subjectForm);
         showToast('Subject added');
       }
       setShowSubjectModal(false);
@@ -199,7 +192,7 @@ const CatalogPanel = () => {
       // Refresh types to update subject count
       fetchTypes();
     } catch (err) {
-      showToast(err?.response?.data?.error || 'Failed to save', 'error');
+      showToast(err?.error || 'Failed to save', 'error');
     } finally {
       setSaving(false);
     }
@@ -210,17 +203,17 @@ const CatalogPanel = () => {
     try {
       const { kind, id } = showDeleteConfirm;
       if (kind === 'type') {
-        await authAxios.delete(`/catalog/types/${id}`);
+        await api.delete(`/catalog/types/${id}`);
         showToast('Examination type deactivated');
         fetchTypes();
       } else {
-        await authAxios.delete(`/catalog/subjects/${id}`);
+        await api.delete(`/catalog/subjects/${id}`);
         showToast('Subject deactivated');
         fetchSubjects(activeTypeId);
         fetchTypes();
       }
     } catch (err) {
-      showToast(err?.response?.data?.error || 'Failed to deactivate', 'error');
+      showToast(err?.error || 'Failed to deactivate', 'error');
     } finally {
       setShowDeleteConfirm(null);
     }
@@ -670,8 +663,8 @@ const TeacherPanel = () => {
   const fetchTeachers = async () => {
     setLoading(true);
     try {
-      const res = await authAxios.get('/catalog/teachers');
-      if (res.data?.success) setTeachers(res.data.data);
+      const res = await api.get('/catalog/teachers');
+      if (res?.success) setTeachers(res);
     } catch { showToast('Failed to load teachers', 'error'); }
     finally { setLoading(false); }
   };
@@ -679,15 +672,15 @@ const TeacherPanel = () => {
   const fetchAllSubjects = async () => {
     try {
       // Single efficient query — no N+1
-      const res = await authAxios.get('/catalog/all-subjects');
-      if (res.data?.success) setAllSubjects(res.data.data);
+      const res = await api.get('/catalog/all-subjects');
+      if (res?.success) setAllSubjects(res);
     } catch {}
   };
 
   const fetchTeacherSubjects = async (teacherId) => {
     try {
-      const res = await authAxios.get(`/catalog/teachers/${teacherId}/subjects`);
-      if (res.data?.success) setTeacherSubjects(p => ({ ...p, [teacherId]: res.data.data }));
+      const res = await api.get(`/catalog/teachers/${teacherId}/subjects`);
+      if (res?.success) setTeacherSubjects(p => ({ ...p, [teacherId]: res }));
     } catch {}
   };
 
@@ -711,19 +704,19 @@ const TeacherPanel = () => {
     if (!selectedSubjects.length) { showToast('Select at least one subject', 'error'); return; }
     setSaving(true);
     try {
-      await authAxios.post(`/catalog/teachers/${showAssignModal}/assign`, { subject_ids: selectedSubjects });
+      await api.post(`/catalog/teachers/${showAssignModal}/assign`, { subject_ids: selectedSubjects });
       showToast('Subjects assigned successfully');
       setShowAssignModal(null);
       fetchTeacherSubjects(showAssignModal);
       fetchTeachers();
     } catch (err) {
-      showToast(err?.response?.data?.error || 'Failed to assign', 'error');
+      showToast(err?.error || 'Failed to assign', 'error');
     } finally { setSaving(false); }
   };
 
   const revokeSubject = async (teacherId, subjectId) => {
     try {
-      await authAxios.delete(`/catalog/teachers/${teacherId}/subjects/${subjectId}`);
+      await api.delete(`/catalog/teachers/${teacherId}/subjects/${subjectId}`);
       showToast('Subject revoked');
       fetchTeacherSubjects(teacherId);
       fetchTeachers();
@@ -862,6 +855,8 @@ const TeacherPanel = () => {
 };
 
 // ─── AI Generate Panel ────────────────────────────────────────────────────────
+// PROMPT 1: Shows concept_hint preview in generated question list.
+//           Questions badge shows ✦ AI for AI-generated items.
 const AIGeneratePanel = () => {
   const [subjects,     setSubjects]     = useState([]);
   const [subjectsLoad, setSubjectsLoad] = useState(true);
@@ -873,14 +868,16 @@ const AIGeneratePanel = () => {
   const [generating, setGenerating]     = useState(false);
   const [result,     setResult]         = useState(null);
   const [error,      setError]          = useState('');
+  // PROMPT 1: preview list of generated questions (with concept_hint)
+  const [previewQuestions, setPreviewQuestions] = useState([]);
 
   useEffect(() => {
-    authAxios.get('/admin/subjects')
-      .then(r => setSubjects(r.data.data || []))
+    api.get('/admin/subjects')
+      .then(r => setSubjects(r.data || r || []))
       .catch(() => {})
       .finally(() => setSubjectsLoad(false));
-    authAxios.get('/admin/questions/pending-count')
-      .then(r => setPendingCount(r.data.count))
+    api.get('/admin/questions/pending-count')
+      .then(r => setPendingCount(r.count))
       .catch(() => {});
   }, []);
 
@@ -889,13 +886,15 @@ const AIGeneratePanel = () => {
     if (!form.subject_id || !form.topic.trim()) {
       setError('Subject and topic are required.'); return;
     }
-    setError(''); setResult(null); setGenerating(true);
+    setError(''); setResult(null); setPreviewQuestions([]); setGenerating(true);
     try {
-      const { data } = await authAxios.post('/admin/generate-questions', form);
-      setResult(data);
-      setPendingCount(c => (c || 0) + (data.inserted || 0));
+      const res = await api.post('/admin/generate-questions', form);
+      setResult(res);
+      // PROMPT 1: server now returns questions array with concept_hint
+      if (Array.isArray(res.questions)) setPreviewQuestions(res.questions);
+      setPendingCount(c => (c || 0) + (res.inserted || 0));
     } catch (err) {
-      setError(err.response?.data?.error || 'Generation failed.');
+      setError(err?.error || 'Generation failed.');
     } finally {
       setGenerating(false);
     }
@@ -1002,6 +1001,41 @@ const AIGeneratePanel = () => {
             : <><Sparkles size={14} /> Generate Questions</>}
         </button>
       </form>
+
+      {/* PROMPT 1: Generated questions preview with concept_hint */}
+      {previewQuestions.length > 0 && (
+        <div className="mt-6 max-w-lg">
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles size={14} className="text-teal-500" />
+            <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+              Generated Questions Preview ({previewQuestions.length})
+            </p>
+            <span className="text-[10px] font-bold bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full">
+              ✦ AI • Pending Review
+            </span>
+          </div>
+          <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+            {previewQuestions.map((q, i) => (
+              <div key={q.id || i} className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                <p className="text-sm font-medium text-gray-800 mb-2 leading-relaxed">
+                  {i + 1}. {q.question_text}
+                </p>
+                {q.concept_hint && (
+                  <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-2">
+                    <Zap size={12} className="text-amber-500 shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-700 leading-relaxed">
+                      <span className="font-semibold">Concept hint: </span>{q.concept_hint}
+                    </p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-gray-400 mt-3">
+            Go to <strong>Question Review</strong> to approve these before they appear in quizzes.
+          </p>
+        </div>
+      )}
     </div>
   );
 };
@@ -1025,8 +1059,8 @@ const UserManagementPanel = () => {
 
   // Fetch stats once on mount
   useEffect(() => {
-    authAxios.get('/users/stats')
-      .then(r => { if (r.data.success) setUserStats(r.data.data); })
+    api.get('/users/stats')
+      .then(r => { if (r.success) setUserStats(r.data); })
       .catch(() => {});
   }, []);
 
@@ -1039,11 +1073,11 @@ const UserManagementPanel = () => {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const r = await authAxios.get('/users', {
+      const r = await api.get('/users', {
         params: { search, role: roleFilter, page, limit: LIMIT },
       });
-      setUsers(r.data.data || []);
-      setTotal(r.data.total || 0);
+      setUsers(r || []);
+      setTotal(r.total || 0);
     } catch {
       showToast('Failed to load users', 'error');
     } finally {
@@ -1053,7 +1087,7 @@ const UserManagementPanel = () => {
 
   const changeRole = async (userId, role) => {
     try {
-      await authAxios.put(`/users/${userId}/role`, { role });
+      await api.put(`/users/${userId}/role`, { role });
       showToast(`Role updated to ${role}`);
       fetchUsers();
     } catch {
@@ -1063,11 +1097,22 @@ const UserManagementPanel = () => {
 
   const toggleActive = async (userId, currentActive) => {
     try {
-      await authAxios.put(`/users/${userId}/deactivate`, { is_active: !currentActive });
+      await api.put(`/users/${userId}/deactivate`, { is_active: !currentActive });
       showToast(!currentActive ? 'User activated' : 'User deactivated');
       fetchUsers();
     } catch {
       showToast('Failed to update user status', 'error');
+    }
+  };
+
+  const deleteUser = async (userId, email) => {
+    if (!window.confirm(`Permanently delete user "${email}"? This cannot be undone.`)) return;
+    try {
+      await api.delete(`/users/${userId}`);
+      showToast(`User ${email} deleted`);
+      fetchUsers();
+    } catch (err) {
+      showToast(err?.error || 'Failed to delete user', 'error');
     }
   };
 
@@ -1201,6 +1246,14 @@ const UserManagementPanel = () => {
                       >
                         {u.is_active ? 'Deactivate' : 'Activate'}
                       </button>
+                      {/* Delete button */}
+                      <button
+                        onClick={() => deleteUser(u.id, u.email)}
+                        title="Permanently delete user"
+                        className="text-xs px-2.5 py-1 rounded-lg font-semibold bg-gray-100 text-gray-500 hover:bg-red-100 hover:text-red-600 transition-colors"
+                      >
+                        <Trash2 size={12} />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -1251,10 +1304,10 @@ const PlatformAnalyticsPanel = () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await authAxios.get('/admin/platform-stats');
-      if (res.data?.success) setStats(res.data.data);
+      const res = await api.get('/admin/platform-stats');
+      if (res?.success) setStats(res);
     } catch (err) {
-      setError(err?.response?.data?.error || 'Failed to load analytics');
+      setError(err?.error || 'Failed to load analytics');
     } finally {
       setLoading(false);
     }
@@ -1392,7 +1445,7 @@ const PlatformAnalyticsPanel = () => {
           <button
             onClick={async () => {
               try {
-                await authAxios.post('/admin/send-weekly-digest');
+                await api.post('/admin/send-weekly-digest');
                 alert('Weekly digest queued successfully.');
               } catch {
                 alert('Failed to queue digest. Check server logs.');
@@ -1403,10 +1456,7 @@ const PlatformAnalyticsPanel = () => {
             <Zap size={14} /> Run Weekly Digest Now
           </button>
           <button
-            onClick={() => {
-              const el = document.querySelector('[data-panel="questions"]');
-              if (el) el.click();
-            }}
+            onClick={() => navigate('/admin/questions/review')}
             className="flex items-center gap-2 text-sm border border-amber-300 text-amber-700 hover:bg-amber-50 font-semibold px-4 py-2 rounded-xl transition-colors"
           >
             <AlertTriangle size={14} /> View Pending Questions ({questions.total_pending ?? 0})
@@ -1440,15 +1490,15 @@ const TeacherAssignmentPanel = () => {
     setLoading(true);
     try {
       const [aRes, tRes, sRes, ebRes] = await Promise.all([
-        authAxios.get('/admin/teacher-assignments'),
-        authAxios.get('/users?role=teacher'),
-        authAxios.get('/admin/subjects'),
-        authAxios.get('/exam-boards'),
+        api.get('/admin/teacher-assignments'),
+        api.get('/users?role=teacher'),
+        api.get('/admin/subjects'),
+        api.get('/exam-boards'),
       ]);
-      if (aRes.data?.success)  setAssignments(aRes.data.data  || []);
-      if (tRes.data?.data)     setTeachers(tRes.data.data      || []);
-      if (sRes.data?.success)  setSubjects(sRes.data.data      || []);
-      if (ebRes.data?.data)    setExamBoards(ebRes.data.data   || []);
+      if (aRes?.success)  setAssignments(aRes.data  || []);
+      if (tRes?.data)     setTeachers(tRes.data      || []);
+      if (sRes?.success)  setSubjects(sRes.data      || []);
+      if (ebRes?.data)    setExamBoards(ebRes.data   || []);
     } catch { showToast('Failed to load data', 'error'); }
     finally   { setLoading(false); }
   };
@@ -1461,20 +1511,20 @@ const TeacherAssignmentPanel = () => {
     }
     setSaving(true);
     try {
-      await authAxios.post('/admin/teacher-assignments', form);
+      await api.post('/admin/teacher-assignments', form);
       showToast('Assignment saved successfully');
       setShowModal(false);
       setForm({ teacher_id: '', subject_id: '', exam_board_id: '' });
       fetchAll();
     } catch (err) {
-      showToast(err?.response?.data?.error || 'Failed to save', 'error');
+      showToast(err?.error || 'Failed to save', 'error');
     } finally { setSaving(false); }
   };
 
   const handleRemove = async (id) => {
     if (!window.confirm('Remove this assignment?')) return;
     try {
-      await authAxios.delete(`/admin/teacher-assignments/${id}`);
+      await api.delete(`/admin/teacher-assignments/${id}`);
       showToast('Assignment removed');
       fetchAll();
     } catch { showToast('Failed to remove', 'error'); }
@@ -1630,7 +1680,8 @@ const TeacherAssignmentPanel = () => {
 
 const AdminDashboard = () => {
   const { user, logout } = useAuth();
-  const [activePanel, setActivePanel] = useState('analytics');
+  const navigate = useNavigate();
+  const [activePanel, setActivePanel] = useState(null);
   const [stats, setStats]             = useState(null);
   const [statsLoading, setStatsLoading] = useState(true);
 
@@ -1639,8 +1690,8 @@ const AdminDashboard = () => {
     const fetchStats = async () => {
       setStatsLoading(true);
       try {
-        const res = await authAxios.get('/catalog/stats');
-        if (res.data?.success) setStats(res.data.data);
+        const res = await api.get('/catalog/stats');
+        if (res?.success) setStats(res);
       } catch {
         // Stats endpoint may not exist yet — fallback gracefully
         setStats(null);
@@ -1680,24 +1731,7 @@ const AdminDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
-          <img
-            src={branding.logo.main}
-            alt="EAC Learning Platform"
-            className="h-12 w-auto object-contain"
-          />
-          <div className="flex items-center space-x-4">
-            <span className="text-gray-700 font-medium hidden sm:inline">
-              Welcome, {user?.first_name || user?.firstName}!
-            </span>
-            <button onClick={logout} className="flex items-center text-red-600 hover:text-red-700">
-              <LogOut className="w-5 h-5 mr-1" />
-              Logout
-            </button>
-          </div>
-        </div>
-      </header>
+      <TopNav />
 
       <main className="max-w-7xl mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Admin Dashboard</h1>
@@ -1746,13 +1780,27 @@ const AdminDashboard = () => {
               <h3 className="font-semibold mb-1">User Management</h3>
               <p className="text-sm text-gray-600">Manage users and permissions</p>
             </button>
-            <button className="p-6 border-2 border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-left">
-              <School className="w-8 h-8 text-purple-600 mb-2" />
+            <button
+              onClick={() => setActivePanel(activePanel === 'schools' ? null : 'schools')}
+              className={`p-6 border-2 rounded-lg transition-colors text-left ${
+                activePanel === 'schools'
+                  ? 'border-purple-500 bg-purple-50'
+                  : 'border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              <School className={`w-8 h-8 mb-2 ${activePanel === 'schools' ? 'text-purple-600' : 'text-purple-600'}`} />
               <h3 className="font-semibold mb-1">School Management</h3>
               <p className="text-sm text-gray-600">Manage schools and institutions</p>
             </button>
-            <button className="p-6 border-2 border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-left">
-              <BookOpen className="w-8 h-8 text-green-600 mb-2" />
+            <button
+              onClick={() => setActivePanel(activePanel === 'content' ? null : 'content')}
+              className={`p-6 border-2 rounded-lg transition-colors text-left ${
+                activePanel === 'content'
+                  ? 'border-green-500 bg-green-50'
+                  : 'border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              <BookOpen className={`w-8 h-8 mb-2 ${activePanel === 'content' ? 'text-green-600' : 'text-green-600'}`} />
               <h3 className="font-semibold mb-1">Content Management</h3>
               <p className="text-sm text-gray-600">Manage courses and subjects</p>
             </button>
@@ -1795,6 +1843,64 @@ const AdminDashboard = () => {
           </div>
         </div>
 
+        {/* School Management Panel */}
+        {activePanel === 'schools' && (
+          <div className="bg-white rounded-xl shadow p-6 mt-6">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">School Management</h2>
+                <p className="text-sm text-gray-500 mt-0.5">Manage schools and institutions registered on the platform</p>
+              </div>
+            </div>
+            <div className="text-center py-16 text-gray-400">
+              <School className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p className="text-sm font-medium">School management coming soon.</p>
+              <p className="text-xs mt-1">This section will allow you to register and manage schools, link students to institutions, and track school-level analytics.</p>
+            </div>
+          </div>
+        )}
+
+        {/* Content Management Panel */}
+        {activePanel === 'content' && (
+          <div className="bg-white rounded-xl shadow p-6 mt-6">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Content Management</h2>
+                <p className="text-sm text-gray-500 mt-0.5">Manage courses, notes, videos and learning materials</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+              <button
+                onClick={() => setActivePanel('catalog')}
+                className="border border-gray-200 rounded-xl p-4 hover:border-green-400 hover:bg-green-50 transition-colors text-left group"
+              >
+                <BookOpen className="w-7 h-7 text-green-500 mb-2" />
+                <p className="font-semibold text-gray-800 text-sm group-hover:text-green-700">Manage Subjects</p>
+                <p className="text-xs text-gray-400 mt-1">Add, edit or deactivate exam types and subjects</p>
+                <span className="text-xs text-green-600 font-semibold mt-2 inline-block">Open Catalog Management →</span>
+              </button>
+              <button
+                onClick={() => navigate('/past-papers')}
+                className="border border-gray-200 rounded-xl p-4 hover:border-blue-400 hover:bg-blue-50 transition-colors text-left group"
+              >
+                <Settings className="w-7 h-7 text-blue-500 mb-2" />
+                <p className="font-semibold text-gray-800 text-sm group-hover:text-blue-700">Past Papers</p>
+                <p className="text-xs text-gray-400 mt-1">View and manage past exam papers available to students</p>
+                <span className="text-xs text-blue-600 font-semibold mt-2 inline-block">Go to Past Papers →</span>
+              </button>
+              <button
+                onClick={() => navigate('/admin/questions/review')}
+                className="border border-gray-200 rounded-xl p-4 hover:border-amber-400 hover:bg-amber-50 transition-colors text-left group"
+              >
+                <BookOpen className="w-7 h-7 text-amber-500 mb-2" />
+                <p className="font-semibold text-gray-800 text-sm group-hover:text-amber-700">Question Review</p>
+                <p className="text-xs text-gray-400 mt-1">Review and approve AI-generated and submitted questions</p>
+                <span className="text-xs text-amber-600 font-semibold mt-2 inline-block">Review Queue →</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Platform Analytics Panel */}
         {activePanel === 'analytics' && (
           <div className="bg-white rounded-xl shadow p-6 mt-6">
@@ -1835,3 +1941,5 @@ const AdminDashboard = () => {
 };
 
 export default AdminDashboard;
+
+

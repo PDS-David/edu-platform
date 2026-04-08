@@ -1,4 +1,3 @@
-// client/src/pages/StudentTestPage.jsx
 // Route: /student/test/:testId
 // Same UI as QuizPage but with teacher-assigned context banner and countdown timer.
 
@@ -49,8 +48,15 @@ export default function StudentTestPage() {
   const [submitting, setSubmitting] = useState(false);
   const [result,     setResult]     = useState(null);
   const [timeLeft,   setTimeLeft]   = useState(null);
-  const timerRef  = useRef(null);
-  const startTime = useRef(Date.now());
+  const timerRef        = useRef(null);
+  const startTime       = useRef(Date.now());
+  // BUG FIX (Bug 9): handleSubmit is defined after this useEffect, but the
+  // timer setInterval captures it at mount time via closure — so if test or
+  // answers haven't loaded yet when the timer fires, it submits an empty array.
+  // Storing the latest handleSubmit in a ref and calling handleSubmitRef.current
+  // inside the interval means the interval always invokes the current version,
+  // with access to the fully-loaded test and answers state.
+  const handleSubmitRef = useRef(null);
 
   useEffect(() => {
     api.get(`/student/test/${testId}`)
@@ -67,7 +73,7 @@ export default function StudentTestPage() {
     if (!timeLeft || timeLeft <= 0) return;
     timerRef.current = setInterval(() => {
       setTimeLeft(t => {
-        if (t <= 1) { clearInterval(timerRef.current); handleSubmit(true); return 0; }
+        if (t <= 1) { clearInterval(timerRef.current); handleSubmitRef.current(true); return 0; }
         return t - 1;
       });
     }, 1000);
@@ -88,12 +94,16 @@ export default function StudentTestPage() {
         `/student/test/${testId}/submit`,
         { answers: answersArray, total_time_ms: Date.now() - startTime.current }
       );
-      setResult(res.data);
+      setResult(res);
     } catch (err) {
       alert('Submission failed. Please try again.');
       setSubmitting(false);
     }
   }, [test, answers, testId]);
+
+  // Keep the ref in sync every render so the timer always calls the latest
+  // version of handleSubmit (with current test + answers in its closure).
+  handleSubmitRef.current = handleSubmit;
 
   if (loading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><Loader2 size={28} className="text-teal-400 animate-spin" /></div>;
   if (submitting && !result) return (

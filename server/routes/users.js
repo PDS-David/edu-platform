@@ -242,11 +242,80 @@ router.patch('/preferences', protect, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GET /api/users/:id  (stub — must stay AFTER all named sub-routes)
+// GET /api/users/:id
+// Must stay AFTER all named sub-routes (stats, preferences).
+// Restricted to admin only.
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/:id', protect, async (req, res) => {
-  res.json({ success: true, message: 'Get user by ID endpoint' });
+router.get('/:id', protect, authorize('admin'), async (req, res) => {
+  const userId = req.params.id;
+
+  if (!userId || typeof userId !== 'string' || userId.trim() === '') {
+    return res.status(400).json({ success: false, error: 'User ID is required' });
+  }
+
+  try {
+    const rows = await sequelize.query(
+      `SELECT
+         id, email, first_name, last_name, role, is_active,
+         subscription_status, subscription_expires_at, created_at,
+         last_login, xp_points, study_streak_days, onboarding_complete,
+         avatar_url, phone, country
+       FROM users
+       WHERE id = :userId`,
+      { replacements: { userId }, type: QueryTypes.SELECT }
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    return res.status(200).json({ success: true, data: rows[0] });
+  } catch (err) {
+    console.error('[GET /users/:id]', err.message);
+    return res.status(500).json({ success: false, error: 'Failed to fetch user' });
+  }
 });
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DELETE /api/users/:id
+// Permanently removes a user and their related data.
+// Restricted to admin only. Cannot delete your own account.
+// ─────────────────────────────────────────────────────────────────────────────
+router.delete('/:id', protect, authorize('admin'), async (req, res) => {
+  const userId = req.params.id;
+
+  if (!userId || userId.trim() === '') {
+    return res.status(400).json({ success: false, error: 'User ID is required' });
+  }
+
+  // Prevent admin from deleting their own account
+  if (userId === req.user.id) {
+    return res.status(400).json({ success: false, error: 'You cannot delete your own account' });
+  }
+
+  try {
+    const rows = await sequelize.query(
+      `SELECT id, email, role FROM users WHERE id = :userId`,
+      { replacements: { userId }, type: QueryTypes.SELECT }
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    // Delete the user (CASCADE handles related rows if FK constraints are set up)
+    await sequelize.query(
+      `DELETE FROM users WHERE id = :userId`,
+      { replacements: { userId }, type: QueryTypes.DELETE }
+    );
+
+    console.log(`[DELETE /users/:id] Admin ${req.user.id} deleted user ${userId} (${rows[0].email})`);
+    return res.status(200).json({ success: true, message: `User ${rows[0].email} deleted successfully` });
+  } catch (err) {
+    console.error('[DELETE /users/:id]', err.message);
+    return res.status(500).json({ success: false, error: 'Failed to delete user' });
+  }
+});
 
 module.exports = router;

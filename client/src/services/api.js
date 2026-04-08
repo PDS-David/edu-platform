@@ -118,15 +118,37 @@ export const quizAPI = {
 };
 
 // ── Analytics API ─────────────────────────────────────────────────────────────
+// All endpoints query the live practice_attempts table.
 export const analyticsAPI = {
-  getStudentAnalytics: (id)              => api.get(`/analytics/student/${id}`),
-  getLearningGaps:     (id, params)      => api.get(`/analytics/learning-gaps/${id}`, { params }),
-  getDailyStudy:       (id)              => api.get(`/analytics/daily-study/${id}`),
-  getWeeklyAccuracy:   (id)              => api.get(`/analytics/weekly-accuracy/${id}`),
-  // New Wave 1B endpoints
+  /** Overall summary stats for the logged-in student (questions, accuracy, streak, etc.) */
+  getSummary:          ()                     => api.get('/analytics/summary'),
+
+  /** Top N weakest topics for the logged-in student. Default limit = 5. */
+  getWeakTopics:       (limit = 5)            => api.get('/analytics/weak-topics', { params: { limit } }),
+
+  /** Score trend over the last N days for the logged-in student. Default days = 30. */
+  getScoreTrend:       (days = 30)            => api.get('/analytics/score-trend', { params: { days } }),
+
+  /** Accuracy and attempt breakdown grouped by subject for the logged-in student. */
+  getSubjectBreakdown: ()                     => api.get('/analytics/subject-breakdown'),
+
+  /** Time-on-task metrics (avg session length, total study time, etc.) */
+  getTimeMetrics:      ()                     => api.get('/analytics/time-metrics'),
+
+  /** Leaderboard for a specific subject. Pass subject_id to filter. */
+  getLeaderboard:      (subjectId = '')       => api.get('/analytics/leaderboard', { params: { subject_id: subjectId } }),
+
+  /** Badges/achievements earned by the logged-in student. */
+  getBadges:           ()                     => api.get('/analytics/badges'),
+
+  /** Per-topic performance for a specific student, optionally filtered by subject. */
   getTopicPerformance: (studentId, subjectId) => api.get(`/analytics/student/${studentId}/topics`, { params: { subject_id: subjectId } }),
-  getSummary:          (studentId)       => api.get(`/analytics/student/${studentId}/summary`),
-  getCohortTopics:     (subjectId)       => api.get(`/analytics/cohort/${subjectId}/topics`),
+
+  /** Full summary stats for a specific student (admin/teacher view). */
+  getStudentSummary:   (studentId)            => api.get(`/analytics/student/${studentId}/summary`),
+
+  /** Cohort-wide topic breakdown for a given subject (teacher/admin view). */
+  getCohortTopics:     (subjectId)            => api.get(`/analytics/cohort/${subjectId}/topics`),
 };
 
 // ── AI API ────────────────────────────────────────────────────────────────────
