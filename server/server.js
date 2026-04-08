@@ -3,7 +3,6 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const dotenv = require('dotenv');
 const path = require('path');
 const fs = require('fs');
 const { aiLimiter, globalLimiter } = require('./middleware/rateLimiter');
@@ -11,8 +10,13 @@ const logger = require('./config/logger');
 const requestId = require('./middleware/requestId');
 const requestLogger = require('./middleware/requestLogger');
 
-dotenv.config({ path: path.join(__dirname, '.env') });
+// ── DOTENV FOR LOCAL DEV ONLY ────────────────────────────────────────────────
+if (process.env.NODE_ENV !== 'production') {
+  const dotenv = require('dotenv');
+  dotenv.config({ path: path.join(__dirname, '.env') });
+}
 
+// ── CREATE LOGS DIR IF PRODUCTION ─────────────────────────────────────────────
 if (process.env.NODE_ENV === 'production') {
   const logsDir = path.join(__dirname, 'logs');
   if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
@@ -23,26 +27,24 @@ if (process.env.NODE_ENV === 'production') {
   const required = [
     'JWT_SECRET',
     'DB_PASSWORD',
-    'DATABASE_URL',
+    'DB_HOST',
+    'DB_PORT',
+    'DB_NAME',
+    'DB_USER',
+    'PORT',
   ];
-  for (const key of required) {
-    if (!process.env[key]) {
-      console.error(`❌ ${key} missing in .env`);
-      process.exit(1);
-    }
+  const missing = required.filter((key) => !process.env[key]);
+  if (missing.length > 0) {
+    console.error(`❌ Missing required environment variables: ${missing.join(', ')}`);
+    process.exit(1);
   }
 })();
 
 // ── EXPRESS APP ───────────────────────────────────────────────────────────────
 const app = express();
-
-// Trust the first proxy — required for Render, ngrok, and express-rate-limit
 app.set('trust proxy', 1);
 
-// ── SERVE REACT STATIC FILES (BEFORE CORS) ───────────────────────────────────
-// Must be registered first so JS/CSS assets are never subject to CORS checks.
-// On Render the frontend is a separate Static Site service, so clientDist
-// won't exist there — this block only activates in local/ngrok mode.
+// ── SERVE REACT STATIC FILES (LOCAL/NGROK ONLY) ─────────────────────────────
 const clientDist = path.join(__dirname, '..', 'client', 'dist');
 if (fs.existsSync(clientDist)) {
   app.use(express.static(clientDist));
@@ -63,8 +65,6 @@ app.use(
 app.use(globalLimiter);
 
 // ── CORS ──────────────────────────────────────────────────────────────────────
-// Allowed origins: localhost dev + Render frontend URL (set via env vars).
-// Add NGROK_URL to server/.env when testing locally through ngrok.
 const ALLOWED_ORIGINS = [
   'http://localhost:5173',
   'http://localhost:3000',
@@ -77,7 +77,6 @@ const ALLOWED_ORIGINS = [
 app.use(
   cors({
     origin: (origin, cb) => {
-      // Allow server-to-server and same-origin requests (no Origin header)
       if (!origin) return cb(null, true);
       if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
       logger.warn('CORS rejected origin', { origin });
@@ -124,8 +123,6 @@ app.get('/health', (_req, res) => {
 });
 
 // ── SPA CATCH-ALL (local/ngrok only) ─────────────────────────────────────────
-// On Render, the frontend is served by the Static Site service directly.
-// This catch-all only activates when client/dist exists (local dev / ngrok).
 if (fs.existsSync(clientDist)) {
   app.get('*', (_req, res) => {
     res.setHeader('ngrok-skip-browser-warning', 'true');
