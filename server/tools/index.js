@@ -1,6 +1,6 @@
 // server/tools/index.js
 // ---------------------------------------------------------------------------
-// Tools Layer - EAC Learning Platform
+// Tools Layer - AISchoolonair
 // Single entry point that:
 //   1. Boots the shared toolSuccess / toolError helpers (global)
 //   2. Imports every tool module

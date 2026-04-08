@@ -1,5 +1,5 @@
 -- ============================================================
--- EAC LEARNING PLATFORM — NOTIFICATIONS + HEALTH CHECK
+-- AISchoolonair — NOTIFICATIONS + HEALTH CHECK
 -- ============================================================
 
 BEGIN;
@@ -11,7 +11,7 @@ INSERT INTO notifications (id, user_id, title, message, type, is_read, action_ur
 VALUES
   (gen_random_uuid(),
    'cd818b5c-24c2-46a4-ae0c-5635d7f671b0',
-   'Welcome to EAC Learning Platform!',
+   'Welcome to AISchoolonair!',
    'Hi John! Your account is active. Start practising with our question bank today.',
    'welcome', false, '/dashboard', NOW()),
 
@@ -32,7 +32,7 @@ INSERT INTO notifications (id, user_id, title, message, type, is_read, action_ur
 VALUES
   (gen_random_uuid(),
    '10429bfe-bb6b-4b01-99a1-f921bb956687',
-   'Welcome to EAC Learning Platform!',
+   'Welcome to AISchoolonair!',
    'Hi Temitope! Your free trial is active for 14 days. Explore our question bank and quizzes.',
    'welcome', false, '/dashboard', NOW()),
 

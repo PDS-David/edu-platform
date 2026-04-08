@@ -30,7 +30,7 @@ EMAIL_HOST=smtp.gmail.com
 EMAIL_PORT=587
 EMAIL_USER=info@eac.edu.ng
 EMAIL_PASS=[EMAIL_PASS]
-EMAIL_FROM=EACbuddy <noreply@eacbuddy.com>
+EMAIL_FROM=AISchoolonair <noreply@AISchoolonair.com>
 
 # ── CORS / FRONTEND ────────────────────
 CLIENT_URL=http://localhost:5173

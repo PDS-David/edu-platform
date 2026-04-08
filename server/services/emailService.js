@@ -42,7 +42,7 @@ function getTransporter() {
   return _transporter;
 }
 
-const FROM    = process.env.EMAIL_FROM || 'EACbuddy <noreply@eacbuddy.com>';
+const FROM    = process.env.EMAIL_FROM || 'AISchoolonair <noreply@AISchoolonair.com>';
 const APP_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
 async function send(to, subject, html) {
@@ -57,9 +57,9 @@ async function send(to, subject, html) {
 
 async function sendWelcomeEmail(user) {
   const name = user.first_name || user.firstName || 'Student';
-  await send(user.email, 'Welcome to EACbuddy! 🎓', `
+  await send(user.email, 'Welcome to AISchoolonair! 🎓', `
     <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px">
-      <h1 style="color:#0a4a3f;font-size:24px;margin-bottom:8px">Welcome to EACbuddy, ${name}! 🎓</h1>
+      <h1 style="color:#0a4a3f;font-size:24px;margin-bottom:8px">Welcome to AISchoolonair, ${name}! 🎓</h1>
       <p style="color:#555;line-height:1.6">
         You now have access to <strong>5 free practice questions per day</strong> across
         JAMB, WAEC and NECO subjects. Each question comes with instant AI feedback so
@@ -71,7 +71,7 @@ async function sendWelcomeEmail(user) {
         Start Practising →
       </a>
       <p style="color:#aaa;font-size:12px;margin-top:32px">
-        EACbuddy · Nigeria's AI-powered exam prep platform<br>
+        AISchoolonair · Nigeria's AI-powered exam prep platform<br>
         <a href="${APP_URL}/pricing" style="color:#14b8a6">Upgrade to unlimited access</a>
       </p>
     </div>
@@ -92,7 +92,7 @@ async function sendWeeklyDigest(user, stats) {
     ? `${APP_URL}/student/subtopic/${weakest_subtopic_id}?tab=practice`
     : `${APP_URL}/student/dashboard`;
 
-  await send(user.email, `${name}, here's your EACbuddy week in review 📊`, `
+  await send(user.email, `${name}, here's your AISchoolonair week in review 📊`, `
     <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px">
       <h1 style="color:#0a4a3f;font-size:20px;margin-bottom:4px">Your week in review, ${name}</h1>
       <p style="color:#888;font-size:13px;margin-bottom:20px">Here's how you did this week</p>
@@ -120,7 +120,7 @@ async function sendWeeklyDigest(user, stats) {
         Practice ${weakest_topic} now →
       </a>
       <p style="color:#aaa;font-size:12px;margin-top:32px">
-        EACbuddy · <a href="${APP_URL}/student/dashboard" style="color:#14b8a6">Open dashboard</a>
+        AISchoolonair · <a href="${APP_URL}/student/dashboard" style="color:#14b8a6">Open dashboard</a>
       </p>
     </div>
   `);
@@ -165,7 +165,7 @@ async function sendPaymentConfirmation(user, plan, endDate) {
         Start Studying →
       </a>
       <p style="color:#aaa;font-size:12px;margin-top:32px">
-        If you have questions, reply to this email or contact us at info@eacbuddy.com
+        If you have questions, reply to this email or contact us at info@AISchoolonair.com
       </p>
     </div>
   `);
@@ -181,7 +181,7 @@ async function sendPaymentReceipt({ email, firstName, planName, amount, referenc
   await send(email, `Payment Confirmed — ${planName}`, `
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#f9fafb">
       <div style="text-align:center;padding:24px 0 16px">
-        <h1 style="color:#0a4a3f;font-size:22px;margin:0">EAC Learning Platform</h1>
+        <h1 style="color:#0a4a3f;font-size:22px;margin:0">AISchoolonair</h1>
         <p style="color:#6b7280;font-size:13px;margin:4px 0 0">Educational Advancement Centre</p>
       </div>
       <div style="background:#fff;border-radius:16px;padding:32px;margin-bottom:20px;border:1px solid #e5e7eb">
@@ -217,7 +217,7 @@ async function sendPaymentReceipt({ email, firstName, planName, amount, referenc
         </div>
       </div>
       <div style="text-align:center;color:#9ca3af;font-size:12px;padding-top:16px">
-        <p style="margin:0">&copy; 2026 EAC Learning Platform &middot; info@eac.edu.ng</p>
+        <p style="margin:0">&copy; 2026 AISchoolonair &middot; info@eac.edu.ng</p>
         <p style="margin:4px 0 0">If you did not make this payment, please contact us immediately.</p>
       </div>
     </div>

@@ -110,7 +110,7 @@ def write_dump(files):
 
         # Header
         out.write(f"{sep}\n")
-        out.write(f"  EAC LEARNING PLATFORM - FULL PROJECT DUMP\n")
+        out.write(f"  AISchoolonair - FULL PROJECT DUMP\n")
         out.write(f"  Generated : {now}\n")
         out.write(f"  Root      : {ROOT}\n")
         out.write(f"  NOTE: server/uploads folder excluded (binary video files)\n")

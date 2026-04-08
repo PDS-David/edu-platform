@@ -3,7 +3,7 @@
 
 const WhatsAppButton = () => {
   const phoneNumber = "2348099123412"; // +234 809 912 3412 in international format
-  const message = encodeURIComponent("Hi! I'd like to know more about the EAC Learning Platform.");
+  const message = encodeURIComponent("Hi! I'd like to know more about the AISchoolonair.");
   const whatsappURL = `https://wa.me/${phoneNumber}?text=${message}`;
 
   return (

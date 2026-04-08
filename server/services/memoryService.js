@@ -1,6 +1,6 @@
 // server/services/memoryService.js
 // ============================================================================
-// AI Memory Service — EAC Learning Platform
+// AI Memory Service — AISchoolonair
 //
 // Manages three tables (created in database/memory_schema.sql):
 //   user_learning_profile   — per-student aggregated performance snapshot

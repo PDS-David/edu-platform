@@ -1,5 +1,5 @@
 -- ============================================================
--- EAC Learning Platform - Question Explanations
+-- AISchoolonair - Question Explanations
 -- Generated from exact question text export
 -- Run with: psql -U postgres -d edu_platform -f eac_explanations.sql
 -- ============================================================

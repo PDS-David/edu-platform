@@ -35,7 +35,7 @@ import ImageMarkingPage          from './pages/ImageMarkingPage';
 // ── WhatsApp floating contact button ─────────────────────────────────────────
 const WhatsAppButton = () => {
   const phoneNumber = '2348099123412'; // +234 809 912 3412
-  const message     = encodeURIComponent('Hi! I\'d like to know more about the EAC Learning Platform.');
+  const message     = encodeURIComponent('Hi! I\'d like to know more about the AISchoolonair.');
   const url         = `https://wa.me/${phoneNumber}?text=${message}`;
 
   return (

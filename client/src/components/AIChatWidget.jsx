@@ -90,8 +90,8 @@ export default function AIChatWidget({
   useEffect(() => {
     if (open && messages.length === 0 && restored) {
       const greeting = subjectName
-        ? `Hi! I'm EACbuddy AI ✦. Ask me anything about ${subjectName}${subtopicName ? ` — ${subtopicName}` : ''}, exam tips, or how to tackle tricky questions.`
-        : `Hi! I'm EACbuddy AI ✦. Ask me anything about your studies, exam techniques, or any topic you're finding difficult.`;
+        ? `Hi! I'm AISchoolonair AI ✦. Ask me anything about ${subjectName}${subtopicName ? ` — ${subtopicName}` : ''}, exam tips, or how to tackle tricky questions.`
+        : `Hi! I'm AISchoolonair AI ✦. Ask me anything about your studies, exam techniques, or any topic you're finding difficult.`;
       setMessages([{ role: 'ai', text: greeting, id: 0 }]);
     }
   }, [open, restored]); // eslint-disable-line
@@ -172,7 +172,7 @@ export default function AIChatWidget({
                 <Sparkles size={13} className="text-teal-300" />
               </div>
               <div>
-                <p className="text-white text-sm font-semibold leading-none">EACbuddy AI ✦</p>
+                <p className="text-white text-sm font-semibold leading-none">AISchoolonair AI ✦</p>
                 <p className="text-white/40 text-[10px] mt-0.5">Your personal study assistant</p>
               </div>
             </div>

@@ -22,7 +22,7 @@ const TermsOfService = () => {
           <div className="mb-10 pb-8 border-b border-gray-100">
             <h1 className="text-4xl font-extrabold text-gray-900 mb-3">Terms of Service</h1>
             <p className="text-gray-500">
-              Please read these terms carefully before using the EAC Learning Platform.
+              Please read these terms carefully before using the AISchoolonair.
             </p>
           </div>
 
@@ -31,7 +31,7 @@ const TermsOfService = () => {
             <section>
               <h2 className="text-xl font-bold text-gray-900 mb-3">1. Acceptance of Terms</h2>
               <p>
-                By accessing or using the EAC Learning Platform ("Platform"), you agree to be bound by these Terms of Service.
+                By accessing or using the AISchoolonair ("Platform"), you agree to be bound by these Terms of Service.
                 These terms apply to all users — students, teachers, and administrators. If you do not agree to these terms,
                 you may not access or use the Platform.
               </p>
@@ -40,7 +40,7 @@ const TermsOfService = () => {
             <section>
               <h2 className="text-xl font-bold text-gray-900 mb-3">2. Description of Service</h2>
               <p>
-                The EAC Learning Platform is an educational management system provided by Educational Advancement Centre,
+                The AISchoolonair is an educational management system provided by Educational Advancement Centre,
                 Ibadan. The Platform offers tools for course management, student tracking, assessments, analytics,
                 and AI-assisted learning to support academic excellence.
               </p>
@@ -130,7 +130,7 @@ const TermsOfService = () => {
 
           {/* Footer links */}
           <div className="mt-12 pt-8 border-t border-gray-100 flex flex-col sm:flex-row gap-4 justify-between items-center">
-            <p className="text-sm text-gray-500">© 2026 EAC Learning Platform. All rights reserved.</p>
+            <p className="text-sm text-gray-500">© 2026 AISchoolonair. All rights reserved.</p>
             <div className="flex gap-6 text-sm">
               <Link to="/privacy" className="text-primary-600 hover:text-primary-700 font-medium">Privacy Policy</Link>
               <Link to="/register" className="text-primary-600 hover:text-primary-700 font-medium">Create Account</Link>

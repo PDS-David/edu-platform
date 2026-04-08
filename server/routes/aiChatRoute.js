@@ -1,6 +1,6 @@
 // server/routes/aiChatRoute.js
 // ============================================================================
-// PRIMARY AI CHAT ENTRY POINT — EAC Learning Platform
+// PRIMARY AI CHAT ENTRY POINT — AISchoolonair
 //
 // Changes from previous version:
 //   + Integrates memoryService (getMemoryForPrompt, storeConversation)
@@ -360,11 +360,11 @@ router.post('/chat/stream', protect, subscriptionGuard, async (req, res) => {
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     const systemContext = memoryContext.formatted
-      ? `${memoryContext.formatted}\n\nYou are EACbuddy, a friendly AI tutor for Nigerian secondary school students.`
-      : 'You are EACbuddy, a friendly AI tutor for Nigerian secondary school students.';
+      ? `${memoryContext.formatted}\n\nYou are AISchoolonair, a friendly AI tutor for Nigerian secondary school students.`
+      : 'You are AISchoolonair, a friendly AI tutor for Nigerian secondary school students.';
 
     const streamResult = await model.generateContentStream(
-      `${systemContext}\n\nStudent: ${message}\nEACbuddy:`
+      `${systemContext}\n\nStudent: ${message}\nAISchoolonair:`
     );
 
     let fullReply = '';

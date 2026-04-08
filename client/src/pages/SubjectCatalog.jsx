@@ -253,10 +253,10 @@ const SubjectCatalog = () => {
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <img
             src={branding.logo.main}
-            alt="EAC Learning Platform"
+            alt="AISchoolonair"
             className="h-10 w-auto object-contain"
           />
-          <p className="text-sm">© 2026 EAC Learning Platform. All rights reserved.</p>
+          <p className="text-sm">© 2026 AISchoolonair. All rights reserved.</p>
           <div className="flex gap-6 text-sm">
             <Link to="/privacy" className="hover:text-primary-400 transition-colors">Privacy</Link>
             <Link to="/terms" className="hover:text-primary-400 transition-colors">Terms</Link>

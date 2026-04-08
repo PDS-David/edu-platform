@@ -28,7 +28,7 @@ EMAIL_HOST=smtp.gmail.com
 EMAIL_PORT=587
 EMAIL_USER=info@eac.edu.ng
 EMAIL_PASS=Glory_glory1980#
-EMAIL_FROM=EACbuddy <eaceduplatform@gmail.com>
+EMAIL_FROM=AISchoolonair <eaceduplatform@gmail.com>
 
 # ── FRONTEND / BACKEND URLS ────────────────────────────
 CLIENT_URL=http://localhost:5173

@@ -1,6 +1,6 @@
 // server/services/explanationEnhancer.js
 // -------------------------------------------------------------------------
-// Explanation Enhancer Service — EAC Learning Platform
+// Explanation Enhancer Service — AISchoolonair
 //
 // Given a topic_id OR subtopic_id this service:
 //   1. Resolves metadata (topic/subtopic name, subject, exam board)
@@ -315,7 +315,7 @@ async function runAI({ meta, original }) {
   const board   = meta.exam_board    || 'WAEC/JAMB';
 
   const prompt = `
-You are EACbuddy, an expert AI tutor for Nigerian secondary school students preparing for ${board} exams.
+You are AISchoolonair, an expert AI tutor for Nigerian secondary school students preparing for ${board} exams.
 Subject: ${subject}
 Topic: ${meta.topic_name || 'Not specified'}
 ${meta.subtopic_name ? `Subtopic: ${meta.subtopic_name}` : ''}

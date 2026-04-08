@@ -87,7 +87,7 @@ export default function TopNav() {
           </div>
         </Link>
 
-        {/* EACbuddy — product logo (not a nav link) */}
+        {/* AISchoolonair — product logo (not a nav link) */}
         <span className="flex items-center gap-1">
           <span style={{ background: '#2563eb' }} className="px-1.5 py-0.5 rounded text-white font-bold text-sm">EAC</span>
           <span className="font-semibold text-gray-900">buddy</span>

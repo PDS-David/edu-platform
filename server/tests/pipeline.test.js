@@ -1,6 +1,6 @@
 // tests/pipeline.test.js
 // ─────────────────────────────────────────────────────────────────────────────
-// EAC Learning Platform — Full Pipeline Integration Tests
+// AISchoolonair — Full Pipeline Integration Tests
 //
 // Prompt 5 test cases:
 //   1. Create concept

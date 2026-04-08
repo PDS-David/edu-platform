@@ -108,12 +108,12 @@ const register = async (req, res) => {
       const transporter = createTransporter();
 
       await transporter.sendMail({
-        from:    `"EAC Learning Platform" <${process.env.EMAIL_USER}>`,
+        from:    `"AISchoolonair" <${process.env.EMAIL_USER}>`,
         to:      user.email,
-        subject: 'Verify your EAC Learning Platform email',
+        subject: 'Verify your AISchoolonair email',
         html: `
           <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">
-            <h1 style="color:#3B82F6;font-size:24px">EAC Learning Platform</h1>
+            <h1 style="color:#3B82F6;font-size:24px">AISchoolonair</h1>
             <p style="color:#6B7280;font-size:14px">Educational Advancement Centre</p>
             <div style="background:#F9FAFB;border-radius:12px;padding:30px;margin-bottom:20px">
               <h2 style="color:#111827;margin-top:0">Hello, ${firstName}!</h2>
@@ -135,7 +135,7 @@ const register = async (req, res) => {
               </p>
             </div>
             <p style="text-align:center;color:#9CA3AF;font-size:12px">
-              &copy; 2026 EAC Learning Platform &middot; info@eac.edu.ng
+              &copy; 2026 AISchoolonair &middot; info@eac.edu.ng
             </p>
           </div>
         `,
@@ -306,12 +306,12 @@ const forgotPassword = async (req, res) => {
     const transporter = createTransporter();
 
     await transporter.sendMail({
-      from:    `"EAC Learning Platform" <${process.env.EMAIL_USER}>`,
+      from:    `"AISchoolonair" <${process.env.EMAIL_USER}>`,
       to:      user.email,
-      subject: 'Password Reset Request – EAC Learning Platform',
+      subject: 'Password Reset Request – AISchoolonair',
       html: `
         <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">
-          <h1 style="color:#3B82F6;font-size:24px">EAC Learning Platform</h1>
+          <h1 style="color:#3B82F6;font-size:24px">AISchoolonair</h1>
           <div style="background:#F9FAFB;border-radius:12px;padding:30px;margin-bottom:20px">
             <h2 style="color:#111827;margin-top:0">Hello, ${user.first_name}</h2>
             <p style="color:#374151;line-height:1.6">
@@ -333,7 +333,7 @@ const forgotPassword = async (req, res) => {
             </p>
           </div>
           <p style="text-align:center;color:#9CA3AF;font-size:12px">
-            &copy; 2026 EAC Learning Platform &middot; info@eac.edu.ng
+            &copy; 2026 AISchoolonair &middot; info@eac.edu.ng
           </p>
         </div>
       `,
