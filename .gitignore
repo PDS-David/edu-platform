@@ -33,3 +33,4 @@ Thumbs.db
 # ── Uploads / media (if stored locally) ──────────────────────────────────────
 server/uploads/
 server/public/uploads/
+"token.txt" 
