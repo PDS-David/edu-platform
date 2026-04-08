@@ -1,11 +1,4 @@
 // client/src/components/TopNav.jsx
-// Top navigation bar matching AI Buddy exactly.
-// Changes (P9):
-//   1. Upgrade button only for free students
-//   2. Notifications bell with unread badge
-//   3. Role-aware dashboard link in dropdown
-//   4. Blue "EAC" box logo
-
 import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -30,13 +23,11 @@ export default function TopNav() {
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
-  // Dashboard link based on role
   const dashboardPath =
     role === 'admin'   ? '/admin/dashboard'   :
     role === 'teacher' ? '/teacher/dashboard' :
                          '/student/dashboard';
 
-  // Fetch notifications on mount
   useEffect(() => {
     if (!user) return;
     api.get('/notifications')
@@ -44,7 +35,6 @@ export default function TopNav() {
       .catch(() => {});
   }, [user]);
 
-  // Mark all read when notification panel opens
   const handleNotifOpen = () => {
     setNotifOpen(o => !o);
     if (!notifOpen && unreadCount > 0) {
@@ -53,7 +43,6 @@ export default function TopNav() {
     }
   };
 
-  // Close dropdowns on outside click
   useEffect(() => {
     const handler = (e) => {
       if (dropRef.current  && !dropRef.current.contains(e.target))  setDropOpen(false);
@@ -71,10 +60,10 @@ export default function TopNav() {
   return (
     <nav className="w-full bg-white border-b border-gray-100 sticky top-0 z-50 h-14 flex items-center px-4 md:px-6">
 
-      {/* Left — home button (four dots) + product logo + org logo */}
+      {/* Left — home button + AISchoolonair logo */}
       <div className="flex items-center gap-3 shrink-0">
 
-        {/* Four-dot grid = Home button (goes to landing page `/`) */}
+        {/* Four-dot grid = Home button */}
         <Link
           to="/"
           title="Go to Home"
@@ -87,21 +76,18 @@ export default function TopNav() {
           </div>
         </Link>
 
-        {/* AISchoolonair — product logo (not a nav link) */}
+        {/* AISchoolonair — product logo */}
         <span className="flex items-center gap-1">
-          <span style={{ background: '#2563eb' }} className="px-1.5 py-0.5 rounded text-white font-bold text-sm">EAC</span>
-          <span className="font-semibold text-gray-900">buddy</span>
-          <span className="hidden sm:inline text-gray-300 mx-1 text-lg font-light">|</span>
-          <span className="hidden sm:inline text-gray-500 text-sm font-medium">Learning Platform</span>
+          <span style={{ background: '#2563eb' }} className="px-1.5 py-0.5 rounded text-white font-bold text-sm">AISchoolonair</span>
         </span>
 
         {/* Divider */}
         <span className="hidden md:block h-6 w-px bg-gray-200" />
 
-        {/* EAC org logo — visual brand, not a nav link */}
+        {/* Org logo */}
         <img
           src={branding.logo.main}
-          alt="Educational Advancement Centre"
+          alt="AISchoolonair"
           className="hidden md:block h-7 w-auto object-contain"
         />
       </div>
@@ -109,7 +95,7 @@ export default function TopNav() {
       {/* Right */}
       <div className="ml-auto flex items-center gap-2 md:gap-3">
 
-        {/* CHANGE 1 — Upgrade button: only for free students */}
+        {/* Upgrade button: only for free students */}
         {user?.role === 'student' && user?.subscription_status === 'free' && (
           <Link
             to="/pricing"
@@ -119,7 +105,7 @@ export default function TopNav() {
           </Link>
         )}
 
-        {/* CHANGE 2 — Notifications bell */}
+        {/* Notifications bell */}
         <div className="relative" ref={notifRef} onClick={e => e.stopPropagation()}>
           <button
             onClick={handleNotifOpen}
@@ -157,7 +143,7 @@ export default function TopNav() {
           <MessageSquare size={18} />
         </button>
 
-        {/* User avatar + dropdown (CHANGE 3: role-aware dashboard link) */}
+        {/* User avatar + dropdown */}
         <div className="relative" ref={dropRef}>
           <button
             onClick={() => setDropOpen(o => !o)}
@@ -208,4 +194,3 @@ export default function TopNav() {
     </nav>
   );
 }
-
