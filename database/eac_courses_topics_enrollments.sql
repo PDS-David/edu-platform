@@ -1,5 +1,5 @@
 -- ============================================================
--- EAC Learning Platform - Courses, Topics & Enrollments
+-- AISchoolonair - Courses, Topics & Enrollments
 -- Database: edu_platform
 -- Run with: psql -U postgres -d edu_platform -f eac_courses_topics_enrollments.sql
 -- ============================================================

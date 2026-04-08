@@ -1,6 +1,6 @@
 // client/src/context/AuthContext.jsx
 // ─────────────────────────────────────────────────────────────────────────────
-// Authentication context for the EAC Learning Platform.
+// Authentication context for the AISchoolonair.
 //
 // Roles: student | teacher | admin
 //

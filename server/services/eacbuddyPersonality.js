@@ -1,6 +1,6 @@
-// server/services/eacbuddyPersonality.js
+// server/services/AISchoolonairPersonality.js
 // ============================================================================
-// EACbuddy — AI Tutor Personality & Behavior System
+// AISchoolonair — AI Tutor Personality & Behavior System
 //
 // This file defines:
 //   A. The full system prompt (passed to every Gemini / Claude call)
@@ -23,7 +23,7 @@
 //       buildGeneralChatPrompt,
 //       shouldCallTool,
 //       detectConfusion,
-//     } = require('./eacbuddyPersonality');
+//     } = require('./AISchoolonairPersonality');
 //
 // ============================================================================
 
@@ -34,8 +34,8 @@
 // Injected into EVERY prompt as the system header.
 // ============================================================================
 
-const EACBUDDY_IDENTITY = `
-You are EACbuddy — the personal AI tutor for students on the EAC Learning Platform.
+const AISchoolonair_IDENTITY = `
+You are AISchoolonair — the personal AI tutor for students on the AISchoolonair.
 You help Nigerian secondary school students prepare for WAEC, NECO, and JAMB exams.
 
 PERSONALITY:
@@ -139,7 +139,7 @@ function detectConfusion(message) {
 //
 // appendFollowUp(responseText, intent, weakTopics) → string
 //
-// EACbuddy always ends with a question or prompt to keep the student engaged
+// AISchoolonair always ends with a question or prompt to keep the student engaged
 // and detect whether they understood.
 // ============================================================================
 
@@ -185,7 +185,7 @@ function appendFollowUp(responseText, intent, weakTopics = []) {
 // ============================================================================
 // E. PROMPT BUILDERS (drop-in replacements for aiOrchestrator.js)
 //
-// Each builder prefixes EACBUDDY_IDENTITY + the memory block, then builds
+// Each builder prefixes AISchoolonair_IDENTITY + the memory block, then builds
 // the task-specific section. The confusion level adjusts the instruction tone.
 // ============================================================================
 
@@ -208,7 +208,7 @@ function buildExplainPrompt({ message, subjectName, subtopicName, dbRows, examBo
     : '';
 
   return `
-${EACBUDDY_IDENTITY}
+${AISchoolonair_IDENTITY}
 
 Subject: ${subjectName || 'Not specified'}
 ${subtopicName ? `Subtopic: ${subtopicName}` : ''}
@@ -265,7 +265,7 @@ function buildQuizPromptFromRows({ message, subjectName, subtopicName, dbQuestio
   }
 
   return `
-${EACBUDDY_IDENTITY}
+${AISchoolonair_IDENTITY}
 
 Subject: ${subjectName || 'Not specified'}
 ${subtopicName ? `Topic/Subtopic: ${subtopicName}` : ''}
@@ -316,7 +316,7 @@ function buildStudyPlanPrompt({ message, subjectName, topicTree, examBoard, exam
     : 'Full curriculum (standard Nigerian syllabus).';
 
   return `
-${EACBUDDY_IDENTITY}
+${AISchoolonair_IDENTITY}
 
 Subject: ${subjectName || 'Not specified'}
 Exam board: ${examBoard || 'WAEC/NECO/JAMB'}
@@ -371,7 +371,7 @@ Respond ONLY with valid JSON and nothing else:
 function buildGeneralChatPrompt({ message, subjectName, subtopicName, examBoard, history, memoryBlock, weakTopics = [] }) {
   const historyText = (history || [])
     .slice(-6)
-    .map((m) => `${m.role === 'assistant' ? 'EACbuddy' : 'Student'}: ${m.content}`)
+    .map((m) => `${m.role === 'assistant' ? 'AISchoolonair' : 'Student'}: ${m.content}`)
     .join('\n');
 
   const weakAlert = weakTopics.length
@@ -379,7 +379,7 @@ function buildGeneralChatPrompt({ message, subjectName, subtopicName, examBoard,
     : '';
 
   return `
-${EACBUDDY_IDENTITY}
+${AISchoolonair_IDENTITY}
 
 ${subjectName ? `Current subject: ${subjectName}${subtopicName ? ' — ' + subtopicName : ''}` : ''}
 Exam board: ${examBoard || 'WAEC/NECO/JAMB'}
@@ -392,18 +392,18 @@ BEHAVIOR RULES FOR THIS TURN:
 2. If the student is off-topic (sports, entertainment, non-academic), gently redirect.
 3. Use the memory context to personalise: reference their enrolled courses, weak topics, or study streak.
 4. End with ONE follow-up question to keep the student engaged.
-5. Do NOT start your response with "EACbuddy:" — just reply directly.
+5. Do NOT start your response with "AISchoolonair:" — just reply directly.
 
 ${historyText ? 'CONVERSATION SO FAR:\n' + historyText + '\n' : ''}
 Student: ${message}
-EACbuddy:`.trim();
+AISchoolonair:`.trim();
 }
 
 // ============================================================================
 // EXPORTS
 // ============================================================================
 module.exports = {
-  EACBUDDY_IDENTITY,
+  AISchoolonair_IDENTITY,
   shouldCallTool,
   detectConfusion,
   appendFollowUp,

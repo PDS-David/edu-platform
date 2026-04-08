@@ -19,7 +19,7 @@ const model = genAI.getGenerativeModel({
 });
 
 const FALLBACK_REPLY =
-  'EACbuddy AI is temporarily unavailable. Please try again later. 📚';
+  'AISchoolonair AI is temporarily unavailable. Please try again later. 📚';
 
 function isQuotaOrAvailabilityError(err) {
   const msg = err?.message || '';
@@ -60,7 +60,7 @@ async function generateAIResponse({ message, user, context = {} }) {
     : '';
 
   const prompt = `
-You are EACbuddy AI, a friendly and expert study assistant for Nigerian secondary school students preparing for WAEC, NECO, and JAMB exams.
+You are AISchoolonair AI, a friendly and expert study assistant for Nigerian secondary school students preparing for WAEC, NECO, and JAMB exams.
 
 ${systemContext}
 

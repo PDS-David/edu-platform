@@ -1,6 +1,6 @@
 // server/config/logger.js
 // ─────────────────────────────────────────────────────────────────────────────
-// Winston logger singleton for the EAC Learning Platform.
+// Winston logger singleton for the AISchoolonair.
 //
 // Transports:
 //   development  — colourised, single-line text to stdout only

@@ -1,6 +1,6 @@
 // server/services/aiQuestionGenerator.js
 // -------------------------------------------------------------------------
-// AI Question Generation Service for EAC Learning Platform
+// AI Question Generation Service for AISchoolonair
 //
 // Generates curriculum-appropriate multiple-choice questions for a given
 // concept using Google Gemini, then persists them to the DB so they are

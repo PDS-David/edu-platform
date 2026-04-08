@@ -1,6 +1,6 @@
 // server/middleware/roleMiddleware.js
 // ─────────────────────────────────────────────────────────────────────────────
-// Role-based access control middleware for EAC Learning Platform.
+// Role-based access control middleware for AISchoolonair.
 //
 // Usage:
 //   const { studentAccess, teacherAccess, adminOnly, checkSubjectAccess } = require('../middleware/roleMiddleware');

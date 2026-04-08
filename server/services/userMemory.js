@@ -1,9 +1,9 @@
 // server/services/userMemory.js
 // -------------------------------------------------------------------------
-// User Memory Service — EAC Learning Platform
+// User Memory Service — AISchoolonair
 //
 // Fetches three classes of contextual memory for a student so they can be
-// injected into every AI prompt, making EACbuddy feel like a tutor who
+// injected into every AI prompt, making AISchoolonair feel like a tutor who
 // actually knows the student.
 //
 // Memory sources:
@@ -212,7 +212,7 @@ function formatMemoryBlock(memory) {
     // Reverse so oldest first (chronological reading order)
     const ordered = [...memory.recent_messages].reverse();
     const lines   = ordered.map((m) =>
-      `  ${m.role === 'assistant' ? 'EACbuddy' : 'Student'}: ${
+      `  ${m.role === 'assistant' ? 'AISchoolonair' : 'Student'}: ${
         // Truncate very long messages so the memory block stays compact
         m.content.length > 200 ? m.content.slice(0, 200) + '…' : m.content
       }`

@@ -1,5 +1,5 @@
 -- ============================================================
--- EAC LEARNING PLATFORM — TYPE MISMATCH FIXES (v2)
+-- AISchoolonair — TYPE MISMATCH FIXES (v2)
 -- Fix: drop default before altering pending_exam_board_ids type
 -- ============================================================
 

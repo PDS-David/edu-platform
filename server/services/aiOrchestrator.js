@@ -12,7 +12,7 @@ const {
   shouldCallTool,
   detectConfusion,
   appendFollowUp,
-} = require('./eacbuddyPersonality');
+} = require('./AISchoolonairPersonality');
 
 // =========================================================================
 // LLM CLIENTS

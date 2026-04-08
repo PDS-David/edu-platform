@@ -1,6 +1,6 @@
 // EAC Platform Branding Configuration
 export const branding = {
-  platformName: 'EAC Learning Platform',
+  platformName: 'AISchoolonair',
   tagline: 'Transform Your Learning Experience',
   description: 'The ultimate learning management system for modern education',
 

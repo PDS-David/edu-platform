@@ -1,7 +1,7 @@
 services:
   # ── Backend: Node/Express API ─────────────────────────────────────────────
   - type: web
-    name: eacbuddy-api
+    name: AISchoolonair-api
     runtime: node
     rootDir: server
     buildCommand: npm install
@@ -17,10 +17,10 @@ services:
       # Auto-injected from the Render PostgreSQL database below
       - key: DATABASE_URL
         fromDatabase:
-          name: eacbuddy-db
+          name: AISchoolonair-db
           property: connectionString
 
-      # Set these manually in the Render dashboard → eacbuddy-api → Environment
+      # Set these manually in the Render dashboard → AISchoolonair-api → Environment
       - key: DB_HOST
         sync: false
       - key: DB_PORT
@@ -61,14 +61,14 @@ services:
         sync: false
 
       # Set CLIENT_URL to your frontend Render URL after first deploy
-      # e.g. https://eacbuddy-frontend.onrender.com
+      # e.g. https://AISchoolonair-frontend.onrender.com
       - key: CLIENT_URL
         sync: false
       - key: PROD_CLIENT_URL
         sync: false
 
       # Set to your backend's own Render URL after first deploy
-      # e.g. https://eacbuddy-api.onrender.com
+      # e.g. https://AISchoolonair-api.onrender.com
       - key: SERVER_BASE_URL
         sync: false
 
@@ -86,15 +86,15 @@ services:
 
   # ── Frontend: React/Vite Static Site ──────────────────────────────────────
   - type: web
-    name: eacbuddy-frontend
+    name: AISchoolonair-frontend
     runtime: static
     rootDir: client
     buildCommand: npm install && npm run build
     staticPublishPath: dist
 
     envVars:
-      # Set this to your backend URL after eacbuddy-api is deployed
-      # e.g. https://eacbuddy-api.onrender.com
+      # Set this to your backend URL after AISchoolonair-api is deployed
+      # e.g. https://AISchoolonair-api.onrender.com
       - key: VITE_API_URL
         sync: false
 
@@ -106,7 +106,7 @@ services:
 
 # ── PostgreSQL Database ───────────────────────────────────────────────────────
 databases:
-  - name: eacbuddy-db
+  - name: AISchoolonair-db
     plan: free
     databaseName: edu_platform
     user: eduuser

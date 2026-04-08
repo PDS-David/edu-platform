@@ -5,7 +5,7 @@
 //   ForgotPassword, ResetPassword, VerifyEmailPage, TermsOfService, PrivacyPolicy
 //
 // Layout (left side — mirrors TopNav exactly):
-//   [four-dot home button] [EACbuddy | Learning Platform] [divider] [EAC org logo]
+//   [four-dot home button] [AISchoolonair | Learning Platform] [divider] [EAC org logo]
 //
 // The right slot is flexible via the `right` prop so each page can inject
 // its own nav links / buttons (e.g. Login + Start Free on LandingPage).
@@ -38,7 +38,7 @@ export default function PublicNav({
         className,
       ].filter(Boolean).join(' ')}
     >
-      {/* ── Left: four-dot home button + EACbuddy product name + EAC org logo ── */}
+      {/* ── Left: four-dot home button + AISchoolonair product name + EAC org logo ── */}
       <div className="flex items-center gap-3 shrink-0">
 
         {/* Four-dot grid = Home button */}
@@ -54,7 +54,7 @@ export default function PublicNav({
           </div>
         </Link>
 
-        {/* EACbuddy — product identity label (not a nav link) */}
+        {/* AISchoolonair — product identity label (not a nav link) */}
         <span className="flex items-center gap-1">
           <span
             style={{ background: '#2563eb' }}

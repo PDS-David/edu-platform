@@ -403,9 +403,9 @@ export default function LandingPage() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {[
-              { name: 'Adaeze O.', school: 'Federal Government College, Enugu', quote: 'I was scoring 40% in Chemistry. After 3 weeks on EACbuddy my mock score jumped to 74%. The AI explanations make it click in a way textbooks never did.' },
+              { name: 'Adaeze O.', school: 'Federal Government College, Enugu', quote: 'I was scoring 40% in Chemistry. After 3 weeks on AISchoolonair my mock score jumped to 74%. The AI explanations make it click in a way textbooks never did.' },
               { name: 'Emeka T.', school: 'King\'s College, Lagos', quote: 'The daily streak feature keeps me consistent. I\'ve done 5 questions every day for 6 weeks. JAMB is in 2 months and I feel ready for the first time.' },
-              { name: 'Fatima A.', school: 'GGSS Minna, Niger State', quote: 'Past papers used to be impossible to find. EACbuddy has everything in one place with instant marking. My teacher even uses it to set class assignments.' },
+              { name: 'Fatima A.', school: 'GGSS Minna, Niger State', quote: 'Past papers used to be impossible to find. AISchoolonair has everything in one place with instant marking. My teacher even uses it to set class assignments.' },
             ].map(({ name, school, quote }) => (
               <div key={name} className="bg-white rounded-2xl border border-gray-100 p-5 space-y-3 shadow-sm">
                 <div className="flex">
@@ -429,7 +429,7 @@ export default function LandingPage() {
       ══════════════════════════════════════════════════════════════════════ */}
       <section className="bg-white py-16 px-4">
         <div className="max-w-3xl mx-auto">
-          <p className="text-blue-600 text-xs font-bold uppercase tracking-widest text-center mb-2">Why EACbuddy</p>
+          <p className="text-blue-600 text-xs font-bold uppercase tracking-widest text-center mb-2">Why AISchoolonair</p>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 text-center mb-10">
             How We Compare
           </h2>
@@ -440,7 +440,7 @@ export default function LandingPage() {
                 <tr className="bg-gray-50 border-b border-gray-100">
                   <th className="text-left px-5 py-4 text-xs font-semibold text-gray-500 w-1/2">Feature</th>
                   <th className="px-4 py-4 text-center">
-                    <span className="inline-block bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full">EACbuddy</span>
+                    <span className="inline-block bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full">AISchoolonair</span>
                   </th>
                   <th className="px-4 py-4 text-center text-xs font-semibold text-gray-500">Free Websites</th>
                   <th className="px-4 py-4 text-center text-xs font-semibold text-gray-500">Private Tutor</th>
@@ -543,7 +543,7 @@ export default function LandingPage() {
         </div>
 
         <div className="border-t border-white/10 pt-6 text-center text-xs text-gray-500">
-          © {new Date().getFullYear()} {branding.platformName}. All rights reserved. · Powered by EACbuddy
+          © {new Date().getFullYear()} {branding.platformName}. All rights reserved. · Powered by AISchoolonair
         </div>
       </footer>
 

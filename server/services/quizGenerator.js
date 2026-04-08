@@ -1,6 +1,6 @@
 // server/services/quizGenerator.js
 // ─────────────────────────────────────────────────────────────────────────────
-// Quiz Generation Service for EAC Learning Platform
+// Quiz Generation Service for AISchoolonair
 //
 // PROMPT 3 CHANGES — Quiz generation never fails:
 //   If the initial question SELECT returns fewer rows than requested, the

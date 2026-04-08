@@ -1,4 +1,4 @@
-# EAC Learning Platform — Server Environment Variables
+# AISchoolonair — Server Environment Variables
 #
 # HOW THIS FILE WORKS:
 # Every line is KEY=value. The server reads these at startup instead of
@@ -66,7 +66,7 @@ EMAIL_HOST=smtp.gmail.com
 EMAIL_PORT=587
 EMAIL_USER=info@eac.edu.ng
 EMAIL_PASS=your_16_character_gmail_app_password_here
-EMAIL_FROM=EACbuddy <noreply@eacbuddy.com>
+EMAIL_FROM=AISchoolonair <noreply@AISchoolonair.com>
 
 # CORS — which frontend URL the server allows to connect
 # Keep CLIENT_URL as your local Vite dev server during development.

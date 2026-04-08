@@ -1,6 +1,6 @@
 // server/routes/paymentRoutes.js
 // ─────────────────────────────────────────────────────────────────────────────
-// Paystack NGN payment integration for EAC Learning Platform
+// Paystack NGN payment integration for AISchoolonair
 //
 // Endpoints:
 //   GET    /api/payments/plans               — list all active subscription plans

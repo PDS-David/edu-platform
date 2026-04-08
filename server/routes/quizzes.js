@@ -1,5 +1,5 @@
 // server/routes/quizzes.js
-// AI Buddy-style quiz endpoints for the EAC Learning Platform.
+// AI Buddy-style quiz endpoints for the AISchoolonair.
 // Endpoints:
 //   GET  /api/quizzes/attempt-count         → total attempts for a subtopic (public stat)
 //   POST /api/quizzes/attempt               → submit a completed quiz attempt
