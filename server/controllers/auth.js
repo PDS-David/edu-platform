@@ -66,6 +66,11 @@ exports.register = async (req, res, next) => {
     if (password.length < 8) {
       return res.status(400).json({ success: false, error: 'Password must be at least 8 characters' });
     }
+    // Block admin self-registration
+    if (email.toLowerCase().trim() === 'admin@aischoolonair.com') {
+      return res.status(403).json({ success: false, error: 'This email address cannot be used for registration.' });
+    }
+
     const allowedRoles = ['student', 'teacher'];
     const assignedRole = allowedRoles.includes(role) ? role : 'student';
 

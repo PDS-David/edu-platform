@@ -113,13 +113,24 @@ const modelPaths = [
   './models/Payment',
   './models/Notification',
   './models/Concept',
+  './models/StudentExamType',
+  './models/SubtopicProgress',
+  './models/PracticeAttempt',
+  './models/AiChatSession',
+  './models/AiChatMessage',
 ];
 
 for (const modelPath of modelPaths) {
   try {
-    require(modelPath);
+    const modelExport = require(modelPath);
+    // Some models export a factory function (sequelize) => Model
+    // Others (like User) self-register by importing the db instance directly.
+    // Call factory functions so they register with Sequelize.
+    if (typeof modelExport === 'function' && modelExport.length === 1) {
+      modelExport(db);
+    }
   } catch (e) {
-    logger.warn(`Model not found, skipping: ${modelPath}`);
+    logger.warn(`Model not found or failed to load, skipping: ${modelPath} — ${e.message}`);
   }
 }
 
