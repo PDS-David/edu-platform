@@ -1,27 +1,16 @@
 // client/src/pages/OnboardingPage.jsx
 // Route: /onboarding  (redirect here after registration – students only)
-// 4-step wizard: exam board → subjects → daily goal → study schedule
 //
-// FIX v1.1: Replaced raw axios calls with the api instance from services/api.js
-//   - Removed: import axios, const API, const authHeader
-//   - Added:   import api
-//   - All requests now use automatic JWT injection and consistent error handling
+// CHANGE v2.0 – Removed exam board selection step.
+//   Students already choose their curriculum during registration.
+//   Onboarding now starts directly at subject selection (3-step flow):
+//     Step 1 → Select subjects
+//     Step 2 → Daily goal
+//     Step 3 → Study schedule
 //
-// FIX v1.2 – Onboarding subjects list was always empty
-// BUG 1 (backend): subjects controller ignored exam_board_code param.
-//   Fixed in server/controllers/subjects.js – see that file's changelog.
-// BUG 2 (frontend data unwrapping): api.js response interceptor returns
-//   response.data directly, so `r` inside .then() is already the backend's
-//   JSON body: { success, count, data: [...] }.
-//   Previous code did `r.data || []` which correctly got the array – BUT
-//   only when the board filter worked. With the backend fix in place,
-//   this now resolves correctly.
-//   For safety the unwrap is now explicit: `r?.data ?? []` with a fallback
-//   to treat `r` itself as an array (handles any future interceptor change).
-//
-// Supported exam boards loaded dynamically from /api/exam-boards (DB-driven),
-// so the wizard works for ALL boards: JAMB, WAEC, NECO, Cambridge, AQA,
-// Edexcel, IELTS, TOEFL, SAT, Junior WAEC, and any future additions.
+//   On mount the component auto-detects the student's curriculum from their
+//   user profile and fetches matching subjects. If no curriculum is found it
+//   falls back to loading ALL subjects so the student is never blocked.
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -44,76 +33,87 @@ const TIMES = [
   { value: 'evening',   label: 'Evening',   note: '6pm – 10pm',  emoji: '🌙', featured: true },
 ];
 
-// Helper: safely extract the data array from any api response shape
-// The api.js interceptor returns response.data, so `r` from api.get() is the
-// backend JSON body: { success, count, data: [...] }.
-// This helper handles both that shape and a bare array (defensive fallback).
 const extractList = (r) => {
-  if (Array.isArray(r))        return r;          // bare array (shouldn't happen)
-  if (Array.isArray(r?.data))  return r.data;     // { success, count, data: [...] }
+  if (Array.isArray(r))       return r;
+  if (Array.isArray(r?.data)) return r.data;
   return [];
 };
 
 export default function OnboardingPage() {
-  const { user }   = useAuth();
-  const navigate   = useNavigate();
+  const { user, updateUser } = useAuth();
+  const navigate             = useNavigate();
 
-  const [step,       setStep]       = useState(1);
+  // 3-step flow: 1=subjects, 2=goal, 3=schedule
+  const [step,      setStep]      = useState(1);
 
-  // Step 1 – exam board codes (e.g. 'JAMB', 'WAEC', 'Cambridge A Level')
-  const [boards,     setBoards]     = useState([]);
-  // All boards loaded from DB so every exam type is supported
-  const [allBoards,  setAllBoards]  = useState([]);
-  const [boardsLoading, setBoardsLoading] = useState(true);
+  // Subjects
+  const [allSubs,   setAllSubs]   = useState([]);
+  const [subjects,  setSubjects]  = useState([]);   // selected subject IDs
+  const [loadingS,  setLoadingS]  = useState(true);
 
-  // Step 2 – subjects
-  const [subjects,   setSubjects]   = useState([]);
-  const [allSubs,    setAllSubs]    = useState([]);
-  const [loadingS,   setLoadingS]   = useState(false);
+  // The board codes we detected from the user's registration curriculum
+  const [detectedBoards, setDetectedBoards] = useState([]);
 
-  // Step 3 – daily goal
-  const [goal,       setGoal]       = useState(20);
+  // Goal & schedule
+  const [goal,      setGoal]      = useState(20);
+  const [studyDays, setStudyDays] = useState([]);
+  const [studyTime, setStudyTime] = useState('evening');
+  const [saving,    setSaving]    = useState(false);
 
-  // Step 4 – schedule
-  const [studyDays,  setStudyDays]  = useState([]);
-  const [studyTime,  setStudyTime]  = useState('evening');
-  const [saving,     setSaving]     = useState(false);
-
-  // ── Load all exam boards from DB on mount ──────────────────────────────────
+  // ── On mount: detect curriculum from user profile and load subjects ────────
   useEffect(() => {
-    api.get('/exam-boards')
-      .then(r => setAllBoards(extractList(r)))
-      .catch(() => setAllBoards([]))
-      .finally(() => setBoardsLoading(false));
-  }, []);
+    const loadSubjects = async () => {
+      setLoadingS(true);
+      try {
+        // Try to match the user's curriculum to an exam board code
+        const curriculum = user?.curriculum || user?.exam_board || '';
+        let boardCodes   = [];
 
-  // ── Load subjects whenever board selection changes ─────────────────────────
-  // FIX: Send exam_board_code (the board's code string, e.g. "JAMB") – the
-  // backend subjects controller now supports this param directly via a JOIN
-  // on exam_boards.code. Previously only exam_board_id (UUID) was accepted,
-  // so subjects were never returned during onboarding.
-  useEffect(() => {
-    if (boards.length === 0) { setAllSubs([]); return; }
-    setLoadingS(true);
-    Promise.all(
-      boards.map(code =>
-        api.get('/subjects', { params: { exam_board_code: code } })
-          .then(r => extractList(r))
-          .catch(() => [])
-      )
-    )
-      .then(results => {
-        const flat   = results.flat();
-        const unique = [...new Map(flat.map(s => [s.id, s])).values()];
+        if (curriculum) {
+          // Fetch all boards and find one whose name or code fuzzy-matches
+          const boardsRes = await api.get('/exam-boards').catch(() => ({ data: [] }));
+          const allBoards = extractList(boardsRes);
+          const matched   = allBoards.find(b =>
+            b.code?.toLowerCase()  === curriculum.toLowerCase() ||
+            b.name?.toLowerCase().includes(curriculum.toLowerCase()) ||
+            curriculum.toLowerCase().includes(b.code?.toLowerCase())
+          );
+          if (matched) boardCodes = [matched.code];
+        }
+
+        setDetectedBoards(boardCodes);
+
+        // Fetch subjects — filtered by board if we matched one, otherwise all
+        let subs = [];
+        if (boardCodes.length > 0) {
+          const results = await Promise.all(
+            boardCodes.map(code =>
+              api.get('/subjects', { params: { exam_board_code: code } })
+                .then(r => extractList(r))
+                .catch(() => [])
+            )
+          );
+          subs = results.flat();
+        }
+
+        // If board-filtered fetch returned nothing, fall back to all subjects
+        if (subs.length === 0) {
+          const allRes = await api.get('/subjects').catch(() => ({ data: [] }));
+          subs = extractList(allRes);
+        }
+
+        // Deduplicate
+        const unique = [...new Map(subs.map(s => [s.id, s])).values()];
         setAllSubs(unique);
-      })
-      .finally(() => setLoadingS(false));
-  }, [boards.join(',')]); // eslint-disable-line
+      } catch {
+        setAllSubs([]);
+      } finally {
+        setLoadingS(false);
+      }
+    };
 
-  const toggleBoard = (code) =>
-    setBoards(prev =>
-      prev.includes(code) ? prev.filter(b => b !== code) : [...prev, code]
-    );
+    loadSubjects();
+  }, []); // eslint-disable-line
 
   const toggleSubject = (id) => {
     if (subjects.includes(id)) {
@@ -124,36 +124,36 @@ export default function OnboardingPage() {
     }
   };
 
-  // ── Save preferences and redirect to dashboard ────────────────────────────
+  // ── Save preferences and redirect to student dashboard ────────────────────
   const finish = async () => {
     setSaving(true);
     try {
       await api.patch('/users/preferences', {
-        exam_boards: boards,
+        exam_boards: detectedBoards,
         subject_ids: subjects,
         daily_goal:  goal,
         study_days:  studyDays,
         study_time:  studyTime,
       });
-      navigate('/student/dashboard');
     } catch {
-      navigate('/student/dashboard'); // fail-open – don't block the student
+      // fail-open — preferences are non-critical, don't block the student
     } finally {
       setSaving(false);
+      navigate('/student/dashboard');
     }
   };
 
   const canNext =
-    step === 1 ? boards.length > 0 :
-    step === 2 ? subjects.length > 0 :
+    step === 1 ? subjects.length > 0 :
     true;
 
   return (
     <div className="min-h-screen bg-[#0a4a3f] flex flex-col items-center justify-center px-4 py-10">
       <div className="w-full max-w-md">
-        {/* Step progress dots */}
+
+        {/* 3-step progress dots */}
         <div className="flex justify-center gap-2 mb-8">
-          {[1, 2, 3, 4].map(s => (
+          {[1, 2, 3].map(s => (
             <div
               key={s}
               className={`h-1.5 rounded-full transition-all ${
@@ -167,60 +167,20 @@ export default function OnboardingPage() {
 
         <div className="bg-white rounded-3xl p-6 shadow-2xl">
 
-          {/* ── Step 1: Choose exam board ─────────────────────────────────── */}
+          {/* ── Step 1: Select subjects ───────────────────────────────────── */}
           {step === 1 && (
-            <>
-              <h2 className="text-xl font-bold text-gray-900 mb-1">Choose your exam</h2>
-              <p className="text-sm text-gray-500 mb-5">
-                Select all that apply – you can change this later
-              </p>
-              {boardsLoading ? (
-                <div className="flex justify-center py-8">
-                  <Loader2 size={20} className="text-teal-400 animate-spin" />
-                </div>
-              ) : (
-                <div className="space-y-2 max-h-80 overflow-y-auto">
-                  {allBoards.map(b => {
-                    const sel = boards.includes(b.code);
-                    return (
-                      <button
-                        key={b.id}
-                        onClick={() => toggleBoard(b.code)}
-                        className={`w-full flex items-center gap-3 p-4 rounded-2xl border-2 transition-all text-left ${
-                          sel ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:border-teal-300'
-                        }`}
-                      >
-                        <span className="text-2xl">{b.icon_emoji || '📋'}</span>
-                        <div className="flex-1">
-                          <p className={`font-semibold text-sm ${sel ? 'text-teal-700' : 'text-gray-800'}`}>
-                            {b.name}
-                          </p>
-                          {b.description && (
-                            <p className="text-xs text-gray-400">{b.description}</p>
-                          )}
-                        </div>
-                        {sel && <Check size={16} className="text-teal-500 shrink-0" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </>
-          )}
-
-          {/* ── Step 2: Select subjects ───────────────────────────────────── */}
-          {step === 2 && (
             <>
               <h2 className="text-xl font-bold text-gray-900 mb-1">Select your subjects</h2>
               <p className="text-sm text-gray-500 mb-1">Pick up to 3 subjects (free plan)</p>
               <p className="text-xs text-teal-600 font-medium mb-4">{subjects.length}/3 selected</p>
+
               {loadingS ? (
                 <div className="flex justify-center py-8">
                   <Loader2 size={20} className="text-teal-400 animate-spin" />
                 </div>
               ) : allSubs.length === 0 ? (
                 <p className="text-sm text-gray-400 text-center py-8">
-                  No subjects found for the selected exam board(s).
+                  No subjects found. Please contact support.
                 </p>
               ) : (
                 <div className="grid grid-cols-2 gap-2 max-h-72 overflow-y-auto">
@@ -247,14 +207,15 @@ export default function OnboardingPage() {
                   })}
                 </div>
               )}
+
               {subjects.length >= 3 && (
                 <p className="text-xs text-amber-600 mt-2">Upgrade to unlock more subjects</p>
               )}
             </>
           )}
 
-          {/* ── Step 3: Daily goal ────────────────────────────────────────── */}
-          {step === 3 && (
+          {/* ── Step 2: Daily goal ────────────────────────────────────────── */}
+          {step === 2 && (
             <>
               <h2 className="text-xl font-bold text-gray-900 mb-1">Set your study goal</h2>
               <p className="text-sm text-gray-500 mb-5">
@@ -285,8 +246,8 @@ export default function OnboardingPage() {
             </>
           )}
 
-          {/* ── Step 4: Study schedule ────────────────────────────────────── */}
-          {step === 4 && (
+          {/* ── Step 3: Study schedule ────────────────────────────────────── */}
+          {step === 3 && (
             <>
               <h2 className="text-xl font-bold text-gray-900 mb-1">Set your study schedule</h2>
               <p className="text-sm text-gray-500 mb-5">
@@ -337,7 +298,7 @@ export default function OnboardingPage() {
             </>
           )}
 
-          {/* Navigation */}
+          {/* ── Navigation ───────────────────────────────────────────────── */}
           <div className="flex items-center justify-between mt-6">
             <button
               onClick={() => setStep(s => s - 1)}
@@ -346,7 +307,7 @@ export default function OnboardingPage() {
               <ChevronLeft size={14} /> Back
             </button>
 
-            {step < 4 ? (
+            {step < 3 ? (
               <button
                 onClick={() => setStep(s => s + 1)}
                 disabled={!canNext}
