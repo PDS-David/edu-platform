@@ -70,6 +70,8 @@ const ALLOWED_ORIGINS = [
   'http://localhost:5173',
   'http://localhost:3000',
   'http://localhost:5000',
+  // Production frontend — always allowed regardless of env vars
+  'https://aischoolonair.onrender.com',
   process.env.CLIENT_URL,
   process.env.PROD_CLIENT_URL,
   process.env.NGROK_URL,

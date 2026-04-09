@@ -58,7 +58,7 @@ const ExamBoardSelector = ({
     { id: 5, code: 'IELTS',  name: 'IELTS',     icon_emoji: '🌍' },
     { id: 6, code: 'TOEFL',  name: 'TOEFL',     icon_emoji: '🇺🇸' },
     { id: 7, code: 'SAT',      name: 'SAT',                  icon_emoji: '🎯' },
-    { id: 8, code: 'GCE_AL',  name: 'GCE A'Levels',          icon_emoji: '🎓' },
+    { id: 8, code: 'GCE_AL',  name: "GCE A'Levels",           icon_emoji: '🎓' },
     { id: 9, code: 'JUPEB',   name: 'JUPEB',                 icon_emoji: '📚' },
     { id: 10, code: 'LANG_EN', name: 'Language Lab – English', icon_emoji: '🇬🇧' },
     { id: 11, code: 'LANG_FR', name: 'Language Lab – French',  icon_emoji: '🇫🇷' },
