@@ -855,31 +855,59 @@ const TeacherPanel = () => {
 };
 
 // ─── AI Generate Panel ────────────────────────────────────────────────────────
-// PROMPT 1: Shows concept_hint preview in generated question list.
-//           Questions badge shows ✦ AI for AI-generated items.
+// Loads exam types dynamically from /api/exam-boards instead of hardcoding.
 const AIGeneratePanel = () => {
-  const [subjects,     setSubjects]     = useState([]);
-  const [subjectsLoad, setSubjectsLoad] = useState(true);
-  const [pendingCount, setPendingCount] = useState(null);
+  const [subjects,      setSubjects]      = useState([]);
+  const [subjectsLoad,  setSubjectsLoad]  = useState(true);
+  const [examTypes,     setExamTypes]     = useState([]);
+  const [examTypesLoad, setExamTypesLoad] = useState(true);
+  const [pendingCount,  setPendingCount]  = useState(null);
   const [form, setForm] = useState({
     subject_id: '', topic: '', exam_board: 'JAMB',
     count: 10, difficulty: 'medium',
   });
-  const [generating, setGenerating]     = useState(false);
-  const [result,     setResult]         = useState(null);
-  const [error,      setError]          = useState('');
-  // PROMPT 1: preview list of generated questions (with concept_hint)
+  const [generating,       setGenerating]       = useState(false);
+  const [result,           setResult]           = useState(null);
+  const [error,            setError]            = useState('');
   const [previewQuestions, setPreviewQuestions] = useState([]);
 
+  // Static fallback — all 12 exam types
+  const STATIC_EXAM_TYPES = [
+    { code: 'JAMB',    name: 'JAMB / UTME'             },
+    { code: 'WAEC',    name: 'WAEC'                    },
+    { code: 'GCE_OL',  name: 'GCE O-Levels'            },
+    { code: 'NECO',    name: 'NECO'                    },
+    { code: 'IELTS',   name: 'IELTS'                   },
+    { code: 'TOEFL',   name: 'TOEFL'                   },
+    { code: 'SAT',     name: 'SAT'                     },
+    { code: 'GCE_AL',  name: 'GCE A-Levels'            },
+    { code: 'JUPEB',   name: 'JUPEB'                   },
+    { code: 'LANG_EN', name: 'Language Lab. - English' },
+    { code: 'LANG_FR', name: 'Language Lab. - French'  },
+    { code: 'LANG_YO', name: 'Language Lab. - Yoruba'  },
+  ];
+
   useEffect(() => {
+    // Load subjects
     api.get('/admin/subjects')
       .then(r => setSubjects(r.data || r || []))
       .catch(() => {})
       .finally(() => setSubjectsLoad(false));
+
+    // Load exam types dynamically, fall back to static list
+    api.get('/exam-boards')
+      .then(r => {
+        const list = Array.isArray(r) ? r : (r.data || []);
+        setExamTypes(list.length > 0 ? list : STATIC_EXAM_TYPES);
+      })
+      .catch(() => setExamTypes(STATIC_EXAM_TYPES))
+      .finally(() => setExamTypesLoad(false));
+
+    // Load pending count
     api.get('/admin/questions/pending-count')
       .then(r => setPendingCount(r.count))
       .catch(() => {});
-  }, []);
+  }, []); // eslint-disable-line
 
   const handleGenerate = async (e) => {
     e.preventDefault();
@@ -890,7 +918,6 @@ const AIGeneratePanel = () => {
     try {
       const res = await api.post('/admin/generate-questions', form);
       setResult(res);
-      // PROMPT 1: server now returns questions array with concept_hint
       if (Array.isArray(res.questions)) setPreviewQuestions(res.questions);
       setPendingCount(c => (c || 0) + (res.inserted || 0));
     } catch (err) {
@@ -951,14 +978,21 @@ const AIGeneratePanel = () => {
           />
         </div>
 
-        {/* Exam board + difficulty + count row */}
+        {/* Exam Type + difficulty + count row */}
         <div className="grid grid-cols-3 gap-3">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Exam board</label>
-            <select value={form.exam_board} onChange={e => setForm(f => ({ ...f, exam_board: e.target.value }))} className={inputCls}>
-              <option value="JAMB">JAMB</option>
-              <option value="WAEC">WAEC</option>
-              <option value="NECO">NECO</option>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Exam Type</label>
+            <select
+              value={form.exam_board}
+              onChange={e => setForm(f => ({ ...f, exam_board: e.target.value }))}
+              className={inputCls}
+            >
+              {examTypesLoad
+                ? <option disabled>Loading…</option>
+                : examTypes.map(et => (
+                    <option key={et.code} value={et.code}>{et.name}</option>
+                  ))
+              }
             </select>
           </div>
           <div>
@@ -1002,7 +1036,7 @@ const AIGeneratePanel = () => {
         </button>
       </form>
 
-      {/* PROMPT 1: Generated questions preview with concept_hint */}
+      {/* Generated questions preview with concept_hint */}
       {previewQuestions.length > 0 && (
         <div className="mt-6 max-w-lg">
           <div className="flex items-center gap-2 mb-3">
@@ -1288,9 +1322,6 @@ const UserManagementPanel = () => {
     </div>
   );
 };
-
-// ─── Main AdminDashboard ──────────────────────────────────────────────────────
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PlatformAnalyticsPanel — platform-wide stats, charts, quick actions
@@ -1941,5 +1972,3 @@ const AdminDashboard = () => {
 };
 
 export default AdminDashboard;
-
-
