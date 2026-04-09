@@ -89,9 +89,11 @@ export default function TeacherResourcesPage() {
   const fileInputRef = useRef(null);
   const dropRef      = useRef(null);
 
-  // ── Load subjects ──────────────────────────────────────────────────────────
+  // ── Load subjects — only those assigned to this teacher ───────────────────
   useEffect(() => {
-    api.get('/subjects').then(r => setSubjects(r.data || [])).catch(() => {});
+    api.get('/teacher/my-subjects')
+      .then(r => setSubjects(r.data || []))
+      .catch(() => api.get('/subjects').then(r => setSubjects(r.data || [])).catch(() => {}));
   }, []);
 
   // ── Load topics when subject changes ──────────────────────────────────────

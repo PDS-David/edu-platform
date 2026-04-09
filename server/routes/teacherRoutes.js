@@ -330,4 +330,33 @@ router.post('/nudge/:userId', protect, teacherOnly, async (req, res) => {
   }
 });
 
+// ── GET /api/teacher/my-subjects ──────────────────────────────────────────────
+// Returns the subjects assigned to the logged-in teacher (via teacher_subjects).
+// Used by TeacherResourcesPage to restrict the Subject dropdown.
+router.get('/my-subjects', protect, teacherOnly, async (req, res) => {
+  try {
+    const rows = await sequelize.query(
+      `SELECT
+         s.id,
+         s.name,
+         s.code,
+         s.icon_emoji,
+         s.category,
+         eb.code  AS exam_board_code,
+         eb.name  AS exam_board_name
+       FROM teacher_subjects ts
+       JOIN subjects    s  ON s.id  = ts.subject_id
+       LEFT JOIN exam_boards eb ON eb.id = ts.exam_board_id
+       WHERE ts.teacher_id = :teacherId
+         AND ts.is_active  = true
+       ORDER BY s.name ASC`,
+      { replacements: { teacherId: req.user.id }, type: QueryTypes.SELECT }
+    );
+    return res.json({ success: true, count: rows.length, data: rows });
+  } catch (err) {
+    console.error('[GET /teacher/my-subjects]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;

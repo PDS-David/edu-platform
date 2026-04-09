@@ -39,21 +39,36 @@ const GRADE_MAP = {
   'IELTS':                         ['All Levels'],
   'TOEFL':                         ['All Levels'],
   'SAT':                           ['Grade 11', 'Grade 12'],
+  // GCE A-Levels: Lower 6 (Year 12) and Upper 6 (Year 13)
+  "GCE A' Levels":                 ['Lower 6 (Year 12)', 'Upper 6 (Year 13)'],
+  'GCE A Levels':                  ['Lower 6 (Year 12)', 'Upper 6 (Year 13)'],
+  'GCE':                           ['Lower 6 (Year 12)', 'Upper 6 (Year 13)'],
+  // JUPEB: 1-year programme, Year 1 only
+  'JUPEB':                         ['JUPEB Year 1'],
+  // Language Lab: proficiency levels
+  'Language Lab – English':        ['Beginner (A1)', 'Elementary (A2)', 'Intermediate (B1)', 'Upper-Intermediate (B2)', 'Advanced (C1)', 'Proficiency (C2)'],
+  'Language Lab – French':         ['Beginner (A1)', 'Elementary (A2)', 'Intermediate (B1)', 'Upper-Intermediate (B2)', 'Advanced (C1)', 'Proficiency (C2)'],
+  'Language Lab – Yoruba':         ['Beginner', 'Elementary', 'Intermediate', 'Advanced'],
 };
 
 // ── FIX A: Hardcoded fallback curricula used if the API call fails ─────────────
 // This means the Curriculum dropdown is ALWAYS populated, even offline.
 const FALLBACK_CURRICULA = [
-  { id: null, code: 'JAMB',   name: 'JAMB/UTME',           icon_emoji: '📚' },
-  { id: null, code: 'WAEC',   name: 'WAEC/NECO (SSCE)',     icon_emoji: '📚' },
-  { id: null, code: 'BECE',   name: 'Junior WAEC (BECE)',   icon_emoji: '📚' },
-  { id: null, code: 'CAMBAL', name: 'Cambridge A Level',    icon_emoji: '📚' },
-  { id: null, code: 'CAMBOL', name: 'Cambridge O Level',    icon_emoji: '📚' },
-  { id: null, code: 'AQAAL',  name: 'AQA A Level',          icon_emoji: '📚' },
-  { id: null, code: 'EDXAL',  name: 'Edexcel A Level',      icon_emoji: '📚' },
-  { id: null, code: 'IELTS',  name: 'IELTS',                icon_emoji: '📚' },
-  { id: null, code: 'TOEFL',  name: 'TOEFL',                icon_emoji: '📚' },
-  { id: null, code: 'SAT',    name: 'SAT',                  icon_emoji: '📚' },
+  { id: null, code: 'JAMB',    name: 'JAMB/UTME',              icon_emoji: '📚' },
+  { id: null, code: 'WAEC',    name: 'WAEC/NECO (SSCE)',        icon_emoji: '📚' },
+  { id: null, code: 'BECE',    name: 'Junior WAEC (BECE)',      icon_emoji: '📚' },
+  { id: null, code: 'GCE_AL',  name: "GCE A' Levels",          icon_emoji: '🎓' },
+  { id: null, code: 'JUPEB',   name: 'JUPEB',                   icon_emoji: '🏛️' },
+  { id: null, code: 'CAMBAL',  name: 'Cambridge A Level',       icon_emoji: '📚' },
+  { id: null, code: 'CAMBOL',  name: 'Cambridge O Level',       icon_emoji: '📚' },
+  { id: null, code: 'AQAAL',   name: 'AQA A Level',             icon_emoji: '📚' },
+  { id: null, code: 'EDXAL',   name: 'Edexcel A Level',         icon_emoji: '📚' },
+  { id: null, code: 'IELTS',   name: 'IELTS',                   icon_emoji: '📚' },
+  { id: null, code: 'TOEFL',   name: 'TOEFL',                   icon_emoji: '📚' },
+  { id: null, code: 'SAT',     name: 'SAT',                     icon_emoji: '📚' },
+  { id: null, code: 'LANG_EN', name: 'Language Lab – English',  icon_emoji: '🇬🇧' },
+  { id: null, code: 'LANG_FR', name: 'Language Lab – French',   icon_emoji: '🇫🇷' },
+  { id: null, code: 'LANG_YO', name: 'Language Lab – Yoruba',   icon_emoji: '🌍' },
 ];
 
 // ── Resolve grade options for a curriculum ───────────────────────────────────
@@ -69,13 +84,19 @@ function getGradeOptions(curriculum) {
 
   // Code-based match
   const codeMap = {
-    'JAMB': GRADE_MAP['JAMB/UTME'],
-    'WAEC': GRADE_MAP['WAEC/NECO (SSCE)'],
-    'NECO': GRADE_MAP['WAEC/NECO (SSCE)'],
-    'BECE': GRADE_MAP['Junior WAEC (BECE)'],
-    'IELTS': GRADE_MAP['IELTS'],
-    'TOEFL': GRADE_MAP['TOEFL'],
-    'SAT':   GRADE_MAP['SAT'],
+    'JAMB':    GRADE_MAP['JAMB/UTME'],
+    'WAEC':    GRADE_MAP['WAEC/NECO (SSCE)'],
+    'NECO':    GRADE_MAP['WAEC/NECO (SSCE)'],
+    'BECE':    GRADE_MAP['Junior WAEC (BECE)'],
+    'IELTS':   GRADE_MAP['IELTS'],
+    'TOEFL':   GRADE_MAP['TOEFL'],
+    'SAT':     GRADE_MAP['SAT'],
+    'GCE_AL':  GRADE_MAP["GCE A' Levels"],
+    'GCE':     GRADE_MAP["GCE A' Levels"],
+    'JUPEB':   GRADE_MAP['JUPEB'],
+    'LANG_EN': GRADE_MAP['Language Lab – English'],
+    'LANG_FR': GRADE_MAP['Language Lab – French'],
+    'LANG_YO': GRADE_MAP['Language Lab – Yoruba'],
   };
   if (codeMap[code]) return codeMap[code];
 
@@ -86,6 +107,13 @@ function getGradeOptions(curriculum) {
     return GRADE_MAP['WAEC/NECO (SSCE)'];
   if (lowerName.includes('junior') || lowerName.includes('bece') || lowerName.includes('jss'))
     return GRADE_MAP['Junior WAEC (BECE)'];
+  if (lowerName.includes('jupeb'))    return GRADE_MAP['JUPEB'];
+  if (lowerName.includes('gce'))      return GRADE_MAP["GCE A' Levels"];
+  if (lowerName.includes('language lab') || lowerName.includes('lang lab')) {
+    if (lowerName.includes('french') || lowerName.includes('fr'))  return GRADE_MAP['Language Lab – French'];
+    if (lowerName.includes('yoruba') || lowerName.includes('yo'))  return GRADE_MAP['Language Lab – Yoruba'];
+    return GRADE_MAP['Language Lab – English']; // default language lab
+  }
   if (lowerName.includes('cambridge') && lowerName.includes('primary'))
     return GRADE_MAP['Cambridge Primary'];
   if (lowerName.includes('cambridge') && (lowerName.includes('o level') || lowerName.includes('igcse')))
@@ -292,28 +320,28 @@ const RegisterPage = () => {
     setSelectedGrade(''); // reset grade whenever curriculum changes
   };
 
-  // FIX B: Password minimum aligned with backend (8 chars, not 6)
+  // isReady: curriculum/grade only required for students
   const isReady =
     formData.fullName.trim().length > 0 &&
     formData.email.trim().length > 0 &&
     formData.phone.trim().length > 0 &&
-    formData.password.length >= 8 &&    // ← was >= 6, backend requires >= 8
-    selectedCurriculum !== null &&
-    selectedGrade !== '' &&
+    formData.password.length >= 8 &&
+    (formData.role === 'teacher' || (selectedCurriculum !== null && selectedGrade !== '')) &&
     termsAccepted;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
-    if (!selectedCurriculum) { setError('Please select a curriculum.'); return; }
-    if (!selectedGrade)       { setError('Please select your grade.'); return; }
-    // FIX B: Check aligned with backend minimum
+    if (formData.role === 'student') {
+      if (!selectedCurriculum) { setError('Please select a curriculum.'); return; }
+      if (!selectedGrade)       { setError('Please select your grade.'); return; }
+    }
     if (formData.password.length < 8) { setError('Password must be at least 8 characters.'); return; }
 
     const nameParts = formData.fullName.trim().split(/\s+/);
     const firstName = nameParts[0] || '';
-    const lastName  = nameParts.slice(1).join(' ') || firstName; // fallback: repeat first name if no surname
+    const lastName  = nameParts.slice(1).join(' ') || firstName;
 
     setLoading(true);
     try {
@@ -324,8 +352,8 @@ const RegisterPage = () => {
         phone:             `${countryCode.dial}${formData.phone.trim()}`,
         password:          formData.password,
         role:              formData.role,
-        pendingExamBoards: selectedCurriculum.id ? [selectedCurriculum.id] : [],
-        grade:             selectedGrade,
+        pendingExamBoards: selectedCurriculum?.id ? [selectedCurriculum.id] : [],
+        grade:             selectedGrade || null,
         terms_accepted:    true,
       });
 
@@ -333,8 +361,6 @@ const RegisterPage = () => {
       else if (user.role === 'teacher') navigate('/teacher/dashboard');
       else                              navigate('/admin/dashboard');
     } catch (err) {
-      // FIX C: AuthContext throws { message }, not { error }
-      // Handle both shapes defensively
       setError(err.message || err.error || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
@@ -521,33 +547,62 @@ const RegisterPage = () => {
                   )}
                 </div>
 
-                {/* Curriculum & Grade */}
-                <div className="flex gap-3">
-                  <div className="relative flex-1">
-                    <label className="absolute -top-2 left-3 px-1 bg-white text-xs text-gray-500 font-medium z-10">
-                      Curriculum *
-                    </label>
-                    <CustomDropdown
-                      placeholder="Curriculum"
-                      value={selectedCurriculum?.name || ''}
-                      options={curricula}
-                      onChange={handleCurriculumChange}
-                      loading={loadingCurricula}
-                    />
-                  </div>
-                  <div className="relative flex-1">
-                    <label className="absolute -top-2 left-3 px-1 bg-white text-xs text-gray-500 font-medium z-10">
-                      Grade *
-                    </label>
-                    <CustomDropdown
-                      placeholder="Grade"
-                      value={selectedGrade}
-                      options={gradeOptions}
-                      onChange={(opt) => setSelectedGrade(typeof opt === 'string' ? opt : (opt.name || opt))}
-                      disabled={!selectedCurriculum || loadingCurricula}
-                    />
+                {/* Role selector */}
+                <div className="relative">
+                  <label className="absolute -top-2 left-3 px-1 bg-white text-xs text-gray-500 font-medium z-10">
+                    I am a *
+                  </label>
+                  <div className="flex gap-2 pt-1">
+                    {[
+                      { value: 'student', label: '🎓 Student', desc: 'Access lessons & practice exams' },
+                      { value: 'teacher', label: '📖 Teacher', desc: 'Upload resources & teach subjects' },
+                    ].map(opt => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setFormData(f => ({ ...f, role: opt.value }))}
+                        className={`flex-1 flex flex-col items-center py-3 px-2 border-2 rounded-lg text-xs font-medium transition-all
+                          ${formData.role === opt.value
+                            ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                            : 'border-gray-200 bg-white text-gray-500 hover:border-indigo-300'}`}
+                      >
+                        <span className="text-lg mb-0.5">{opt.label.split(' ')[0]}</span>
+                        <span className="font-semibold">{opt.label.split(' ').slice(1).join(' ')}</span>
+                        <span className="text-gray-400 text-[10px] mt-0.5 text-center leading-tight">{opt.desc}</span>
+                      </button>
+                    ))}
                   </div>
                 </div>
+
+                {/* Curriculum & Grade — only for students */}
+                {formData.role === 'student' && (
+                  <div className="flex gap-3">
+                    <div className="relative flex-1">
+                      <label className="absolute -top-2 left-3 px-1 bg-white text-xs text-gray-500 font-medium z-10">
+                        Curriculum *
+                      </label>
+                      <CustomDropdown
+                        placeholder="Curriculum"
+                        value={selectedCurriculum?.name || ''}
+                        options={curricula}
+                        onChange={handleCurriculumChange}
+                        loading={loadingCurricula}
+                      />
+                    </div>
+                    <div className="relative flex-1">
+                      <label className="absolute -top-2 left-3 px-1 bg-white text-xs text-gray-500 font-medium z-10">
+                        Grade *
+                      </label>
+                      <CustomDropdown
+                        placeholder="Grade"
+                        value={selectedGrade}
+                        options={gradeOptions}
+                        onChange={(opt) => setSelectedGrade(typeof opt === 'string' ? opt : (opt.name || opt))}
+                        disabled={!selectedCurriculum || loadingCurricula}
+                      />
+                    </div>
+                  </div>
+                )}
 
                 {/* Terms of Service */}
                 <div className="flex items-start gap-2 mt-2">

@@ -37,6 +37,11 @@ const register = async (req, res) => {
       return res.status(400).json({ success: false, error: 'You must accept the Terms of Service to register' });
     }
 
+    // Admin account is pre-seeded and cannot be self-registered
+    if (email.toLowerCase() === 'admin@aischoolonair.com') {
+      return res.status(400).json({ success: false, error: 'This email address cannot be used for registration.' });
+    }
+
     const existingUser = await db.query(
       'SELECT id FROM users WHERE email = $1',
       { bind: [email.toLowerCase()], type: QueryTypes.SELECT }
@@ -93,7 +98,9 @@ const register = async (req, res) => {
       }
     }
 
-    // Email verification link (non-fatal if email is not configured)
+    // Email verification link — only sent to students
+    // Teachers are activated by admin assignment; admin is pre-seeded
+    if (user.role === 'student') {
     try {
       const verifyToken     = crypto.randomBytes(32).toString('hex');
       const verifyTokenHash = crypto.createHash('sha256').update(verifyToken).digest('hex');
@@ -143,6 +150,7 @@ const register = async (req, res) => {
     } catch (emailErr) {
       console.warn('[register] Verification email failed:', emailErr.message);
     }
+    } // end student-only email block
 
     res.status(201).json({
       success: true,
