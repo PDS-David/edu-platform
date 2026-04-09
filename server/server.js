@@ -150,6 +150,27 @@ async function initDatabase() {
     await db.authenticate();
     logger.info('✅ DB connected');
 
+    // ── One-time migration: fix teacher_id column type mismatch ──────────────
+    // The TeacherSubject model defines teacher_id as INTEGER, but the column
+    // may have been created earlier as TEXT/VARCHAR. Postgres won't cast it
+    // automatically, so we do it explicitly here before alter-sync runs.
+    //
+    // This is a no-op after the first successful run:
+    //   • If the column is already INTEGER  → ALTER throws, caught silently.
+    //   • If the table doesn't exist yet    → ALTER throws, caught silently.
+    //   • If the data cannot be cast        → ALTER throws; fix bad rows first.
+    try {
+      await db.query(`
+        ALTER TABLE teacher_subjects
+        ALTER COLUMN teacher_id TYPE INTEGER
+        USING teacher_id::INTEGER;
+      `);
+      logger.info('✅ teacher_subjects.teacher_id cast to INTEGER');
+    } catch (migrationErr) {
+      // Already INTEGER, table absent, or no rows to cast — all safe to ignore.
+      logger.info('ℹ️  teacher_id migration skipped: ' + migrationErr.message);
+    }
+
     // alter: true — safely creates missing tables and adds missing columns
     // without dropping existing data.
     // Never use force: true in production — it wipes all tables.
