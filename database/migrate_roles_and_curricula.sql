@@ -26,31 +26,27 @@ END$$;
 --    The hash below is bcrypt cost-10 of "password123"
 -- ─────────────────────────────────────────────────────────────
 INSERT INTO users (
-  id, email, password_hash, first_name, last_name,
-  role, is_active, email_verified,
-  terms_accepted_at, terms_version,
+  email, password, first_name, last_name,
+  role, is_active, is_verified,
   subscription_status, created_at, updated_at
 )
 VALUES (
-  gen_random_uuid(),
   'admin@aischoolonair.com',
   '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', -- password123
   'Platform',
   'Admin',
   'admin',
   true,
-  true,          -- no email verification needed
-  NOW(),
-  '1.0',
+  true,
   'active',
   NOW(),
   NOW()
 )
 ON CONFLICT (email) DO UPDATE
-  SET role            = 'admin',
-      is_active       = true,
-      email_verified  = true,
-      updated_at      = NOW();
+  SET role        = 'admin',
+      is_active   = true,
+      is_verified = true,
+      updated_at  = NOW();
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 3. Add new exam boards (safe — won't duplicate if run twice)
@@ -68,86 +64,41 @@ BEGIN
 END$$;
 
 -- GCE A-Level
-INSERT INTO exam_boards (id, code, name, full_name, description, country, icon_emoji, display_order, is_active, created_at, updated_at)
-VALUES (
-  gen_random_uuid(),
-  'GCE_AL',
-  'GCE A'' Levels',
-  'General Certificate of Education Advanced Level',
-  'GCE Advanced Level examinations for post-secondary students, recognised across West Africa and the UK.',
-  'NG', '🎓', 15, true, NOW(), NOW()
-)
-ON CONFLICT (code) DO UPDATE
-  SET name = EXCLUDED.name, full_name = EXCLUDED.full_name,
-      description = EXCLUDED.description, is_active = true, updated_at = NOW();
+INSERT INTO exam_boards (code, name, description, country, is_active, created_at, updated_at)
+VALUES ('GCE_AL', 'GCE A-Levels', 'GCE Advanced Level examinations for post-secondary students.', 'NG', true, NOW(), NOW())
+ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, is_active = true, updated_at = NOW();
 
 -- JUPEB
-INSERT INTO exam_boards (id, code, name, full_name, description, country, icon_emoji, display_order, is_active, created_at, updated_at)
-VALUES (
-  gen_random_uuid(),
-  'JUPEB',
-  'JUPEB',
-  'Joint Universities Preliminary Examinations Board',
-  'Nigerian pre-degree programme equivalent to A-Levels, accepted for direct entry into 200 Level at Nigerian universities.',
-  'NG', '🏛️', 16, true, NOW(), NOW()
-)
-ON CONFLICT (code) DO UPDATE
-  SET name = EXCLUDED.name, full_name = EXCLUDED.full_name,
-      description = EXCLUDED.description, is_active = true, updated_at = NOW();
+INSERT INTO exam_boards (code, name, description, country, is_active, created_at, updated_at)
+VALUES ('JUPEB', 'JUPEB', 'Joint Universities Preliminary Examinations Board — direct entry to 200 Level.', 'NG', true, NOW(), NOW())
+ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, is_active = true, updated_at = NOW();
 
 -- Language Lab — English
-INSERT INTO exam_boards (id, code, name, full_name, description, country, icon_emoji, display_order, is_active, created_at, updated_at)
-VALUES (
-  gen_random_uuid(),
-  'LANG_EN',
-  'Language Lab – English',
-  'Language Laboratory: English Language',
-  'Spoken and written English language training for proficiency, communication and examination preparation.',
-  'NG', '🇬🇧', 20, true, NOW(), NOW()
-)
-ON CONFLICT (code) DO UPDATE
-  SET name = EXCLUDED.name, full_name = EXCLUDED.full_name,
-      description = EXCLUDED.description, is_active = true, updated_at = NOW();
+INSERT INTO exam_boards (code, name, description, country, is_active, created_at, updated_at)
+VALUES ('LANG_EN', 'Language Lab – English', 'English language training for proficiency and exam preparation.', 'NG', true, NOW(), NOW())
+ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, is_active = true, updated_at = NOW();
 
 -- Language Lab — French
-INSERT INTO exam_boards (id, code, name, full_name, description, country, icon_emoji, display_order, is_active, created_at, updated_at)
-VALUES (
-  gen_random_uuid(),
-  'LANG_FR',
-  'Language Lab – French',
-  'Language Laboratory: French Language',
-  'Spoken and written French language training from beginner to advanced level.',
-  'NG', '🇫🇷', 21, true, NOW(), NOW()
-)
-ON CONFLICT (code) DO UPDATE
-  SET name = EXCLUDED.name, full_name = EXCLUDED.full_name,
-      description = EXCLUDED.description, is_active = true, updated_at = NOW();
+INSERT INTO exam_boards (code, name, description, country, is_active, created_at, updated_at)
+VALUES ('LANG_FR', 'Language Lab – French', 'French language training from beginner to advanced level.', 'NG', true, NOW(), NOW())
+ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, is_active = true, updated_at = NOW();
 
 -- Language Lab — Yoruba
-INSERT INTO exam_boards (id, code, name, full_name, description, country, icon_emoji, display_order, is_active, created_at, updated_at)
-VALUES (
-  gen_random_uuid(),
-  'LANG_YO',
-  'Language Lab – Yoruba',
-  'Language Laboratory: Yoruba Language',
-  'Yoruba language training covering oral, written and cultural aspects for academic and professional use.',
-  'NG', '🌍', 22, true, NOW(), NOW()
-)
-ON CONFLICT (code) DO UPDATE
-  SET name = EXCLUDED.name, full_name = EXCLUDED.full_name,
-      description = EXCLUDED.description, is_active = true, updated_at = NOW();
+INSERT INTO exam_boards (code, name, description, country, is_active, created_at, updated_at)
+VALUES ('LANG_YO', 'Language Lab – Yoruba', 'Yoruba language training covering oral, written and cultural aspects.', 'NG', true, NOW(), NOW())
+ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, is_active = true, updated_at = NOW();
 
 -- ─────────────────────────────────────────────────────────────
 -- 4. Add teacher_subjects table if not already present
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS teacher_subjects (
-  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  teacher_id   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  subject_id   UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
-  exam_board_id UUID REFERENCES exam_boards(id) ON DELETE SET NULL,
-  assigned_by  UUID REFERENCES users(id) ON DELETE SET NULL,
-  is_active    BOOLEAN NOT NULL DEFAULT true,
-  assigned_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  id            SERIAL PRIMARY KEY,
+  teacher_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  subject_id    INTEGER NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+  exam_board_id INTEGER REFERENCES exam_boards(id) ON DELETE SET NULL,
+  assigned_by   INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  is_active     BOOLEAN NOT NULL DEFAULT true,
+  assigned_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (teacher_id, subject_id)
 );
 
