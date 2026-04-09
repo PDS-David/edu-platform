@@ -5,17 +5,11 @@ const router = express.Router();
 const { QueryTypes } = require('sequelize');
 const sequelize = require('../config/database');
 
-// ─────────────────────────────────────────────────────────────
-// GET /api/curriculum
-// Aggregated curriculum:
-// exam_boards → subjects → topics → subtopics
-// PUBLIC endpoint
-// ─────────────────────────────────────────────────────────────
 router.get('/', async (req, res) => {
   try {
-    // 1. Get exam boards
+    // ✅ FIXED: removed "full_name"
     const examBoards = await sequelize.query(
-      `SELECT id, code, name, full_name, icon_emoji
+      `SELECT id, code, name, icon_emoji
        FROM exam_boards
        WHERE is_active = true
        ORDER BY display_order ASC, name ASC`,
@@ -28,7 +22,6 @@ router.get('/', async (req, res) => {
       let subjects = [];
 
       try {
-        // 2. Get subjects for board
         subjects = await sequelize.query(
           `SELECT id, name, code, subject_code
            FROM subjects
@@ -50,7 +43,6 @@ router.get('/', async (req, res) => {
         let topics = [];
 
         try {
-          // 3. Get topics for subject
           topics = await sequelize.query(
             `SELECT id, name
              FROM topics
@@ -71,7 +63,6 @@ router.get('/', async (req, res) => {
           let subtopics = [];
 
           try {
-            // 4. Get subtopics for topic
             subtopics = await sequelize.query(
               `SELECT id, name
                FROM subtopics
@@ -111,7 +102,6 @@ router.get('/', async (req, res) => {
     });
 
   } catch (error) {
-    // 🔥 FULL DEBUG OUTPUT
     console.error('🔥 FULL ERROR in /api/curriculum:', error);
 
     return res.status(500).json({
