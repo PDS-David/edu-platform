@@ -4,28 +4,19 @@
 //
 // Roles: student | teacher | admin
 //
-// FIX v1.1:
-//   1. /auth/me response parsing corrected.
-//      The api.js response interceptor already unwraps response.data, so the
-//      resolved value `r` is already { success, data: {...user} }.
-//      Previous code checked r.data?.data (always undefined) — fixed to r?.data.
+// FIX v1.3 (Token extraction bug):
+//   api.js response interceptor returns response.data directly, so the
+//   resolved value from authAPI.login() / authAPI.register() is already:
+//     { success: true, token: '...', data: { user: {...} } }
 //
-//   2. login() and register() catch blocks now correctly extract the error
-//      message from the api.js interceptor's rejected value.
-//      The interceptor rejects with the raw backend data object
-//      { success: false, error: '...' }, so err.error is the right field.
-//      We throw a plain { message } object so LoginPage/RegisterPage can read
-//      err.message cleanly without depending on Axios internals.
+//   Previous code destructured `const { user, token } = response.data`
+//   which looked for a nested `.data` that doesn't exist at that level,
+//   causing token to be stored as "undefined" in localStorage.
+//   Every subsequent protected request then got a 401, triggering the
+//   auto-logout redirect — hence the "flash then back to login" bug.
 //
-// FIX v1.2 (Bug 3):
-//   3. User shape inconsistency between login and page refresh fixed.
-//      After login the auth controller returns camelCase fields (firstName,
-//      lastName). After refresh /auth/me returns snake_case (first_name,
-//      last_name). Any component reading user.firstName would silently get
-//      undefined after a page refresh.
-//      Fix: normalizeUser() merges both casings so every consumer always
-//      gets BOTH forms — camelCase for convenience and snake_case for DB
-//      round-trips. Applied to every code path that sets the user object.
+//   Fix: extract token from response.token and user from response.data.user
+//   Also fixed /auth/me handler to read r.data.user (not r.data directly).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { createContext, useContext, useState, useEffect } from 'react';
@@ -34,22 +25,16 @@ import api from '../services/api';
 
 const AuthContext = createContext(null);
 
-// ── FIX v1.2: Normalize user object so both camelCase and snake_case fields
-// are always present, regardless of which endpoint returned the user.
-// login/register → auth controller → camelCase (firstName, lastName)
-// page refresh   → /auth/me        → snake_case (first_name, last_name)
-// After normalizeUser both forms coexist, so every component works correctly
-// on first load AND after refresh without defensive fallbacks.
+// ── Normalize user object so both camelCase and snake_case fields are always
+// present, regardless of which endpoint returned the user.
 const normalizeUser = (u) => {
   if (!u) return u;
   return {
     ...u,
-    // Ensure camelCase (from login) — fall back to snake_case (from /auth/me)
-    firstName: u.firstName ?? u.first_name ?? '',
-    lastName:  u.lastName  ?? u.last_name  ?? '',
-    // Ensure snake_case (for DB round-trips / API calls)
-    first_name: u.first_name ?? u.firstName ?? '',
-    last_name:  u.last_name  ?? u.lastName  ?? '',
+    firstName:  u.firstName  ?? u.first_name  ?? '',
+    lastName:   u.lastName   ?? u.last_name   ?? '',
+    first_name: u.first_name ?? u.firstName   ?? '',
+    last_name:  u.last_name  ?? u.lastName    ?? '',
   };
 };
 
@@ -63,10 +48,9 @@ export const AuthProvider = ({ children }) => {
     const token     = localStorage.getItem('token');
     const savedUser = localStorage.getItem('user');
 
-    if (token && savedUser) {
-      // Paint the UI immediately from localStorage
+    if (token && savedUser && token !== 'undefined') {
       try {
-        setUser(JSON.parse(savedUser));
+        setUser(normalizeUser(JSON.parse(savedUser)));
       } catch {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
@@ -75,22 +59,21 @@ export const AuthProvider = ({ children }) => {
       // Refresh from server in background so subscription_status,
       // xp_points, study_streak_days etc. are always fresh.
       //
-      // FIX: api.js interceptor returns response.data directly, so `r` here
-      // is already { success: true, data: { id, email, role, ... } }.
-      // The previous check `r.data?.data` was always undefined because
-      // `r` has no nested `.data.data` — it IS the data. Fixed to `r?.data`.
+      // FIX v1.3: interceptor returns response.data directly, so `r` is:
+      //   { success: true, data: { id, email, role, ... } }
+      // User is at r.data, not r.data.data or r directly.
       api
         .get('/auth/me')
         .then(r => {
-          if (r?.data) {
-            const normalized = normalizeUser(r.data);
+          const freshUser = r?.data?.user ?? r?.data;
+          if (freshUser && freshUser.id) {
+            const normalized = normalizeUser(freshUser);
             setUser(normalized);
             localStorage.setItem('user', JSON.stringify(normalized));
           }
         })
         .catch(() => {
-          // Silent — don't log out on a network error or token expiry here;
-          // the 401 interceptor in api.js handles forced logouts globally.
+          // Silent — 401 interceptor in api.js handles forced logouts globally.
         });
     }
 
@@ -98,24 +81,27 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   // ── Login ─────────────────────────────────────────────────────────────────
-  // Used by: LoginPage.jsx
-  // Roles:   student → /student/dashboard
-  //          teacher → /teacher/dashboard
-  //          admin   → /admin/dashboard
   const login = async (email, password, rememberMe = false) => {
     try {
       setError(null);
 
-      // authAPI.login() resolves to response.data (interceptor-unwrapped):
-      // { success: true, data: { user: {...}, token: '...' } }
+      // FIX v1.3: api.js interceptor returns response.data directly, so the
+      // resolved value is already:
+      //   { success: true, token: '...', data: { user: {...} } }
+      // token is at the TOP level, user is nested under .data.user
       const response = await authAPI.login({
         email,
         password,
         remember_me: rememberMe,
       });
 
-      const { user, token } = response.data;
-      const normalizedUser  = normalizeUser(user);
+      const token          = response.token;        // ✅ top-level
+      const user           = response.data?.user;   // ✅ nested under data
+      const normalizedUser = normalizeUser(user);
+
+      if (!token || token === 'undefined') {
+        throw { message: 'Login failed — no token received. Please try again.' };
+      }
 
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(normalizedUser));
@@ -123,36 +109,31 @@ export const AuthProvider = ({ children }) => {
 
       return normalizedUser;
     } catch (err) {
-      // FIX: api.js interceptor rejects with the backend's data object directly:
-      // { success: false, error: 'Invalid credentials' }
-      // So err.error is the message — not err.message (which would be an Axios
-      // internal like "Request failed with status code 401").
       const message =
-        err.error ||
+        err.error   ||
         err.message ||
         'Login failed. Please check your credentials.';
-
       setError(message);
-
-      // Throw a plain object so LoginPage.jsx can read err.message cleanly
-      // without depending on Axios error internals
       throw { message };
     }
   };
 
   // ── Register ──────────────────────────────────────────────────────────────
-  // Used by: RegisterPage.jsx
-  // Roles:   student (default) | teacher | admin
-  // Boards:  JAMB, WAEC/NECO, Cambridge, AQA, Edexcel, IELTS, TOEFL, SAT,
-  //          Junior WAEC, and any board added via the catalog
   const register = async (userData) => {
     try {
       setError(null);
 
+      // FIX v1.3: same shape as login —
+      //   { success: true, token: '...', data: { user: {...} } }
       const response = await authAPI.register(userData);
 
-      const { user, token } = response.data;
-      const normalizedUser  = normalizeUser(user);
+      const token          = response.token;        // ✅ top-level
+      const user           = response.data?.user;   // ✅ nested under data
+      const normalizedUser = normalizeUser(user);
+
+      if (!token || token === 'undefined') {
+        throw { message: 'Registration failed — no token received. Please try again.' };
+      }
 
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(normalizedUser));
@@ -161,17 +142,15 @@ export const AuthProvider = ({ children }) => {
       return normalizedUser;
     } catch (err) {
       const message =
-        err.error ||
+        err.error   ||
         err.message ||
         'Registration failed. Please try again.';
-
       setError(message);
       throw { message };
     }
   };
 
   // ── Logout ────────────────────────────────────────────────────────────────
-  // Clears local state and storage for all roles.
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -179,11 +158,10 @@ export const AuthProvider = ({ children }) => {
   };
 
   // ── Update user in context + localStorage ─────────────────────────────────
-  // Called after profile edits, subscription changes, XP updates etc.
-  // Works for all roles.
   const updateUser = (updatedUser) => {
-    setUser(updatedUser);
-    localStorage.setItem('user', JSON.stringify(updatedUser));
+    const normalized = normalizeUser(updatedUser);
+    setUser(normalized);
+    localStorage.setItem('user', JSON.stringify(normalized));
   };
 
   const value = {
@@ -195,7 +173,6 @@ export const AuthProvider = ({ children }) => {
     logout,
     updateUser,
     isAuthenticated: !!user,
-    // Convenience role checks used across the app
     isStudent: user?.role === 'student',
     isTeacher: user?.role === 'teacher',
     isAdmin:   user?.role === 'admin',
