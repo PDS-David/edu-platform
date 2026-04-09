@@ -32,7 +32,7 @@ INSERT INTO users (
 )
 VALUES (
   'admin@aischoolonair.com',
-  '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', -- password123
+  '$2a$10$xJXYWxcpi607RxAR.KT0OeKNRa6H8.6SnAs3rQD1ktr7DUXp5kkyO', -- password123
   'Platform',
   'Admin',
   'admin',
