@@ -1327,6 +1327,7 @@ const UserManagementPanel = () => {
 // PlatformAnalyticsPanel — platform-wide stats, charts, quick actions
 // ─────────────────────────────────────────────────────────────────────────────
 const PlatformAnalyticsPanel = () => {
+  const navigate              = useNavigate();
   const [stats,   setStats]   = useState(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState(null);
