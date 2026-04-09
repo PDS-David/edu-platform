@@ -224,10 +224,55 @@ async function sendPaymentReceipt({ email, firstName, planName, amount, referenc
   `);
 }
 
+async function sendVerificationEmail({ email, first_name, token }) {
+  const name = first_name || 'Student';
+  const link = `${APP_URL}/verify-email?token=${token}`;
+  await send(email, 'Verify your AISchoolonair email address ✉️', `
+    <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px">
+      <h1 style="color:#0a4a3f;font-size:22px;margin-bottom:8px">Hi ${name}, please verify your email</h1>
+      <p style="color:#555;line-height:1.6">
+        Click the button below to verify your email address. This link expires in <strong>24 hours</strong>.
+      </p>
+      <a href="${link}"
+         style="display:inline-block;margin-top:16px;background:#14b8a6;color:#fff;
+                text-decoration:none;font-weight:600;padding:12px 24px;border-radius:12px;font-size:14px">
+        Verify Email →
+      </a>
+      <p style="color:#aaa;font-size:12px;margin-top:32px">
+        If you did not create an account, you can safely ignore this email.
+      </p>
+    </div>
+  `);
+}
+
+async function sendPasswordResetEmail({ email, first_name, token }) {
+  const name = first_name || 'Student';
+  const link = `${APP_URL}/reset-password?token=${token}`;
+  await send(email, 'Reset your AISchoolonair password 🔒', `
+    <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px">
+      <h1 style="color:#0a4a3f;font-size:22px;margin-bottom:8px">Password reset request</h1>
+      <p style="color:#555;line-height:1.6">
+        Hi ${name}, we received a request to reset your password.
+        Click the button below — this link expires in <strong>1 hour</strong>.
+      </p>
+      <a href="${link}"
+         style="display:inline-block;margin-top:16px;background:#0a4a3f;color:#fff;
+                text-decoration:none;font-weight:600;padding:12px 24px;border-radius:12px;font-size:14px">
+        Reset Password →
+      </a>
+      <p style="color:#aaa;font-size:12px;margin-top:32px">
+        If you did not request a password reset, you can safely ignore this email.
+      </p>
+    </div>
+  `);
+}
+
 module.exports = {
   sendWelcomeEmail,
   sendWeeklyDigest,
   sendStreakNudge,
   sendPaymentConfirmation,
   sendPaymentReceipt,
+  sendVerificationEmail,
+  sendPasswordResetEmail,
 };
