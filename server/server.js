@@ -121,6 +121,7 @@ const modelPaths = [
   './models/PracticeAttempt',
   './models/AiChatSession',
   './models/AiChatMessage',
+  './models/TeacherSubject',
 ];
 
 for (const modelPath of modelPaths) {
