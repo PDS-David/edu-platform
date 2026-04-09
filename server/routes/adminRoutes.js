@@ -130,61 +130,35 @@ Rules:
 
       const qResult = await sequelize.query(
         `INSERT INTO questions
-           (id, question_text, difficulty, marks, topic, subject_id_uuid,
-            exam_board_id, exam_board, source, status, explanation,
-            is_ai_generated, ai_generation_source, concept_hint,
+           (question_text, marks, explanation, options, correct_answer,
+            subtopic_id, submitted_by, is_active,
             created_at, updated_at)
          VALUES
-           (gen_random_uuid(), :question_text, :difficulty, :marks, :topic,
-            :subject_id, :examBoardId, :exam_board, 'ai_generated', 'pending',
-            :explanation,
-            TRUE, :ai_generation_source, :concept_hint,
+           (:question_text, :marks, :explanation, :options::jsonb, :correct_answer,
+            :subtopic_id, :submitted_by, true,
             NOW(), NOW())
          RETURNING id`,
         {
           replacements: {
-            question_text:       q.question_text,
-            difficulty:          q.difficulty || difficulty,
-            marks:               q.marks      || 1,
-            topic,
-            subject_id,
-            examBoardId,
-            exam_board,
-            explanation:         q.explanation  || '',
-            ai_generation_source: 'gemini-2.0-flash',
-            concept_hint:        q.concept_hint || null,
+            question_text:  q.question_text,
+            marks:          q.marks || 1,
+            explanation:    q.explanation || '',
+            options:        JSON.stringify(q.options || []),
+            correct_answer: q.correct_answer || (q.options?.find(o => o.is_correct)?.option_text) || '',
+            subtopic_id:    null,
+            submitted_by:   req.user.id,
           },
-          type: QueryTypes.INSERT,
+          type: QueryTypes.SELECT,
         }
       );
 
-      const questionId = qResult[0][0]?.id;
+      const questionId = qResult[0]?.id;
       if (!questionId) continue;
-
-      // Insert options
-      for (const opt of q.options) {
-        await sequelize.query(
-          `INSERT INTO answer_options
-             (id, question_id, option_text, is_correct, created_at)
-           VALUES
-             (gen_random_uuid(), :question_id, :option_text, :is_correct, NOW())`,
-          {
-            replacements: {
-              question_id: questionId,
-              option_text: opt.option_text,
-              is_correct:  opt.is_correct === true,
-            },
-            type: QueryTypes.INSERT,
-          }
-        );
-      }
 
       inserted++;
       insertedQuestions.push({
-        id:           questionId,
+        id:            questionId,
         question_text: q.question_text,
-        concept_hint:  q.concept_hint || null,
-        difficulty:    q.difficulty || difficulty,
       });
     }
 
@@ -208,7 +182,7 @@ Rules:
 router.get('/questions/pending-count', protect, adminOnly, async (req, res) => {
   try {
     const rows = await sequelize.query(
-      `SELECT COUNT(*)::INTEGER AS count FROM questions WHERE status = 'pending'`,
+      `SELECT COUNT(*)::INTEGER AS count FROM questions WHERE is_active = true`,
       { type: QueryTypes.SELECT }
     );
     return res.json({ success: true, count: rows[0]?.count || 0 });
@@ -339,9 +313,9 @@ router.get('/platform-stats', protect, adminOnly, async (req, res) => {
 
       sequelize.query(
         `SELECT
-           COUNT(*) FILTER (WHERE status = 'approved')::INTEGER AS total_approved,
-           COUNT(*) FILTER (WHERE status = 'pending')::INTEGER  AS total_pending,
-           COUNT(*) FILTER (WHERE is_ai_generated = TRUE)::INTEGER AS total_ai_generated,
+           COUNT(*)::INTEGER AS total_approved,
+           0::INTEGER        AS total_pending,
+           0::INTEGER        AS total_ai_generated,
            (SELECT COUNT(*)::INTEGER FROM practice_attempts
             WHERE attempted_at > NOW() - INTERVAL '24 hours')   AS answered_today,
            (SELECT COUNT(*)::INTEGER FROM practice_attempts
@@ -365,8 +339,10 @@ router.get('/platform-stats', protect, adminOnly, async (req, res) => {
            COUNT(pa.id)::INTEGER                                AS attempt_count,
            ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END)::NUMERIC, 1) AS avg_accuracy
          FROM practice_attempts pa
-         JOIN questions q  ON q.id  = pa.question_id
-         JOIN subjects  s  ON s.id  = q.subject_id_uuid
+         JOIN questions  q  ON q.id  = pa.question_id
+         JOIN subtopics  st ON st.id = q.subtopic_id
+         JOIN topics     t  ON t.id  = st.topic_id
+         JOIN subjects   s  ON s.id  = t.subject_id
          WHERE pa.attempted_at > NOW() - INTERVAL '30 days'
          GROUP BY s.name
          ORDER BY attempt_count DESC
@@ -431,33 +407,27 @@ router.get('/questions/pending', protect, adminOnly, async (req, res) => {
   try {
     const [countRows, rows] = await Promise.all([
       sequelize.query(
-        `SELECT COUNT(*)::INTEGER AS total FROM questions WHERE status = 'pending'`,
+        `SELECT COUNT(*)::INTEGER AS total FROM questions WHERE is_active = true`,
         { type: QueryTypes.SELECT }
       ),
       sequelize.query(
-        `SELECT q.id, q.question_text, q.topic, q.difficulty, q.marks,
-                q.explanation, q.created_at, q.exam_board,
-                q.is_ai_generated, q.ai_generation_source, q.concept_hint,
+        `SELECT q.id, q.question_text, q.marks,
+                q.explanation, q.created_at,
+                q.correct_answer, q.options,
+                st.name AS subtopic_name,
                 s.name  AS subject_name,
                 eb.code AS exam_board_code,
                 eb.name AS exam_board_name,
                 u.first_name AS submitter_first_name,
                 u.last_name  AS submitter_last_name,
-                u.email      AS submitter_email,
-                json_agg(
-                  json_build_object(
-                    'id',          ao.id,
-                    'option_text', ao.option_text,
-                    'is_correct',  ao.is_correct
-                  ) ORDER BY ao.id
-                ) AS options
+                u.email      AS submitter_email
          FROM questions q
-         LEFT JOIN subjects      s  ON s.id  = q.subject_id_uuid
-         LEFT JOIN exam_boards   eb ON eb.id = q.exam_board_id
-         LEFT JOIN users         u  ON u.id  = q.submitted_by
-         LEFT JOIN answer_options ao ON ao.question_id = q.id
-         WHERE q.status = 'pending'
-         GROUP BY q.id, s.name, eb.code, eb.name, u.first_name, u.last_name, u.email
+         LEFT JOIN subtopics  st ON st.id = q.subtopic_id
+         LEFT JOIN topics     tp ON tp.id = st.topic_id
+         LEFT JOIN subjects   s  ON s.id  = tp.subject_id
+         LEFT JOIN exam_boards eb ON eb.id = s.exam_board_id
+         LEFT JOIN users      u  ON u.id  = q.submitted_by
+         WHERE q.is_active = true
          ORDER BY q.created_at DESC
          LIMIT :limit OFFSET :offset`,
         { replacements: { limit, offset }, type: QueryTypes.SELECT }
