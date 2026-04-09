@@ -24,15 +24,16 @@ if (process.env.NODE_ENV === 'production') {
 
 // ── ENV VALIDATION ────────────────────────────────────────────────────────────
 (function validateEnv() {
-  const required = [
-    'JWT_SECRET',
-    'DB_PASSWORD',
-    'DB_HOST',
-    'DB_PORT',
-    'DB_NAME',
-    'DB_USER',
-    'PORT',
-  ];
+  // Always required
+  const required = ['JWT_SECRET', 'PORT'];
+
+  // In production, we need either DATABASE_URL (Render linked PG)
+  // or all individual DB_* vars (manual setup)
+  const isProduction = process.env.NODE_ENV === 'production';
+  if (isProduction && !process.env.DATABASE_URL) {
+    required.push('DB_PASSWORD', 'DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER');
+  }
+
   const missing = required.filter((key) => !process.env[key]);
   if (missing.length > 0) {
     console.error(`❌ Missing required environment variables: ${missing.join(', ')}`);
@@ -92,9 +93,61 @@ app.use(requestLogger);
 
 // ── DATABASE ──────────────────────────────────────────────────────────────────
 const db = require('./config/database');
-db.authenticate()
-  .then(() => logger.info('DB connected'))
-  .catch((err) => logger.error('DB error', { error: err.message }));
+
+// Import all models so Sequelize registers them before sync runs.
+// Add any additional models your project has to this list.
+const modelPaths = [
+  './models/User',
+  './models/ExamBoard',
+  './models/Subject',
+  './models/Topic',
+  './models/Subtopic',
+  './models/Resource',
+  './models/Course',
+  './models/Enrollment',
+  './models/Quiz',
+  './models/Question',
+  './models/Note',
+  './models/Video',
+  './models/PastPaper',
+  './models/Payment',
+  './models/Notification',
+  './models/Concept',
+];
+
+for (const modelPath of modelPaths) {
+  try {
+    require(modelPath);
+  } catch (e) {
+    logger.warn(`Model not found, skipping: ${modelPath}`);
+  }
+}
+
+// Load associations if you have a central associations file
+try {
+  require('./models/associations');
+} catch (e) {
+  // No associations file — that's fine
+}
+
+async function initDatabase() {
+  try {
+    await db.authenticate();
+    logger.info('✅ DB connected');
+
+    // alter: true — safely creates missing tables and adds missing columns
+    // without dropping existing data.
+    // Never use force: true in production — it wipes all tables.
+    await db.sync({ alter: true });
+    logger.info('✅ DB tables synced');
+  } catch (err) {
+    logger.error('❌ DB initialisation failed', { error: err.message });
+    // Exit so Render auto-restarts the service and retries the connection.
+    process.exit(1);
+  }
+}
+
+initDatabase();
 
 // ── AUTH & SUBSCRIPTION MIDDLEWARE ───────────────────────────────────────────
 const { protect } = require('./middleware/auth');
@@ -128,9 +181,8 @@ const notificationsRoutes = require('./routes/notificationsRoutes');
 const studentRoutes     = require('./routes/studentRoutes');
 const conceptRoutes     = require('./routes/conceptRoutes');
 
-// optional routes — skip if file missing
+// Optional routes — skip if file missing
 let aiChatRoute         = null;
-let aiQueueRoute        = null;
 let quizGeneratorRoute  = null;
 let studyPlannerRoute   = null;
 let explanationRoute    = null;
@@ -153,12 +205,12 @@ app.use('/api/exam-boards', examBoardsRoutes);
 
 // ── Protected routes ──────────────────────────────────────────────────────────
 app.use('/api/ai', protect, subscriptionGuard, aiLimiter, aiRoutes);
-if (aiChatRoute)        app.use('/api/ai',            protect, subscriptionGuard, aiLimiter, aiChatRoute);
-if (quizGeneratorRoute) app.use('/api/quiz-generator', protect, quizGeneratorRoute);
-if (studyPlannerRoute)  app.use('/api/study-planner',  protect, studyPlannerRoute);
-if (explanationRoute)   app.use('/api/explanations',   protect, explanationRoute);
-if (examTypeActivation) app.use('/api/exam-types',     protect, examTypeActivation);
-if (analyticsLegacy)    app.use('/api/analytics',      protect, analyticsLegacy);
+if (aiChatRoute)        app.use('/api/ai',             protect, subscriptionGuard, aiLimiter, aiChatRoute);
+if (quizGeneratorRoute) app.use('/api/quiz-generator',  protect, quizGeneratorRoute);
+if (studyPlannerRoute)  app.use('/api/study-planner',   protect, studyPlannerRoute);
+if (explanationRoute)   app.use('/api/explanations',    protect, explanationRoute);
+if (examTypeActivation) app.use('/api/exam-types',      protect, examTypeActivation);
+if (analyticsLegacy)    app.use('/api/analytics',       protect, analyticsLegacy);
 
 app.use('/api/admin',         protect, adminRoutes);
 app.use('/api/teacher',       protect, teacherRoutes);
