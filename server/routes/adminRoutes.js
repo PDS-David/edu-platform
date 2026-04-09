@@ -232,6 +232,10 @@ router.get('/teacher-assignments', protect, adminOnly, async (req, res) => {
     );
     return res.json({ success: true, count: rows.length, data: rows });
   } catch (err) {
+    // teacher_subjects table may not exist yet — return empty
+    if (err.message.includes('teacher_subjects') || err.message.includes('does not exist')) {
+      return res.json({ success: true, count: 0, data: [] });
+    }
     console.error('[GET /admin/teacher-assignments] Error:', err.message);
     return res.status(500).json({ success: false, error: err.message });
   }
