@@ -72,7 +72,6 @@ const CatalogPanel = () => {
     setTimeout(() => setToast(null), 3500);
   };
 
-  // ── Fetch all types ──────────────────────────────────────────
   const fetchTypes = async () => {
     setLoading(true);
     try {
@@ -90,7 +89,6 @@ const CatalogPanel = () => {
 
   useEffect(() => { fetchTypes(); }, []);
 
-  // ── Fetch subjects for a type ────────────────────────────────
   const fetchSubjects = async (typeId) => {
     setLoadingSubjects(prev => ({ ...prev, [typeId]: true }));
     try {
@@ -189,7 +187,6 @@ const CatalogPanel = () => {
       }
       setShowSubjectModal(false);
       fetchSubjects(activeTypeId);
-      // Refresh types to update subject count
       fetchTypes();
     } catch (err) {
       showToast(err?.error || 'Failed to save', 'error');
@@ -230,7 +227,6 @@ const CatalogPanel = () => {
 
   return (
     <div>
-      {/* Panel Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-xl font-bold text-gray-900">Catalog Management</h2>
@@ -254,7 +250,6 @@ const CatalogPanel = () => {
         </div>
       </div>
 
-      {/* Types List */}
       <div className="space-y-2">
         {types.map((type) => (
           <div
@@ -263,7 +258,6 @@ const CatalogPanel = () => {
               type.is_active ? 'border-gray-200' : 'border-gray-100 opacity-60'
             }`}
           >
-            {/* Type Row */}
             <div className="flex items-center gap-3 px-4 py-3 bg-white">
               <button
                 onClick={() => toggleExpand(type.id)}
@@ -319,7 +313,6 @@ const CatalogPanel = () => {
               </div>
             </div>
 
-            {/* Subjects Expanded */}
             {expandedType === type.id && (
               <div className="bg-gray-50 border-t border-gray-100 px-4 pb-4 pt-3">
                 {loadingSubjects[type.id] ? (
@@ -644,218 +637,310 @@ const CatalogPanel = () => {
 };
 
 // ─── Teacher Assignment Panel ─────────────────────────────────────────────────
-const TeacherPanel = () => {
-  const [teachers, setTeachers]           = useState([]);
-  const [loading, setLoading]             = useState(true);
-  const [expandedTeacher, setExpandedTeacher] = useState(null);
-  const [teacherSubjects, setTeacherSubjects] = useState({});
-  const [allSubjects, setAllSubjects]     = useState([]);
-  const [showAssignModal, setShowAssignModal] = useState(null); // teacherId
-  const [selectedSubjects, setSelectedSubjects] = useState([]);
-  const [saving, setSaving]               = useState(false);
-  const [toast, setToast]                 = useState(null);
+const TeacherAssignmentPanel = () => {
+  const [assignments,      setAssignments]      = useState([]);
+  const [teachers,         setTeachers]         = useState([]);
+  const [examTypes,        setExamTypes]        = useState([]);
+  const [filteredSubjects, setFilteredSubjects] = useState([]);
+  const [loading,          setLoading]          = useState(true);
+  const [loadingSubjects,  setLoadingSubjects]  = useState(false);
+  const [showModal,        setShowModal]        = useState(false);
+  const [saving,           setSaving]           = useState(false);
+  const [toast,            setToast]            = useState(null);
+  const [selectedSubjectIds, setSelectedSubjectIds] = useState([]);
+  const [form, setForm] = useState({ teacher_id: '', exam_type_id: '' });
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
   };
 
-  const fetchTeachers = async () => {
+  const fetchAll = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/catalog/teachers');
-      if (res?.success) setTeachers(res.data || []);
-    } catch { showToast('Failed to load teachers', 'error'); }
+      const [aRes, tRes, etRes] = await Promise.all([
+        api.get('/admin/teacher-assignments'),
+        api.get('/users?role=teacher'),
+        api.get('/catalog/types'),
+      ]);
+      if (aRes?.success)  setAssignments(aRes.data || []);
+      if (tRes?.data)     setTeachers(tRes.data    || []);
+      if (etRes?.success) setExamTypes(etRes.data  || []);
+    } catch { showToast('Failed to load data', 'error'); }
     finally { setLoading(false); }
   };
 
-  const fetchAllSubjects = async () => {
+  useEffect(() => { fetchAll(); }, []); // eslint-disable-line
+
+  // When exam type changes, fetch subjects for that type
+  const handleExamTypeChange = async (typeId) => {
+    setForm(f => ({ ...f, exam_type_id: typeId }));
+    setSelectedSubjectIds([]);
+    setFilteredSubjects([]);
+    if (!typeId) return;
+    setLoadingSubjects(true);
     try {
-      // Single efficient query — no N+1
-      const res = await api.get('/catalog/all-subjects');
-      if (res?.success) setAllSubjects(res.data || []);
-    } catch {}
-  };
-
-  const fetchTeacherSubjects = async (teacherId) => {
-    try {
-      const res = await api.get(`/catalog/teachers/${teacherId}/subjects`);
-      if (res?.success) setTeacherSubjects(p => ({ ...p, [teacherId]: res.data || [] }));
-    } catch {}
-  };
-
-  useEffect(() => { fetchTeachers(); fetchAllSubjects(); }, []);
-
-  const toggleExpand = (id) => {
-    if (expandedTeacher === id) { setExpandedTeacher(null); return; }
-    setExpandedTeacher(id);
-    if (!teacherSubjects[id]) fetchTeacherSubjects(id);
-  };
-
-  const openAssign = (teacherId) => {
-    setShowAssignModal(teacherId);
-    setSelectedSubjects([]);
+      const res = await api.get(`/catalog/types/${typeId}/subjects`);
+      if (res?.success) setFilteredSubjects(res.data || []);
+    } catch {
+      showToast('Failed to load subjects for this exam type', 'error');
+    } finally {
+      setLoadingSubjects(false);
+    }
   };
 
   const toggleSubject = (id) =>
-    setSelectedSubjects(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
+    setSelectedSubjectIds(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
 
-  const saveAssignment = async () => {
-    if (!selectedSubjects.length) { showToast('Select at least one subject', 'error'); return; }
+  const openModal = () => {
+    setForm({ teacher_id: '', exam_type_id: '' });
+    setSelectedSubjectIds([]);
+    setFilteredSubjects([]);
+    setShowModal(true);
+  };
+
+  const handleSave = async () => {
+    if (!form.teacher_id || !form.exam_type_id || selectedSubjectIds.length === 0) {
+      showToast('Teacher, Exam Type and at least one Subject are required', 'error');
+      return;
+    }
     setSaving(true);
     try {
-      await api.post(`/catalog/teachers/${showAssignModal}/assign`, { subject_ids: selectedSubjects });
-      showToast('Subjects assigned successfully');
-      setShowAssignModal(null);
-      fetchTeacherSubjects(showAssignModal);
-      fetchTeachers();
+      // Post one assignment per selected subject
+      await Promise.all(
+        selectedSubjectIds.map(subject_id =>
+          api.post('/admin/teacher-assignments', {
+            teacher_id:   form.teacher_id,
+            subject_id,
+            exam_board_id: form.exam_type_id,
+          })
+        )
+      );
+      showToast(`${selectedSubjectIds.length} assignment${selectedSubjectIds.length > 1 ? 's' : ''} saved successfully`);
+      setShowModal(false);
+      setForm({ teacher_id: '', exam_type_id: '' });
+      setSelectedSubjectIds([]);
+      setFilteredSubjects([]);
+      fetchAll();
     } catch (err) {
-      showToast(err?.error || 'Failed to assign', 'error');
+      showToast(err?.error || 'Failed to save', 'error');
     } finally { setSaving(false); }
   };
 
-  const revokeSubject = async (teacherId, subjectId) => {
+  const handleRemove = async (id) => {
+    if (!window.confirm('Remove this assignment?')) return;
     try {
-      await api.delete(`/catalog/teachers/${teacherId}/subjects/${subjectId}`);
-      showToast('Subject revoked');
-      fetchTeacherSubjects(teacherId);
-      fetchTeachers();
-    } catch { showToast('Failed to revoke', 'error'); }
+      await api.delete(`/admin/teacher-assignments/${id}`);
+      showToast('Assignment removed');
+      fetchAll();
+    } catch { showToast('Failed to remove', 'error'); }
   };
 
   if (loading) return (
     <div className="flex items-center justify-center py-12">
-      <Loader2 className="w-7 h-7 text-green-600 animate-spin mr-3" />
-      <span className="text-gray-500">Loading teachers...</span>
+      <Loader2 className="w-7 h-7 text-purple-500 animate-spin mr-3" />
+      <span className="text-gray-500">Loading assignments…</span>
     </div>
   );
 
   return (
     <div>
+      {toast && (
+        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white ${
+          toast.type === 'error' ? 'bg-red-500' : 'bg-green-500'
+        }`}>
+          {toast.msg}
+        </div>
+      )}
+
+      {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>
           <h2 className="text-xl font-bold text-gray-900">Teacher Assignment</h2>
-          <p className="text-sm text-gray-500 mt-0.5">
-            Assign subjects to teachers — teachers can only add content to assigned subjects
-          </p>
+          <p className="text-sm text-gray-500 mt-0.5">Assign teachers to subjects and exam types</p>
         </div>
-        <button onClick={fetchTeachers} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 px-3 py-2 border border-gray-200 rounded-xl">
-          <RefreshCw size={14} /> Refresh
-        </button>
+        <div className="flex gap-2">
+          <button onClick={fetchAll} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 px-3 py-2 border border-gray-200 rounded-xl">
+            <RefreshCw size={14} /> Refresh
+          </button>
+          <button onClick={openModal} className="flex items-center gap-1.5 text-sm bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl font-semibold">
+            <Plus size={14} /> Add Assignment
+          </button>
+        </div>
       </div>
 
-      {teachers.length === 0 ? (
+      {/* Assignments table */}
+      {assignments.length === 0 ? (
         <div className="text-center py-12 text-gray-400">
-          <UserCheck size={36} className="mx-auto mb-3 opacity-30" />
-          <p className="text-sm">No teachers registered yet.</p>
+          <UserCheck className="w-10 h-10 mx-auto mb-3 opacity-30" />
+          <p className="text-sm">No assignments yet. Click "Add Assignment" to get started.</p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {teachers.map(teacher => (
-            <div key={teacher.id} className={`border-2 rounded-2xl overflow-hidden ${teacher.is_active ? 'border-gray-200' : 'border-gray-100 opacity-60'}`}>
-              <div className="flex items-center gap-3 px-4 py-3 bg-white">
-                <button onClick={() => toggleExpand(teacher.id)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
-                  {expandedTeacher === teacher.id ? <ChevronDown size={18} className="text-gray-400 shrink-0" /> : <ChevronRight size={18} className="text-gray-400 shrink-0" />}
-                  <div className="w-9 h-9 bg-purple-100 rounded-xl flex items-center justify-center shrink-0">
-                    <UserCheck size={16} className="text-purple-600" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-bold text-gray-900">{teacher.first_name} {teacher.last_name}</p>
-                    <p className="text-xs text-gray-400 truncate">{teacher.email}</p>
-                  </div>
-                </button>
-                <span className="text-xs text-gray-400 shrink-0 hidden sm:block">
-                  {teacher.assigned_subjects} subject{teacher.assigned_subjects !== 1 ? 's' : ''} assigned
-                </span>
-                <button
-                  onClick={() => openAssign(teacher.id)}
-                  className="flex items-center gap-1 text-xs text-purple-600 hover:text-purple-700 border border-purple-200 hover:border-purple-400 px-2.5 py-1.5 rounded-lg font-semibold transition-colors"
-                >
-                  <Plus size={12} /> Assign
-                </button>
-              </div>
-
-              {expandedTeacher === teacher.id && (
-                <div className="bg-gray-50 border-t border-gray-100 px-4 pb-4 pt-3">
-                  {!(teacherSubjects[teacher.id]?.length) ? (
-                    <p className="text-gray-400 text-sm py-3 text-center">No subjects assigned yet.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {teacherSubjects[teacher.id].map(ts => (
-                        <div key={ts.assignment_id} className="flex items-center gap-3 bg-white rounded-xl px-4 py-2.5 border border-gray-200">
-                          <span className="text-sm font-semibold text-gray-900 flex-1">{ts.subject_name}</span>
-                          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{ts.exam_board_code}</span>
-                          <button
-                            onClick={() => revokeSubject(teacher.id, ts.subject_id)}
-                            className="p-1 text-gray-400 hover:text-red-500 transition-colors"
-                            title="Revoke"
-                          >
-                            <X size={14} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 text-left">
+                <th className="pb-3 font-semibold text-gray-600">Teacher</th>
+                <th className="pb-3 font-semibold text-gray-600">Email</th>
+                <th className="pb-3 font-semibold text-gray-600">Subject</th>
+                <th className="pb-3 font-semibold text-gray-600">Exam Type</th>
+                <th className="pb-3 font-semibold text-gray-600">Status</th>
+                <th className="pb-3 font-semibold text-gray-600">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {assignments.map(a => (
+                <tr key={a.id} className="border-b border-gray-50 hover:bg-gray-50">
+                  <td className="py-3 font-medium text-gray-800">{a.teacher_name}</td>
+                  <td className="py-3 text-gray-500 text-xs">{a.email}</td>
+                  <td className="py-3 text-gray-700">{a.subject_name}</td>
+                  <td className="py-3 text-gray-500">{a.exam_board_code || '—'}</td>
+                  <td className="py-3">
+                    <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                      a.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                    }`}>
+                      {a.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td className="py-3">
+                    {a.is_active && (
+                      <button onClick={() => handleRemove(a.id)}
+                        className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1">
+                        <Trash2 size={12} /> Remove
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
-      {/* Assign Modal */}
-      {showAssignModal && (
-        <Modal
-          title={`Assign Subjects to ${teachers.find(t => t.id === showAssignModal)?.first_name || 'Teacher'}`}
-          onClose={() => setShowAssignModal(null)}
-        >
-          <p className="text-sm text-gray-500 mb-4">Select subjects this teacher can add content to:</p>
-          <div className="space-y-1 max-h-72 overflow-y-auto pr-1 mb-5">
-            {allSubjects.length === 0 ? (
-              <p className="text-gray-400 text-sm text-center py-4">No subjects available. Add subjects first via Catalog Management.</p>
-            ) : (
-              allSubjects.map(s => {
-                const selected = selectedSubjects.includes(s.id);
-                return (
-                  <button
-                    key={s.id}
-                    onClick={() => toggleSubject(s.id)}
-                    className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all ${
-                      selected ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-purple-300'
-                    }`}
-                  >
-                    <span className="text-lg">{s.icon_emoji || '📚'}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className={`font-semibold text-sm ${selected ? 'text-purple-700' : 'text-gray-900'}`}>{s.name}</p>
-                      <p className="text-xs text-gray-400">{s.exam_board_name}</p>
-                    </div>
-                    {selected && <Check size={15} className="text-purple-600 shrink-0" />}
-                  </button>
-                );
-              })
-            )}
-          </div>
-          <div className="flex gap-3">
-            <button onClick={() => setShowAssignModal(null)} className="flex-1 border border-gray-300 text-gray-700 font-semibold py-2.5 rounded-xl text-sm hover:bg-gray-50">Cancel</button>
-            <button
-              onClick={saveAssignment}
-              disabled={saving || selectedSubjects.length === 0}
-              className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
-            >
-              {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-              Assign {selectedSubjects.length > 0 ? `${selectedSubjects.length} Subject${selectedSubjects.length > 1 ? 's' : ''}` : ''}
-            </button>
-          </div>
-        </Modal>
-      )}
+      {/* Add Assignment Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-bold text-gray-900">Add Assignment</h3>
+              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X size={18} />
+              </button>
+            </div>
 
-      {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+            <div className="space-y-4">
+
+              {/* Step 1: Teacher */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                  Teacher <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={form.teacher_id}
+                  onChange={e => setForm(f => ({ ...f, teacher_id: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-purple-400"
+                >
+                  <option value="">Select a teacher…</option>
+                  {teachers.map(t => (
+                    <option key={t.id} value={t.id}>{t.first_name} {t.last_name} — {t.email}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Step 2: Exam Type (required, drives subject list) */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                  Exam Type <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={form.exam_type_id}
+                  onChange={e => handleExamTypeChange(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-purple-400"
+                >
+                  <option value="">Select an exam type…</option>
+                  {examTypes.map(et => (
+                    <option key={et.id} value={et.id}>
+                      {et.icon_emoji} {et.name} ({et.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Step 3: Subjects — multi-select, loads after exam type chosen */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                  Subject(s) <span className="text-red-500">*</span>
+                  {selectedSubjectIds.length > 0 && (
+                    <span className="ml-2 text-purple-600 font-bold">{selectedSubjectIds.length} selected</span>
+                  )}
+                </label>
+
+                {!form.exam_type_id ? (
+                  <div className="border-2 border-dashed border-gray-200 rounded-xl p-4 text-center text-gray-400 text-sm">
+                    Select an exam type first to see its subjects
+                  </div>
+                ) : loadingSubjects ? (
+                  <div className="flex items-center gap-2 py-4 text-gray-400 text-sm">
+                    <Loader2 size={15} className="animate-spin" /> Loading subjects…
+                  </div>
+                ) : filteredSubjects.length === 0 ? (
+                  <div className="border-2 border-dashed border-gray-200 rounded-xl p-4 text-center text-gray-400 text-sm">
+                    No subjects found for this exam type. Add subjects first via Catalog Management.
+                  </div>
+                ) : (
+                  <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1 border border-gray-200 rounded-xl p-2">
+                    {filteredSubjects.map(s => {
+                      const selected = selectedSubjectIds.includes(s.id);
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => toggleSubject(s.id)}
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border-2 text-left transition-all ${
+                            selected
+                              ? 'border-purple-500 bg-purple-50'
+                              : 'border-transparent hover:border-purple-200 hover:bg-gray-50'
+                          }`}
+                        >
+                          <span className="text-base">{s.icon_emoji || '📚'}</span>
+                          <span className={`flex-1 text-sm font-medium ${selected ? 'text-purple-800' : 'text-gray-800'}`}>
+                            {s.name}
+                          </span>
+                          {selected && <Check size={14} className="text-purple-600 shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={handleSave}
+                disabled={saving || !form.teacher_id || !form.exam_type_id || selectedSubjectIds.length === 0}
+                className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl text-sm transition-colors flex items-center justify-center gap-2"
+              >
+                {saving
+                  ? <><Loader2 size={14} className="animate-spin" /> Saving…</>
+                  : <><Check size={14} /> Save {selectedSubjectIds.length > 0 ? `${selectedSubjectIds.length} Assignment${selectedSubjectIds.length > 1 ? 's' : ''}` : 'Assignment'}</>
+                }
+              </button>
+              <button
+                onClick={() => setShowModal(false)}
+                className="flex-1 border border-gray-200 text-gray-600 hover:bg-gray-50 font-semibold py-2.5 rounded-xl text-sm transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 // ─── AI Generate Panel ────────────────────────────────────────────────────────
-// Loads exam types dynamically from /api/exam-boards instead of hardcoding.
 const AIGeneratePanel = () => {
   const [subjects,      setSubjects]      = useState([]);
   const [subjectsLoad,  setSubjectsLoad]  = useState(true);
@@ -871,30 +956,27 @@ const AIGeneratePanel = () => {
   const [error,            setError]            = useState('');
   const [previewQuestions, setPreviewQuestions] = useState([]);
 
-  // Static fallback — all 12 exam types
   const STATIC_EXAM_TYPES = [
-    { code: 'JAMB',    name: 'JAMB / UTME'             },
-    { code: 'WAEC',    name: 'WAEC'                    },
-    { code: 'GCE_OL',  name: 'GCE O-Levels'            },
-    { code: 'NECO',    name: 'NECO'                    },
-    { code: 'IELTS',   name: 'IELTS'                   },
-    { code: 'TOEFL',   name: 'TOEFL'                   },
-    { code: 'SAT',     name: 'SAT'                     },
-    { code: 'GCE_AL',  name: 'GCE A-Levels'            },
-    { code: 'JUPEB',   name: 'JUPEB'                   },
-    { code: 'LANG_EN', name: 'Language Lab. - English' },
-    { code: 'LANG_FR', name: 'Language Lab. - French'  },
-    { code: 'LANG_YO', name: 'Language Lab. - Yoruba'  },
+    { code: 'JAMB',    name: 'JAMB / UTME'              },
+    { code: 'WAEC',    name: 'WAEC'                     },
+    { code: 'GCE_OL',  name: 'GCE O-Levels'             },
+    { code: 'NECO',    name: 'NECO'                     },
+    { code: 'IELTS',   name: 'IELTS'                    },
+    { code: 'TOEFL',   name: 'TOEFL'                    },
+    { code: 'SAT',     name: 'SAT'                      },
+    { code: 'GCE_AL',  name: 'GCE A-Levels'             },
+    { code: 'JUPEB',   name: 'JUPEB'                    },
+    { code: 'LANG_EN', name: 'Language Lab. - English'  },
+    { code: 'LANG_FR', name: 'Language Lab. - French'   },
+    { code: 'LANG_YO', name: 'Language Lab. - Yoruba'   },
   ];
 
   useEffect(() => {
-    // Load subjects
     api.get('/admin/subjects')
       .then(r => setSubjects(r.data || r || []))
       .catch(() => {})
       .finally(() => setSubjectsLoad(false));
 
-    // Load exam types dynamically, fall back to static list
     api.get('/exam-boards')
       .then(r => {
         const list = Array.isArray(r) ? r : (r.data || []);
@@ -903,7 +985,6 @@ const AIGeneratePanel = () => {
       .catch(() => setExamTypes(STATIC_EXAM_TYPES))
       .finally(() => setExamTypesLoad(false));
 
-    // Load pending count
     api.get('/admin/questions/pending-count')
       .then(r => setPendingCount(r.count))
       .catch(() => {});
@@ -946,7 +1027,6 @@ const AIGeneratePanel = () => {
       </div>
 
       <form onSubmit={handleGenerate} className="space-y-4 max-w-lg">
-        {/* Subject */}
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">Subject</label>
           <select
@@ -965,7 +1045,6 @@ const AIGeneratePanel = () => {
           </select>
         </div>
 
-        {/* Topic */}
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">Topic</label>
           <input
@@ -978,7 +1057,6 @@ const AIGeneratePanel = () => {
           />
         </div>
 
-        {/* Exam Type + difficulty + count row */}
         <div className="grid grid-cols-3 gap-3">
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Exam Type</label>
@@ -1036,7 +1114,6 @@ const AIGeneratePanel = () => {
         </button>
       </form>
 
-      {/* Generated questions preview with concept_hint */}
       {previewQuestions.length > 0 && (
         <div className="mt-6 max-w-lg">
           <div className="flex items-center gap-2 mb-3">
@@ -1091,14 +1168,12 @@ const UserManagementPanel = () => {
     setTimeout(() => setToast(null), 3500);
   };
 
-  // Fetch stats once on mount
   useEffect(() => {
     api.get('/users/stats')
       .then(r => { if (r.success) setUserStats(r.data); })
       .catch(() => {});
   }, []);
 
-  // Debounced fetch on search/role/page change
   useEffect(() => {
     const timer = setTimeout(() => fetchUsers(), 300);
     return () => clearTimeout(timer);
@@ -1176,7 +1251,6 @@ const UserManagementPanel = () => {
     <div>
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-      {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>
           <h2 className="text-xl font-bold text-gray-900">User Management</h2>
@@ -1187,7 +1261,6 @@ const UserManagementPanel = () => {
         </button>
       </div>
 
-      {/* Stats row */}
       {userStats && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
           {[
@@ -1204,7 +1277,6 @@ const UserManagementPanel = () => {
         </div>
       )}
 
-      {/* Search + filter row */}
       <div className="flex gap-3 mb-4">
         <input
           type="text"
@@ -1225,7 +1297,6 @@ const UserManagementPanel = () => {
         </select>
       </div>
 
-      {/* Table */}
       {loading ? (
         <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 text-blue-400 animate-spin" /></div>
       ) : users.length === 0 ? (
@@ -1258,7 +1329,6 @@ const UserManagementPanel = () => {
                   <td className="px-4 py-3 hidden sm:table-cell text-gray-400 text-xs">{fmtDate(u.last_login)}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      {/* Role dropdown */}
                       <select
                         value={u.role}
                         onChange={e => changeRole(u.id, e.target.value)}
@@ -1268,7 +1338,6 @@ const UserManagementPanel = () => {
                         <option value="teacher">Teacher</option>
                         <option value="admin">Admin</option>
                       </select>
-                      {/* Active toggle */}
                       <button
                         onClick={() => toggleActive(u.id, u.is_active)}
                         title={u.is_active ? 'Deactivate' : 'Activate'}
@@ -1280,7 +1349,6 @@ const UserManagementPanel = () => {
                       >
                         {u.is_active ? 'Deactivate' : 'Activate'}
                       </button>
-                      {/* Delete button */}
                       <button
                         onClick={() => deleteUser(u.id, u.email)}
                         title="Permanently delete user"
@@ -1297,7 +1365,6 @@ const UserManagementPanel = () => {
         </div>
       )}
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between mt-4">
           <span className="text-xs text-gray-400">Page {page} of {totalPages} · {total} users</span>
@@ -1324,7 +1391,7 @@ const UserManagementPanel = () => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PlatformAnalyticsPanel — platform-wide stats, charts, quick actions
+// PlatformAnalyticsPanel
 // ─────────────────────────────────────────────────────────────────────────────
 const PlatformAnalyticsPanel = () => {
   const navigate              = useNavigate();
@@ -1367,18 +1434,16 @@ const PlatformAnalyticsPanel = () => {
   const { users = {}, questions = {}, revenue = {}, top_subjects = [], daily_activity = [] } = stats;
 
   const statCards = [
-    { label: 'Total Students',        value: users.students        ?? '—', color: 'bg-blue-50',   border: 'border-blue-200',   text: 'text-blue-700'   },
-    { label: 'Answered Today',         value: questions.answered_today ?? '—', color: 'bg-teal-50', border: 'border-teal-200', text: 'text-teal-700' },
-    { label: 'Active Subscriptions',   value: revenue.total_active_subs ?? '—', color: 'bg-green-50', border: 'border-green-200', text: 'text-green-700' },
-    { label: 'Pending Questions',      value: questions.total_pending ?? '—', color: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700' },
+    { label: 'Total Students',       value: users.students           ?? '—', color: 'bg-blue-50',   border: 'border-blue-200',   text: 'text-blue-700'   },
+    { label: 'Answered Today',        value: questions.answered_today ?? '—', color: 'bg-teal-50',   border: 'border-teal-200',   text: 'text-teal-700'   },
+    { label: 'Active Subscriptions',  value: revenue.total_active_subs ?? '—', color: 'bg-green-50', border: 'border-green-200', text: 'text-green-700' },
+    { label: 'Pending Questions',     value: questions.total_pending  ?? '—', color: 'bg-amber-50',  border: 'border-amber-200',  text: 'text-amber-700'  },
   ];
 
   const SUBJECT_COLORS = ['#14b8a6','#6366f1','#f59e0b','#ec4899','#8b5cf6'];
 
   return (
     <div className="space-y-6">
-
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-gray-900">Platform Analytics</h2>
@@ -1389,7 +1454,6 @@ const PlatformAnalyticsPanel = () => {
         </button>
       </div>
 
-      {/* Stat cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {statCards.map((c, i) => (
           <div key={i} className={`${c.color} border ${c.border} rounded-2xl p-4`}>
@@ -1399,7 +1463,6 @@ const PlatformAnalyticsPanel = () => {
         ))}
       </div>
 
-      {/* Secondary stats row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
         <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
           <p className="text-gray-400 text-xs">Active Today</p>
@@ -1419,10 +1482,7 @@ const PlatformAnalyticsPanel = () => {
         </div>
       </div>
 
-      {/* Charts row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-        {/* Daily activity line chart */}
         <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
           <p className="text-sm font-semibold text-gray-700 mb-4">Daily Activity (Last 14 Days)</p>
           {daily_activity.length === 0 ? (
@@ -1433,18 +1493,13 @@ const PlatformAnalyticsPanel = () => {
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
                 <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={d => d.slice(5)} />
                 <YAxis tick={{ fontSize: 10 }} width={30} />
-                <Tooltip
-                  formatter={(v) => [v, 'Attempts']}
-                  labelFormatter={(l) => `Date: ${l}`}
-                  contentStyle={{ borderRadius: '8px', fontSize: '12px' }}
-                />
+                <Tooltip formatter={(v) => [v, 'Attempts']} labelFormatter={(l) => `Date: ${l}`} contentStyle={{ borderRadius: '8px', fontSize: '12px' }} />
                 <Line type="monotone" dataKey="attempt_count" stroke="#14b8a6" strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           )}
         </div>
 
-        {/* Top subjects bar chart */}
         <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
           <p className="text-sm font-semibold text-gray-700 mb-4">Top Subjects — Avg Accuracy (%)</p>
           {top_subjects.length === 0 ? (
@@ -1455,10 +1510,7 @@ const PlatformAnalyticsPanel = () => {
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
                 <XAxis dataKey="name" tick={{ fontSize: 10 }} />
                 <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} width={30} />
-                <Tooltip
-                  formatter={(v, n) => [`${v}%`, 'Avg Accuracy']}
-                  contentStyle={{ borderRadius: '8px', fontSize: '12px' }}
-                />
+                <Tooltip formatter={(v) => [`${v}%`, 'Avg Accuracy']} contentStyle={{ borderRadius: '8px', fontSize: '12px' }} />
                 <Bar dataKey="avg_accuracy" radius={[4, 4, 0, 0]}>
                   {top_subjects.map((_, i) => (
                     <Cell key={i} fill={SUBJECT_COLORS[i % SUBJECT_COLORS.length]} />
@@ -1470,7 +1522,6 @@ const PlatformAnalyticsPanel = () => {
         </div>
       </div>
 
-      {/* Quick actions */}
       <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
         <p className="text-sm font-semibold text-gray-700 mb-3">Quick Actions</p>
         <div className="flex flex-wrap gap-3">
@@ -1499,217 +1550,7 @@ const PlatformAnalyticsPanel = () => {
   );
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TeacherAssignmentPanel — uses /api/admin/teacher-assignments endpoints
-// ─────────────────────────────────────────────────────────────────────────────
-const TeacherAssignmentPanel = () => {
-  const [assignments,  setAssignments]  = useState([]);
-  const [teachers,     setTeachers]     = useState([]);
-  const [subjects,     setSubjects]     = useState([]);
-  const [examBoards,   setExamBoards]   = useState([]);
-  const [loading,      setLoading]      = useState(true);
-  const [showModal,    setShowModal]    = useState(false);
-  const [saving,       setSaving]       = useState(false);
-  const [toast,        setToast]        = useState(null);
-  const [form, setForm] = useState({ teacher_id: '', subject_id: '', exam_board_id: '' });
-
-  const showToast = (msg, type = 'success') => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 3000);
-  };
-
-  const fetchAll = async () => {
-    setLoading(true);
-    try {
-      const [aRes, tRes, sRes, ebRes] = await Promise.all([
-        api.get('/admin/teacher-assignments'),
-        api.get('/users?role=teacher'),
-        api.get('/admin/subjects'),
-        api.get('/exam-boards'),
-      ]);
-      if (aRes?.success)  setAssignments(aRes.data  || []);
-      if (tRes?.data)     setTeachers(tRes.data      || []);
-      if (sRes?.success)  setSubjects(sRes.data      || []);
-      if (ebRes?.data)    setExamBoards(ebRes.data   || []);
-    } catch { showToast('Failed to load data', 'error'); }
-    finally   { setLoading(false); }
-  };
-
-  useEffect(() => { fetchAll(); }, []);  // eslint-disable-line
-
-  const handleSave = async () => {
-    if (!form.teacher_id || !form.subject_id) {
-      showToast('Teacher and Subject are required', 'error'); return;
-    }
-    setSaving(true);
-    try {
-      await api.post('/admin/teacher-assignments', form);
-      showToast('Assignment saved successfully');
-      setShowModal(false);
-      setForm({ teacher_id: '', subject_id: '', exam_board_id: '' });
-      fetchAll();
-    } catch (err) {
-      showToast(err?.error || 'Failed to save', 'error');
-    } finally { setSaving(false); }
-  };
-
-  const handleRemove = async (id) => {
-    if (!window.confirm('Remove this assignment?')) return;
-    try {
-      await api.delete(`/admin/teacher-assignments/${id}`);
-      showToast('Assignment removed');
-      fetchAll();
-    } catch { showToast('Failed to remove', 'error'); }
-  };
-
-  if (loading) return (
-    <div className="flex items-center justify-center py-12">
-      <Loader2 className="w-7 h-7 text-purple-500 animate-spin mr-3" />
-      <span className="text-gray-500">Loading assignments…</span>
-    </div>
-  );
-
-  return (
-    <div>
-      {/* Toast */}
-      {toast && (
-        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white ${
-          toast.type === 'error' ? 'bg-red-500' : 'bg-green-500'
-        }`}>
-          {toast.msg}
-        </div>
-      )}
-
-      {/* Header */}
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h2 className="text-xl font-bold text-gray-900">Teacher Assignment</h2>
-          <p className="text-sm text-gray-500 mt-0.5">Assign teachers to subjects and exam boards</p>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={fetchAll} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 px-3 py-2 border border-gray-200 rounded-xl">
-            <RefreshCw size={14} /> Refresh
-          </button>
-          <button onClick={() => setShowModal(true)} className="flex items-center gap-1.5 text-sm bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl">
-            <Plus size={14} /> Add Assignment
-          </button>
-        </div>
-      </div>
-
-      {/* Assignments table */}
-      {assignments.length === 0 ? (
-        <div className="text-center py-12 text-gray-400">
-          <UserCheck className="w-10 h-10 mx-auto mb-3 opacity-30" />
-          <p className="text-sm">No assignments yet. Click "Add Assignment" to get started.</p>
-        </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 text-left">
-                <th className="pb-3 font-semibold text-gray-600">Teacher</th>
-                <th className="pb-3 font-semibold text-gray-600">Email</th>
-                <th className="pb-3 font-semibold text-gray-600">Subject</th>
-                <th className="pb-3 font-semibold text-gray-600">Exam Board</th>
-                <th className="pb-3 font-semibold text-gray-600">Status</th>
-                <th className="pb-3 font-semibold text-gray-600">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {assignments.map(a => (
-                <tr key={a.id} className="border-b border-gray-50 hover:bg-gray-50">
-                  <td className="py-3 font-medium text-gray-800">{a.teacher_name}</td>
-                  <td className="py-3 text-gray-500 text-xs">{a.email}</td>
-                  <td className="py-3 text-gray-700">{a.subject_name}</td>
-                  <td className="py-3 text-gray-500">{a.exam_board_code || '—'}</td>
-                  <td className="py-3">
-                    <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                      a.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                    }`}>
-                      {a.is_active ? 'Active' : 'Inactive'}
-                    </span>
-                  </td>
-                  <td className="py-3">
-                    {a.is_active && (
-                      <button onClick={() => handleRemove(a.id)}
-                        className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1">
-                        <Trash2 size={12} /> Remove
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Add Assignment Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="text-lg font-bold text-gray-900">Add Assignment</h3>
-              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600">
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              {/* Teacher */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Teacher *</label>
-                <select value={form.teacher_id} onChange={e => setForm(f => ({ ...f, teacher_id: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-purple-400">
-                  <option value="">Select a teacher…</option>
-                  {teachers.map(t => (
-                    <option key={t.id} value={t.id}>{t.first_name} {t.last_name} — {t.email}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Subject */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Subject *</label>
-                <select value={form.subject_id} onChange={e => setForm(f => ({ ...f, subject_id: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-purple-400">
-                  <option value="">Select a subject…</option>
-                  {subjects.map(s => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Exam Board */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Exam Board (optional)</label>
-                <select value={form.exam_board_id} onChange={e => setForm(f => ({ ...f, exam_board_id: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-purple-400">
-                  <option value="">All boards</option>
-                  {examBoards.map(eb => (
-                    <option key={eb.id} value={eb.id}>{eb.name} ({eb.code})</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <button onClick={handleSave} disabled={saving}
-                className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors">
-                {saving ? 'Saving…' : 'Save Assignment'}
-              </button>
-              <button onClick={() => setShowModal(false)}
-                className="flex-1 border border-gray-200 text-gray-600 hover:bg-gray-50 font-semibold py-2.5 rounded-xl text-sm transition-colors">
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
+// ─── Admin Dashboard ──────────────────────────────────────────────────────────
 const AdminDashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -1717,7 +1558,6 @@ const AdminDashboard = () => {
   const [stats, setStats]             = useState(null);
   const [statsLoading, setStatsLoading] = useState(true);
 
-  // ── Fetch real stats ─────────────────────────────────────────
   useEffect(() => {
     const fetchStats = async () => {
       setStatsLoading(true);
@@ -1725,7 +1565,6 @@ const AdminDashboard = () => {
         const res = await api.get('/catalog/stats');
         if (res?.success) setStats(res.data || null);
       } catch {
-        // Stats endpoint may not exist yet — fallback gracefully
         setStats(null);
       } finally {
         setStatsLoading(false);
@@ -1735,30 +1574,10 @@ const AdminDashboard = () => {
   }, []);
 
   const statCards = [
-    {
-      label: 'Total Users',
-      value: statsLoading ? '…' : stats?.total_users ?? '—',
-      icon: Users,
-      color: 'bg-blue-500',
-    },
-    {
-      label: 'Exam Types',
-      value: statsLoading ? '…' : stats?.total_exam_types ?? '—',
-      icon: GraduationCap,
-      color: 'bg-purple-500',
-    },
-    {
-      label: 'Total Subjects',
-      value: statsLoading ? '…' : stats?.total_subjects ?? '—',
-      icon: BookOpen,
-      color: 'bg-green-500',
-    },
-    {
-      label: 'Active Students',
-      value: statsLoading ? '…' : stats?.active_students ?? '—',
-      icon: Settings,
-      color: 'bg-amber-500',
-    },
+    { label: 'Total Users',     value: statsLoading ? '…' : stats?.total_users      ?? '—', icon: Users,         color: 'bg-blue-500'   },
+    { label: 'Exam Types',      value: statsLoading ? '…' : stats?.total_exam_types  ?? '—', icon: GraduationCap, color: 'bg-purple-500' },
+    { label: 'Total Subjects',  value: statsLoading ? '…' : stats?.total_subjects    ?? '—', icon: BookOpen,      color: 'bg-green-500'  },
+    { label: 'Active Students', value: statsLoading ? '…' : stats?.active_students   ?? '—', icon: Settings,      color: 'bg-amber-500'  },
   ];
 
   return (
@@ -1768,7 +1587,6 @@ const AdminDashboard = () => {
       <main className="max-w-7xl mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Admin Dashboard</h1>
 
-        {/* Stats Cards — real data */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           {statCards.map((stat, idx) => (
             <div key={idx} className="bg-white rounded-xl shadow p-6">
@@ -1784,106 +1602,42 @@ const AdminDashboard = () => {
           ))}
         </div>
 
-        {/* System Management */}
         <div className="bg-white rounded-xl shadow p-6 mb-6">
           <h2 className="text-xl font-bold text-gray-900 mb-4">System Management</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            <button
-              onClick={() => setActivePanel(activePanel === 'analytics' ? null : 'analytics')}
-              className={`p-6 border-2 rounded-lg transition-colors text-left ${
-                activePanel === 'analytics'
-                  ? 'border-teal-500 bg-teal-50'
-                  : 'border-gray-200 hover:bg-gray-50'
-              }`}
-            >
-              <Zap className={`w-8 h-8 mb-2 ${activePanel === 'analytics' ? 'text-teal-600' : 'text-teal-400'}`} />
-              <h3 className="font-semibold mb-1">Analytics</h3>
-              <p className="text-sm text-gray-600">Platform-wide stats and charts</p>
-            </button>
-            <button
-              onClick={() => setActivePanel(activePanel === 'users' ? null : 'users')}
-              className={`p-6 border-2 rounded-lg transition-colors text-left ${
-                activePanel === 'users'
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-200 hover:bg-gray-50'
-              }`}
-            >
-              <Users className={`w-8 h-8 text-blue-600 mb-2`} />
-              <h3 className="font-semibold mb-1">User Management</h3>
-              <p className="text-sm text-gray-600">Manage users and permissions</p>
-            </button>
-            <button
-              onClick={() => setActivePanel(activePanel === 'schools' ? null : 'schools')}
-              className={`p-6 border-2 rounded-lg transition-colors text-left ${
-                activePanel === 'schools'
-                  ? 'border-purple-500 bg-purple-50'
-                  : 'border-gray-200 hover:bg-gray-50'
-              }`}
-            >
-              <School className={`w-8 h-8 mb-2 ${activePanel === 'schools' ? 'text-purple-600' : 'text-purple-600'}`} />
-              <h3 className="font-semibold mb-1">School Management</h3>
-              <p className="text-sm text-gray-600">Manage schools and institutions</p>
-            </button>
-            <button
-              onClick={() => setActivePanel(activePanel === 'content' ? null : 'content')}
-              className={`p-6 border-2 rounded-lg transition-colors text-left ${
-                activePanel === 'content'
-                  ? 'border-green-500 bg-green-50'
-                  : 'border-gray-200 hover:bg-gray-50'
-              }`}
-            >
-              <BookOpen className={`w-8 h-8 mb-2 ${activePanel === 'content' ? 'text-green-600' : 'text-green-600'}`} />
-              <h3 className="font-semibold mb-1">Content Management</h3>
-              <p className="text-sm text-gray-600">Manage courses and subjects</p>
-            </button>
-            <button
-              onClick={() => setActivePanel(activePanel === 'catalog' ? null : 'catalog')}
-              className={`p-6 border-2 rounded-lg transition-colors text-left ${
-                activePanel === 'catalog'
-                  ? 'border-green-500 bg-green-50'
-                  : 'border-gray-200 hover:bg-gray-50'
-              }`}
-            >
-              <GraduationCap className={`w-8 h-8 mb-2 ${activePanel === 'catalog' ? 'text-green-600' : 'text-orange-500'}`} />
-              <h3 className="font-semibold mb-1">Catalog Management</h3>
-              <p className="text-sm text-gray-600">Manage exam types &amp; subjects</p>
-            </button>
-            <button
-              onClick={() => setActivePanel(activePanel === 'teachers' ? null : 'teachers')}
-              className={`p-6 border-2 rounded-lg transition-colors text-left ${
-                activePanel === 'teachers'
-                  ? 'border-purple-500 bg-purple-50'
-                  : 'border-gray-200 hover:bg-gray-50'
-              }`}
-            >
-              <UserCheck className={`w-8 h-8 mb-2 ${activePanel === 'teachers' ? 'text-purple-600' : 'text-purple-400'}`} />
-              <h3 className="font-semibold mb-1">Teacher Assignment</h3>
-              <p className="text-sm text-gray-600">Assign subjects to teachers</p>
-            </button>
-            <button
-              onClick={() => setActivePanel(activePanel === 'aigenerate' ? null : 'aigenerate')}
-              className={`p-6 border-2 rounded-lg transition-colors text-left ${
-                activePanel === 'aigenerate'
-                  ? 'border-teal-500 bg-teal-50'
-                  : 'border-gray-200 hover:bg-gray-50'
-              }`}
-            >
-              <Sparkles className={`w-8 h-8 mb-2 ${activePanel === 'aigenerate' ? 'text-teal-600' : 'text-teal-400'}`} />
-              <h3 className="font-semibold mb-1">AI Generate</h3>
-              <p className="text-sm text-gray-600">Generate questions with Gemini</p>
-            </button>
+            {[
+              { key: 'analytics', icon: Zap,         color: 'teal',   label: 'Analytics',          desc: 'Platform-wide stats and charts'       },
+              { key: 'users',     icon: Users,        color: 'blue',   label: 'User Management',    desc: 'Manage users and permissions'          },
+              { key: 'schools',   icon: School,       color: 'purple', label: 'School Management',  desc: 'Manage schools and institutions'       },
+              { key: 'content',   icon: BookOpen,     color: 'green',  label: 'Content Management', desc: 'Manage courses and subjects'           },
+              { key: 'catalog',   icon: GraduationCap,color: 'orange', label: 'Catalog Management', desc: 'Manage exam types & subjects'          },
+              { key: 'teachers',  icon: UserCheck,    color: 'purple', label: 'Teacher Assignment', desc: 'Assign subjects to teachers'           },
+              { key: 'aigenerate',icon: Sparkles,     color: 'teal',   label: 'AI Generate',        desc: 'Generate questions with Gemini'        },
+            ].map(({ key, icon: Icon, color, label, desc }) => {
+              const active = activePanel === key;
+              const borderMap = { teal: 'border-teal-500', blue: 'border-blue-500', purple: 'border-purple-500', green: 'border-green-500', orange: 'border-green-500' };
+              const bgMap =     { teal: 'bg-teal-50',      blue: 'bg-blue-50',      purple: 'bg-purple-50',      green: 'bg-green-50',      orange: 'bg-green-50'      };
+              const textMap =   { teal: 'text-teal-600',   blue: 'text-blue-600',   purple: 'text-purple-600',   green: 'text-green-600',   orange: 'text-orange-500'  };
+              return (
+                <button
+                  key={key}
+                  onClick={() => setActivePanel(active ? null : key)}
+                  className={`p-6 border-2 rounded-lg transition-colors text-left ${
+                    active ? `${borderMap[color]} ${bgMap[color]}` : 'border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  <Icon className={`w-8 h-8 mb-2 ${active ? textMap[color] : textMap[color]}`} />
+                  <h3 className="font-semibold mb-1">{label}</h3>
+                  <p className="text-sm text-gray-600">{desc}</p>
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        {/* School Management Panel */}
         {activePanel === 'schools' && (
           <div className="bg-white rounded-xl shadow p-6 mt-6">
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">School Management</h2>
-                <p className="text-sm text-gray-500 mt-0.5">Manage schools and institutions registered on the platform</p>
-              </div>
-            </div>
+            <h2 className="text-xl font-bold text-gray-900 mb-5">School Management</h2>
             <div className="text-center py-16 text-gray-400">
               <School className="w-12 h-12 mx-auto mb-3 opacity-30" />
               <p className="text-sm font-medium">School management coming soon.</p>
@@ -1892,38 +1646,23 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {/* Content Management Panel */}
         {activePanel === 'content' && (
           <div className="bg-white rounded-xl shadow p-6 mt-6">
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">Content Management</h2>
-                <p className="text-sm text-gray-500 mt-0.5">Manage courses, notes, videos and learning materials</p>
-              </div>
-            </div>
+            <h2 className="text-xl font-bold text-gray-900 mb-5">Content Management</h2>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-              <button
-                onClick={() => setActivePanel('catalog')}
-                className="border border-gray-200 rounded-xl p-4 hover:border-green-400 hover:bg-green-50 transition-colors text-left group"
-              >
+              <button onClick={() => setActivePanel('catalog')} className="border border-gray-200 rounded-xl p-4 hover:border-green-400 hover:bg-green-50 transition-colors text-left group">
                 <BookOpen className="w-7 h-7 text-green-500 mb-2" />
                 <p className="font-semibold text-gray-800 text-sm group-hover:text-green-700">Manage Subjects</p>
                 <p className="text-xs text-gray-400 mt-1">Add, edit or deactivate exam types and subjects</p>
                 <span className="text-xs text-green-600 font-semibold mt-2 inline-block">Open Catalog Management →</span>
               </button>
-              <button
-                onClick={() => navigate('/past-papers')}
-                className="border border-gray-200 rounded-xl p-4 hover:border-blue-400 hover:bg-blue-50 transition-colors text-left group"
-              >
+              <button onClick={() => navigate('/past-papers')} className="border border-gray-200 rounded-xl p-4 hover:border-blue-400 hover:bg-blue-50 transition-colors text-left group">
                 <Settings className="w-7 h-7 text-blue-500 mb-2" />
                 <p className="font-semibold text-gray-800 text-sm group-hover:text-blue-700">Past Papers</p>
                 <p className="text-xs text-gray-400 mt-1">View and manage past exam papers available to students</p>
                 <span className="text-xs text-blue-600 font-semibold mt-2 inline-block">Go to Past Papers →</span>
               </button>
-              <button
-                onClick={() => navigate('/admin/questions/review')}
-                className="border border-gray-200 rounded-xl p-4 hover:border-amber-400 hover:bg-amber-50 transition-colors text-left group"
-              >
+              <button onClick={() => navigate('/admin/questions/review')} className="border border-gray-200 rounded-xl p-4 hover:border-amber-400 hover:bg-amber-50 transition-colors text-left group">
                 <BookOpen className="w-7 h-7 text-amber-500 mb-2" />
                 <p className="font-semibold text-gray-800 text-sm group-hover:text-amber-700">Question Review</p>
                 <p className="text-xs text-gray-400 mt-1">Review and approve AI-generated and submitted questions</p>
@@ -1933,35 +1672,30 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {/* Platform Analytics Panel */}
         {activePanel === 'analytics' && (
           <div className="bg-white rounded-xl shadow p-6 mt-6">
             <PlatformAnalyticsPanel />
           </div>
         )}
 
-        {/* User Management Panel */}
         {activePanel === 'users' && (
           <div className="bg-white rounded-xl shadow p-6 mt-6">
             <UserManagementPanel />
           </div>
         )}
 
-        {/* Catalog Panel */}
         {activePanel === 'catalog' && (
           <div className="bg-white rounded-xl shadow p-6">
             <CatalogPanel />
           </div>
         )}
 
-        {/* Teacher Assignment Panel */}
         {activePanel === 'teachers' && (
           <div className="bg-white rounded-xl shadow p-6">
             <TeacherAssignmentPanel />
           </div>
         )}
 
-        {/* AI Generate Panel */}
         {activePanel === 'aigenerate' && (
           <div className="bg-white rounded-xl shadow p-6">
             <AIGeneratePanel />
