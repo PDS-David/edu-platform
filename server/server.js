@@ -10,6 +10,7 @@ const logger = require('./config/logger');
 const requestId = require('./middleware/requestId');
 const requestLogger = require('./middleware/requestLogger');
 
+
 // ── DOTENV FOR LOCAL DEV ONLY ────────────────────────────────────────────────
 if (process.env.NODE_ENV !== 'production') {
   const dotenv = require('dotenv');
@@ -193,6 +194,7 @@ const catalogRoutes     = require('./routes/catalogRoutes');
 const notificationsRoutes = require('./routes/notificationsRoutes');
 const studentRoutes     = require('./routes/studentRoutes');
 const conceptRoutes     = require('./routes/conceptRoutes');
+const curriculumRoutes = require('./routes/curriculumRoutes');
 
 // Optional routes — skip if file missing
 let aiChatRoute         = null;
@@ -215,6 +217,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // ── Public routes ─────────────────────────────────────────────────────────────
 app.use('/api/auth',        authRoutes);
 app.use('/api/exam-boards', examBoardsRoutes);
+app.use('/api/curriculum', curriculumRoutes);
 
 // ── Protected routes ──────────────────────────────────────────────────────────
 app.use('/api/ai', protect, subscriptionGuard, aiLimiter, aiRoutes);
