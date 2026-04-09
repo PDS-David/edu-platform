@@ -104,18 +104,82 @@ try {
 } catch {}
 
 // ── ROUTES ───────────────────────────────────────────────────────────────────
-const authRoutes = require('./routes/authRoutes');
-const aiRoutes = require('./routes/aiRoutes');
-let aiChatRoute = null;
-try {
-  aiChatRoute = require('./routes/aiChatRoute');
-} catch {}
+const authRoutes        = require('./routes/authRoutes');
+const aiRoutes          = require('./routes/aiRoutes');
+const adminRoutes       = require('./routes/adminRoutes');
+const teacherRoutes     = require('./routes/teacherRoutes');
+const userRoutes        = require('./routes/users');
+const examBoardsRoutes  = require('./routes/examBoardsRoutes');
+const subjectRoutes     = require('./routes/subjects');
+const topicsRoutes      = require('./routes/topicsRoutes');
+const subtopicRoutes    = require('./routes/subtopicRoutes');
+const resourceRoutes    = require('./routes/resourceRoutes');
+const coursesRoutes     = require('./routes/courses');
+const enrollmentsRoutes = require('./routes/enrollments');
+const quizzesRoutes     = require('./routes/quizzes');
+const questionsRoutes   = require('./routes/questionsRoutes');
+const analyticsRoutes   = require('./routes/analyticsRoutes');
+const notesRoutes       = require('./routes/notesRoutes');
+const videosRoutes      = require('./routes/videosRoutes');
+const pastPaperRoutes   = require('./routes/pastPaperRoutes');
+const paymentRoutes     = require('./routes/paymentRoutes');
+const catalogRoutes     = require('./routes/catalogRoutes');
+const notificationsRoutes = require('./routes/notificationsRoutes');
+const studentRoutes     = require('./routes/studentRoutes');
+const conceptRoutes     = require('./routes/conceptRoutes');
 
-app.use('/api/auth', authRoutes);
+// optional routes — skip if file missing
+let aiChatRoute         = null;
+let aiQueueRoute        = null;
+let quizGeneratorRoute  = null;
+let studyPlannerRoute   = null;
+let explanationRoute    = null;
+let examTypeActivation  = null;
+let analyticsLegacy     = null;
+
+try { aiChatRoute        = require('./routes/aiChatRoute');        } catch {}
+try { quizGeneratorRoute = require('./routes/quizGeneratorRoute'); } catch {}
+try { studyPlannerRoute  = require('./routes/studyPlannerRoute');  } catch {}
+try { explanationRoute   = require('./routes/explanationRoute');   } catch {}
+try { examTypeActivation = require('./routes/examTypeActivation'); } catch {}
+try { analyticsLegacy    = require('./routes/analytics');          } catch {}
+
+// ── Serve uploaded files (resources, videos) ─────────────────────────────────
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// ── Public routes ─────────────────────────────────────────────────────────────
+app.use('/api/auth',        authRoutes);
+app.use('/api/exam-boards', examBoardsRoutes);
+
+// ── Protected routes ──────────────────────────────────────────────────────────
 app.use('/api/ai', protect, subscriptionGuard, aiLimiter, aiRoutes);
-if (aiChatRoute) {
-  app.use('/api/ai', protect, subscriptionGuard, aiLimiter, aiChatRoute);
-}
+if (aiChatRoute)        app.use('/api/ai',            protect, subscriptionGuard, aiLimiter, aiChatRoute);
+if (quizGeneratorRoute) app.use('/api/quiz-generator', protect, quizGeneratorRoute);
+if (studyPlannerRoute)  app.use('/api/study-planner',  protect, studyPlannerRoute);
+if (explanationRoute)   app.use('/api/explanations',   protect, explanationRoute);
+if (examTypeActivation) app.use('/api/exam-types',     protect, examTypeActivation);
+if (analyticsLegacy)    app.use('/api/analytics',      protect, analyticsLegacy);
+
+app.use('/api/admin',         protect, adminRoutes);
+app.use('/api/teacher',       protect, teacherRoutes);
+app.use('/api/users',         protect, userRoutes);
+app.use('/api/subjects',      protect, subjectRoutes);
+app.use('/api/topics',        protect, topicsRoutes);
+app.use('/api/subtopics',     protect, subtopicRoutes);
+app.use('/api/resources',     protect, resourceRoutes);
+app.use('/api/courses',       protect, coursesRoutes);
+app.use('/api/enrollments',   protect, enrollmentsRoutes);
+app.use('/api/quizzes',       protect, quizzesRoutes);
+app.use('/api/questions',     protect, questionsRoutes);
+app.use('/api/analytics',     protect, analyticsRoutes);
+app.use('/api/notes',         protect, notesRoutes);
+app.use('/api/videos',        protect, videosRoutes);
+app.use('/api/past-papers',   protect, pastPaperRoutes);
+app.use('/api/payments',      protect, paymentRoutes);
+app.use('/api/catalog',       protect, catalogRoutes);
+app.use('/api/notifications', protect, notificationsRoutes);
+app.use('/api/students',      protect, studentRoutes);
+app.use('/api/concepts',      protect, conceptRoutes);
 
 // ── HEALTH CHECK ──────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {

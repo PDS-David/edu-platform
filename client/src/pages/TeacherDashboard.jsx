@@ -11,11 +11,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect } from 'react';
-import { useNavigate }         from 'react-router-dom';
+import { useNavigate, Link }   from 'react-router-dom';
 import api                     from '../services/api';
 import {
   Users, Plus, Copy, CheckCircle, Loader2, AlertTriangle,
   BarChart2, Zap, X, ChevronRight, Send, PenTool,
+  BookOpen, Upload, AlertCircle,
 } from 'lucide-react';
 import TopNav       from '../components/TopNav';
 import { useAuth }  from '../context/AuthContext';
@@ -467,15 +468,16 @@ function TestBuilderTab() {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function TeacherDashboard() {
-  const { user }                       = useAuth();
-  const navigate                       = useNavigate();
-  const [activeTab,     setActiveTab]  = useState('classes');
-  const [selectedClass, setSelectedClass] = useState(null);
+  const { user }                           = useAuth();
+  const navigate                           = useNavigate();
+  const [activeTab,      setActiveTab]     = useState('classes');
+  const [selectedClass,  setSelectedClass] = useState(null);
+  const [assignedSubjects, setAssignedSubjects] = useState(null); // null = loading
 
   const tabs = [
-    { id: 'classes',     label: 'My Classes',   icon: Users    },
+    { id: 'classes',     label: 'My Classes',   icon: Users     },
     { id: 'analytics',   label: 'Analytics',    icon: BarChart2 },
-    { id: 'testbuilder', label: 'Test Builder',  icon: PenTool  },
+    { id: 'testbuilder', label: 'Test Builder',  icon: PenTool   },
   ];
 
   const handleViewAnalytics = (cls) => {
@@ -483,19 +485,71 @@ export default function TeacherDashboard() {
     setActiveTab('analytics');
   };
 
+  // Load teacher's assigned subjects to show status banner
+  useEffect(() => {
+    api.get('/teacher/my-subjects')
+      .then(r => setAssignedSubjects(r.data || []))
+      .catch(() => setAssignedSubjects([]));
+  }, []);
+
+  const hasSubjects = assignedSubjects && assignedSubjects.length > 0;
+  const subjectsLoading = assignedSubjects === null;
+
   return (
     <div className="min-h-screen bg-gray-50">
       <TopNav />
 
+      {/* ── Header ── */}
       <div className="bg-[#0a4a3f] px-4 py-5">
-        <div className="max-w-4xl mx-auto">
-          <p className="text-white/50 text-xs mb-1">Teacher Dashboard</p>
-          <h1 className="text-white text-xl font-bold">
-            Welcome back, {user?.first_name || 'Teacher'} 👋
-          </h1>
+        <div className="max-w-4xl mx-auto flex items-start justify-between gap-4">
+          <div>
+            <p className="text-white/50 text-xs mb-1">Teacher Dashboard</p>
+            <h1 className="text-white text-xl font-bold">
+              Welcome back, {user?.firstName || user?.first_name || 'Teacher'} 👋
+            </h1>
+          </div>
+          {/* Quick-access Resources button — visible once subjects are assigned */}
+          {hasSubjects && (
+            <Link
+              to="/teacher/resources"
+              className="flex items-center gap-2 bg-teal-500 hover:bg-teal-400 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors shrink-0 mt-1"
+            >
+              <Upload size={14} />
+              Upload Resources
+            </Link>
+          )}
         </div>
       </div>
 
+      {/* ── Subject assignment status banner ── */}
+      {!subjectsLoading && (
+        <div className={`border-b px-4 py-3 ${hasSubjects ? 'bg-teal-50 border-teal-100' : 'bg-amber-50 border-amber-100'}`}>
+          <div className="max-w-4xl mx-auto flex items-center gap-3">
+            {hasSubjects ? (
+              <>
+                <CheckCircle size={16} className="text-teal-600 shrink-0" />
+                <p className="text-sm text-teal-800">
+                  <span className="font-semibold">Subjects assigned:</span>{' '}
+                  {assignedSubjects.map(s => `${s.name}${s.exam_board_code ? ` (${s.exam_board_code})` : ''}`).join(' · ')}
+                </p>
+                <Link to="/teacher/resources" className="ml-auto text-xs font-semibold text-teal-700 hover:text-teal-900 shrink-0 flex items-center gap-1">
+                  <BookOpen size={12} /> Manage Resources →
+                </Link>
+              </>
+            ) : (
+              <>
+                <AlertCircle size={16} className="text-amber-600 shrink-0" />
+                <p className="text-sm text-amber-800">
+                  <span className="font-semibold">Awaiting subject assignment.</span>{' '}
+                  The admin needs to assign you subjects and a curriculum before you can upload resources or create content.
+                </p>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Tab bar ── */}
       <div className="bg-white border-b border-gray-100 sticky top-14 z-30">
         <div className="max-w-4xl mx-auto px-4 flex gap-1 overflow-x-auto">
           {tabs.map(t => {
