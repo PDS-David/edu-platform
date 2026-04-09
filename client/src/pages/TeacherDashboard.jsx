@@ -1,14 +1,4 @@
 // client/src/pages/TeacherDashboard.jsx
-// ─────────────────────────────────────────────────────────────────────────────
-// FIXES in this version:
-//   1. AnalyticsTab: "Run AI Analysis" was calling /ai/cohort-gaps with a
-//      subjectId param that's never set — now calls /analytics/cohort-gaps
-//      with class_id, which is always available in this context.
-//   2. TestBuilderTab: was calling POST /teacher/tests expecting the old
-//      test_assignments schema; now works with the corrected backend.
-//   3. TestBuilderTab: share link now correctly shows
-//      /student/test/:id (not /student/tests/:id).
-// ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect } from 'react';
 import { useNavigate, Link }   from 'react-router-dom';
@@ -28,6 +18,20 @@ const accColor = (pct) => {
   if (pct >= 40) return 'text-amber-600';
   return 'text-red-500';
 };
+
+/** Derive a friendly first name from whatever fields the user object has */
+function getDisplayName(user) {
+  if (!user) return 'Teacher';
+  // Try camelCase first (from login), then snake_case (from /auth/me)
+  const first = user.firstName || user.first_name;
+  if (first && first.trim()) return first.trim();
+  // Fall back to splitting a full name if stored in last_name or name
+  const full = user.lastName || user.last_name || user.name || '';
+  if (full.trim()) return full.trim().split(' ')[0];
+  // Last resort: use the part of the email before @
+  if (user.email) return user.email.split('@')[0];
+  return 'Teacher';
+}
 
 function Toast({ msg, type, onClose }) {
   return (
@@ -186,7 +190,6 @@ function AnalyticsTab({ cls }) {
     }
   };
 
-  // FIX: now calls /analytics/cohort-gaps?class_id= (not /ai/cohort-gaps/:subjectId)
   const runGapAnalysis = async () => {
     setGapLoading(true);
     try {
@@ -217,7 +220,6 @@ function AnalyticsTab({ cls }) {
         <p className="font-semibold text-gray-800">{cls.name} — Analytics</p>
       </div>
 
-      {/* Weak topics */}
       {data.weak_topics?.length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-100 p-5">
           <p className="text-sm font-semibold text-gray-700 mb-3">Class weak topics</p>
@@ -236,7 +238,6 @@ function AnalyticsTab({ cls }) {
         </div>
       )}
 
-      {/* AI Gap Analysis */}
       <div className="bg-white rounded-2xl border border-gray-100 p-5">
         <div className="flex items-center justify-between mb-3">
           <p className="text-sm font-semibold text-gray-700">AI Gap Analysis</p>
@@ -263,7 +264,6 @@ function AnalyticsTab({ cls }) {
         )}
       </div>
 
-      {/* Student table */}
       {data.students?.length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-100 p-5">
           <p className="text-sm font-semibold text-gray-700 mb-3">Students</p>
@@ -346,7 +346,6 @@ function TestBuilderTab() {
         time_limit_minutes: parseInt(form.time_limit_minutes) || 30,
         due_date:           form.due_date || null,
       });
-      // FIX: backend returns { success, data: { id, title, question_count, ... } }
       setCreatedTest(res.data);
       setStep(2);
     } catch (err) {
@@ -357,7 +356,6 @@ function TestBuilderTab() {
     }
   };
 
-  // FIX: share link uses /student/test/:id (not /student/tests/:id)
   const shareLink = createdTest ? `${window.location.origin}/student/test/${createdTest.id}` : '';
 
   const copyLink = () => {
@@ -472,7 +470,7 @@ export default function TeacherDashboard() {
   const navigate                           = useNavigate();
   const [activeTab,      setActiveTab]     = useState('classes');
   const [selectedClass,  setSelectedClass] = useState(null);
-  const [assignedSubjects, setAssignedSubjects] = useState(null); // null = loading
+  const [assignedSubjects, setAssignedSubjects] = useState(null);
 
   const tabs = [
     { id: 'classes',     label: 'My Classes',   icon: Users     },
@@ -485,15 +483,17 @@ export default function TeacherDashboard() {
     setActiveTab('analytics');
   };
 
-  // Load teacher's assigned subjects to show status banner
   useEffect(() => {
     api.get('/teacher/my-subjects')
       .then(r => setAssignedSubjects(r.data || []))
       .catch(() => setAssignedSubjects([]));
   }, []);
 
-  const hasSubjects = assignedSubjects && assignedSubjects.length > 0;
+  const hasSubjects     = assignedSubjects && assignedSubjects.length > 0;
   const subjectsLoading = assignedSubjects === null;
+
+  // ── Derive teacher's display name from whatever fields are available ────────
+  const displayName = getDisplayName(user);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -505,10 +505,9 @@ export default function TeacherDashboard() {
           <div>
             <p className="text-white/50 text-xs mb-1">Teacher Dashboard</p>
             <h1 className="text-white text-xl font-bold">
-              Welcome back, {user?.firstName || user?.first_name || 'Teacher'} 👋
+              Welcome back, {displayName} 👋
             </h1>
           </div>
-          {/* Quick-access Resources button — visible once subjects are assigned */}
           {hasSubjects && (
             <Link
               to="/teacher/resources"
