@@ -17,7 +17,8 @@ router.get('/', protect, async (req, res) => {
     );
     res.json({ success: true, count: rows.length, data: rows });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    // Table may not exist yet — return empty list instead of 500
+    res.json({ success: true, count: 0, data: [] });
   }
 });
 

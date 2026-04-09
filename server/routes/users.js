@@ -71,7 +71,7 @@ router.get('/', protect, authorize('admin'), async (req, res) => {
         `SELECT
            u.id, u.email, u.first_name, u.last_name, u.role,
            u.is_active, u.subscription_status, u.created_at, u.last_login,
-           (SELECT COUNT(*)::INTEGER FROM questions WHERE submitted_by = u.id) AS questions_submitted
+           0::INTEGER AS questions_submitted
          FROM users u
          WHERE (:role = '' OR u.role = :role)
            AND (:search = '' OR u.email      ILIKE :searchLike

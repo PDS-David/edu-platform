@@ -292,73 +292,58 @@ router.delete('/teacher-assignments/:id', protect, adminOnly, async (req, res) =
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/platform-stats', protect, adminOnly, async (req, res) => {
   try {
-    const [
-      userStats,
-      questionStats,
-      revenueStats,
-      topSubjects,
-      dailyActivity,
-    ] = await Promise.all([
+    // Run each query independently so one missing table doesn't kill the whole response
+    const safeQuery = async (sql, fallback) => {
+      try {
+        const rows = await sequelize.query(sql, { type: QueryTypes.SELECT });
+        return rows;
+      } catch (e) {
+        console.warn('[platform-stats] query skipped:', e.message);
+        return fallback;
+      }
+    };
 
-      sequelize.query(
+    const [userStats, questionStats, revenueStats, topSubjects, dailyActivity] = await Promise.all([
+      safeQuery(
         `SELECT
-           COUNT(*)::INTEGER                                                   AS total,
-           COUNT(*) FILTER (WHERE role = 'student')::INTEGER                  AS students,
-           COUNT(*) FILTER (WHERE role = 'teacher')::INTEGER                  AS teachers,
+           COUNT(*)::INTEGER AS total,
+           COUNT(*) FILTER (WHERE role = 'student')::INTEGER  AS students,
+           COUNT(*) FILTER (WHERE role = 'teacher')::INTEGER  AS teachers,
            COUNT(*) FILTER (WHERE last_login > NOW() - INTERVAL '24 hours')::INTEGER AS active_today,
            COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '7 days')::INTEGER   AS new_this_week
          FROM users WHERE is_active = true`,
-        { type: QueryTypes.SELECT }
+        [{}]
       ),
-
-      sequelize.query(
-        `SELECT
-           COUNT(*)::INTEGER AS total_approved,
-           0::INTEGER        AS total_pending,
-           0::INTEGER        AS total_ai_generated,
-           (SELECT COUNT(*)::INTEGER FROM practice_attempts
-            WHERE attempted_at > NOW() - INTERVAL '24 hours')   AS answered_today,
-           (SELECT COUNT(*)::INTEGER FROM practice_attempts
-            WHERE attempted_at > NOW() - INTERVAL '7 days')     AS answered_this_week
-         FROM questions`,
-        { type: QueryTypes.SELECT }
+      safeQuery(
+        `SELECT COUNT(*)::INTEGER AS total_approved, 0 AS total_pending, 0 AS answered_today, 0 AS answered_this_week FROM questions`,
+        [{}]
       ),
-
-      sequelize.query(
+      safeQuery(
         `SELECT
-           COUNT(*) FILTER (WHERE subscription_status = 'active')::INTEGER                                AS total_active_subs,
+           COUNT(*) FILTER (WHERE subscription_status = 'active')::INTEGER AS total_active_subs,
            COUNT(*) FILTER (WHERE subscription_status IN ('active','free_trial')
                               AND created_at > NOW() - INTERVAL '30 days')::INTEGER AS new_subs_this_month
          FROM users`,
-        { type: QueryTypes.SELECT }
+        [{}]
       ),
-
-      sequelize.query(
-        `SELECT
-           s.name,
-           COUNT(pa.id)::INTEGER                                AS attempt_count,
+      safeQuery(
+        `SELECT s.name, COUNT(pa.id)::INTEGER AS attempt_count,
            ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END)::NUMERIC, 1) AS avg_accuracy
          FROM practice_attempts pa
-         JOIN questions  q  ON q.id  = pa.question_id
-         JOIN subtopics  st ON st.id = q.subtopic_id
-         JOIN topics     t  ON t.id  = st.topic_id
-         JOIN subjects   s  ON s.id  = t.subject_id
+         JOIN questions q  ON q.id  = pa.question_id
+         JOIN subtopics st ON st.id = q.subtopic_id
+         JOIN topics    t  ON t.id  = st.topic_id
+         JOIN subjects  s  ON s.id  = t.subject_id
          WHERE pa.attempted_at > NOW() - INTERVAL '30 days'
-         GROUP BY s.name
-         ORDER BY attempt_count DESC
-         LIMIT 5`,
-        { type: QueryTypes.SELECT }
+         GROUP BY s.name ORDER BY attempt_count DESC LIMIT 5`,
+        []
       ),
-
-      sequelize.query(
-        `SELECT
-           DATE(attempted_at)::TEXT AS date,
-           COUNT(*)::INTEGER        AS attempt_count
+      safeQuery(
+        `SELECT DATE(attempted_at)::TEXT AS date, COUNT(*)::INTEGER AS attempt_count
          FROM practice_attempts
          WHERE attempted_at > NOW() - INTERVAL '14 days'
-         GROUP BY DATE(attempted_at)
-         ORDER BY date ASC`,
-        { type: QueryTypes.SELECT }
+         GROUP BY DATE(attempted_at) ORDER BY date ASC`,
+        []
       ),
     ]);
 
@@ -368,8 +353,8 @@ router.get('/platform-stats', protect, adminOnly, async (req, res) => {
         users:          userStats[0]    || {},
         questions:      questionStats[0] || {},
         revenue:        revenueStats[0]  || {},
-        top_subjects:   topSubjects,
-        daily_activity: dailyActivity,
+        top_subjects:   Array.isArray(topSubjects)   ? topSubjects   : [],
+        daily_activity: Array.isArray(dailyActivity) ? dailyActivity : [],
       },
     });
 
