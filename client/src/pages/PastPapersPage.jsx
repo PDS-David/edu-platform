@@ -9,7 +9,20 @@ import { FileText, Download, Filter, Loader2, BookOpen } from 'lucide-react';
 import branding from '../config/branding';
 import PublicNav from '../components/PublicNav';
 
-const EXAM_BOARDS = ['JAMB', 'WAEC', 'NECO', 'IGCSE'];
+const EXAM_BOARDS = [
+  { code: 'JAMB',    name: '🎓 JAMB/UTME' },
+  { code: 'WAEC',    name: '📘 WAEC' },
+  { code: 'OLEVEL',  name: '📗 O-Levels' },
+  { code: 'NECO',    name: '📙 NECO' },
+  { code: 'IELTS',   name: '🌍 IELTS' },
+  { code: 'TOEFL',   name: '🇺🇸 TOEFL' },
+  { code: 'SAT',     name: '🎯 SAT' },
+  { code: 'GCE_AL',  name: "🎓 GCE A'Levels" },
+  { code: 'JUPEB',   name: '📚 JUPEB' },
+  { code: 'LANG_EN', name: '🇬🇧 Language Lab – English' },
+  { code: 'LANG_FR', name: '🇫🇷 Language Lab – French' },
+  { code: 'LANG_YO', name: '🌍 Language Lab – Yoruba' },
+];
 const YEAR_MIN = 2015;
 const YEAR_MAX = new Date().getFullYear();
 
@@ -80,10 +93,10 @@ export default function PastPapersPage() {
           <Filter size={16} className="text-gray-400 mt-1 shrink-0" />
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-500 font-medium">Exam board</label>
+            <label className="text-xs text-gray-500 font-medium">Exam type</label>
             <select value={board} onChange={e => setBoard(e.target.value)} className={selectCls}>
-              <option value="">All boards</option>
-              {EXAM_BOARDS.map(b => <option key={b} value={b}>{b}</option>)}
+              <option value="">All types</option>
+              {EXAM_BOARDS.map(b => <option key={b.code} value={b.code}>{b.name}</option>)}
             </select>
           </div>
 
