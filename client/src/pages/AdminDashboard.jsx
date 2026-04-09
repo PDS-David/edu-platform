@@ -77,7 +77,7 @@ const CatalogPanel = () => {
     setLoading(true);
     try {
       const res = await api.get('/catalog/types');
-      if (res?.success) setTypes(res);
+      if (res?.success) setTypes(res.data || []);
     } catch (err) {
       const msg = err?.status === 401
         ? 'Session expired — please log out and log back in'
@@ -96,7 +96,7 @@ const CatalogPanel = () => {
     try {
       const res = await api.get(`/catalog/types/${typeId}/subjects`);
       if (res?.success) {
-        setTypeSubjects(prev => ({ ...prev, [typeId]: res }));
+        setTypeSubjects(prev => ({ ...prev, [typeId]: res.data || [] }));
       }
     } catch {
       showToast('Failed to load subjects', 'error');
@@ -664,7 +664,7 @@ const TeacherPanel = () => {
     setLoading(true);
     try {
       const res = await api.get('/catalog/teachers');
-      if (res?.success) setTeachers(res);
+      if (res?.success) setTeachers(res.data || []);
     } catch { showToast('Failed to load teachers', 'error'); }
     finally { setLoading(false); }
   };
@@ -673,14 +673,14 @@ const TeacherPanel = () => {
     try {
       // Single efficient query — no N+1
       const res = await api.get('/catalog/all-subjects');
-      if (res?.success) setAllSubjects(res);
+      if (res?.success) setAllSubjects(res.data || []);
     } catch {}
   };
 
   const fetchTeacherSubjects = async (teacherId) => {
     try {
       const res = await api.get(`/catalog/teachers/${teacherId}/subjects`);
-      if (res?.success) setTeacherSubjects(p => ({ ...p, [teacherId]: res }));
+      if (res?.success) setTeacherSubjects(p => ({ ...p, [teacherId]: res.data || [] }));
     } catch {}
   };
 
@@ -1076,7 +1076,7 @@ const UserManagementPanel = () => {
       const r = await api.get('/users', {
         params: { search, role: roleFilter, page, limit: LIMIT },
       });
-      setUsers(r || []);
+      setUsers(r.data || []);
       setTotal(r.total || 0);
     } catch {
       showToast('Failed to load users', 'error');
@@ -1305,7 +1305,7 @@ const PlatformAnalyticsPanel = () => {
     setError(null);
     try {
       const res = await api.get('/admin/platform-stats');
-      if (res?.success) setStats(res);
+      if (res?.success) setStats(res.data || null);
     } catch (err) {
       setError(err?.error || 'Failed to load analytics');
     } finally {
@@ -1691,7 +1691,7 @@ const AdminDashboard = () => {
       setStatsLoading(true);
       try {
         const res = await api.get('/catalog/stats');
-        if (res?.success) setStats(res);
+        if (res?.success) setStats(res.data || null);
       } catch {
         // Stats endpoint may not exist yet — fallback gracefully
         setStats(null);
