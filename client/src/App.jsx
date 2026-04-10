@@ -31,6 +31,7 @@ import PastPapersPage            from './pages/PastPapersPage';
 import OnboardingPage            from './pages/OnboardingPage';
 import StudentTestPage           from './pages/StudentTestPage';
 import ImageMarkingPage          from './pages/ImageMarkingPage';
+import SettingsPage              from './pages/SettingsPage';   // ← ADDED
 
 // ── WhatsApp floating contact button ─────────────────────────────────────────
 const WhatsAppButton = () => {
@@ -126,6 +127,8 @@ function App() {
           {/* ── Teacher routes ──────────────────────────────────────────── */}
           <Route path="/teacher/dashboard"
             element={<PrivateRoute allowedRoles={['teacher']}><TeacherDashboard /></PrivateRoute>} />
+          <Route path="/teacher/resources"
+            element={<PrivateRoute allowedRoles={['teacher', 'admin']}><TeacherResourcesPage /></PrivateRoute>} />  {/* ← ADDED */}
           <Route path="/teacher/upload-video"
             element={<PrivateRoute allowedRoles={['teacher', 'admin']}><TeacherResourcesPage defaultTab="upload" /></PrivateRoute>} />
           <Route path="/teacher/add-questions"
@@ -136,6 +139,10 @@ function App() {
             element={<PrivateRoute allowedRoles={['admin']}><AdminDashboard /></PrivateRoute>} />
           <Route path="/admin/questions/review"
             element={<PrivateRoute allowedRoles={['admin']}><QuestionReview /></PrivateRoute>} />
+
+          {/* ── Shared routes (all authenticated roles) ──────────────────── */}
+          <Route path="/settings"
+            element={<PrivateRoute allowedRoles={['admin', 'teacher', 'student']}><SettingsPage /></PrivateRoute>} />  {/* ← ADDED */}
 
           {/* ── Fallback ─────────────────────────────────────────────────── */}
           <Route path="*" element={<NotFound />} />
