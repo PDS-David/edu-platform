@@ -418,7 +418,7 @@ export default function PracticeMode() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const { subjectId, subjectName, boardCode } = location.state || {};
+  const { subjectId, subjectName, boardCode, isRemediation, conceptName } = location.state || {};
 
   const [phase,     setPhase]     = useState('loading');
   const [questions, setQuestions] = useState([]);
@@ -517,6 +517,23 @@ export default function PracticeMode() {
   if (phase === 'quiz') {
     return (
       <div>
+        {/* Remediation banner — shown when launched from weakness analysis */}
+        {isRemediation && (
+          <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-center gap-2.5">
+            <span className="text-base">🎯</span>
+            <div>
+              <span className="text-xs font-bold text-amber-800">Targeted follow-up</span>
+              {conceptName && (
+                <span className="text-xs text-amber-700"> · Weak area: <strong>{conceptName}</strong></span>
+              )}
+            </div>
+            <span className="ml-auto text-xs text-amber-600 font-medium">
+              These questions are personalised to your needs
+            </span>
+          </div>
+        )}
+
+        {/* Back button row */}
         <div className="bg-white border-b border-gray-100 px-4 py-2.5">
           <button
             onClick={() => navigate('/student/dashboard')}
@@ -526,6 +543,7 @@ export default function PracticeMode() {
             {subjectName || 'Back to Dashboard'}
           </button>
         </div>
+
         <QuestionCard
           key={questions[current]?.id}
           question={questions[current]}
