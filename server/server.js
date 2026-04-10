@@ -299,3 +299,21 @@ app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`🌐 Local:  http://localhost:${PORT}`);
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TASK 13 ADDITION: Start scheduled jobs on server boot.
+// Placed after app.listen() — safe to run after routes are registered.
+// ─────────────────────────────────────────────────────────────────────────────
+
+try {
+  const scheduledJobs = require('./jobs/scheduledJobs');
+  if (typeof scheduledJobs.start === 'function') {
+    scheduledJobs.start();
+    console.log('[server] Scheduled jobs started.');
+  } else {
+    // Module auto-runs on require (no exported start function)
+    console.log('[server] Scheduled jobs loaded.');
+  }
+} catch (e) {
+  console.warn('[server] Scheduled jobs not loaded:', e.message);
+}
