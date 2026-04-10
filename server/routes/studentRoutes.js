@@ -189,4 +189,54 @@ router.post('/test/:testId/submit', protect, async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/students/remediation
+// Generates targeted AI practice questions for the student's weak concepts.
+// Returns { conceptSets: [{ concept_name, mastery_score, questions: [...] }] }
+// No body required — uses req.user.id from JWT.
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/remediation', protect, async (req, res) => {
+  try {
+    const { generateRemediationSet } = require('../services/remediationService');
+    const result = await generateRemediationSet(req.user.id);
+
+    return res.status(200).json({
+      success: true,
+      data:    result,
+    });
+  } catch (err) {
+    console.error('[POST /students/remediation]', err.message);
+    return res.status(500).json({
+      success: false,
+      error:   'Failed to generate remediation set: ' + err.message,
+    });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/students/remediation/status
+// Returns whether the student has any weak concepts without generating questions.
+// Useful for the dashboard to decide whether to show the remediation prompt.
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/remediation/status', protect, async (req, res) => {
+  try {
+    const { getWeakConcepts } = require('../services/weakConceptService');
+    const weakConcepts = await getWeakConcepts(req.user.id);
+
+    return res.status(200).json({
+      success:            true,
+      has_weak_concepts:  weakConcepts.length > 0,
+      weak_concept_count: weakConcepts.length,
+      concepts:           weakConcepts.map(c => ({
+        id:            c.id,
+        name:          c.name,
+        mastery_score: c.mastery_score,
+      })),
+    });
+  } catch (err) {
+    console.error('[GET /students/remediation/status]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;
