@@ -17,6 +17,8 @@ import StudentDashboard          from './pages/StudentDashboard';
 import StudentAnalyticsDashboard from './pages/StudentAnalyticsDashboard';
 import TeacherDashboard          from './pages/TeacherDashboard';
 import TeacherResourcesPage      from './pages/TeacherResourcesPage';
+import TeacherContentPage           from './pages/TeacherContentPage';        // ← ADDED
+import TeacherPendingQuestions     from './pages/TeacherPendingQuestions';  // ← ADDED
 import AdminDashboard            from './pages/AdminDashboard';
 import PracticeMode              from './pages/PracticeMode';
 import ContributeQuestion        from './pages/ContributeQuestion';
@@ -31,11 +33,11 @@ import PastPapersPage            from './pages/PastPapersPage';
 import OnboardingPage            from './pages/OnboardingPage';
 import StudentTestPage           from './pages/StudentTestPage';
 import ImageMarkingPage          from './pages/ImageMarkingPage';
-import SettingsPage              from './pages/SettingsPage';   // ← ADDED
+import SettingsPage              from './pages/SettingsPage';
 
 // ── WhatsApp floating contact button ─────────────────────────────────────────
 const WhatsAppButton = () => {
-  const phoneNumber = '2348099123412'; // +234 809 912 3412
+  const phoneNumber = '2348099123412';
   const message     = encodeURIComponent('Hi! I\'d like to know more about the AISchoolonair.');
   const url         = `https://wa.me/${phoneNumber}?text=${message}`;
 
@@ -63,12 +65,12 @@ const WhatsAppButton = () => {
         textDecoration: 'none',
       }}
       onMouseEnter={e => {
-        e.currentTarget.style.transform  = 'scale(1.1)';
-        e.currentTarget.style.boxShadow  = '0 6px 16px rgba(0,0,0,0.3)';
+        e.currentTarget.style.transform = 'scale(1.1)';
+        e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.3)';
       }}
       onMouseLeave={e => {
-        e.currentTarget.style.transform  = 'scale(1)';
-        e.currentTarget.style.boxShadow  = '0 4px 12px rgba(0,0,0,0.25)';
+        e.currentTarget.style.transform = 'scale(1)';
+        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.25)';
       }}
     >
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="30" height="30" fill="white">
@@ -128,11 +130,15 @@ function App() {
           <Route path="/teacher/dashboard"
             element={<PrivateRoute allowedRoles={['teacher']}><TeacherDashboard /></PrivateRoute>} />
           <Route path="/teacher/resources"
-            element={<PrivateRoute allowedRoles={['teacher', 'admin']}><TeacherResourcesPage /></PrivateRoute>} />  {/* ← ADDED */}
+            element={<PrivateRoute allowedRoles={['teacher', 'admin']}><TeacherResourcesPage /></PrivateRoute>} />
           <Route path="/teacher/upload-video"
             element={<PrivateRoute allowedRoles={['teacher', 'admin']}><TeacherResourcesPage defaultTab="upload" /></PrivateRoute>} />
           <Route path="/teacher/add-questions"
             element={<PrivateRoute allowedRoles={['teacher', 'admin']}><TeacherResourcesPage defaultTab="questions" /></PrivateRoute>} />
+          <Route path="/content"                                                                          {/* ← ADDED */}
+            element={<PrivateRoute allowedRoles={['teacher', 'admin']}><TeacherContentPage /></PrivateRoute>} />
+          <Route path="/teacher/pending-questions"                                                               {/* ← ADDED */}
+            element={<PrivateRoute allowedRoles={['teacher', 'admin']}><TeacherPendingQuestions /></PrivateRoute>} />
 
           {/* ── Admin routes ─────────────────────────────────────────────── */}
           <Route path="/admin/dashboard"
@@ -142,7 +148,7 @@ function App() {
 
           {/* ── Shared routes (all authenticated roles) ──────────────────── */}
           <Route path="/settings"
-            element={<PrivateRoute allowedRoles={['admin', 'teacher', 'student']}><SettingsPage /></PrivateRoute>} />  {/* ← ADDED */}
+            element={<PrivateRoute allowedRoles={['admin', 'teacher', 'student']}><SettingsPage /></PrivateRoute>} />
 
           {/* ── Fallback ─────────────────────────────────────────────────── */}
           <Route path="*" element={<NotFound />} />
