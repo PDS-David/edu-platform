@@ -1,20 +1,3 @@
-// server/routes/teacherRoutes.js
-// FIXES in this version:
-//   1. POST /teacher/tests — the test builder was writing to test_assignments
-//      but the actual schema uses custom_tests + test_questions. Now writes
-//      to the correct tables, randomly selects questions, and returns the
-//      correct shape the frontend expects.
-//   2. GET /teacher/class/:classId/analytics — last_active computation
-//      fixed; was dividing ms by wrong constant.
-//   3. GET /teacher/tests — returns tests created by this teacher so
-//      the frontend can list them after creation.
-//
-// ADDED (Task 5) — Concept Management:
-//   POST   /api/teacher/concepts              → create concept
-//   GET    /api/teacher/concepts/:subtopicId  → list concepts for a subtopic
-//   PUT    /api/teacher/concepts/:id          → update concept
-//   DELETE /api/teacher/concepts/:id          → delete concept
-
 'use strict';
 
 const express        = require('express');
@@ -32,6 +15,41 @@ const teacherOnly = (req, res, next) => {
     return res.status(403).json({ success: false, error: 'Teacher access required' });
   next();
 };
+
+// ============================================================================
+// GET /api/teacher/my-subjects
+// Returns all subjects + exam board info assigned to the logged-in teacher.
+// Used by TeacherDashboard to determine whether to show the "Awaiting
+// subject assignment" banner or the green "Subjects assigned" banner.
+// ============================================================================
+router.get('/my-subjects', protect, teacherOnly, async (req, res) => {
+  try {
+    const rows = await sequelize.query(
+      `SELECT
+         s.id,
+         s.name,
+         s.code,
+         s.level,
+         s.description,
+         eb.id   AS exam_board_id,
+         eb.code AS exam_board_code,
+         eb.name AS exam_board_name,
+         eb.icon_emoji
+       FROM teacher_subjects ts
+       JOIN subjects    s  ON ts.subject_id    = s.id
+       LEFT JOIN exam_boards eb ON ts.exam_board_id = eb.id
+       WHERE ts.teacher_id = :teacherId
+         AND ts.is_active  = true
+         AND s.is_active   = true
+       ORDER BY eb.display_order NULLS LAST, s.name ASC`,
+      { replacements: { teacherId: req.user.id }, type: QueryTypes.SELECT }
+    );
+    return res.status(200).json({ success: true, data: rows });
+  } catch (err) {
+    console.error('[GET /teacher/my-subjects]', err.message);
+    return res.status(500).json({ success: false, error: 'Failed to fetch assigned subjects' });
+  }
+});
 
 // ============================================================================
 // EXISTING ROUTES (unchanged)
@@ -152,7 +170,6 @@ router.get('/class/:classId/analytics', protect, teacherOnly, async (req, res) =
       ),
     ]);
 
-    // FIX: use integer division (ms → days = /86400000)
     const now = Date.now();
     const studentsTagged = students.map(s => ({
       ...s,
@@ -197,18 +214,15 @@ router.get('/tests', protect, teacherOnly, async (req, res) => {
 });
 
 // POST /api/teacher/tests
-// FIX: now writes to custom_tests + test_questions (the correct schema tables).
-// Randomly selects questions from the bank matching subject/difficulty.
-// Returns { id, title, question_count } so the frontend can show the share link.
 router.post('/tests', protect, teacherOnly, async (req, res) => {
   const {
     title,
-    class_id          = null,
-    subject_id        = null,
-    difficulty        = 'mixed',
-    question_count    = 10,
+    class_id           = null,
+    subject_id         = null,
+    difficulty         = 'mixed',
+    question_count     = 10,
     time_limit_minutes = 30,
-    due_date          = null,
+    due_date           = null,
   } = req.body;
 
   if (!title?.trim()) {
@@ -218,10 +232,9 @@ router.post('/tests', protect, teacherOnly, async (req, res) => {
   const qCount = Math.min(Math.max(parseInt(question_count) || 10, 5), 40);
 
   try {
-    // 1. Select random approved questions matching the criteria
-    const diffFilter  = difficulty !== 'mixed' ? 'AND q.difficulty = :difficulty' : '';
-    const subjFilter  = subject_id ? 'AND q.subject_id_uuid = :subject_id' : '';
-    const questions = await sequelize.query(
+    const diffFilter = difficulty !== 'mixed' ? 'AND q.difficulty = :difficulty' : '';
+    const subjFilter = subject_id ? 'AND q.subject_id_uuid = :subject_id' : '';
+    const questions  = await sequelize.query(
       `SELECT q.id
        FROM questions q
        WHERE q.status = 'approved'
@@ -247,7 +260,6 @@ router.post('/tests', protect, teacherOnly, async (req, res) => {
       });
     }
 
-    // 2. Insert into custom_tests
     const testResult = await sequelize.query(
       `INSERT INTO custom_tests
          (id, teacher_id, subject_id, title, duration_minutes, total_marks,
@@ -270,7 +282,6 @@ router.post('/tests', protect, teacherOnly, async (req, res) => {
     );
     const test = testResult[0][0];
 
-    // 3. Insert question links into test_questions
     for (let i = 0; i < questions.length; i++) {
       await sequelize.query(
         `INSERT INTO test_questions (id, test_id, question_id, question_order, marks_allocated)
@@ -282,7 +293,6 @@ router.post('/tests', protect, teacherOnly, async (req, res) => {
       );
     }
 
-    // 4. If class_id provided, assign to all class members
     if (class_id) {
       const members = await sequelize.query(
         `SELECT student_id FROM class_memberships WHERE class_id = :class_id`,
@@ -294,11 +304,7 @@ router.post('/tests', protect, teacherOnly, async (req, res) => {
            VALUES (gen_random_uuid(), :testId, :studentId, :dueDate, NOW())
            ON CONFLICT (test_id, student_id) DO NOTHING`,
           {
-            replacements: {
-              testId:    test.id,
-              studentId: m.student_id,
-              dueDate:   due_date || null,
-            },
+            replacements: { testId: test.id, studentId: m.student_id, dueDate: due_date || null },
             type: QueryTypes.INSERT,
           }
         );
@@ -308,9 +314,9 @@ router.post('/tests', protect, teacherOnly, async (req, res) => {
     return res.status(201).json({
       success: true,
       data: {
-        id:             test.id,
-        title:          test.title,
-        question_count: questions.length,
+        id:                test.id,
+        title:             test.title,
+        question_count:    questions.length,
         time_limit_minutes: parseInt(time_limit_minutes) || 30,
         due_date,
       },
@@ -338,55 +344,35 @@ router.post('/nudge/:userId', protect, teacherOnly, async (req, res) => {
 });
 
 // ============================================================================
-// TASK 5 — Concept Management Routes
-// Teachers can create concept knowledge structures within their subtopics.
+// CONCEPT MANAGEMENT (Task 5)
 // ============================================================================
 
-// ---------------------------------------------------------------------------
-// POST /api/teacher/concepts
-// Create a new concept inside a subtopic.
-// Body: {
-//   subtopic_id:         UUID   (required)
-//   name:                string (required)
-//   description:         string
-//   difficulty_level:    1-5    (default 1)
-//   estimated_minutes:   integer
-//   order_index:         integer
-//   prerequisite_ids:    UUID[] — concept IDs that must be mastered first
-// }
-// ---------------------------------------------------------------------------
 router.post('/concepts', protect, teacherOnly, async (req, res) => {
   const {
     subtopic_id,
     name,
-    description        = null,
-    difficulty_level   = 1,
-    estimated_minutes  = 10,
-    order_index        = 0,
-    prerequisite_ids   = [],  // array of concept UUIDs that are prerequisites
+    description       = null,
+    difficulty_level  = 1,
+    estimated_minutes = 10,
+    order_index       = 0,
+    prerequisite_ids  = [],
   } = req.body;
 
-  // Validate required fields
-  if (!subtopic_id || !isValidUUID(subtopic_id)) {
+  if (!subtopic_id || !isValidUUID(subtopic_id))
     return res.status(400).json({ success: false, error: 'subtopic_id is required and must be a valid UUID' });
-  }
-  if (!name || !name.trim()) {
+  if (!name || !name.trim())
     return res.status(400).json({ success: false, error: 'name is required' });
-  }
 
   const diffLevel = Math.min(Math.max(parseInt(difficulty_level) || 1, 1), 5);
 
   try {
-    // 1. Verify the subtopic exists
     const subtopicRows = await sequelize.query(
       `SELECT id FROM subtopics WHERE id = :subtopicId`,
       { replacements: { subtopicId: subtopic_id }, type: QueryTypes.SELECT }
     );
-    if (!subtopicRows.length) {
+    if (!subtopicRows.length)
       return res.status(404).json({ success: false, error: 'Subtopic not found' });
-    }
 
-    // 2. Insert the concept
     const conceptRows = await sequelize.query(
       `INSERT INTO concepts
          (id, subtopic_id, name, description, difficulty_level,
@@ -409,148 +395,87 @@ router.post('/concepts', protect, teacherOnly, async (req, res) => {
       }
     );
 
-    const concept = conceptRows[0];
-
-    // 3. Insert prerequisite concept dependencies
+    const concept      = conceptRows[0];
     const savedPrereqs = [];
+
     if (Array.isArray(prerequisite_ids) && prerequisite_ids.length > 0) {
       for (const parentId of prerequisite_ids) {
-        if (!isValidUUID(parentId)) continue; // skip invalid UUIDs
-        // Guard against self-reference
-        if (parentId === concept.id) continue;
+        if (!isValidUUID(parentId) || parentId === concept.id) continue;
         try {
           await sequelize.query(
             `INSERT INTO concept_dependencies
                (id, parent_concept_id, child_concept_id, dependency_type, created_at)
-             VALUES
-               (gen_random_uuid(), :parentId, :childId, 'prerequisite', NOW())
+             VALUES (gen_random_uuid(), :parentId, :childId, 'prerequisite', NOW())
              ON CONFLICT (parent_concept_id, child_concept_id) DO NOTHING`,
-            {
-              replacements: { parentId, childId: concept.id },
-              type: QueryTypes.INSERT,
-            }
+            { replacements: { parentId, childId: concept.id }, type: QueryTypes.INSERT }
           );
           savedPrereqs.push(parentId);
         } catch (depErr) {
-          console.warn(`[POST /teacher/concepts] Failed to insert dependency (parent: ${parentId}):`, depErr.message);
+          console.warn(`[POST /teacher/concepts] Dependency insert failed (${parentId}):`, depErr.message);
         }
       }
     }
 
-    return res.status(201).json({
-      success: true,
-      data: {
-        ...concept,
-        prerequisite_ids: savedPrereqs,
-      },
-    });
+    return res.status(201).json({ success: true, data: { ...concept, prerequisite_ids: savedPrereqs } });
   } catch (err) {
     console.error('[POST /teacher/concepts]', err.message);
     return res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// ---------------------------------------------------------------------------
-// GET /api/teacher/concepts/:subtopicId
-// List all concepts for a given subtopic, including their prerequisites.
-// ---------------------------------------------------------------------------
 router.get('/concepts/:subtopicId', protect, teacherOnly, async (req, res) => {
   const { subtopicId } = req.params;
-  if (!isValidUUID(subtopicId)) {
+  if (!isValidUUID(subtopicId))
     return res.status(400).json({ success: false, error: 'Invalid subtopic ID' });
-  }
 
   try {
-    // Fetch concepts
     const concepts = await sequelize.query(
-      `SELECT
-         c.id,
-         c.name,
-         c.description,
-         c.difficulty_level,
-         c.estimated_minutes,
-         c.order_index,
-         c.created_at,
-         c.updated_at
-       FROM concepts c
-       WHERE c.subtopic_id = :subtopicId
-       ORDER BY c.order_index ASC, c.name ASC`,
+      `SELECT id, name, description, difficulty_level, estimated_minutes, order_index, created_at, updated_at
+       FROM concepts WHERE subtopic_id = :subtopicId
+       ORDER BY order_index ASC, name ASC`,
       { replacements: { subtopicId }, type: QueryTypes.SELECT }
     );
 
-    if (!concepts.length) {
-      return res.status(200).json({ success: true, count: 0, data: [] });
-    }
+    if (!concepts.length) return res.status(200).json({ success: true, count: 0, data: [] });
 
-    // Fetch all prerequisite links for these concepts in one query
     const conceptIds = concepts.map(c => c.id);
-    const depRows = await sequelize.query(
-      `SELECT parent_concept_id, child_concept_id
-       FROM concept_dependencies
+    const depRows    = await sequelize.query(
+      `SELECT parent_concept_id, child_concept_id FROM concept_dependencies
        WHERE child_concept_id = ANY(:conceptIds)`,
       { replacements: { conceptIds }, type: QueryTypes.SELECT }
     );
 
-    // Group prerequisites by child concept ID
     const prereqMap = depRows.reduce((acc, row) => {
       if (!acc[row.child_concept_id]) acc[row.child_concept_id] = [];
       acc[row.child_concept_id].push(row.parent_concept_id);
       return acc;
     }, {});
 
-    // Merge
-    const result = concepts.map(c => ({
-      ...c,
-      prerequisite_ids: prereqMap[c.id] || [],
-    }));
-
-    return res.status(200).json({ success: true, count: result.length, data: result });
+    return res.status(200).json({
+      success: true,
+      count:   concepts.length,
+      data:    concepts.map(c => ({ ...c, prerequisite_ids: prereqMap[c.id] || [] })),
+    });
   } catch (err) {
     console.error('[GET /teacher/concepts/:subtopicId]', err.message);
     return res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// ---------------------------------------------------------------------------
-// PUT /api/teacher/concepts/:id
-// Update an existing concept.
-// Body (all fields optional):
-// {
-//   name:              string
-//   description:       string
-//   difficulty_level:  1-5
-//   estimated_minutes: integer
-//   order_index:       integer
-//   prerequisite_ids:  UUID[]  — replaces ALL existing prerequisites
-// }
-// ---------------------------------------------------------------------------
 router.put('/concepts/:id', protect, teacherOnly, async (req, res) => {
   const { id } = req.params;
-  if (!isValidUUID(id)) {
-    return res.status(400).json({ success: false, error: 'Invalid concept ID' });
-  }
+  if (!isValidUUID(id)) return res.status(400).json({ success: false, error: 'Invalid concept ID' });
 
-  const {
-    name,
-    description,
-    difficulty_level,
-    estimated_minutes,
-    order_index,
-    prerequisite_ids,  // if provided, replaces existing prerequisites
-  } = req.body;
+  const { name, description, difficulty_level, estimated_minutes, order_index, prerequisite_ids } = req.body;
 
   try {
-    // 1. Verify concept exists
     const existing = await sequelize.query(
-      `SELECT id, subtopic_id FROM concepts WHERE id = :id`,
+      `SELECT id FROM concepts WHERE id = :id`,
       { replacements: { id }, type: QueryTypes.SELECT }
     );
-    if (!existing.length) {
-      return res.status(404).json({ success: false, error: 'Concept not found' });
-    }
+    if (!existing.length) return res.status(404).json({ success: false, error: 'Concept not found' });
 
-    // 2. Build update clause dynamically (only update provided fields)
-    const setClauses = ['updated_at = NOW()'];
+    const setClauses   = ['updated_at = NOW()'];
     const replacements = { id };
 
     if (name !== undefined) {
@@ -558,51 +483,31 @@ router.put('/concepts/:id', protect, teacherOnly, async (req, res) => {
       setClauses.push('name = :name');
       replacements.name = name.trim();
     }
-    if (description !== undefined) {
-      setClauses.push('description = :description');
-      replacements.description = description;
-    }
-    if (difficulty_level !== undefined) {
-      const dl = Math.min(Math.max(parseInt(difficulty_level) || 1, 1), 5);
-      setClauses.push('difficulty_level = :difficultyLevel');
-      replacements.difficultyLevel = dl;
-    }
-    if (estimated_minutes !== undefined) {
-      setClauses.push('estimated_minutes = :estimatedMinutes');
-      replacements.estimatedMinutes = parseInt(estimated_minutes) || 10;
-    }
-    if (order_index !== undefined) {
-      setClauses.push('order_index = :orderIndex');
-      replacements.orderIndex = parseInt(order_index) || 0;
-    }
+    if (description !== undefined)      { setClauses.push('description = :description');           replacements.description      = description; }
+    if (difficulty_level !== undefined) { setClauses.push('difficulty_level = :difficultyLevel'); replacements.difficultyLevel  = Math.min(Math.max(parseInt(difficulty_level) || 1, 1), 5); }
+    if (estimated_minutes !== undefined){ setClauses.push('estimated_minutes = :estimatedMinutes');replacements.estimatedMinutes = parseInt(estimated_minutes) || 10; }
+    if (order_index !== undefined)      { setClauses.push('order_index = :orderIndex');            replacements.orderIndex       = parseInt(order_index) || 0; }
 
     const updatedRows = await sequelize.query(
-      `UPDATE concepts SET ${setClauses.join(', ')}
-       WHERE id = :id
-       RETURNING id, subtopic_id, name, description, difficulty_level,
-                 estimated_minutes, order_index, updated_at`,
+      `UPDATE concepts SET ${setClauses.join(', ')} WHERE id = :id
+       RETURNING id, subtopic_id, name, description, difficulty_level, estimated_minutes, order_index, updated_at`,
       { replacements, type: QueryTypes.SELECT }
     );
-    const updated = updatedRows[0];
 
-    // 3. Replace prerequisites if provided
     let finalPrereqs = null;
     if (Array.isArray(prerequisite_ids)) {
-      // Delete all existing dependencies for this concept as the child
       await sequelize.query(
         `DELETE FROM concept_dependencies WHERE child_concept_id = :id`,
         { replacements: { id }, type: QueryTypes.DELETE }
       );
-
       finalPrereqs = [];
       for (const parentId of prerequisite_ids) {
-        if (!isValidUUID(parentId) || parentId === id) continue; // skip invalid/self
+        if (!isValidUUID(parentId) || parentId === id) continue;
         try {
           await sequelize.query(
             `INSERT INTO concept_dependencies
                (id, parent_concept_id, child_concept_id, dependency_type, created_at)
-             VALUES
-               (gen_random_uuid(), :parentId, :childId, 'prerequisite', NOW())
+             VALUES (gen_random_uuid(), :parentId, :childId, 'prerequisite', NOW())
              ON CONFLICT (parent_concept_id, child_concept_id) DO NOTHING`,
             { replacements: { parentId, childId: id }, type: QueryTypes.INSERT }
           );
@@ -615,10 +520,7 @@ router.put('/concepts/:id', protect, teacherOnly, async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      data: {
-        ...updated,
-        ...(finalPrereqs !== null ? { prerequisite_ids: finalPrereqs } : {}),
-      },
+      data: { ...updatedRows[0], ...(finalPrereqs !== null ? { prerequisite_ids: finalPrereqs } : {}) },
     });
   } catch (err) {
     console.error('[PUT /teacher/concepts/:id]', err.message);
@@ -626,36 +528,22 @@ router.put('/concepts/:id', protect, teacherOnly, async (req, res) => {
   }
 });
 
-// ---------------------------------------------------------------------------
-// DELETE /api/teacher/concepts/:id
-// Delete a concept (CASCADE will remove its question_concepts links and
-// concept_dependencies rows via FK ON DELETE CASCADE in the schema).
-// ---------------------------------------------------------------------------
 router.delete('/concepts/:id', protect, teacherOnly, async (req, res) => {
   const { id } = req.params;
-  if (!isValidUUID(id)) {
-    return res.status(400).json({ success: false, error: 'Invalid concept ID' });
-  }
+  if (!isValidUUID(id)) return res.status(400).json({ success: false, error: 'Invalid concept ID' });
 
   try {
-    // Verify it exists first so we return 404 rather than a silent no-op
     const rows = await sequelize.query(
       `SELECT id, name FROM concepts WHERE id = :id`,
       { replacements: { id }, type: QueryTypes.SELECT }
     );
-    if (!rows.length) {
-      return res.status(404).json({ success: false, error: 'Concept not found' });
-    }
+    if (!rows.length) return res.status(404).json({ success: false, error: 'Concept not found' });
 
     await sequelize.query(
       `DELETE FROM concepts WHERE id = :id`,
       { replacements: { id }, type: QueryTypes.DELETE }
     );
-
-    return res.status(200).json({
-      success: true,
-      message: `Concept "${rows[0].name}" deleted successfully`,
-    });
+    return res.status(200).json({ success: true, message: `Concept "${rows[0].name}" deleted successfully` });
   } catch (err) {
     console.error('[DELETE /teacher/concepts/:id]', err.message);
     return res.status(500).json({ success: false, error: err.message });
