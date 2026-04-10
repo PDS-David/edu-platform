@@ -1,740 +1,611 @@
 // client/src/pages/TeacherResourcesPage.jsx
-// Route: /teacher/resources
-// Teachers upload and manage video/audio/document resources for students.
+// URL: /teacher/resources  (also /teacher/upload-video, /teacher/add-questions)
+// Props: defaultTab — "upload" | "resources" | "questions"
+//
+// Tab 1 — Upload: file picker → POST /api/resources/upload (multipart)
+// Tab 2 — My Resources: list + delete → GET/DELETE /api/resources
+// Tab 3 — Add Questions: MCQ submission → POST /api/teacher/questions
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../services/api';
+import TopNav from '../components/TopNav';
 import {
-  Upload, Video, Music, FileText, Trash2,
-  CheckCircle, AlertCircle, ChevronDown,
-  FolderOpen, X, Clock, HardDrive,
-  FilePlus, Filter, Search
+  Upload, FileText, Video, Music, Trash2, Loader2,
+  CheckCircle, AlertTriangle, X, Plus, BookOpen,
+  ChevronDown, File,
 } from 'lucide-react';
-import TopNav   from '../components/TopNav';
-import { useAuth } from '../context/AuthContext';
 
+// ── Toast ────────────────────────────────────────────────────────────────────
+function Toast({ msg, type, onClose }) {
+  useEffect(() => { const t = setTimeout(onClose, 4000); return () => clearTimeout(t); }, [onClose]);
+  return (
+    <div className={`fixed bottom-6 right-4 z-50 flex items-center gap-2.5 px-5 py-3
+      rounded-2xl shadow-xl text-sm font-semibold text-white
+      ${type === 'success' ? 'bg-gray-900' : 'bg-red-600'}`}>
+      {type === 'success'
+        ? <CheckCircle size={14} className="text-teal-400 shrink-0" />
+        : <AlertTriangle size={14} className="shrink-0" />}
+      <span>{msg}</span>
+      <button onClick={onClose}><X size={13} className="opacity-60" /></button>
+    </div>
+  );
+}
 
+// ── File type icon ────────────────────────────────────────────────────────────
+function FileTypeIcon({ type, size = 20 }) {
+  if (type === 'video')    return <Video    size={size} className="text-blue-500" />;
+  if (type === 'audio')    return <Music    size={size} className="text-purple-500" />;
+  if (type === 'document') return <FileText size={size} className="text-amber-500" />;
+  return <File size={size} className="text-gray-400" />;
+}
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
-const formatSize = (bytes) => {
+// ── Format file size ─────────────────────────────────────────────────────────
+function fmtSize(bytes) {
   if (!bytes) return '';
-  if (bytes < 1024)       return `${bytes} B`;
-  if (bytes < 1048576)    return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1073741824) return `${(bytes / 1048576).toFixed(1)} MB`;
-  return `${(bytes / 1073741824).toFixed(2)} GB`;
-};
-
-const guessType = (file) => {
-  if (!file) return 'document';
-  const mime = file.type || '';
-  if (mime.startsWith('video/')) return 'video';
-  if (mime.startsWith('audio/')) return 'audio';
-  return 'document';
-};
-
-const TYPE_META = {
-  video:    { icon: Video,     colour: 'text-teal-500',   bg: 'bg-teal-50',    label: 'Video',    emoji: '🎥' },
-  audio:    { icon: Music,     colour: 'text-purple-500', bg: 'bg-purple-50',  label: 'Audio',    emoji: '🔊' },
-  document: { icon: FileText,  colour: 'text-blue-500',   bg: 'bg-blue-50',    label: 'Document', emoji: '📄' },
-};
-
-// ── Small reusable select ──────────────────────────────────────────────────────
-const Select = ({ value, onChange, disabled, placeholder, children, className = '' }) => (
-  <div className={`relative ${className}`}>
-    <select
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      disabled={disabled}
-      className={`w-full appearance-none bg-white border border-gray-200 rounded-xl px-4 py-2.5 pr-9 text-sm
-        text-gray-700 focus:outline-none focus:ring-2 focus:ring-teal-300 transition-colors
-        disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed`}
-    >
-      <option value="">{placeholder}</option>
-      {children}
-    </select>
-    <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-  </div>
-);
-
-// ── Response shape helper ──────────────────────────────────────────────────────
-const extractList = (r, ...keys) => {
-  if (!r) return [];
-  for (const key of keys) {
-    if (Array.isArray(r[key])) return r[key];
-  }
-  if (Array.isArray(r.data)) return r.data;
-  if (Array.isArray(r))      return r;
-  return [];
-};
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
-export default function TeacherResourcesPage() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
+// TAB 1 — Upload Resource
+// ══════════════════════════════════════════════════════════════════════════════
+function UploadTab({ showToast }) {
+  const [subjects,    setSubjects]    = useState([]);
+  const [topics,      setTopics]      = useState([]);
+  const [subtopics,   setSubtopics]   = useState([]);
+  const [form,        setForm]        = useState({
+    subject_id: '', topic_id: '', subtopic_id: '', title: '',
+  });
+  const [file,        setFile]        = useState(null);
+  const [uploading,   setUploading]   = useState(false);
+  const [progress,    setProgress]    = useState(0);
+  const [dragOver,    setDragOver]    = useState(false);
+  const fileRef = useRef(null);
 
-  // ── Upload form state ──────────────────────────────────────────────────────
-  const [subjects,   setSubjects]   = useState([]);
-  const [topics,     setTopics]     = useState([]);
-  const [subtopics,  setSubtopics]  = useState([]);
-
-  const [subjectId,  setSubjectId]  = useState('');
-  const [topicId,    setTopicId]    = useState('');
-  const [subtopicId, setSubtopicId] = useState('');
-  const [title,      setTitle]      = useState('');
-  const [file,       setFile]       = useState(null);
-  const [source,     setSource]     = useState('');          // PATCH 1
-
-  const [uploading,  setUploading]  = useState(false);
-  const [uploadPct,  setUploadPct]  = useState(0);
-  const [toast,      setToast]      = useState(null);
-
-  // ── Resources list state ───────────────────────────────────────────────────
-  const [resources,      setResources]      = useState([]);
-  const [resLoading,     setResLoading]     = useState(true);
-  const [filterSubject,  setFilterSubject]  = useState('');
-  const [filterTopic,    setFilterTopic]    = useState('');
-  const [filterTopics,   setFilterTopics]   = useState([]);
-  const [searchQuery,    setSearchQuery]    = useState('');
-  const [deleteConfirm,  setDeleteConfirm]  = useState(null);
-
-  const fileInputRef = useRef(null);
-  const dropRef      = useRef(null);
-
-  // ── Load subjects ─────────────────────────────────────────────────────────
+  // Load teacher's assigned subjects
   useEffect(() => {
     api.get('/teacher/my-subjects')
-      .then(r => setSubjects(extractList(r, 'data', 'subjects')))
-      .catch(() =>
-        api.get('/subjects')
-          .then(r => setSubjects(extractList(r, 'data', 'subjects')))
-          .catch(() => {})
-      );
+      .then(r => {
+        const list = Array.isArray(r) ? r : (r.data ?? []);
+        setSubjects(list);
+      })
+      .catch(() => {});
   }, []);
 
-  // ── Load topics when subject changes ──────────────────────────────────────
+  // Load topics when subject changes
   useEffect(() => {
-    setTopicId(''); setSubtopicId(''); setTopics([]); setSubtopics([]);
-    if (!subjectId) return;
-    api.get(`/topics?subject_id=${subjectId}`)
-      .then(r => setTopics(extractList(r, 'topics', 'data')))
+    setTopics([]); setSubtopics([]);
+    setForm(f => ({ ...f, topic_id: '', subtopic_id: '' }));
+    if (!form.subject_id) return;
+    api.get('/teacher/topics', { params: { subject_id: form.subject_id } })
+      .then(r => setTopics(Array.isArray(r) ? r : (r.data ?? [])))
       .catch(() => {});
-  }, [subjectId]);
+  }, [form.subject_id]);
 
-  // ── Load subtopics when topic changes ─────────────────────────────────────
+  // Load subtopics when topic changes
   useEffect(() => {
-    setSubtopicId(''); setSubtopics([]);
-    if (!topicId) return;
-    api.get(`/subtopics?topic_id=${topicId}`)
-      .then(r => setSubtopics(extractList(r, 'subtopics', 'data')))
+    setSubtopics([]);
+    setForm(f => ({ ...f, subtopic_id: '' }));
+    if (!form.topic_id) return;
+    api.get('/teacher/subtopics', { params: { topic_id: form.topic_id } })
+      .then(r => setSubtopics(Array.isArray(r) ? r : (r.data ?? [])))
       .catch(() => {});
-  }, [topicId]);
+  }, [form.topic_id]);
 
-  // ── Load resources list ───────────────────────────────────────────────────
-  const loadResources = useCallback(() => {
-    setResLoading(true);
-    const params = new URLSearchParams();
-    if (filterSubject) params.set('subject_id', filterSubject);
-    if (filterTopic)   params.set('topic_id',   filterTopic);
-    api.get(`/resources?${params}`)
-      .then(r => setResources(extractList(r, 'resources', 'data')))
-      .catch(() => setResources([]))
-      .finally(() => setResLoading(false));
-  }, [filterSubject, filterTopic]);
-
-  useEffect(() => { loadResources(); }, [loadResources]);
-
-  // ── Filter topics for resources filter bar ────────────────────────────────
-  useEffect(() => {
-    setFilterTopic('');
-    if (!filterSubject) { setFilterTopics([]); return; }
-    api.get(`/topics?subject_id=${filterSubject}`)
-      .then(r => setFilterTopics(extractList(r, 'topics', 'data')))
-      .catch(() => {});
-  }, [filterSubject]);
-
-  // ── Drag and drop ─────────────────────────────────────────────────────────
-  const handleDrop = (e) => {
-    e.preventDefault();
-    const f = e.dataTransfer.files[0];
-    if (f) setFile(f);
+  const handleFile = (f) => {
+    if (!f) return;
+    setFile(f);
+    if (!form.title) setForm(prev => ({ ...prev, title: f.name.replace(/\.[^/.]+$/, '') }));
   };
 
-  // ── Upload ────────────────────────────────────────────────────────────────
+  const handleDrop = (e) => {
+    e.preventDefault(); setDragOver(false);
+    const f = e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  };
+
   const handleUpload = async () => {
-    if (!subjectId || !topicId || !title.trim() || !file) return;  // PATCH 4
+    if (!file || !form.subject_id || !form.title.trim()) {
+      showToast('Please select a file, subject, and title.', 'error');
+      return;
+    }
     setUploading(true);
-    setUploadPct(0);
+    setProgress(0);
+
     const fd = new FormData();
-    fd.append('file', file);
-    fd.append('subject_id',  subjectId);
-    fd.append('topic_id',    topicId);
-    fd.append('subtopic_id', subtopicId);
-    fd.append('title',       title.trim());
-    fd.append('type',        guessType(file));
-    fd.append('uploaded_by', user?.id || '');
-    if (source.trim()) fd.append('source', source.trim());         // PATCH 3
+    fd.append('file',       file);
+    fd.append('subject_id', form.subject_id);
+    fd.append('title',      form.title.trim());
+    if (form.topic_id)    fd.append('topic_id',    form.topic_id);
+    if (form.subtopic_id) fd.append('subtopic_id', form.subtopic_id);
+
     try {
-      await api.post('/resources/upload', fd, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        onUploadProgress: (e) => {
-          if (e.total) setUploadPct(Math.round((e.loaded / e.total) * 100));
-        },
+      // Use raw fetch for upload progress (axios doesn't stream progress well here)
+      const apiBase = import.meta.env.VITE_API_URL || '/api';
+      const token   = localStorage.getItem('token') || sessionStorage.getItem('token') ||
+                      document.cookie.match(/token=([^;]+)/)?.[1] || '';
+
+      await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${apiBase}/resources/upload`);
+        if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 100));
+        };
+        xhr.onload = () => {
+          const res = JSON.parse(xhr.responseText);
+          if (xhr.status >= 200 && xhr.status < 300 && res.success) resolve(res);
+          else reject(new Error(res.error || 'Upload failed'));
+        };
+        xhr.onerror = () => reject(new Error('Network error'));
+        xhr.send(fd);
       });
-      setToast({ type: 'success', msg: 'Resource uploaded successfully!' });
-      // PATCH 6 — include setSource('') in reset
-      setSubjectId(''); setTopicId(''); setSubtopicId(''); setTitle(''); setFile(null); setSource('');
-      loadResources();
-    } catch {
-      setToast({ type: 'error', msg: 'Upload failed. Please try again.' });
+
+      showToast('Resource uploaded successfully!');
+      setFile(null);
+      setProgress(0);
+      setForm(f => ({ ...f, title: '', topic_id: '', subtopic_id: '' }));
+      if (fileRef.current) fileRef.current.value = '';
+    } catch (err) {
+      showToast(err.message || 'Upload failed.', 'error');
     } finally {
       setUploading(false);
-      setUploadPct(0);
-      setTimeout(() => setToast(null), 4000);
     }
   };
 
-  // ── Delete ────────────────────────────────────────────────────────────────
-  const handleDelete = async (id) => {
+  const sel = 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-300';
+  const lbl = 'block text-xs font-semibold text-gray-600 mb-1.5';
+
+  return (
+    <div className="max-w-xl space-y-5">
+
+      {/* Drop zone */}
+      <div
+        onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
+        onClick={() => fileRef.current?.click()}
+        className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-colors
+          ${dragOver ? 'border-teal-400 bg-teal-50' : 'border-gray-200 hover:border-teal-300 hover:bg-gray-50'}`}
+      >
+        <input
+          ref={fileRef}
+          type="file"
+          className="hidden"
+          accept=".mp4,.webm,.mov,.mp3,.wav,.m4a,.pdf,.doc,.docx,.ppt,.pptx"
+          onChange={e => handleFile(e.target.files[0])}
+        />
+        {file ? (
+          <div className="flex items-center justify-center gap-3">
+            <FileTypeIcon type={file.type.split('/')[0] === 'video' ? 'video' : file.type.startsWith('audio') ? 'audio' : 'document'} size={24} />
+            <div className="text-left">
+              <p className="text-sm font-semibold text-gray-800 truncate max-w-xs">{file.name}</p>
+              <p className="text-xs text-gray-400">{fmtSize(file.size)}</p>
+            </div>
+            <button onClick={e => { e.stopPropagation(); setFile(null); if (fileRef.current) fileRef.current.value = ''; }}
+              className="ml-2 text-gray-400 hover:text-red-500">
+              <X size={16} />
+            </button>
+          </div>
+        ) : (
+          <>
+            <Upload size={28} className="mx-auto mb-2 text-gray-300" />
+            <p className="text-sm font-semibold text-gray-600">Drop file here or click to browse</p>
+            <p className="text-xs text-gray-400 mt-1">MP4, WebM, MP3, WAV, PDF, DOCX, PPTX · Max 500 MB</p>
+          </>
+        )}
+      </div>
+
+      {/* Title */}
+      <div>
+        <label className={lbl}>Title *</label>
+        <input
+          value={form.title}
+          onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+          placeholder="e.g. Introduction to Cell Biology"
+          className={sel}
+        />
+      </div>
+
+      {/* Subject */}
+      <div>
+        <label className={lbl}>Subject * <span className="text-gray-400 font-normal">(your assigned subjects only)</span></label>
+        <select value={form.subject_id} onChange={e => setForm(f => ({ ...f, subject_id: e.target.value }))} className={sel}>
+          <option value="">Select subject…</option>
+          {subjects.map(s => (
+            <option key={s.id} value={s.id}>{s.icon_emoji} {s.name} {s.exam_board_code ? `(${s.exam_board_code})` : ''}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Topic (optional) */}
+      <div>
+        <label className={lbl}>Topic <span className="text-gray-400 font-normal">(optional)</span></label>
+        <select value={form.topic_id} onChange={e => setForm(f => ({ ...f, topic_id: e.target.value }))}
+          disabled={!form.subject_id || topics.length === 0} className={sel}>
+          <option value="">All topics / General</option>
+          {topics.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+        </select>
+      </div>
+
+      {/* Subtopic (optional) */}
+      <div>
+        <label className={lbl}>Subtopic <span className="text-gray-400 font-normal">(optional)</span></label>
+        <select value={form.subtopic_id} onChange={e => setForm(f => ({ ...f, subtopic_id: e.target.value }))}
+          disabled={!form.topic_id || subtopics.length === 0} className={sel}>
+          <option value="">All subtopics / General</option>
+          {subtopics.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
+      </div>
+
+      {/* Progress bar */}
+      {uploading && (
+        <div>
+          <div className="flex justify-between text-xs text-gray-500 mb-1">
+            <span>Uploading…</span><span>{progress}%</span>
+          </div>
+          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+            <div className="h-full bg-teal-500 rounded-full transition-all duration-300"
+              style={{ width: `${progress}%` }} />
+          </div>
+        </div>
+      )}
+
+      <button
+        onClick={handleUpload}
+        disabled={uploading || !file || !form.subject_id || !form.title.trim()}
+        className="w-full bg-teal-500 hover:bg-teal-600 disabled:opacity-50 text-white font-semibold
+          py-3 rounded-xl text-sm transition-colors flex items-center justify-center gap-2"
+      >
+        {uploading
+          ? <><Loader2 size={15} className="animate-spin" /> Uploading {progress}%…</>
+          : <><Upload size={15} /> Upload Resource</>}
+      </button>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TAB 2 — My Resources
+// ══════════════════════════════════════════════════════════════════════════════
+function ResourcesTab({ showToast }) {
+  const [resources, setResources] = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [deleting,  setDeleting]  = useState(null);
+
+  const load = () => {
+    setLoading(true);
+    api.get('/resources')
+      .then(r => setResources(Array.isArray(r) ? r : (r.data ?? [])))
+      .catch(() => setResources([]))
+      .finally(() => setLoading(false));
+  };
+  useEffect(load, []);
+
+  const handleDelete = async (id, title) => {
+    if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
+    setDeleting(id);
     try {
       await api.delete(`/resources/${id}`);
       setResources(prev => prev.filter(r => r.id !== id));
-      setToast({ type: 'success', msg: 'Resource deleted.' });
-      setTimeout(() => setToast(null), 3000);
-    } catch {
-      setToast({ type: 'error', msg: 'Delete failed.' });
-      setTimeout(() => setToast(null), 3000);
+      showToast('Resource deleted.');
+    } catch (err) {
+      showToast(err?.error || 'Failed to delete.', 'error');
     } finally {
-      setDeleteConfirm(null);
+      setDeleting(null);
     }
   };
 
-  // PATCH 4 — subtopicId no longer required
-  const canUpload = subjectId && topicId && title.trim() && file && !uploading;
+  if (loading) return <div className="flex justify-center py-16"><Loader2 size={24} className="animate-spin text-teal-400" /></div>;
 
-  // ── Notes tab state ───────────────────────────────────────────────────────
-  const [activeTab,       setActiveTab]       = useState('upload');
-  const [noteSubjectId,   setNoteSubjectId]   = useState('');
-  const [noteTopicId,     setNoteTopicId]     = useState('');
-  const [noteSubtopicId,  setNoteSubtopicId]  = useState('');
-  const [noteTopics,      setNoteTopics]      = useState([]);
-  const [noteSubtopics,   setNoteSubtopics]   = useState([]);
-  const [noteTitle,       setNoteTitle]       = useState('');
-  const [noteContent,     setNoteContent]     = useState('');
-  const [noteSaving,      setNoteSaving]      = useState(false);
-  const [existingNotes,   setExistingNotes]   = useState([]);
-  const [editingNote,     setEditingNote]     = useState(null);
+  if (resources.length === 0) return (
+    <div className="text-center py-16 text-gray-400">
+      <BookOpen size={36} className="mx-auto mb-3 opacity-30" />
+      <p className="text-sm">No resources uploaded yet.</p>
+      <p className="text-xs mt-1">Switch to the Upload tab to add your first resource.</p>
+    </div>
+  );
 
-  useEffect(() => {
-    setNoteTopicId(''); setNoteSubtopicId(''); setNoteTopics([]); setNoteSubtopics([]);
-    if (!noteSubjectId) return;
-    api.get(`/topics?subject_id=${noteSubjectId}`)
-      .then(r => setNoteTopics(extractList(r, 'topics', 'data')))
-      .catch(() => {});
-  }, [noteSubjectId]);
+  return (
+    <div className="space-y-3 max-w-3xl">
+      {resources.map(r => (
+        <div key={r.id} className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center gap-4">
+          <FileTypeIcon type={r.resource_type} size={22} />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-gray-800 truncate">{r.title}</p>
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+              <span className="text-xs text-gray-400 capitalize">{r.resource_type}</span>
+              {r.file_size_bytes && <span className="text-xs text-gray-300">·</span>}
+              {r.file_size_bytes && <span className="text-xs text-gray-400">{fmtSize(r.file_size_bytes)}</span>}
+              {r.subject_name && <span className="text-xs text-gray-300">·</span>}
+              {r.subject_name && <span className="text-xs text-teal-600">{r.subject_name}</span>}
+              {r.subtopic_name && <span className="text-xs text-gray-300">·</span>}
+              {r.subtopic_name && <span className="text-xs text-gray-400">{r.subtopic_name}</span>}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <a href={r.file_url} target="_blank" rel="noreferrer"
+              className="text-xs text-teal-600 hover:text-teal-800 font-medium px-3 py-1.5 border border-teal-200 rounded-lg transition-colors">
+              View
+            </a>
+            <button
+              onClick={() => handleDelete(r.id, r.title)}
+              disabled={deleting === r.id}
+              className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+            >
+              {deleting === r.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
-  useEffect(() => {
-    setNoteSubtopicId(''); setNoteSubtopics([]);
-    if (!noteTopicId) return;
-    api.get(`/subtopics?topic_id=${noteTopicId}`)
-      .then(r => setNoteSubtopics(extractList(r, 'subtopics', 'data')))
-      .catch(() => {});
-  }, [noteTopicId]);
-
-  useEffect(() => {
-    if (!noteSubtopicId) { setExistingNotes([]); return; }
-    api.get(`/notes?subtopic_id=${noteSubtopicId}`)
-      .then(r => setExistingNotes(extractList(r, 'data', 'notes')))
-      .catch(() => {});
-  }, [noteSubtopicId]);
-
-  const handleSaveNote = async () => {
-    if (!noteSubtopicId || !noteTitle.trim() || !noteContent.trim()) {
-      setToast({ type: 'error', msg: 'Subtopic, title and content are required.' });
-      setTimeout(() => setToast(null), 3000);
-      return;
-    }
-    setNoteSaving(true);
-    try {
-      if (editingNote) {
-        await api.put(`/notes/${editingNote.id}`, { title: noteTitle, content_html: noteContent });
-        setEditingNote(null);
-      } else {
-        await api.post('/notes', { subtopic_id: noteSubtopicId, title: noteTitle, content_html: noteContent });
-      }
-      setNoteTitle(''); setNoteContent('');
-      setToast({ type: 'success', msg: editingNote ? 'Note updated.' : 'Note saved.' });
-      api.get(`/notes?subtopic_id=${noteSubtopicId}`)
-        .then(r => setExistingNotes(extractList(r, 'data', 'notes')))
-        .catch(() => {});
-    } catch {
-      setToast({ type: 'error', msg: 'Failed to save note.' });
-    } finally {
-      setNoteSaving(false);
-      setTimeout(() => setToast(null), 3000);
-    }
-  };
-
-  const handleEditNote = (note) => {
-    setEditingNote(note);
-    setNoteTitle(note.title);
-    setNoteContent(note.content_html);
-  };
-
-  const handleDeleteNote = async (id) => {
-    if (!window.confirm('Delete this note?')) return;
-    try {
-      await api.delete(`/notes/${id}`);
-      setExistingNotes(prev => prev.filter(n => n.id !== id));
-      setToast({ type: 'success', msg: 'Note deleted.' });
-      setTimeout(() => setToast(null), 3000);
-    } catch {
-      setToast({ type: 'error', msg: 'Delete failed.' });
-      setTimeout(() => setToast(null), 3000);
-    }
-  };
-
-  const filteredResources = resources.filter(r => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return (r.title || '').toLowerCase().includes(q) ||
-           (r.subject_name || '').toLowerCase().includes(q) ||
-           (r.subtopic_name || '').toLowerCase().includes(q);
+// ══════════════════════════════════════════════════════════════════════════════
+// TAB 3 — Add Question
+// ══════════════════════════════════════════════════════════════════════════════
+function QuestionsTab({ showToast }) {
+  const [subjects,   setSubjects]   = useState([]);
+  const [subtopics,  setSubtopics]  = useState([]);
+  const [saving,     setSaving]     = useState(false);
+  const EMPTY_OPT = { text: '', is_correct: false };
+  const [form, setForm] = useState({
+    question_text: '',
+    subject_id:    '',
+    subtopic_id:   '',
+    difficulty:    'medium',
+    explanation:   '',
+    options:       [
+      { text: '', is_correct: true  },
+      { text: '', is_correct: false },
+      { text: '', is_correct: false },
+      { text: '', is_correct: false },
+    ],
   });
+
+  useEffect(() => {
+    api.get('/teacher/my-subjects')
+      .then(r => setSubjects(Array.isArray(r) ? r : (r.data ?? [])))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    setSubtopics([]);
+    setForm(f => ({ ...f, subtopic_id: '' }));
+    if (!form.subject_id) return;
+    // Fetch all subtopics for the subject by fetching topics first
+    api.get('/teacher/topics', { params: { subject_id: form.subject_id } })
+      .then(async r => {
+        const topicList = Array.isArray(r) ? r : (r.data ?? []);
+        const allSubs = [];
+        await Promise.all(topicList.map(t =>
+          api.get('/teacher/subtopics', { params: { topic_id: t.id } })
+            .then(sr => {
+              const subs = Array.isArray(sr) ? sr : (sr.data ?? []);
+              allSubs.push(...subs);
+            })
+            .catch(() => {})
+        ));
+        setSubtopics(allSubs);
+      })
+      .catch(() => {});
+  }, [form.subject_id]);
+
+  const setOption = (idx, field, val) => {
+    setForm(f => {
+      const opts = [...f.options];
+      if (field === 'is_correct') {
+        // Only one option can be correct
+        opts.forEach((o, i) => { opts[i] = { ...o, is_correct: i === idx }; });
+      } else {
+        opts[idx] = { ...opts[idx], [field]: val };
+      }
+      return { ...f, options: opts };
+    });
+  };
+
+  const handleSubmit = async () => {
+    const { question_text, subject_id, options, difficulty } = form;
+    if (!question_text.trim()) { showToast('Question text is required.', 'error'); return; }
+    if (!subject_id)           { showToast('Please select a subject.', 'error'); return; }
+    if (options.some(o => !o.text.trim())) { showToast('All 4 options must be filled.', 'error'); return; }
+    if (!options.some(o => o.is_correct))  { showToast('Mark one option as correct.', 'error'); return; }
+
+    setSaving(true);
+    try {
+      await api.post('/teacher/questions', {
+        question_text:    question_text.trim(),
+        subject_id,
+        subtopic_id:      form.subtopic_id || null,
+        difficulty,
+        explanation:      form.explanation.trim() || null,
+        options:          options.map(o => ({ option_text: o.text.trim(), is_correct: o.is_correct })),
+      });
+      showToast('Question submitted and approved!');
+      setForm(f => ({
+        ...f,
+        question_text: '',
+        explanation:   '',
+        subtopic_id:   '',
+        options: [
+          { text: '', is_correct: true  },
+          { text: '', is_correct: false },
+          { text: '', is_correct: false },
+          { text: '', is_correct: false },
+        ],
+      }));
+    } catch (err) {
+      showToast(err?.error || 'Failed to submit question.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const inp = 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-300';
+  const lbl = 'block text-xs font-semibold text-gray-600 mb-1.5';
+  const LABELS = ['A', 'B', 'C', 'D'];
+
+  return (
+    <div className="max-w-2xl space-y-5">
+      <div className="bg-teal-50 border border-teal-100 rounded-2xl px-4 py-3 text-xs text-teal-700">
+        ✅ Questions you submit here are <strong>automatically approved</strong> and will immediately appear in quizzes for your assigned subjects.
+      </div>
+
+      {/* Question text */}
+      <div>
+        <label className={lbl}>Question *</label>
+        <textarea
+          value={form.question_text}
+          onChange={e => setForm(f => ({ ...f, question_text: e.target.value }))}
+          rows={3}
+          placeholder="Type your question here…"
+          className={inp + ' resize-none'}
+        />
+      </div>
+
+      {/* Subject + Difficulty */}
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className={lbl}>Subject *</label>
+          <select value={form.subject_id} onChange={e => setForm(f => ({ ...f, subject_id: e.target.value }))} className={inp}>
+            <option value="">Select…</option>
+            {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className={lbl}>Difficulty</label>
+          <select value={form.difficulty} onChange={e => setForm(f => ({ ...f, difficulty: e.target.value }))} className={inp}>
+            <option value="easy">Easy</option>
+            <option value="medium">Medium</option>
+            <option value="hard">Hard</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Subtopic (optional) */}
+      <div>
+        <label className={lbl}>Subtopic <span className="text-gray-400 font-normal">(optional — links question to specific content)</span></label>
+        <select value={form.subtopic_id} onChange={e => setForm(f => ({ ...f, subtopic_id: e.target.value }))}
+          disabled={subtopics.length === 0} className={inp}>
+          <option value="">No specific subtopic</option>
+          {subtopics.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
+      </div>
+
+      {/* Options */}
+      <div>
+        <label className={lbl}>Answer Options * <span className="text-gray-400 font-normal">(click the circle to mark correct answer)</span></label>
+        <div className="space-y-2">
+          {form.options.map((opt, i) => (
+            <div key={i} className={`flex items-center gap-3 border-2 rounded-xl px-3 py-2.5 transition-colors ${opt.is_correct ? 'border-teal-400 bg-teal-50' : 'border-gray-200'}`}>
+              <button
+                onClick={() => setOption(i, 'is_correct', true)}
+                className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${opt.is_correct ? 'border-teal-500 bg-teal-500' : 'border-gray-300 hover:border-teal-300'}`}
+              >
+                {opt.is_correct && <div className="w-2.5 h-2.5 rounded-full bg-white" />}
+              </button>
+              <span className="text-xs font-bold text-gray-500 shrink-0 w-4">{LABELS[i]}</span>
+              <input
+                value={opt.text}
+                onChange={e => setOption(i, 'text', e.target.value)}
+                placeholder={`Option ${LABELS[i]}…`}
+                className="flex-1 bg-transparent text-sm focus:outline-none placeholder-gray-300"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Explanation */}
+      <div>
+        <label className={lbl}>Explanation <span className="text-gray-400 font-normal">(optional — shown after student answers)</span></label>
+        <textarea
+          value={form.explanation}
+          onChange={e => setForm(f => ({ ...f, explanation: e.target.value }))}
+          rows={2}
+          placeholder="Why is the correct answer right? What concept does this test?"
+          className={inp + ' resize-none'}
+        />
+      </div>
+
+      <button
+        onClick={handleSubmit}
+        disabled={saving}
+        className="w-full bg-teal-500 hover:bg-teal-600 disabled:opacity-50 text-white font-semibold
+          py-3 rounded-xl text-sm transition-colors flex items-center justify-center gap-2"
+      >
+        {saving ? <><Loader2 size={15} className="animate-spin" /> Submitting…</> : <><Plus size={15} /> Submit Question</>}
+      </button>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MAIN PAGE
+// ══════════════════════════════════════════════════════════════════════════════
+export default function TeacherResourcesPage({ defaultTab = 'upload' }) {
+  const [activeTab, setActiveTab] = useState(defaultTab);
+  const [toast,     setToast]     = useState(null);
+
+  const showToast = (msg, type = 'success') => setToast({ msg, type });
+
+  const tabs = [
+    { id: 'upload',    label: 'Upload Resource', icon: Upload   },
+    { id: 'resources', label: 'My Resources',    icon: BookOpen },
+    { id: 'questions', label: 'Add Question',    icon: Plus     },
+  ];
 
   return (
     <div className="min-h-screen bg-gray-50">
       <TopNav />
 
-      <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-
-        {/* Page heading */}
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Resource Library</h1>
-          <p className="text-gray-500 text-sm mt-1">Upload and manage learning materials for your students</p>
-        </div>
-
-        {/* ── TAB BAR ────────────────────────────────────────────────────── */}
-        <div className="flex gap-2">
-          {[
-            { id: 'upload', label: 'Upload Resources' },
-            { id: 'notes',  label: 'Revision Notes'  },
-          ].map(t => (
-            <button
-              key={t.id}
-              onClick={() => setActiveTab(t.id)}
-              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
-                activeTab === t.id
-                  ? 'bg-gray-900 text-white'
-                  : 'text-gray-500 hover:bg-gray-100'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {/* ── NOTES TAB ──────────────────────────────────────────────────── */}
-        {activeTab === 'notes' && (
-          <div className="space-y-5">
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
-              <h2 className="text-lg font-semibold text-gray-900">
-                {editingNote ? 'Edit Note' : 'Write a Revision Note'}
-              </h2>
-              <div className="grid grid-cols-3 gap-3">
-                <Select value={noteSubjectId} onChange={setNoteSubjectId} placeholder="Subject">
-                  {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </Select>
-                <Select value={noteTopicId} onChange={setNoteTopicId} placeholder="Topic" disabled={!noteSubjectId}>
-                  {noteTopics.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </Select>
-                <Select value={noteSubtopicId} onChange={setNoteSubtopicId} placeholder="Subtopic" disabled={!noteTopicId}>
-                  {noteSubtopics.map(st => <option key={st.id} value={st.id}>{st.name}</option>)}
-                </Select>
-              </div>
-              <input
-                type="text"
-                value={noteTitle}
-                onChange={e => setNoteTitle(e.target.value)}
-                placeholder="Note title e.g. Key definitions for Cell Biology"
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-300"
-              />
-              <textarea
-                value={noteContent}
-                onChange={e => setNoteContent(e.target.value)}
-                rows={10}
-                placeholder="Write your revision notes here. Markdown is supported: **bold**, _italic_, ## heading, - bullet"
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-300 resize-y font-mono"
-              />
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={handleSaveNote}
-                  disabled={noteSaving}
-                  className="flex items-center gap-2 bg-teal-500 hover:bg-teal-600 disabled:opacity-50 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors"
-                >
-                  {noteSaving
-                    ? <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> Saving…</>
-                    : (editingNote ? 'Update Note' : 'Save Note')
-                  }
-                </button>
-                {editingNote && (
-                  <button
-                    onClick={() => { setEditingNote(null); setNoteTitle(''); setNoteContent(''); }}
-                    className="text-sm text-gray-500 hover:text-gray-700"
-                  >
-                    Cancel
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {existingNotes.length > 0 && (
-              <div className="space-y-3">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-1">
-                  Existing notes for this subtopic
-                </p>
-                {existingNotes.map(note => (
-                  <div key={note.id} className="bg-white border border-gray-100 rounded-2xl p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-gray-800 text-sm">{note.title}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          by {note.author_name} · {new Date(note.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-2 line-clamp-2 font-mono">
-                          {note.content_html.slice(0, 120)}{note.content_html.length > 120 ? '…' : ''}
-                        </p>
-                      </div>
-                      <div className="flex gap-2 shrink-0">
-                        <button onClick={() => handleEditNote(note)} className="text-xs text-teal-600 hover:text-teal-800 font-medium">Edit</button>
-                        <button onClick={() => handleDeleteNote(note.id)} className="text-xs text-red-400 hover:text-red-600 font-medium">Delete</button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+      {/* Header */}
+      <div className="bg-[#0a4a3f] px-4 py-5">
+        <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
+          <div>
+            <p className="text-white/50 text-xs mb-1">Teacher</p>
+            <h1 className="text-white text-xl font-bold">Resources & Content</h1>
+            <p className="text-white/60 text-sm mt-0.5">Upload files and add questions for your students</p>
           </div>
-        )}
+          <Link to="/teacher/dashboard"
+            className="text-white/70 hover:text-white text-sm transition-colors shrink-0">
+            ← Dashboard
+          </Link>
+        </div>
+      </div>
 
-        {/* ── UPLOAD TAB ─────────────────────────────────────────────────── */}
-        {activeTab === 'upload' && (<>
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-teal-50 flex items-center justify-center">
-                <FilePlus size={16} className="text-teal-500" />
-              </div>
-              <h2 className="text-lg font-semibold text-gray-900">Upload New Resource</h2>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <Select value={subjectId} onChange={setSubjectId} placeholder="Select Subject">
-                {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </Select>
-              <Select value={topicId} onChange={setTopicId} disabled={!subjectId} placeholder="Select Topic">
-                {topics.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </Select>
-              <Select value={subtopicId} onChange={setSubtopicId} disabled={!topicId} placeholder="Select Sub-topic">
-                {subtopics.map(st => <option key={st.id} value={st.id}>{st.name}</option>)}
-              </Select>
-            </div>
-
-            {/* Helpful empty-state hints */}
-            {subjectId && topics.length === 0 && (
-              <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                No topics found for this subject. Ask the admin to add topics under this subject first.
-              </p>
-            )}
-            {topicId && subtopics.length === 0 && (
-              <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                No subtopics found for this topic. Ask the admin to add subtopics first.
-              </p>
-            )}
-
-            <input
-              type="text"
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-              placeholder="Resource title e.g. Introduction to Algebra — Video 1"
-              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-800
-                placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-300 transition-colors"
-            />
-
-            {/* PATCH 2 — Source input */}
-            <input
-              type="text"
-              value={source}
-              onChange={e => setSource(e.target.value)}
-              placeholder="Source / Authority (optional) — e.g. WAEC Past Questions 2019, EAC AI-Generated"
-              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-800
-                placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-300 transition-colors"
-            />
-
-            <div
-              ref={dropRef}
-              onClick={() => fileInputRef.current?.click()}
-              onDragOver={e => e.preventDefault()}
-              onDrop={handleDrop}
-              className={`border-2 border-dashed rounded-xl px-6 py-10 cursor-pointer text-center transition-colors
-                ${file
-                  ? 'border-teal-300 bg-teal-50'
-                  : 'border-gray-200 bg-gray-50 hover:border-teal-300 hover:bg-teal-50/40'
+      {/* Tab bar */}
+      <div className="bg-white border-b border-gray-100">
+        <div className="max-w-4xl mx-auto px-4 flex gap-1 overflow-x-auto">
+          {tabs.map(t => {
+            const Icon = t.icon;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setActiveTab(t.id)}
+                className={`flex items-center gap-1.5 px-4 py-3.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
+                  activeTab === t.id
+                    ? 'border-teal-500 text-teal-600'
+                    : 'border-transparent text-gray-400 hover:text-gray-600'
                 }`}
-            >
-              {file ? (
-                <div className="flex flex-col items-center gap-3">
-                  <div className={`w-12 h-12 rounded-xl ${TYPE_META[guessType(file)].bg} flex items-center justify-center`}>
-                    {(() => { const I = TYPE_META[guessType(file)].icon; return <I size={22} className={TYPE_META[guessType(file)].colour} />; })()}
-                  </div>
-                  <div>
-                    <p className="font-semibold text-gray-800 text-sm">{file.name}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{formatSize(file.size)} · {TYPE_META[guessType(file)].label}</p>
-                  </div>
-                  <button
-                    onClick={e => { e.stopPropagation(); setFile(null); }}
-                    className="flex items-center gap-1 text-xs text-red-400 hover:text-red-600 transition-colors"
-                  >
-                    <X size={12} /> Remove
-                  </button>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-white border border-gray-200 flex items-center justify-center shadow-sm">
-                    <Upload size={20} className="text-gray-400" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-700">Drag &amp; drop or click to browse</p>
-                    <p className="text-xs text-gray-400 mt-1">MP4, WebM, MP3, WAV, PDF, DOCX, PPTX — max 500 MB</p>
-                  </div>
-                </div>
-              )}
-            </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx"
-              className="hidden"
-              onChange={e => { if (e.target.files[0]) setFile(e.target.files[0]); }}
-            />
-
-            {uploading && (
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs text-gray-500">
-                  <span>Uploading…</span>
-                  <span>{uploadPct}%</span>
-                </div>
-                <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-                  <div
-                    className="h-2 bg-teal-500 rounded-full transition-all duration-300"
-                    style={{ width: `${uploadPct}%` }}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* PATCH 5 — Incomplete fields warning */}
-            {file && !canUpload && (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-800 space-y-1">
-                <p className="font-semibold mb-1.5">Complete these fields to enable upload:</p>
-                {!subjectId    && <p className="flex items-center gap-1.5">⚠️ Select a subject</p>}
-                {!topicId      && <p className="flex items-center gap-1.5">⚠️ Select a topic</p>}
-                {!title.trim() && <p className="flex items-center gap-1.5">⚠️ Add a resource title</p>}
-              </div>
-            )}
-
-            <div className="flex justify-end">
-              <button
-                onClick={handleUpload}
-                disabled={!canUpload}
-                className="flex items-center gap-2 bg-teal-500 hover:bg-teal-600 disabled:opacity-40 disabled:cursor-not-allowed
-                  text-white font-bold text-sm px-6 py-2.5 rounded-xl transition-colors"
               >
-                {uploading
-                  ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  : <Upload size={15} />
-                }
-                {uploading ? 'Uploading…' : 'Upload'}
+                <Icon size={14} />
+                {t.label}
               </button>
-            </div>
-          </div>
-
-          {/* ── RESOURCES LIST ──────────────────────────────────────────── */}
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-              <div className="flex items-center gap-2 text-gray-500 shrink-0">
-                <Filter size={15} />
-                <span className="text-sm font-medium text-gray-600">Filter:</span>
-              </div>
-              <Select value={filterSubject} onChange={setFilterSubject} placeholder="All Subjects" className="sm:w-44">
-                {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </Select>
-              <Select value={filterTopic} onChange={setFilterTopic} disabled={!filterSubject} placeholder="All Topics" className="sm:w-44">
-                {filterTopics.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </Select>
-              <div className="relative flex-1 min-w-0">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  placeholder="Search resources…"
-                  className="w-full border border-gray-200 rounded-xl pl-8 pr-3 py-2.5 text-sm text-gray-700
-                    placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-300 transition-colors bg-white"
-                />
-              </div>
-            </div>
-
-            <p className="text-xs text-gray-400 font-medium">
-              {filteredResources.length} resource{filteredResources.length !== 1 ? 's' : ''}
-            </p>
-
-            {resLoading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {[...Array(6)].map((_, i) => (
-                  <div key={i} className="bg-white rounded-2xl border border-gray-100 p-4 animate-pulse">
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-gray-100 shrink-0" />
-                      <div className="flex-1 space-y-2">
-                        <div className="h-3 bg-gray-100 rounded w-3/4" />
-                        <div className="h-2.5 bg-gray-100 rounded w-1/2" />
-                        <div className="h-2.5 bg-gray-100 rounded w-2/3" />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : filteredResources.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center">
-                <FolderOpen size={40} className="text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-400 font-medium text-sm">No resources found</p>
-                <p className="text-gray-300 text-xs mt-1">Upload your first resource above</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredResources.map(res => (
-                  <ResourceCard
-                    key={res.id}
-                    resource={res}
-                    onDelete={() => setDeleteConfirm(res.id)}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        </>)}
+            );
+          })}
+        </div>
       </div>
 
-      {/* ── TOAST ──────────────────────────────────────────────────────────── */}
-      {toast && (
-        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5
-          px-5 py-3 rounded-2xl shadow-2xl text-sm font-semibold transition-all
-          ${toast.type === 'success' ? 'bg-gray-900 text-white' : 'bg-red-600 text-white'}`}
-        >
-          {toast.type === 'success'
-            ? <CheckCircle size={16} className="text-teal-400" />
-            : <AlertCircle size={16} className="text-red-200" />
-          }
-          {toast.msg}
-          <button onClick={() => setToast(null)} className="ml-2 opacity-60 hover:opacity-100">
-            <X size={13} />
-          </button>
-        </div>
-      )}
-
-      {/* ── DELETE CONFIRM MODAL ─────────────────────────────────────────── */}
-      {deleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center">
-                <Trash2 size={17} className="text-red-500" />
-              </div>
-              <h3 className="font-bold text-gray-900">Delete Resource?</h3>
-            </div>
-            <p className="text-sm text-gray-500 mb-5">
-              This will permanently remove the resource and it will no longer be visible to students.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setDeleteConfirm(null)}
-                className="flex-1 border border-gray-200 text-gray-700 font-semibold py-2.5 rounded-xl hover:bg-gray-50 transition-colors text-sm"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleDelete(deleteConfirm)}
-                className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-2.5 rounded-xl transition-colors text-sm"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Resource Card ──────────────────────────────────────────────────────────────
-function ResourceCard({ resource, onDelete }) {
-  const type = resource.type || 'document';
-  const meta = TYPE_META[type] || TYPE_META.document;
-  const Icon = meta.icon;
-
-  const uploadDate = resource.created_at
-    ? new Date(resource.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
-    : '';
-
-  return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-col gap-3
-      hover:shadow-md hover:border-gray-200 transition-all group">
-      <div className="flex items-start gap-3">
-        <div className={`w-10 h-10 rounded-xl ${meta.bg} flex items-center justify-center shrink-0`}>
-          <Icon size={18} className={meta.colour} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold text-gray-900 text-sm leading-snug truncate" title={resource.title}>
-            {resource.title}
-          </p>
-          <p className="text-xs text-gray-400 mt-0.5 capitalize">{meta.label}</p>
-        </div>
-        <button
-          onClick={onDelete}
-          className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
-          title="Delete resource"
-        >
-          <Trash2 size={14} />
-        </button>
+      <div className="max-w-4xl mx-auto px-4 py-6">
+        {activeTab === 'upload'    && <UploadTab    showToast={showToast} />}
+        {activeTab === 'resources' && <ResourcesTab showToast={showToast} />}
+        {activeTab === 'questions' && <QuestionsTab showToast={showToast} />}
       </div>
-      <div className="flex flex-wrap gap-1.5">
-        {resource.subject_name && (
-          <span className="text-[10px] font-semibold bg-teal-50 text-teal-600 px-2 py-0.5 rounded-full">
-            {resource.subject_name}
-          </span>
-        )}
-        {resource.subtopic_name && (
-          <span className="text-[10px] font-semibold bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">
-            {resource.subtopic_name}
-          </span>
-        )}
-      </div>
-      <div className="flex items-center gap-3 text-xs text-gray-400">
-        {uploadDate && (
-          <span className="flex items-center gap-1">
-            <Clock size={11} /> {uploadDate}
-          </span>
-        )}
-        {resource.file_size && (
-          <span className="flex items-center gap-1">
-            <HardDrive size={11} /> {typeof resource.file_size === 'number' ? formatSize(resource.file_size) : resource.file_size}
-          </span>
-        )}
-        {resource.duration && (
-          <span className="flex items-center gap-1">
-            <Clock size={11} /> {resource.duration}
-          </span>
-        )}
-      </div>
+
+      {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }
