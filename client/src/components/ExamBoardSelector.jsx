@@ -1,80 +1,50 @@
-import React, { useState, useEffect } from 'react';
-
 /**
- * ExamBoardSelector Component
- * Displays dropdown to filter content by exam board
- * Used in navigation, subject catalog, and course pages
+ * ExamBoardSelector.jsx
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Dropdown to filter content by exam type.
+ * Now powered by useCatalog() — same data source as TeacherAssignmentPanel
+ * and AIGeneratePanel, with module-level caching (no duplicate API calls).
+ *
+ * Props
+ * ──────
+ * selectedBoard   string | ''     – currently selected exam type code
+ * onBoardChange   fn(code)        – called when selection changes
+ * showLabel       bool (true)     – show "Select Type" label above dropdown
+ * showAll         bool (true)     – show the "🌟 All Types" blank option
+ * className       string ('')     – extra classes on wrapper
+ * size            'small' | 'medium' | 'large'  (default 'medium')
+ * filterActive    bool (true)     – when true, only show active types
  */
 
-const ExamBoardSelector = ({ 
-  selectedBoard, 
-  onBoardChange, 
-  showLabel = true,
-  className = '',
-  size = 'medium' // 'small', 'medium', 'large'
+import React from 'react';
+import { useCatalog } from '../hooks/useCatalog';
+
+const ExamBoardSelector = ({
+  selectedBoard,
+  onBoardChange,
+  showLabel    = true,
+  showAll      = true,
+  className    = '',
+  size         = 'medium',
+  filterActive = true,
 }) => {
-  const [boards, setBoards] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchExamBoards();
-  }, []);
-
-  const fetchExamBoards = async () => {
-    try {
-      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-      const response = await fetch(`${apiBase}/exam-boards`);
-
-      if (!response.ok) {
-        throw new Error(`Server responded with ${response.status}`);
-      }
-
-      const json = await response.json();
-
-      // API returns { success: true, count: N, data: [...] }
-      // but guard against plain arrays too, just in case
-      const list = Array.isArray(json) ? json : (json.data || []);
-
-      if (list.length > 0) {
-        setBoards(list);
-      } else {
-        // API succeeded but returned empty — fall back to static list
-        setBoards(getStaticBoards());
-      }
-    } catch (error) {
-      console.error('Error fetching exam boards:', error);
-      // Network/server error — fall back to static list so UI still works
-      setBoards(getStaticBoards());
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getStaticBoards = () => [
-    { id: 1, code: 'JAMB',   name: 'JAMB/UTME', icon_emoji: '🎓' },
-    { id: 2, code: 'WAEC',   name: 'WAEC',      icon_emoji: '📘' },
-    { id: 3, code: 'OLEVEL', name: 'O-Levels',  icon_emoji: '📗' },
-    { id: 4, code: 'NECO',   name: 'NECO',      icon_emoji: '📙' },
-    { id: 5, code: 'IELTS',  name: 'IELTS',     icon_emoji: '🌍' },
-    { id: 6, code: 'TOEFL',  name: 'TOEFL',     icon_emoji: '🇺🇸' },
-    { id: 7, code: 'SAT',      name: 'SAT',                  icon_emoji: '🎯' },
-    { id: 8, code: 'GCE_AL',  name: "GCE A'Levels",           icon_emoji: '🎓' },
-    { id: 9, code: 'JUPEB',   name: 'JUPEB',                 icon_emoji: '📚' },
-    { id: 10, code: 'LANG_EN', name: 'Language Lab – English', icon_emoji: '🇬🇧' },
-    { id: 11, code: 'LANG_FR', name: 'Language Lab – French',  icon_emoji: '🇫🇷' },
-    { id: 12, code: 'LANG_YO', name: 'Language Lab – Yoruba',  icon_emoji: '🌍' }
-  ];
+  const { examTypes, loadingTypes } = useCatalog();
 
   const sizeClasses = {
-    small: 'px-3 py-2 text-sm',
+    small:  'px-3 py-2 text-sm',
     medium: 'px-4 py-3 text-base',
-    large: 'px-6 py-4 text-lg'
+    large:  'px-6 py-4 text-lg',
   };
 
-  if (loading) {
+  const visibleTypes = filterActive
+    ? examTypes.filter(b => b.is_active !== false)
+    : examTypes;
+
+  if (loadingTypes) {
     return (
-      <div className="animate-pulse">
-        <div className="h-10 bg-gray-200 rounded-lg w-48"></div>
+      <div className={`exam-board-selector animate-pulse ${className}`}>
+        {showLabel && <div className="h-4 bg-gray-200 rounded w-20 mb-2" />}
+        <div className="h-10 bg-gray-200 rounded-lg w-48" />
       </div>
     );
   }
@@ -86,7 +56,7 @@ const ExamBoardSelector = ({
           Select Type
         </label>
       )}
-      
+
       <div className="relative">
         <select
           value={selectedBoard || ''}
@@ -101,10 +71,11 @@ const ExamBoardSelector = ({
             hover:border-green-400
           `}
         >
-          <option value="">🌟 All Types</option>
-          {boards.map(board => (
+          {showAll && <option value="">🌟 All Types</option>}
+
+          {visibleTypes.map(board => (
             <option key={board.id} value={board.code}>
-              {board.icon_emoji || board.icon || ''} {board.name}
+              {board.icon_emoji || '📚'} {board.name}
             </option>
           ))}
         </select>
