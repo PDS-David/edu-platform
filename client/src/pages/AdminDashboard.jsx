@@ -44,6 +44,9 @@ const Toast = ({ message, type, onClose }) => (
 
 // ─── Catalog Management Panel ─────────────────────────────────────────────────
 const CatalogPanel = () => {
+  // Bust the shared subject cache after saves/deletes so other panels see fresh data
+  const { invalidateCache: bustSubjectCache } = useCatalog();
+
   const [types, setTypes]               = useState([]);
   const [loading, setLoading]           = useState(true);
   const [expandedType, setExpandedType] = useState(null);
@@ -189,6 +192,7 @@ const CatalogPanel = () => {
       setShowSubjectModal(false);
       fetchSubjects(activeTypeId);
       fetchTypes();
+      bustSubjectCache(activeTypeId); // clear shared cache so modal re-fetches fresh
     } catch (err) {
       showToast(err?.error || 'Failed to save', 'error');
     } finally {
@@ -209,6 +213,7 @@ const CatalogPanel = () => {
         showToast('Subject deactivated');
         fetchSubjects(activeTypeId);
         fetchTypes();
+        bustSubjectCache(activeTypeId); // clear shared cache
       }
     } catch (err) {
       showToast(err?.error || 'Failed to deactivate', 'error');
@@ -651,7 +656,7 @@ const TeacherAssignmentPanel = () => {
   const [form, setForm] = useState({ teacher_id: '', exam_type_id: '' });
 
   // ── Shared catalog hook — exam types come from cache, no duplicate fetch ──
-  const { examTypes, loadingTypes, fetchSubjectsForType } = useCatalog();
+  const { examTypes, loadingTypes, fetchSubjectsForType, invalidateCache } = useCatalog();
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
@@ -673,7 +678,7 @@ const TeacherAssignmentPanel = () => {
 
   useEffect(() => { fetchAll(); }, []); // eslint-disable-line
 
-  // When exam type changes, fetch subjects via shared hook (cached)
+  // When exam type changes, fetch subjects via shared hook (cached for non-empty)
   const handleExamTypeChange = async (typeId) => {
     setForm(f => ({ ...f, exam_type_id: typeId }));
     setSelectedSubjectIds([]);
@@ -685,6 +690,23 @@ const TeacherAssignmentPanel = () => {
       setFilteredSubjects(subjects);
     } catch {
       showToast('Failed to load subjects for this exam type', 'error');
+    } finally {
+      setLoadingSubjects(false);
+    }
+  };
+
+  // Manual refresh — busts cache for current type and re-fetches
+  const refreshSubjects = async () => {
+    if (!form.exam_type_id) return;
+    invalidateCache(form.exam_type_id); // clear stale cache entry
+    setSelectedSubjectIds([]);
+    setFilteredSubjects([]);
+    setLoadingSubjects(true);
+    try {
+      const subjects = await fetchSubjectsForType(form.exam_type_id);
+      setFilteredSubjects(subjects);
+    } catch {
+      showToast('Failed to refresh subjects', 'error');
     } finally {
       setLoadingSubjects(false);
     }
@@ -872,12 +894,26 @@ const TeacherAssignmentPanel = () => {
 
               {/* Step 3: Subjects — multi-select, loads after exam type chosen */}
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                  Subject(s) <span className="text-red-500">*</span>
-                  {selectedSubjectIds.length > 0 && (
-                    <span className="ml-2 text-purple-600 font-bold">{selectedSubjectIds.length} selected</span>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-gray-600">
+                    Subject(s) <span className="text-red-500">*</span>
+                    {selectedSubjectIds.length > 0 && (
+                      <span className="ml-2 text-purple-600 font-bold">{selectedSubjectIds.length} selected</span>
+                    )}
+                  </label>
+                  {form.exam_type_id && (
+                    <button
+                      type="button"
+                      onClick={refreshSubjects}
+                      disabled={loadingSubjects}
+                      title="Re-fetch subjects (use after adding subjects in Catalog Management)"
+                      className="flex items-center gap-1 text-xs text-gray-400 hover:text-purple-600 transition-colors disabled:opacity-40"
+                    >
+                      <RefreshCw size={11} className={loadingSubjects ? 'animate-spin' : ''} />
+                      Refresh
+                    </button>
                   )}
-                </label>
+                </div>
 
                 {!form.exam_type_id ? (
                   <div className="border-2 border-dashed border-gray-200 rounded-xl p-4 text-center text-gray-400 text-sm">
