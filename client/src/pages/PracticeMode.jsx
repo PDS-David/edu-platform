@@ -1,21 +1,19 @@
 // client/src/pages/PracticeMode.jsx
 // Launched from StudentDashboard subject card via react-router state:
 //   navigate('/student/practice', { state: { subjectId, subjectName, boardCode } })
-// No setup screen — goes straight into questions for that subject.
-// Server validates every answer — correct option never sent to client upfront.
 //
-// FIX v1.1: Replaced raw axios with api instance from services/api.js
-//   - Removed: import axios, const API, const authHeader
-//   - Added:   import api
-//   - Response shape updated: api interceptor returns response.data directly,
-//     so the resolved value is already { success, data, count, ... }
-//   - Error handling updated: err.error instead of err.response?.data?.error
+// v1.2 ADDITIONS:
+//   - Passes mode=practice to /questions/random (backend keeps AI-generated questions in practice)
+//   - AI hint generation: when student clicks hint after getting wrong answer or after 2 static hints
+//   - Essay question support: shows textarea instead of MCQ options
+//   - Source attribution: shows question source when present
+//   - concept_hint is a DB field used internally — NOT the student hint system
 
 import { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   ChevronLeft, ChevronRight, Lightbulb, CheckCircle,
-  XCircle, RotateCcw, ArrowRight, Loader2, BookOpen,
+  XCircle, RotateCcw, ArrowRight, Loader2, BookOpen, Sparkles,
 } from 'lucide-react';
 import api from '../services/api';
 
@@ -25,31 +23,78 @@ function genSessionId() {
   return `sess_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+// ─── AI Hint fetcher ──────────────────────────────────────────────────────────
+async function fetchAIHint(questionId, selectedOptionId) {
+  try {
+    const res = await api.post('/ai/hint', {
+      question_id:        questionId,
+      selected_option_id: selectedOptionId || null,
+    });
+    return res?.hint || res?.data?.hint || null;
+  } catch {
+    return null;
+  }
+}
+
 // ─── Question Card ────────────────────────────────────────────────────────────
 function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sessionId }) {
-  const [selected,   setSelected]   = useState(null);
-  const [result,     setResult]     = useState(null);
-  const [hintIndex,  setHintIndex]  = useState(-1);
-  const [submitting, setSubmitting] = useState(false);
+  const [selected,      setSelected]      = useState(null);
+  const [essayText,     setEssayText]     = useState('');
+  const [result,        setResult]        = useState(null);
+  const [hintIndex,     setHintIndex]     = useState(-1);
+  const [aiHint,        setAiHint]        = useState(null);
+  const [aiHintLoading, setAiHintLoading] = useState(false);
+  const [submitting,    setSubmitting]    = useState(false);
   const startTime = useRef(Date.now());
+
+  const isEssay = question.question_type === 'essay';
 
   useEffect(() => {
     setSelected(null);
+    setEssayText('');
     setResult(null);
     setHintIndex(-1);
+    setAiHint(null);
     startTime.current = Date.now();
   }, [question.id]);
 
-  const handleSubmit = async () => {
+  // ── Request AI hint ─────────────────────────────────────────────────────────
+  const handleGetAIHint = async () => {
+    setAiHintLoading(true);
+    const hint = await fetchAIHint(question.id, selected);
+    setAiHint(hint || 'Try breaking the question into smaller parts and focus on key terms.');
+    setAiHintLoading(false);
+  };
+
+  // ── Submit MCQ ──────────────────────────────────────────────────────────────
+  const handleSubmitMCQ = async () => {
     if (!selected || submitting || result) return;
     setSubmitting(true);
     try {
-      // api interceptor returns response.data directly
-      // so `res` = { success, is_correct, correct_options, explanation, ... }
       const res = await api.post(`/questions/${question.id}/answer`, {
         selected_option_id: selected,
         session_id:         sessionId,
         time_taken_ms:      Date.now() - startTime.current,
+        mode:               'practice',
+      });
+      setResult(res);
+    } catch {
+      alert('Failed to submit answer. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ── Submit Essay ────────────────────────────────────────────────────────────
+  const handleSubmitEssay = async () => {
+    if (!essayText.trim() || submitting || result) return;
+    setSubmitting(true);
+    try {
+      const res = await api.post(`/questions/${question.id}/answer`, {
+        essay_response: essayText.trim(),
+        session_id:     sessionId,
+        time_taken_ms:  Date.now() - startTime.current,
+        mode:           'practice',
       });
       setResult(res);
     } catch {
@@ -65,9 +110,9 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
         ? 'border-indigo-400 bg-indigo-50'
         : 'border-gray-200 hover:border-indigo-300 hover:bg-gray-50 cursor-pointer';
     }
-    const isCorrect  = result.correct_options.some(c => c.id === optId);
+    const isCorrect  = result.correct_options?.some(c => c.id === optId);
     const isSelected = selected === optId;
-    if (isCorrect)               return 'border-green-400 bg-green-50';
+    if (isCorrect)                return 'border-green-400 bg-green-50';
     if (isSelected && !isCorrect) return 'border-red-400 bg-red-50';
     return 'border-gray-100 opacity-60';
   };
@@ -78,11 +123,16 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
     hard:   'bg-red-100 text-red-700',
   };
 
+  // Show AI hint button when: static hints exhausted OR student answered wrong
+  const showAIHintBtn = !result && !aiHint && (
+    hintIndex >= (question.hints?.length ?? 0) - 1 || (result && !result.is_correct)
+  );
+
   return (
     <div className="min-h-screen bg-gray-50 flex items-start justify-center pt-8 pb-12 px-4">
       <div className="w-full max-w-2xl">
 
-        {/* Progress bar */}
+        {/* Progress */}
         <div className="mb-5">
           <div className="flex justify-between text-xs text-gray-400 mb-1.5">
             <span>Question {questionNumber} of {totalQuestions}</span>
@@ -121,6 +171,11 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
                 {question.difficulty.charAt(0).toUpperCase() + question.difficulty.slice(1)}
               </span>
             )}
+            {isEssay && (
+              <span className="px-2.5 py-1 bg-teal-100 text-teal-700 rounded-full text-xs font-semibold">
+                Essay
+              </span>
+            )}
           </div>
 
           {/* Question */}
@@ -128,35 +183,60 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
             <p className="text-gray-900 font-medium text-base leading-relaxed">
               {question.question_text}
             </p>
+            {/* Source attribution */}
+            {question.source && (
+              <p className="text-xs text-gray-400 mt-2 italic">
+                Source: {question.source}
+              </p>
+            )}
           </div>
 
-          {/* Options */}
-          <div className="px-5 pb-4 space-y-2.5">
-            {question.options.map((opt, i) => (
-              <button
-                key={opt.id}
-                onClick={() => !result && setSelected(opt.id)}
+          {/* ── MCQ Options ── */}
+          {!isEssay && (
+            <div className="px-5 pb-4 space-y-2.5">
+              {question.options?.map((opt, i) => (
+                <button
+                  key={opt.id}
+                  onClick={() => !result && setSelected(opt.id)}
+                  disabled={!!result}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${getOptionStyle(opt.id)}`}
+                >
+                  <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                    selected === opt.id && !result ? 'bg-indigo-500 text-white' : 'bg-gray-100 text-gray-500'
+                  }`}>
+                    {LABELS[i]}
+                  </span>
+                  <span className="text-sm text-gray-800">{opt.option_text}</span>
+                  {result && result.correct_options?.some(c => c.id === opt.id) && (
+                    <CheckCircle className="w-4 h-4 text-green-500 ml-auto flex-shrink-0" />
+                  )}
+                  {result && selected === opt.id && !result.correct_options?.some(c => c.id === opt.id) && (
+                    <XCircle className="w-4 h-4 text-red-400 ml-auto flex-shrink-0" />
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* ── Essay textarea ── */}
+          {isEssay && (
+            <div className="px-5 pb-4">
+              <textarea
+                value={essayText}
+                onChange={e => setEssayText(e.target.value)}
                 disabled={!!result}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${getOptionStyle(opt.id)}`}
-              >
-                <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                  selected === opt.id && !result ? 'bg-indigo-500 text-white' : 'bg-gray-100 text-gray-500'
-                }`}>
-                  {LABELS[i]}
-                </span>
-                <span className="text-sm text-gray-800">{opt.option_text}</span>
-                {result && result.correct_options.some(c => c.id === opt.id) && (
-                  <CheckCircle className="w-4 h-4 text-green-500 ml-auto flex-shrink-0" />
-                )}
-                {result && selected === opt.id && !result.correct_options.some(c => c.id === opt.id) && (
-                  <XCircle className="w-4 h-4 text-red-400 ml-auto flex-shrink-0" />
-                )}
-              </button>
-            ))}
-          </div>
+                rows={6}
+                placeholder="Write your answer here…"
+                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 focus:outline-none focus:border-indigo-400 resize-y disabled:bg-gray-50 disabled:text-gray-500"
+              />
+              {question.marks && (
+                <p className="text-xs text-gray-400 mt-1.5">{question.marks} mark{question.marks !== 1 ? 's' : ''} available</p>
+              )}
+            </div>
+          )}
 
-          {/* Hints */}
-          {question.hints && question.hints.length > 0 && !result && (
+          {/* ── Static Hints ── */}
+          {question.hints?.length > 0 && !result && (
             <div className="px-5 pb-4">
               {hintIndex >= 0 && (
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-2">
@@ -179,8 +259,34 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
             </div>
           )}
 
-          {/* Explanation */}
-          {result?.explanation && (
+          {/* ── AI Hint button ── */}
+          {!result && (
+            <div className="px-5 pb-4">
+              {!aiHint && (
+                <button
+                  onClick={handleGetAIHint}
+                  disabled={aiHintLoading}
+                  className="flex items-center gap-1.5 text-xs text-indigo-500 hover:text-indigo-700 font-medium disabled:opacity-50"
+                >
+                  {aiHintLoading
+                    ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Getting AI hint…</>
+                    : <><Sparkles className="w-3.5 h-3.5" /> Get AI hint</>
+                  }
+                </button>
+              )}
+              {aiHint && (
+                <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3">
+                  <p className="text-xs font-semibold text-indigo-700 mb-1 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3" /> AI Hint
+                  </p>
+                  <p className="text-xs text-indigo-700 leading-relaxed">{aiHint}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Explanation (MCQ after answer) ── */}
+          {result?.explanation && !isEssay && (
             <div className="mx-5 mb-4 bg-blue-50 border border-blue-100 rounded-xl p-3">
               <p className="text-xs font-semibold text-blue-700 mb-1 flex items-center gap-1">
                 <BookOpen className="w-3.5 h-3.5" /> Explanation
@@ -189,8 +295,31 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
             </div>
           )}
 
-          {/* Result banner */}
-          {result && (
+          {/* ── Essay result ── */}
+          {result && isEssay && (
+            <div className="mx-5 mb-4 space-y-3">
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+                <p className="text-xs font-semibold text-blue-700 mb-1">AI Marking Feedback</p>
+                <p className="text-xs text-blue-600 leading-relaxed">
+                  {result.feedback || result.explanation || 'Your answer has been submitted for review.'}
+                </p>
+                {result.marks_awarded !== undefined && result.max_marks !== undefined && (
+                  <p className="text-xs font-bold text-blue-700 mt-2">
+                    Score: {result.marks_awarded} / {result.max_marks} marks
+                  </p>
+                )}
+              </div>
+              {result.model_answer && (
+                <div className="bg-green-50 border border-green-100 rounded-xl p-3">
+                  <p className="text-xs font-semibold text-green-700 mb-1">Model Answer</p>
+                  <p className="text-xs text-green-700 leading-relaxed">{result.model_answer}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── MCQ result banner ── */}
+          {result && !isEssay && (
             <div className={`mx-5 mb-4 rounded-xl px-3 py-2.5 flex items-center gap-2 text-sm ${
               result.is_correct
                 ? 'bg-green-50 border border-green-200 text-green-700'
@@ -202,12 +331,12 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
             </div>
           )}
 
-          {/* Action */}
+          {/* ── Action ── */}
           <div className="px-5 pb-5 flex justify-end">
             {!result ? (
               <button
-                onClick={handleSubmit}
-                disabled={!selected || submitting}
+                onClick={isEssay ? handleSubmitEssay : handleSubmitMCQ}
+                disabled={(!selected && !essayText.trim()) || submitting}
                 className="bg-indigo-500 hover:bg-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold px-6 py-2.5 rounded-xl flex items-center gap-2 transition-colors"
               >
                 {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
@@ -215,7 +344,7 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
               </button>
             ) : (
               <button
-                onClick={() => onAnswer(result.is_correct)}
+                onClick={() => onAnswer(result.is_correct ?? (result.marks_awarded > 0))}
                 className="bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-semibold px-6 py-2.5 rounded-xl flex items-center gap-2 transition-colors"
               >
                 {questionNumber < totalQuestions ? 'Next Question' : 'See Results'}
@@ -287,7 +416,7 @@ function EndScreen({ score, total, subjectName, onRetry, onBack }) {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function PracticeMode() {
   const location = useLocation();
-  const navigate  = useNavigate();
+  const navigate = useNavigate();
 
   const { subjectId, subjectName, boardCode } = location.state || {};
 
@@ -302,12 +431,13 @@ export default function PracticeMode() {
     setPhase('loading');
     setErrMsg('');
     try {
-      const params = { count: 10 };
+      const params = {
+        count: 10,
+        mode:  'practice',   // ← tells backend to include AI-generated (not yet teacher-approved) questions
+      };
       if (boardCode) params.board      = boardCode;
       if (subjectId) params.subject_id = subjectId;
 
-      // api interceptor returns response.data directly
-      // so `res` = { success, count, data: [...questions] }
       const res = await api.get('/questions/random', { params });
 
       if (!res.success || !res.data?.length) {
@@ -322,7 +452,6 @@ export default function PracticeMode() {
       setScore(0);
       setPhase('quiz');
     } catch (err) {
-      // Check for subscription limit (403 free_limit_reached)
       if (err.error === 'free_limit_reached') {
         setErrMsg(err.message || "You've used your free questions for today. Upgrade to continue.");
       } else {
@@ -354,7 +483,7 @@ export default function PracticeMode() {
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-3">
         <Loader2 className="w-8 h-8 text-indigo-400 animate-spin" />
         <p className="text-sm text-gray-400">
-          Loading {subjectName ? `${subjectName} ` : ''}questions…
+          Loading {subjectName ? `${subjectName} ` : ''}practice questions…
         </p>
       </div>
     );
