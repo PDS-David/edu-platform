@@ -58,12 +58,6 @@ const Select = ({ value, onChange, disabled, placeholder, children, className = 
 );
 
 // ── Response shape helper ──────────────────────────────────────────────────────
-// The API interceptor returns response.data directly, so different routes
-// return different shapes. This safely extracts arrays regardless of shape:
-//   { topics: [...] }          → topicsRoutes.js
-//   { subtopics: [...] }       → subtopicsRoutes.js
-//   { data: [...] }            → some routes
-//   [...]                      → raw array fallback
 const extractList = (r, ...keys) => {
   if (!r) return [];
   for (const key of keys) {
@@ -89,10 +83,11 @@ export default function TeacherResourcesPage() {
   const [subtopicId, setSubtopicId] = useState('');
   const [title,      setTitle]      = useState('');
   const [file,       setFile]       = useState(null);
+  const [source,     setSource]     = useState('');          // PATCH 1
 
   const [uploading,  setUploading]  = useState(false);
   const [uploadPct,  setUploadPct]  = useState(0);
-  const [toast,      setToast]      = useState(null); // { type: 'success'|'error', msg }
+  const [toast,      setToast]      = useState(null);
 
   // ── Resources list state ───────────────────────────────────────────────────
   const [resources,      setResources]      = useState([]);
@@ -106,7 +101,7 @@ export default function TeacherResourcesPage() {
   const fileInputRef = useRef(null);
   const dropRef      = useRef(null);
 
-  // ── Load subjects — only those assigned to this teacher ───────────────────
+  // ── Load subjects ─────────────────────────────────────────────────────────
   useEffect(() => {
     api.get('/teacher/my-subjects')
       .then(r => setSubjects(extractList(r, 'data', 'subjects')))
@@ -118,8 +113,6 @@ export default function TeacherResourcesPage() {
   }, []);
 
   // ── Load topics when subject changes ──────────────────────────────────────
-  // FIX: topicsRoutes.js returns { success, count, topics: [...] }
-  //      Previously read as r.data?.topics which was always undefined → empty list.
   useEffect(() => {
     setTopicId(''); setSubtopicId(''); setTopics([]); setSubtopics([]);
     if (!subjectId) return;
@@ -129,7 +122,6 @@ export default function TeacherResourcesPage() {
   }, [subjectId]);
 
   // ── Load subtopics when topic changes ─────────────────────────────────────
-  // FIX: same pattern — subtopicsRoutes likely returns { subtopics: [...] }
   useEffect(() => {
     setSubtopicId(''); setSubtopics([]);
     if (!topicId) return;
@@ -170,7 +162,7 @@ export default function TeacherResourcesPage() {
 
   // ── Upload ────────────────────────────────────────────────────────────────
   const handleUpload = async () => {
-    if (!subjectId || !topicId || !subtopicId || !title.trim() || !file) return;
+    if (!subjectId || !topicId || !title.trim() || !file) return;  // PATCH 4
     setUploading(true);
     setUploadPct(0);
     const fd = new FormData();
@@ -181,6 +173,7 @@ export default function TeacherResourcesPage() {
     fd.append('title',       title.trim());
     fd.append('type',        guessType(file));
     fd.append('uploaded_by', user?.id || '');
+    if (source.trim()) fd.append('source', source.trim());         // PATCH 3
     try {
       await api.post('/resources/upload', fd, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -189,7 +182,8 @@ export default function TeacherResourcesPage() {
         },
       });
       setToast({ type: 'success', msg: 'Resource uploaded successfully!' });
-      setSubjectId(''); setTopicId(''); setSubtopicId(''); setTitle(''); setFile(null);
+      // PATCH 6 — include setSource('') in reset
+      setSubjectId(''); setTopicId(''); setSubtopicId(''); setTitle(''); setFile(null); setSource('');
       loadResources();
     } catch {
       setToast({ type: 'error', msg: 'Upload failed. Please try again.' });
@@ -215,7 +209,8 @@ export default function TeacherResourcesPage() {
     }
   };
 
-  const canUpload = subjectId && topicId && subtopicId && title.trim() && file && !uploading;
+  // PATCH 4 — subtopicId no longer required
+  const canUpload = subjectId && topicId && title.trim() && file && !uploading;
 
   // ── Notes tab state ───────────────────────────────────────────────────────
   const [activeTab,       setActiveTab]       = useState('upload');
@@ -230,7 +225,6 @@ export default function TeacherResourcesPage() {
   const [existingNotes,   setExistingNotes]   = useState([]);
   const [editingNote,     setEditingNote]     = useState(null);
 
-  // FIX: same response-shape fix applied to notes tab topic/subtopic loading
   useEffect(() => {
     setNoteTopicId(''); setNoteSubtopicId(''); setNoteTopics([]); setNoteSubtopics([]);
     if (!noteSubjectId) return;
@@ -466,6 +460,16 @@ export default function TeacherResourcesPage() {
                 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-300 transition-colors"
             />
 
+            {/* PATCH 2 — Source input */}
+            <input
+              type="text"
+              value={source}
+              onChange={e => setSource(e.target.value)}
+              placeholder="Source / Authority (optional) — e.g. WAEC Past Questions 2019, EAC AI-Generated"
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-800
+                placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-300 transition-colors"
+            />
+
             <div
               ref={dropRef}
               onClick={() => fileInputRef.current?.click()}
@@ -525,6 +529,16 @@ export default function TeacherResourcesPage() {
                     style={{ width: `${uploadPct}%` }}
                   />
                 </div>
+              </div>
+            )}
+
+            {/* PATCH 5 — Incomplete fields warning */}
+            {file && !canUpload && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-800 space-y-1">
+                <p className="font-semibold mb-1.5">Complete these fields to enable upload:</p>
+                {!subjectId    && <p className="flex items-center gap-1.5">⚠️ Select a subject</p>}
+                {!topicId      && <p className="flex items-center gap-1.5">⚠️ Select a topic</p>}
+                {!title.trim() && <p className="flex items-center gap-1.5">⚠️ Add a resource title</p>}
               </div>
             )}
 
