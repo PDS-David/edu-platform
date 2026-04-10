@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import branding from '../config/branding';
 import TopNav from '../components/TopNav';
+import { useCatalog } from '../hooks/useCatalog';
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Cell,
@@ -638,17 +639,19 @@ const CatalogPanel = () => {
 
 // ─── Teacher Assignment Panel ─────────────────────────────────────────────────
 const TeacherAssignmentPanel = () => {
-  const [assignments,      setAssignments]      = useState([]);
-  const [teachers,         setTeachers]         = useState([]);
-  const [examTypes,        setExamTypes]        = useState([]);
-  const [filteredSubjects, setFilteredSubjects] = useState([]);
-  const [loading,          setLoading]          = useState(true);
-  const [loadingSubjects,  setLoadingSubjects]  = useState(false);
-  const [showModal,        setShowModal]        = useState(false);
-  const [saving,           setSaving]           = useState(false);
-  const [toast,            setToast]            = useState(null);
+  const [assignments,        setAssignments]        = useState([]);
+  const [teachers,           setTeachers]           = useState([]);
+  const [filteredSubjects,   setFilteredSubjects]   = useState([]);
+  const [loading,            setLoading]            = useState(true);
+  const [loadingSubjects,    setLoadingSubjects]    = useState(false);
+  const [showModal,          setShowModal]          = useState(false);
+  const [saving,             setSaving]             = useState(false);
+  const [toast,              setToast]              = useState(null);
   const [selectedSubjectIds, setSelectedSubjectIds] = useState([]);
   const [form, setForm] = useState({ teacher_id: '', exam_type_id: '' });
+
+  // ── Shared catalog hook — exam types come from cache, no duplicate fetch ──
+  const { examTypes, loadingTypes, fetchSubjectsForType } = useCatalog();
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
@@ -658,21 +661,19 @@ const TeacherAssignmentPanel = () => {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [aRes, tRes, etRes] = await Promise.all([
+      const [aRes, tRes] = await Promise.all([
         api.get('/admin/teacher-assignments'),
         api.get('/users?role=teacher'),
-        api.get('/catalog/types'),
       ]);
-      if (aRes?.success)  setAssignments(aRes.data || []);
-      if (tRes?.data)     setTeachers(tRes.data    || []);
-      if (etRes?.success) setExamTypes(etRes.data  || []);
+      if (aRes?.success) setAssignments(aRes.data || []);
+      if (tRes?.data)    setTeachers(tRes.data    || []);
     } catch { showToast('Failed to load data', 'error'); }
-    finally { setLoading(false); }
+    finally  { setLoading(false); }
   };
 
   useEffect(() => { fetchAll(); }, []); // eslint-disable-line
 
-  // When exam type changes, fetch subjects for that type
+  // When exam type changes, fetch subjects via shared hook (cached)
   const handleExamTypeChange = async (typeId) => {
     setForm(f => ({ ...f, exam_type_id: typeId }));
     setSelectedSubjectIds([]);
@@ -680,8 +681,8 @@ const TeacherAssignmentPanel = () => {
     if (!typeId) return;
     setLoadingSubjects(true);
     try {
-      const res = await api.get(`/catalog/types/${typeId}/subjects`);
-      if (res?.success) setFilteredSubjects(res.data || []);
+      const subjects = await fetchSubjectsForType(typeId);
+      setFilteredSubjects(subjects);
     } catch {
       showToast('Failed to load subjects for this exam type', 'error');
     } finally {
@@ -858,11 +859,14 @@ const TeacherAssignmentPanel = () => {
                   className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-purple-400"
                 >
                   <option value="">Select an exam type…</option>
-                  {examTypes.map(et => (
-                    <option key={et.id} value={et.id}>
-                      {et.icon_emoji} {et.name} ({et.code})
-                    </option>
-                  ))}
+                  {loadingTypes
+                    ? <option disabled>Loading…</option>
+                    : examTypes.filter(et => et.is_active !== false).map(et => (
+                        <option key={et.id} value={et.id}>
+                          {et.icon_emoji || '📚'} {et.name} ({et.code})
+                        </option>
+                      ))
+                  }
                 </select>
               </div>
 
@@ -944,8 +948,6 @@ const TeacherAssignmentPanel = () => {
 const AIGeneratePanel = () => {
   const [subjects,      setSubjects]      = useState([]);
   const [subjectsLoad,  setSubjectsLoad]  = useState(true);
-  const [examTypes,     setExamTypes]     = useState([]);
-  const [examTypesLoad, setExamTypesLoad] = useState(true);
   const [pendingCount,  setPendingCount]  = useState(null);
   const [form, setForm] = useState({
     subject_id: '', topic: '', exam_board: 'JAMB',
@@ -956,34 +958,14 @@ const AIGeneratePanel = () => {
   const [error,            setError]            = useState('');
   const [previewQuestions, setPreviewQuestions] = useState([]);
 
-  const STATIC_EXAM_TYPES = [
-    { code: 'JAMB',    name: 'JAMB / UTME'              },
-    { code: 'WAEC',    name: 'WAEC'                     },
-    { code: 'GCE_OL',  name: 'GCE O-Levels'             },
-    { code: 'NECO',    name: 'NECO'                     },
-    { code: 'IELTS',   name: 'IELTS'                    },
-    { code: 'TOEFL',   name: 'TOEFL'                    },
-    { code: 'SAT',     name: 'SAT'                      },
-    { code: 'GCE_AL',  name: 'GCE A-Levels'             },
-    { code: 'JUPEB',   name: 'JUPEB'                    },
-    { code: 'LANG_EN', name: 'Language Lab. - English'  },
-    { code: 'LANG_FR', name: 'Language Lab. - French'   },
-    { code: 'LANG_YO', name: 'Language Lab. - Yoruba'   },
-  ];
+  // ── Use shared catalog hook for exam types ──────────────────────────────────
+  const { examTypes, loadingTypes: examTypesLoad } = useCatalog();
 
   useEffect(() => {
     api.get('/admin/subjects')
       .then(r => setSubjects(r.data || r || []))
       .catch(() => {})
       .finally(() => setSubjectsLoad(false));
-
-    api.get('/exam-boards')
-      .then(r => {
-        const list = Array.isArray(r) ? r : (r.data || []);
-        setExamTypes(list.length > 0 ? list : STATIC_EXAM_TYPES);
-      })
-      .catch(() => setExamTypes(STATIC_EXAM_TYPES))
-      .finally(() => setExamTypesLoad(false));
 
     api.get('/admin/questions/pending-count')
       .then(r => setPendingCount(r.count))
@@ -1067,9 +1049,13 @@ const AIGeneratePanel = () => {
             >
               {examTypesLoad
                 ? <option disabled>Loading…</option>
-                : examTypes.map(et => (
-                    <option key={et.code} value={et.code}>{et.name}</option>
-                  ))
+                : examTypes
+                    .filter(et => et.is_active !== false)
+                    .map(et => (
+                      <option key={et.code} value={et.code}>
+                        {et.icon_emoji || '📚'} {et.name}
+                      </option>
+                    ))
               }
             </select>
           </div>
