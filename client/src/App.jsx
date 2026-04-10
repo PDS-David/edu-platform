@@ -17,8 +17,8 @@ import StudentDashboard          from './pages/StudentDashboard';
 import StudentAnalyticsDashboard from './pages/StudentAnalyticsDashboard';
 import TeacherDashboard          from './pages/TeacherDashboard';
 import TeacherResourcesPage      from './pages/TeacherResourcesPage';
-import TeacherContentPage           from './pages/TeacherContentPage';        // ← ADDED
-import TeacherPendingQuestions     from './pages/TeacherPendingQuestions';  // ← ADDED
+import TeacherContentPage        from './pages/TeacherContentPage';
+import TeacherPendingQuestions   from './pages/TeacherPendingQuestions';
 import AdminDashboard            from './pages/AdminDashboard';
 import PracticeMode              from './pages/PracticeMode';
 import ContributeQuestion        from './pages/ContributeQuestion';
@@ -135,9 +135,9 @@ function App() {
             element={<PrivateRoute allowedRoles={['teacher', 'admin']}><TeacherResourcesPage defaultTab="upload" /></PrivateRoute>} />
           <Route path="/teacher/add-questions"
             element={<PrivateRoute allowedRoles={['teacher', 'admin']}><TeacherResourcesPage defaultTab="questions" /></PrivateRoute>} />
-          <Route path="/content"                                                                          {/* ← ADDED */}
+          <Route path="/teacher/content"
             element={<PrivateRoute allowedRoles={['teacher', 'admin']}><TeacherContentPage /></PrivateRoute>} />
-          <Route path="/teacher/pending-questions"                                                               {/* ← ADDED */}
+          <Route path="/teacher/pending-questions"
             element={<PrivateRoute allowedRoles={['teacher', 'admin']}><TeacherPendingQuestions /></PrivateRoute>} />
 
           {/* ── Admin routes ─────────────────────────────────────────────── */}
