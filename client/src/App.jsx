@@ -34,6 +34,8 @@ import OnboardingPage            from './pages/OnboardingPage';
 import StudentTestPage           from './pages/StudentTestPage';
 import ImageMarkingPage          from './pages/ImageMarkingPage';
 import SettingsPage              from './pages/SettingsPage';
+// TASK 10 ADDITION: QuizHistoryPage import
+import QuizHistoryPage           from './pages/QuizHistoryPage';
 
 // ── WhatsApp floating contact button ─────────────────────────────────────────
 const WhatsAppButton = () => {
@@ -121,6 +123,15 @@ function App() {
             element={<PrivateRoute allowedRoles={['student']}><PracticeMode /></PrivateRoute>} />
           <Route path="/student/mark-image"
             element={<PrivateRoute allowedRoles={['student']}><ImageMarkingPage /></PrivateRoute>} />
+          {/* TASK 10 ADDITION: Quiz history route for a specific subtopic */}
+          <Route
+            path="/student/subtopic/:subtopicId/quiz-history"
+            element={
+              <PrivateRoute allowedRoles={['student']}>
+                <QuizHistoryPage />
+              </PrivateRoute>
+            }
+          />
           <Route path="/onboarding"
             element={<PrivateRoute allowedRoles={['student']}><OnboardingPage /></PrivateRoute>} />
           <Route path="/contribute"
