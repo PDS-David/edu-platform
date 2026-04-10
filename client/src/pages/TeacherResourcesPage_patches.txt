@@ -1,0 +1,35 @@
+
+TeacherResourcesPage.jsx — 5 surgical patches to apply manually:
+
+PATCH 1 — After `const [file, setFile] = useState(null);` add:
+  const [source, setSource] = useState('');
+
+PATCH 2 — After the title input, before the drop zone, add a source input:
+  <input
+    type="text"
+    value={source}
+    onChange={e => setSource(e.target.value)}
+    placeholder="Source / Authority (optional) — e.g. WAEC Past Questions 2019, EAC AI-Generated"
+    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-800
+      placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-300 transition-colors"
+  />
+
+PATCH 3 — After `fd.append('uploaded_by', user?.id || '');` add:
+  if (source.trim()) fd.append('source', source.trim());
+
+PATCH 4 — Change canUpload (make subtopicId optional so button enables sooner):
+  BEFORE: const canUpload = subjectId && topicId && subtopicId && title.trim() && file && !uploading;
+  AFTER:  const canUpload = subjectId && topicId && title.trim() && file && !uploading;
+
+PATCH 5 — Before the <div className="flex justify-end"> upload button wrapper, add:
+  {file && !canUpload && (
+    <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-800 space-y-1">
+      <p className="font-semibold mb-1.5">Complete these fields to enable upload:</p>
+      {!subjectId    && <p className="flex items-center gap-1.5">⚠️ Select a subject</p>}
+      {!topicId      && <p className="flex items-center gap-1.5">⚠️ Select a topic</p>}
+      {!title.trim() && <p className="flex items-center gap-1.5">⚠️ Add a resource title</p>}
+    </div>
+  )}
+
+PATCH 6 — In upload success reset, add setSource('') to the reset line:
+  setSubjectId(''); setTopicId(''); setSubtopicId(''); setTitle(''); setFile(null); setSource('');

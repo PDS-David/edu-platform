@@ -1,10 +1,17 @@
 // client/src/pages/ImageMarkingPage.jsx
 // ─────────────────────────────────────────────────────────────────────────────
 // Student feature: Upload a photo of a handwritten exam answer for AI marking.
-// Route: /student/mark-image  (add to App.jsx — see instructions below)
+// Route: /student/mark-image
+//
+// FIXES v1.2:
+//   - CRITICAL: api interceptor already unwraps response.data.
+//     Was: const { data } = await api.post(...)  → data was always undefined
+//     Now: const res = await api.post(...)        → res IS the unwrapped payload
+//   - Subject now loaded from /subjects API (linked to exam board selection)
+//   - Exam board loaded from /exam-boards API instead of hardcoded list
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 
@@ -12,18 +19,18 @@ import api from '../services/api';
 function gradeColor(grade) {
   if (!grade) return '#6b7280';
   const g = grade.toUpperCase();
-  if (g === 'A1')                   return '#16a34a';
-  if (g === 'B2' || g === 'B3')    return '#2563eb';
+  if (g === 'A1')                              return '#16a34a';
+  if (g === 'B2' || g === 'B3')               return '#2563eb';
   if (g === 'C4' || g === 'C5' || g === 'C6') return '#d97706';
   return '#dc2626';
 }
 
 // ── Score ring SVG ────────────────────────────────────────────────────────────
 function ScoreRing({ percentage }) {
-  const r = 54;
-  const circ = 2 * Math.PI * r;
+  const r      = 54;
+  const circ   = 2 * Math.PI * r;
   const offset = circ - (percentage / 100) * circ;
-  const color = percentage >= 75 ? '#16a34a'
+  const color  = percentage >= 75 ? '#16a34a'
     : percentage >= 60 ? '#2563eb'
     : percentage >= 45 ? '#d97706'
     : '#dc2626';
@@ -46,15 +53,20 @@ function ScoreRing({ percentage }) {
 }
 
 export default function ImageMarkingPage() {
-  const navigate = useNavigate();
+  const navigate     = useNavigate();
   const fileInputRef = useRef(null);
+
+  // ── Catalog state ───────────────────────────────────────────────────────────
+  const [examBoards,      setExamBoards]      = useState([]);
+  const [subjectOptions,  setSubjectOptions]  = useState([]);
 
   // ── Form state ──────────────────────────────────────────────────────────────
   const [imageFile,    setImageFile]    = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [questionText, setQuestionText] = useState('');
-  const [subject,      setSubject]      = useState('');
-  const [examBoard,    setExamBoard]    = useState('WAEC');
+  const [subjectId,    setSubjectId]    = useState('');
+  const [subjectName,  setSubjectName]  = useState('');
+  const [examBoard,    setExamBoard]    = useState('');
   const [totalMarks,   setTotalMarks]   = useState(10);
   const [markScheme,   setMarkScheme]   = useState('');
 
@@ -63,6 +75,41 @@ export default function ImageMarkingPage() {
   const [result,   setResult]   = useState(null);
   const [error,    setError]    = useState('');
   const [dragging, setDragging] = useState(false);
+
+  // ── Load exam boards on mount ───────────────────────────────────────────────
+  useEffect(() => {
+    api.get('/exam-boards')
+      .then(r => {
+        const list = Array.isArray(r) ? r : (r.data || []);
+        setExamBoards(list);
+        if (list.length > 0) setExamBoard(list[0].code);
+      })
+      .catch(() => {
+        // Fallback static list if endpoint unavailable
+        const fallback = [
+          { id: 1, code: 'WAEC',   name: 'WAEC'   },
+          { id: 2, code: 'NECO',   name: 'NECO'   },
+          { id: 3, code: 'JAMB',   name: 'JAMB'   },
+          { id: 4, code: 'GCE_AL', name: 'GCE A-Levels' },
+          { id: 5, code: 'IELTS',  name: 'IELTS'  },
+        ];
+        setExamBoards(fallback);
+        setExamBoard('WAEC');
+      });
+  }, []);
+
+  // ── Load subjects when exam board changes ───────────────────────────────────
+  useEffect(() => {
+    if (!examBoard) return;
+    setSubjectId('');
+    setSubjectName('');
+    api.get('/subjects', { params: { board: examBoard } })
+      .then(r => {
+        const list = Array.isArray(r) ? r : (r.data || []);
+        setSubjectOptions(list);
+      })
+      .catch(() => setSubjectOptions([]));
+  }, [examBoard]);
 
   // ── File handling ───────────────────────────────────────────────────────────
   const handleFile = useCallback((file) => {
@@ -84,10 +131,10 @@ export default function ImageMarkingPage() {
     reader.readAsDataURL(file);
   }, []);
 
-  const onFileChange  = e => handleFile(e.target.files[0]);
-  const onDrop        = e => { e.preventDefault(); setDragging(false); handleFile(e.dataTransfer.files[0]); };
-  const onDragOver    = e => { e.preventDefault(); setDragging(true); };
-  const onDragLeave   = () => setDragging(false);
+  const onFileChange = e => handleFile(e.target.files[0]);
+  const onDrop       = e => { e.preventDefault(); setDragging(false); handleFile(e.dataTransfer.files[0]); };
+  const onDragOver   = e => { e.preventDefault(); setDragging(true); };
+  const onDragLeave  = () => setDragging(false);
 
   const clearImage = () => {
     setImageFile(null);
@@ -99,7 +146,7 @@ export default function ImageMarkingPage() {
   // ── Submit ──────────────────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!imageFile)          return setError('Please select an image to upload.');
+    if (!imageFile)           return setError('Please select an image to upload.');
     if (!questionText.trim()) return setError('Please enter the exam question.');
 
     setLoading(true);
@@ -110,28 +157,29 @@ export default function ImageMarkingPage() {
       const formData = new FormData();
       formData.append('image',         imageFile);
       formData.append('question_text', questionText.trim());
-      formData.append('subject',       subject || 'General');
+      // Send resolved subject name — fall back to free-text if no dropdown match
+      formData.append('subject',       subjectName || 'General');
+      formData.append('subject_id',    subjectId   || '');
       formData.append('exam_board',    examBoard);
       formData.append('total_marks',   String(totalMarks));
-      if (markScheme.trim()) {
-        formData.append('mark_scheme', markScheme.trim());
-      }
+      if (markScheme.trim()) formData.append('mark_scheme', markScheme.trim());
 
-      const { data } = await api.post('/ai/mark-image', formData, {
+      // ── FIXED: api interceptor already unwraps response.data ─────────────
+      // The resolved value IS the payload — no destructuring needed.
+      const res = await api.post('/ai/mark-image', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      if (data.success) {
-        setResult(data.data);
-        // Smooth scroll to results
+      if (res && res.success) {
+        setResult(res.data);
         setTimeout(() => {
           document.getElementById('marking-result')?.scrollIntoView({ behavior: 'smooth' });
         }, 100);
       } else {
-        setError(data.error || 'Marking failed. Please try again.');
+        setError((res && res.error) || 'Marking failed. Please try again.');
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Something went wrong. Please try again.');
+      setError(err?.error || err?.message || 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -145,305 +193,144 @@ export default function ImageMarkingPage() {
       padding: '32px 16px 64px',
       fontFamily: "'Inter', system-ui, sans-serif",
     },
-    container: {
-      maxWidth: 760,
-      margin: '0 auto',
-    },
+    container:   { maxWidth: 760, margin: '0 auto' },
     backBtn: {
-      background: 'none',
-      border: 'none',
-      color: '#2563eb',
-      cursor: 'pointer',
-      fontSize: 14,
-      display: 'flex',
-      alignItems: 'center',
-      gap: 6,
-      marginBottom: 24,
-      padding: 0,
+      background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer',
+      fontSize: 14, display: 'flex', alignItems: 'center', gap: 6,
+      marginBottom: 24, padding: 0,
     },
-    header: {
-      marginBottom: 32,
-    },
-    title: {
-      fontSize: 28,
-      fontWeight: 700,
-      color: '#111827',
-      margin: '0 0 8px',
-    },
-    subtitle: {
-      fontSize: 15,
-      color: '#6b7280',
-      margin: 0,
-    },
+    header:   { marginBottom: 32 },
+    title:    { fontSize: 28, fontWeight: 700, color: '#111827', margin: '0 0 8px' },
+    subtitle: { fontSize: 15, color: '#6b7280', margin: 0 },
     card: {
-      background: '#fff',
-      borderRadius: 16,
-      padding: 28,
+      background: '#fff', borderRadius: 16, padding: 28,
       boxShadow: '0 1px 3px rgba(0,0,0,0.07), 0 4px 12px rgba(0,0,0,0.05)',
       marginBottom: 20,
     },
     sectionTitle: {
-      fontSize: 16,
-      fontWeight: 600,
-      color: '#374151',
-      marginBottom: 16,
-      display: 'flex',
-      alignItems: 'center',
-      gap: 8,
+      fontSize: 16, fontWeight: 600, color: '#374151', marginBottom: 16,
+      display: 'flex', alignItems: 'center', gap: 8,
     },
     dropZone: (active) => ({
       border: `2px dashed ${active ? '#2563eb' : '#d1d5db'}`,
-      borderRadius: 12,
-      padding: '32px 16px',
-      textAlign: 'center',
-      cursor: 'pointer',
-      background: active ? '#eff6ff' : '#f9fafb',
-      transition: 'all 0.2s ease',
-      position: 'relative',
+      borderRadius: 12, padding: '32px 16px', textAlign: 'center',
+      cursor: 'pointer', background: active ? '#eff6ff' : '#f9fafb',
+      transition: 'all 0.2s ease', position: 'relative',
     }),
-    previewWrap: {
-      position: 'relative',
-      display: 'inline-block',
-      maxWidth: '100%',
-    },
+    previewWrap: { position: 'relative', display: 'inline-block', maxWidth: '100%' },
     previewImg: {
-      maxWidth: '100%',
-      maxHeight: 320,
-      borderRadius: 10,
-      border: '1px solid #e5e7eb',
-      display: 'block',
-      margin: '0 auto',
+      maxWidth: '100%', maxHeight: 320, borderRadius: 10,
+      border: '1px solid #e5e7eb', display: 'block', margin: '0 auto',
     },
     clearBtn: {
-      position: 'absolute',
-      top: -10,
-      right: -10,
-      background: '#ef4444',
-      color: '#fff',
-      border: 'none',
-      borderRadius: '50%',
-      width: 28,
-      height: 28,
-      cursor: 'pointer',
-      fontSize: 16,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+      position: 'absolute', top: -10, right: -10, background: '#ef4444',
+      color: '#fff', border: 'none', borderRadius: '50%', width: 28, height: 28,
+      cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center',
+      justifyContent: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
     },
-    label: {
-      display: 'block',
-      fontSize: 13,
-      fontWeight: 600,
-      color: '#374151',
-      marginBottom: 6,
-    },
+    label:  { display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 },
     input: {
-      width: '100%',
-      padding: '10px 14px',
-      border: '1px solid #d1d5db',
-      borderRadius: 8,
-      fontSize: 14,
-      color: '#111827',
-      background: '#fff',
-      outline: 'none',
-      boxSizing: 'border-box',
-      transition: 'border-color 0.2s',
+      width: '100%', padding: '10px 14px', border: '1px solid #d1d5db', borderRadius: 8,
+      fontSize: 14, color: '#111827', background: '#fff', outline: 'none',
+      boxSizing: 'border-box', transition: 'border-color 0.2s',
     },
     textarea: {
-      width: '100%',
-      padding: '10px 14px',
-      border: '1px solid #d1d5db',
-      borderRadius: 8,
-      fontSize: 14,
-      color: '#111827',
-      background: '#fff',
-      outline: 'none',
-      boxSizing: 'border-box',
-      minHeight: 90,
-      resize: 'vertical',
-      fontFamily: 'inherit',
+      width: '100%', padding: '10px 14px', border: '1px solid #d1d5db', borderRadius: 8,
+      fontSize: 14, color: '#111827', background: '#fff', outline: 'none',
+      boxSizing: 'border-box', minHeight: 90, resize: 'vertical', fontFamily: 'inherit',
     },
     select: {
-      width: '100%',
-      padding: '10px 14px',
-      border: '1px solid #d1d5db',
-      borderRadius: 8,
-      fontSize: 14,
-      color: '#111827',
-      background: '#fff',
-      outline: 'none',
-      boxSizing: 'border-box',
-      appearance: 'none',
+      width: '100%', padding: '10px 14px', border: '1px solid #d1d5db', borderRadius: 8,
+      fontSize: 14, color: '#111827', background: '#fff', outline: 'none',
+      boxSizing: 'border-box', appearance: 'none',
     },
-    row: {
-      display: 'grid',
-      gridTemplateColumns: '1fr 1fr 1fr',
-      gap: 16,
-    },
+    row:  { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 },
+    row2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 },
     submitBtn: {
-      width: '100%',
-      padding: '14px',
+      width: '100%', padding: '14px',
       background: loading ? '#93c5fd' : '#2563eb',
-      color: '#fff',
-      border: 'none',
-      borderRadius: 10,
-      fontSize: 16,
-      fontWeight: 600,
-      cursor: loading ? 'not-allowed' : 'pointer',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 10,
-      transition: 'background 0.2s',
-      marginTop: 8,
+      color: '#fff', border: 'none', borderRadius: 10, fontSize: 16, fontWeight: 600,
+      cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center',
+      justifyContent: 'center', gap: 10, transition: 'background 0.2s', marginTop: 8,
     },
     errorBox: {
-      background: '#fef2f2',
-      border: '1px solid #fecaca',
-      borderRadius: 10,
-      padding: '12px 16px',
-      color: '#dc2626',
-      fontSize: 14,
-      marginBottom: 16,
-      display: 'flex',
-      alignItems: 'center',
-      gap: 8,
+      background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10,
+      padding: '12px 16px', color: '#dc2626', fontSize: 14, marginBottom: 16,
+      display: 'flex', alignItems: 'center', gap: 8,
     },
-    // Result styles
     resultCard: {
-      background: '#fff',
-      borderRadius: 16,
-      padding: 32,
+      background: '#fff', borderRadius: 16, padding: 32,
       boxShadow: '0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.08)',
       marginBottom: 20,
     },
-    scoreRow: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: 32,
-      marginBottom: 28,
-      flexWrap: 'wrap',
-    },
+    scoreRow: { display: 'flex', alignItems: 'center', gap: 32, marginBottom: 28, flexWrap: 'wrap' },
     gradeTag: (grade) => ({
-      display: 'inline-block',
-      padding: '6px 18px',
-      borderRadius: 8,
-      background: gradeColor(grade) + '18',
-      color: gradeColor(grade),
-      fontWeight: 700,
-      fontSize: 22,
-      border: `2px solid ${gradeColor(grade)}30`,
+      display: 'inline-block', padding: '6px 18px', borderRadius: 8,
+      background: gradeColor(grade) + '18', color: gradeColor(grade),
+      fontWeight: 700, fontSize: 22, border: `2px solid ${gradeColor(grade)}30`,
     }),
-    marksText: {
-      fontSize: 15,
-      color: '#6b7280',
-      marginTop: 4,
-    },
+    marksText:    { fontSize: 15, color: '#6b7280', marginTop: 4 },
     feedbackBox: {
-      background: '#f0fdf4',
-      border: '1px solid #bbf7d0',
-      borderRadius: 10,
-      padding: '16px 20px',
-      color: '#166534',
-      fontSize: 15,
-      lineHeight: 1.6,
-      marginBottom: 20,
+      background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10,
+      padding: '16px 20px', color: '#166534', fontSize: 15, lineHeight: 1.6, marginBottom: 20,
     },
-    listSection: {
-      marginBottom: 20,
-    },
+    listSection:  { marginBottom: 20 },
     listTitle: {
-      fontSize: 14,
-      fontWeight: 700,
-      color: '#374151',
-      marginBottom: 10,
-      textTransform: 'uppercase',
-      letterSpacing: '0.05em',
+      fontSize: 14, fontWeight: 700, color: '#374151', marginBottom: 10,
+      textTransform: 'uppercase', letterSpacing: '0.05em',
     },
     listItem: (type) => ({
-      display: 'flex',
-      gap: 10,
-      padding: '8px 12px',
-      borderRadius: 8,
-      marginBottom: 6,
+      display: 'flex', gap: 10, padding: '8px 12px', borderRadius: 8, marginBottom: 6,
       fontSize: 14,
       background: type === 'strength' ? '#f0fdf4' : '#fff7ed',
-      color: type === 'strength' ? '#166534' : '#92400e',
-      border: `1px solid ${type === 'strength' ? '#bbf7d0' : '#fed7aa'}`,
+      color:      type === 'strength' ? '#166534' : '#92400e',
+      border:    `1px solid ${type === 'strength' ? '#bbf7d0' : '#fed7aa'}`,
     }),
     modelAnswerBox: {
-      background: '#eff6ff',
-      border: '1px solid #bfdbfe',
-      borderRadius: 10,
-      padding: '16px 20px',
-      marginBottom: 20,
+      background: '#eff6ff', border: '1px solid #bfdbfe',
+      borderRadius: 10, padding: '16px 20px', marginBottom: 20,
     },
     modelAnswerTitle: {
-      fontSize: 13,
-      fontWeight: 700,
-      color: '#1d4ed8',
-      marginBottom: 8,
-      textTransform: 'uppercase',
-      letterSpacing: '0.04em',
+      fontSize: 13, fontWeight: 700, color: '#1d4ed8', marginBottom: 8,
+      textTransform: 'uppercase', letterSpacing: '0.04em',
     },
-    modelAnswerText: {
-      fontSize: 14,
-      color: '#1e40af',
-      lineHeight: 1.7,
-      whiteSpace: 'pre-wrap',
-    },
+    modelAnswerText: { fontSize: 14, color: '#1e40af', lineHeight: 1.7, whiteSpace: 'pre-wrap' },
     tryAgainBtn: {
-      width: '100%',
-      padding: '12px',
-      background: '#f3f4f6',
-      color: '#374151',
-      border: '1px solid #d1d5db',
-      borderRadius: 10,
-      fontSize: 15,
-      fontWeight: 600,
-      cursor: 'pointer',
-      transition: 'background 0.2s',
+      width: '100%', padding: '12px', background: '#f3f4f6',
+      color: '#374151', border: '1px solid #d1d5db', borderRadius: 10,
+      fontSize: 15, fontWeight: 600, cursor: 'pointer', transition: 'background 0.2s',
     },
     spinner: {
-      width: 20,
-      height: 20,
-      border: '3px solid rgba(255,255,255,0.4)',
-      borderTopColor: '#fff',
-      borderRadius: '50%',
+      width: 20, height: 20, border: '3px solid rgba(255,255,255,0.4)',
+      borderTopColor: '#fff', borderRadius: '50%',
       animation: 'spin 0.8s linear infinite',
     },
     readabilityWarning: {
-      background: '#fffbeb',
-      border: '1px solid #fcd34d',
-      borderRadius: 10,
-      padding: '12px 16px',
-      color: '#92400e',
-      fontSize: 14,
-      marginBottom: 16,
-      display: 'flex',
-      gap: 8,
-      alignItems: 'flex-start',
+      background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 10,
+      padding: '12px 16px', color: '#92400e', fontSize: 14, marginBottom: 16,
+      display: 'flex', gap: 8, alignItems: 'flex-start',
+    },
+    sourceTag: {
+      display: 'inline-block', background: '#f3f4f6', border: '1px solid #e5e7eb',
+      borderRadius: 6, padding: '3px 10px', fontSize: 12, color: '#6b7280',
+      marginTop: 8,
     },
   };
 
   return (
     <div style={S.page}>
-      {/* Spinner keyframe */}
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
       <div style={S.container}>
 
-        {/* Back button */}
-        <button style={S.backBtn} onClick={() => navigate(-1)}>
-          ← Back
-        </button>
+        {/* Back */}
+        <button style={S.backBtn} onClick={() => navigate(-1)}>← Back</button>
 
         {/* Header */}
         <div style={S.header}>
           <h1 style={S.title}>📸 AI Answer Marking</h1>
           <p style={S.subtitle}>
-            Take a photo of your handwritten answer, upload it, and get instant AI feedback and marks.
+            Take a photo of your handwritten answer, upload it, and get instant AI feedback and a mark.
           </p>
         </div>
 
@@ -453,16 +340,12 @@ export default function ImageMarkingPage() {
 
             {/* Step 1 — Upload image */}
             <div style={S.card}>
-              <div style={S.sectionTitle}>
-                <span>1</span> Upload Your Answer Sheet
-              </div>
+              <div style={S.sectionTitle}><span>1</span> Upload Your Answer Sheet</div>
 
               {!imagePreview ? (
                 <div
                   style={S.dropZone(dragging)}
-                  onDrop={onDrop}
-                  onDragOver={onDragOver}
-                  onDragLeave={onDragLeave}
+                  onDrop={onDrop} onDragOver={onDragOver} onDragLeave={onDragLeave}
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <div style={{ fontSize: 40, marginBottom: 12 }}>📷</div>
@@ -473,11 +356,9 @@ export default function ImageMarkingPage() {
                     JPEG, PNG, WEBP or HEIC — max 10 MB
                   </p>
                   <input
-                    ref={fileInputRef}
-                    type="file"
+                    ref={fileInputRef} type="file"
                     accept="image/jpeg,image/png,image/webp,image/heic"
-                    onChange={onFileChange}
-                    style={{ display: 'none' }}
+                    onChange={onFileChange} style={{ display: 'none' }}
                   />
                 </div>
               ) : (
@@ -495,9 +376,7 @@ export default function ImageMarkingPage() {
 
             {/* Step 2 — Question & context */}
             <div style={S.card}>
-              <div style={S.sectionTitle}>
-                <span>2</span> Question Details
-              </div>
+              <div style={S.sectionTitle}><span>2</span> Question Details</div>
 
               <div style={{ marginBottom: 16 }}>
                 <label style={S.label}>
@@ -512,77 +391,79 @@ export default function ImageMarkingPage() {
                 />
               </div>
 
-              <div style={S.row}>
-                <div>
-                  <label style={S.label}>Subject</label>
-                  <input
-                    style={S.input}
-                    placeholder="e.g. Mathematics"
-                    value={subject}
-                    onChange={e => setSubject(e.target.value)}
-                  />
-                </div>
+              {/* Exam board + Subject row */}
+              <div style={S.row2}>
                 <div>
                   <label style={S.label}>Exam Board</label>
-                  <select
-                    style={S.select}
-                    value={examBoard}
-                    onChange={e => setExamBoard(e.target.value)}
-                  >
-                    <option value="WAEC">WAEC</option>
-                    <option value="NECO">NECO</option>
-                    <option value="JAMB">JAMB</option>
-                    <option value="Cambridge IGCSE">Cambridge IGCSE</option>
-                    <option value="Cambridge A Level">Cambridge A Level</option>
-                    <option value="Edexcel">Edexcel</option>
-                    <option value="AQA">AQA</option>
-                    <option value="IELTS">IELTS</option>
+                  <select style={S.select} value={examBoard} onChange={e => setExamBoard(e.target.value)}>
+                    {examBoards.map(b => (
+                      <option key={b.id || b.code} value={b.code}>{b.name}</option>
+                    ))}
                   </select>
                 </div>
                 <div>
-                  <label style={S.label}>Total Marks</label>
-                  <input
-                    style={S.input}
-                    type="number"
-                    min={1}
-                    max={100}
-                    value={totalMarks}
-                    onChange={e => setTotalMarks(parseInt(e.target.value) || 10)}
-                  />
+                  <label style={S.label}>Subject</label>
+                  {subjectOptions.length > 0 ? (
+                    <select
+                      style={S.select}
+                      value={subjectId}
+                      onChange={e => {
+                        const s = subjectOptions.find(s => String(s.id) === e.target.value);
+                        setSubjectId(e.target.value);
+                        setSubjectName(s?.name || '');
+                      }}
+                    >
+                      <option value="">— Select subject —</option>
+                      {subjectOptions.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      style={S.input}
+                      placeholder="e.g. Mathematics"
+                      value={subjectName}
+                      onChange={e => setSubjectName(e.target.value)}
+                    />
+                  )}
                 </div>
               </div>
 
-              <div style={{ marginTop: 16 }}>
+              <div style={{ marginBottom: 16 }}>
+                <label style={S.label}>Total Marks Available</label>
+                <input
+                  style={{ ...S.input, width: 120 }}
+                  type="number" min={1} max={100}
+                  value={totalMarks}
+                  onChange={e => setTotalMarks(parseInt(e.target.value) || 10)}
+                />
+              </div>
+
+              <div>
                 <label style={S.label}>
                   Mark Scheme / Model Answer
-                  <span style={{ fontWeight: 400, color: '#9ca3af', marginLeft: 6 }}>(optional but improves accuracy)</span>
+                  <span style={{ fontWeight: 400, color: '#9ca3af', marginLeft: 6 }}>
+                    (optional — improves accuracy)
+                  </span>
                 </label>
                 <textarea
                   style={{ ...S.textarea, minHeight: 70 }}
-                  placeholder="Paste the mark scheme or key points the answer should include…"
+                  placeholder="Paste the mark scheme or key points the answer should cover…"
                   value={markScheme}
                   onChange={e => setMarkScheme(e.target.value)}
                 />
               </div>
             </div>
 
-            {/* Error */}
             {error && (
-              <div style={S.errorBox}>
-                <span>⚠️</span> {error}
-              </div>
+              <div style={S.errorBox}><span>⚠️</span> {error}</div>
             )}
 
-            {/* Submit */}
             <button type="submit" style={S.submitBtn} disabled={loading}>
-              {loading ? (
-                <>
-                  <div style={S.spinner} />
-                  Marking your answer…
-                </>
-              ) : (
-                '🤖 Mark My Answer'
-              )}
+              {loading
+                ? <><div style={S.spinner} /> Marking your answer…</>
+                : '🤖 Mark My Answer'
+              }
             </button>
           </form>
         )}
@@ -591,7 +472,6 @@ export default function ImageMarkingPage() {
         {result && (
           <div id="marking-result">
 
-            {/* Readability warning */}
             {result.readabilityNote && (
               <div style={S.readabilityWarning}>
                 <span>⚠️</span>
@@ -604,48 +484,43 @@ export default function ImageMarkingPage() {
                 📊 Marking Results
               </h2>
 
-              {/* Score ring + grade */}
               <div style={S.scoreRow}>
                 <ScoreRing percentage={result.percentage} />
                 <div>
                   <div style={S.gradeTag(result.grade)}>{result.grade}</div>
-                  <p style={S.marksText}>
-                    {result.marksAwarded} / {result.totalMarks} marks awarded
-                  </p>
+                  <p style={S.marksText}>{result.marksAwarded} / {result.totalMarks} marks awarded</p>
+                  {/* Source attribution */}
+                  {(examBoard || subjectName) && (
+                    <span style={S.sourceTag}>
+                      {subjectName ? `${subjectName} · ` : ''}{examBoard} · AI-marked
+                    </span>
+                  )}
                 </div>
               </div>
 
-              {/* Feedback */}
               <div style={S.feedbackBox}>
                 <strong style={{ display: 'block', marginBottom: 4 }}>Overall Feedback</strong>
                 {result.feedback}
               </div>
 
-              {/* Strengths */}
               {result.strengths?.length > 0 && (
                 <div style={S.listSection}>
                   <div style={S.listTitle}>✅ Strengths</div>
                   {result.strengths.map((s, i) => (
-                    <div key={i} style={S.listItem('strength')}>
-                      <span>✓</span> {s}
-                    </div>
+                    <div key={i} style={S.listItem('strength')}><span>✓</span> {s}</div>
                   ))}
                 </div>
               )}
 
-              {/* Improvements */}
               {result.improvements?.length > 0 && (
                 <div style={S.listSection}>
                   <div style={S.listTitle}>📈 Areas for Improvement</div>
                   {result.improvements.map((imp, i) => (
-                    <div key={i} style={S.listItem('improvement')}>
-                      <span>→</span> {imp}
-                    </div>
+                    <div key={i} style={S.listItem('improvement')}><span>→</span> {imp}</div>
                   ))}
                 </div>
               )}
 
-              {/* Model answer */}
               {result.modelAnswer && (
                 <div style={S.modelAnswerBox}>
                   <div style={S.modelAnswerTitle}>💡 Model Answer / Key Points</div>
@@ -654,32 +529,27 @@ export default function ImageMarkingPage() {
               )}
             </div>
 
-            {/* Image submitted */}
             {imagePreview && (
               <div style={{ ...S.card, padding: 20 }}>
                 <p style={{ fontSize: 13, fontWeight: 600, color: '#6b7280', marginBottom: 10 }}>
                   YOUR SUBMITTED ANSWER
                 </p>
-                <img src={imagePreview} alt="Submitted answer" style={{ ...S.previewImg, maxHeight: 240 }} />
+                <img src={imagePreview} alt="Submitted answer"
+                  style={{ ...S.previewImg, maxHeight: 240 }} />
               </div>
             )}
 
-            {/* Try another */}
             <button
               style={S.tryAgainBtn}
               onClick={() => {
-                setResult(null);
-                setImageFile(null);
-                setImagePreview(null);
-                setQuestionText('');
-                setMarkScheme('');
+                setResult(null); setImageFile(null); setImagePreview(null);
+                setQuestionText(''); setMarkScheme('');
               }}
             >
               📸 Mark Another Answer
             </button>
           </div>
         )}
-
       </div>
     </div>
   );
