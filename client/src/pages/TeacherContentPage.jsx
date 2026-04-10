@@ -1,4 +1,4 @@
-// client/src/pages/teacher/TeacherContentPage.jsx
+// client/src/pages/TeacherContentPage.jsx
 //
 // Teacher Topic & Subtopic Management
 // URL: /teacher/content
