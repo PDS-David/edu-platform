@@ -19,16 +19,12 @@ const accColor = (pct) => {
   return 'text-red-500';
 };
 
-/** Derive a friendly first name from whatever fields the user object has */
 function getDisplayName(user) {
   if (!user) return 'Teacher';
-  // Try camelCase first (from login), then snake_case (from /auth/me)
   const first = user.firstName || user.first_name;
   if (first && first.trim()) return first.trim();
-  // Fall back to splitting a full name if stored in last_name or name
   const full = user.lastName || user.last_name || user.name || '';
   if (full.trim()) return full.trim().split(' ')[0];
-  // Last resort: use the part of the email before @
   if (user.email) return user.email.split('@')[0];
   return 'Teacher';
 }
@@ -468,14 +464,18 @@ function TestBuilderTab() {
 export default function TeacherDashboard() {
   const { user }                           = useAuth();
   const navigate                           = useNavigate();
-  const [activeTab,      setActiveTab]     = useState('classes');
+  const [activeTab,        setActiveTab]   = useState('classes');
   const [selectedClass,  setSelectedClass] = useState(null);
+
+  // null  = still loading
+  // []    = loaded, none assigned
+  // [...] = loaded, has assignments
   const [assignedSubjects, setAssignedSubjects] = useState(null);
 
   const tabs = [
-    { id: 'classes',     label: 'My Classes',   icon: Users     },
-    { id: 'analytics',   label: 'Analytics',    icon: BarChart2 },
-    { id: 'testbuilder', label: 'Test Builder',  icon: PenTool   },
+    { id: 'classes',     label: 'My Classes',  icon: Users     },
+    { id: 'analytics',   label: 'Analytics',   icon: BarChart2 },
+    { id: 'testbuilder', label: 'Test Builder', icon: PenTool   },
   ];
 
   const handleViewAnalytics = (cls) => {
@@ -483,16 +483,21 @@ export default function TeacherDashboard() {
     setActiveTab('analytics');
   };
 
+  // Load the teacher's assigned subjects from the server.
+  // The API returns { success: true, data: [...] } — we unpack .data.
   useEffect(() => {
     api.get('/teacher/my-subjects')
-      .then(r => setAssignedSubjects(r.data || []))
-      .catch(() => setAssignedSubjects([]));
+      .then(r => {
+        // Handle both shapes: raw array or { data: [...] }
+        const list = Array.isArray(r) ? r : (r.data ?? []);
+        setAssignedSubjects(list);
+      })
+      .catch(() => setAssignedSubjects([])); // treat errors as "none assigned"
   }, []);
 
-  const hasSubjects     = assignedSubjects && assignedSubjects.length > 0;
   const subjectsLoading = assignedSubjects === null;
+  const hasSubjects     = Array.isArray(assignedSubjects) && assignedSubjects.length > 0;
 
-  // ── Derive teacher's display name from whatever fields are available ────────
   const displayName = getDisplayName(user);
 
   return (
@@ -520,18 +525,28 @@ export default function TeacherDashboard() {
         </div>
       </div>
 
-      {/* ── Subject assignment status banner ── */}
+      {/* ── Subject assignment status banner ────────────────────────────────── */}
+      {/* Only render once loading is complete — prevents flash of amber banner */}
       {!subjectsLoading && (
-        <div className={`border-b px-4 py-3 ${hasSubjects ? 'bg-teal-50 border-teal-100' : 'bg-amber-50 border-amber-100'}`}>
+        <div className={`border-b px-4 py-3 ${
+          hasSubjects ? 'bg-teal-50 border-teal-100' : 'bg-amber-50 border-amber-100'
+        }`}>
           <div className="max-w-4xl mx-auto flex items-center gap-3">
             {hasSubjects ? (
               <>
                 <CheckCircle size={16} className="text-teal-600 shrink-0" />
                 <p className="text-sm text-teal-800">
                   <span className="font-semibold">Subjects assigned:</span>{' '}
-                  {assignedSubjects.map(s => `${s.name}${s.exam_board_code ? ` (${s.exam_board_code})` : ''}`).join(' · ')}
+                  {assignedSubjects
+                    .map(s =>
+                      `${s.icon_emoji ? s.icon_emoji + ' ' : ''}${s.name}${s.exam_board_code ? ` (${s.exam_board_code})` : ''}`
+                    )
+                    .join(' · ')}
                 </p>
-                <Link to="/teacher/resources" className="ml-auto text-xs font-semibold text-teal-700 hover:text-teal-900 shrink-0 flex items-center gap-1">
+                <Link
+                  to="/teacher/resources"
+                  className="ml-auto text-xs font-semibold text-teal-700 hover:text-teal-900 shrink-0 flex items-center gap-1"
+                >
                   <BookOpen size={12} /> Manage Resources →
                 </Link>
               </>
