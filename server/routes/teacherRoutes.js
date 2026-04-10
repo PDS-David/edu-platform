@@ -531,4 +531,37 @@ router.delete('/concepts/:id', protect, teacherOnly, async (req, res) => {
   } catch (err) { return res.status(500).json({success:false,error:err.message}); }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// TASK 14 ADDITION: GET /api/teacher/questions
+// Returns this teacher's submitted questions with subject name and status,
+// newest first. Added before module.exports = router.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// GET /api/teacher/questions
+// Returns this teacher's submitted questions with subject name and status.
+router.get('/questions', protect, teacherOnly, async (req, res) => {
+  try {
+    const rows = await sequelize.query(
+      `SELECT q.id, q.question_text, q.status, q.difficulty,
+              q.explanation, q.options, q.created_at,
+              s.name AS subject_name
+       FROM questions q
+       LEFT JOIN subtopics  st ON st.id = q.subtopic_id
+       LEFT JOIN topics      t ON t.id  = st.topic_id
+       LEFT JOIN subjects    s ON s.id  = t.subject_id
+       WHERE q.submitted_by = :teacherId
+       ORDER BY q.created_at DESC
+       LIMIT 100`,
+      {
+        replacements: { teacherId: req.user.id },
+        type: QueryTypes.SELECT,
+      }
+    );
+    return res.json({ success: true, data: rows });
+  } catch (err) {
+    console.error('[GET /teacher/questions]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;
