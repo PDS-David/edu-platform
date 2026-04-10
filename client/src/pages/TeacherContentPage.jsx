@@ -1,0 +1,587 @@
+// client/src/pages/teacher/TeacherContentPage.jsx
+//
+// Teacher Topic & Subtopic Management
+// URL: /teacher/content
+//
+// Flow:
+//   1. Teacher picks one of their assigned subjects from a tab strip
+//   2. Sees all topics for that subject (admin-created + their own)
+//   3. Can add / edit / delete their own topics (admin topics are read-only)
+//   4. Expands a topic to see its subtopics
+//   5. Can add / edit / delete their own subtopics within any topic
+
+import { useState, useEffect, useRef } from 'react';
+import { Link }                        from 'react-router-dom';
+import api                             from '../../services/api';
+import TopNav                          from '../../components/TopNav';
+import {
+  BookOpen, Plus, ChevronDown, ChevronUp, ChevronRight,
+  Pencil, Trash2, Loader2, CheckCircle, AlertTriangle,
+  X, Save, Layers, FileText, Lock,
+} from 'lucide-react';
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function Toast({ msg, type, onClose }) {
+  useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t); }, [onClose]);
+  return (
+    <div className={`fixed bottom-6 right-4 z-50 flex items-center gap-2.5 px-5 py-3
+      rounded-2xl shadow-xl text-sm font-semibold text-white
+      ${type === 'success' ? 'bg-gray-900' : 'bg-red-600'}`}>
+      {type === 'success'
+        ? <CheckCircle size={14} className="text-teal-400 shrink-0" />
+        : <AlertTriangle size={14} className="shrink-0" />}
+      <span>{msg}</span>
+      <button onClick={onClose}><X size={13} className="opacity-60" /></button>
+    </div>
+  );
+}
+
+// ── Inline editable name field ────────────────────────────────────────────────
+function InlineEdit({ value, onSave, onCancel, placeholder = 'Enter name…' }) {
+  const [val, setVal] = useState(value);
+  const ref = useRef(null);
+  useEffect(() => { ref.current?.focus(); }, []);
+  const handleKey = e => {
+    if (e.key === 'Enter')  onSave(val);
+    if (e.key === 'Escape') onCancel();
+  };
+  return (
+    <div className="flex items-center gap-2 flex-1">
+      <input
+        ref={ref}
+        value={val}
+        onChange={e => setVal(e.target.value)}
+        onKeyDown={handleKey}
+        placeholder={placeholder}
+        className="flex-1 border border-teal-300 rounded-lg px-3 py-1.5 text-sm
+          focus:outline-none focus:ring-2 focus:ring-teal-300 bg-white"
+      />
+      <button onClick={() => onSave(val)}
+        className="p-1.5 rounded-lg bg-teal-500 hover:bg-teal-600 text-white transition-colors">
+        <Save size={13} />
+      </button>
+      <button onClick={onCancel}
+        className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors">
+        <X size={13} />
+      </button>
+    </div>
+  );
+}
+
+// ── Confirm delete modal ──────────────────────────────────────────────────────
+function ConfirmModal({ message, onConfirm, onCancel, loading }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+        <p className="text-sm text-gray-700 mb-5">{message}</p>
+        <div className="flex gap-3">
+          <button onClick={onCancel}
+            className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm text-gray-600 hover:bg-gray-50">
+            Cancel
+          </button>
+          <button onClick={onConfirm} disabled={loading}
+            className="flex-1 bg-red-500 hover:bg-red-600 disabled:opacity-60 text-white rounded-xl py-2.5 text-sm font-semibold flex items-center justify-center gap-2">
+            {loading && <Loader2 size={13} className="animate-spin" />}
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Add-item row (used for both new topics and new subtopics) ─────────────────
+function AddRow({ placeholder, onAdd, onCancel }) {
+  const [name, setName] = useState('');
+  const [desc, setDesc] = useState('');
+  const [saving, setSaving] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => { ref.current?.focus(); }, []);
+
+  const handle = async () => {
+    if (!name.trim()) return;
+    setSaving(true);
+    await onAdd(name.trim(), desc.trim() || null);
+    setSaving(false);
+  };
+
+  return (
+    <div className="bg-teal-50 border border-teal-200 rounded-xl p-3 space-y-2 mb-2">
+      <input
+        ref={ref}
+        value={name}
+        onChange={e => setName(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') handle(); if (e.key === 'Escape') onCancel(); }}
+        placeholder={placeholder}
+        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
+          focus:outline-none focus:ring-2 focus:ring-teal-300 bg-white"
+      />
+      <input
+        value={desc}
+        onChange={e => setDesc(e.target.value)}
+        placeholder="Description (optional)"
+        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
+          focus:outline-none focus:ring-2 focus:ring-teal-300 bg-white"
+      />
+      <div className="flex gap-2 justify-end">
+        <button onClick={onCancel}
+          className="px-3 py-1.5 text-sm text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50">
+          Cancel
+        </button>
+        <button onClick={handle} disabled={saving || !name.trim()}
+          className="px-4 py-1.5 text-sm font-semibold bg-teal-500 hover:bg-teal-600
+            disabled:opacity-50 text-white rounded-lg flex items-center gap-1.5">
+          {saving ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+          {saving ? 'Saving…' : 'Add'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Subtopic list inside an expanded topic ────────────────────────────────────
+function SubtopicList({ topic, subjectId, showToast }) {
+  const [subtopics,   setSubtopics]   = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [showAdd,     setShowAdd]     = useState(false);
+  const [editingId,   setEditingId]   = useState(null);
+  const [confirmDel,  setConfirmDel]  = useState(null); // subtopic obj
+  const [deleting,    setDeleting]    = useState(false);
+
+  const load = () => {
+    setLoading(true);
+    api.get('/teacher/subtopics', { params: { topic_id: topic.id } })
+      .then(r => setSubtopics(Array.isArray(r) ? r : (r.data ?? [])))
+      .catch(() => setSubtopics([]))
+      .finally(() => setLoading(false));
+  };
+  useEffect(load, [topic.id]); // eslint-disable-line
+
+  const handleAdd = async (name, description) => {
+    try {
+      const r = await api.post('/teacher/subtopics', {
+        topic_id: topic.id, subject_id: subjectId, name, description,
+        order_index: subtopics.length,
+      });
+      const created = r.data ?? r;
+      setSubtopics(prev => [...prev, created]);
+      setShowAdd(false);
+      showToast('Subtopic added!');
+    } catch (err) {
+      showToast(err?.error || err?.message || 'Failed to add subtopic', 'error');
+    }
+  };
+
+  const handleEdit = async (id, newName) => {
+    if (!newName.trim()) return;
+    try {
+      const r = await api.put(`/teacher/subtopics/${id}`, { name: newName.trim() });
+      const updated = r.data ?? r;
+      setSubtopics(prev => prev.map(s => s.id === id ? { ...s, name: updated.name } : s));
+      setEditingId(null);
+      showToast('Subtopic updated!');
+    } catch (err) {
+      showToast(err?.error || 'Failed to update subtopic', 'error');
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!confirmDel) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/teacher/subtopics/${confirmDel.id}`);
+      setSubtopics(prev => prev.filter(s => s.id !== confirmDel.id));
+      showToast('Subtopic deleted.');
+    } catch (err) {
+      showToast(err?.error || 'Failed to delete subtopic', 'error');
+    } finally {
+      setDeleting(false);
+      setConfirmDel(null);
+    }
+  };
+
+  if (loading) return (
+    <div className="py-4 flex justify-center">
+      <Loader2 size={16} className="animate-spin text-teal-400" />
+    </div>
+  );
+
+  return (
+    <div className="px-5 pb-4 pt-1">
+      {/* Subtopics */}
+      {subtopics.length === 0 && !showAdd && (
+        <p className="text-xs text-gray-400 py-2">No subtopics yet. Add one below.</p>
+      )}
+
+      {subtopics.map(sub => (
+        <div key={sub.id}
+          className="flex items-center gap-2 py-2 border-b border-gray-50 last:border-0 group">
+          {/* dot */}
+          <div className="w-1.5 h-1.5 rounded-full bg-teal-400 shrink-0" />
+
+          {editingId === sub.id && sub.created_by_me ? (
+            <InlineEdit
+              value={sub.name}
+              onSave={v => handleEdit(sub.id, v)}
+              onCancel={() => setEditingId(null)}
+              placeholder="Subtopic name"
+            />
+          ) : (
+            <>
+              <span className="text-sm text-gray-700 flex-1">{sub.name}</span>
+              {sub.concept_count > 0 && (
+                <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-md shrink-0">
+                  {sub.concept_count} concept{sub.concept_count !== 1 ? 's' : ''}
+                </span>
+              )}
+              {sub.created_by_me ? (
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                  <button onClick={() => setEditingId(sub.id)}
+                    className="p-1 rounded text-gray-400 hover:text-teal-600 hover:bg-teal-50 transition-colors">
+                    <Pencil size={12} />
+                  </button>
+                  <button onClick={() => setConfirmDel(sub)}
+                    className="p-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              ) : (
+                <Lock size={11} className="text-gray-300 shrink-0opacity-0 group-hover:opacity-100" title="Admin-created" />
+              )}
+            </>
+          )}
+        </div>
+      ))}
+
+      {/* Add subtopic */}
+      {showAdd ? (
+        <AddRow
+          placeholder="Subtopic name e.g. Cell Division"
+          onAdd={handleAdd}
+          onCancel={() => setShowAdd(false)}
+        />
+      ) : (
+        <button onClick={() => setShowAdd(true)}
+          className="mt-2 flex items-center gap-1.5 text-xs text-teal-600 font-medium
+            hover:text-teal-800 transition-colors">
+          <Plus size={12} /> Add subtopic
+        </button>
+      )}
+
+      {confirmDel && (
+        <ConfirmModal
+          message={`Delete subtopic "${confirmDel.name}"? This will also hide all its concepts from students.`}
+          onConfirm={handleDelete}
+          onCancel={() => setConfirmDel(null)}
+          loading={deleting}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Topic card ────────────────────────────────────────────────────────────────
+function TopicCard({ topic, subjectId, showToast, onEdit, onDelete }) {
+  const [expanded, setExpanded] = useState(false);
+  const [editing,  setEditing]  = useState(false);
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-3">
+      {/* Topic header row */}
+      <div className="flex items-center gap-3 px-5 py-4">
+        {/* Expand toggle */}
+        <button onClick={() => setExpanded(e => !e)}
+          className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors shrink-0">
+          {expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+        </button>
+
+        {/* Name — editable inline */}
+        {editing ? (
+          <InlineEdit
+            value={topic.name}
+            onSave={v => { onEdit(topic.id, v); setEditing(false); }}
+            onCancel={() => setEditing(false)}
+            placeholder="Topic name"
+          />
+        ) : (
+          <span className="text-sm font-semibold text-gray-800 flex-1">{topic.name}</span>
+        )}
+
+        {/* Subtopic count badge */}
+        {!editing && (
+          <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full shrink-0">
+            {topic.subtopic_count} subtopic{topic.subtopic_count !== 1 ? 's' : ''}
+          </span>
+        )}
+
+        {/* Action buttons — only for teacher-created topics */}
+        {!editing && topic.created_by_me && (
+          <div className="flex gap-1 shrink-0">
+            <button onClick={() => setEditing(true)}
+              className="p-1.5 rounded-lg text-gray-400 hover:text-teal-600 hover:bg-teal-50 transition-colors">
+              <Pencil size={13} />
+            </button>
+            <button onClick={() => onDelete(topic)}
+              className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+              <Trash2 size={13} />
+            </button>
+          </div>
+        )}
+
+        {/* Lock icon for admin topics */}
+        {!editing && !topic.created_by_me && (
+          <span title="Created by admin — read only"
+            className="flex items-center gap-1 text-xs text-gray-300 shrink-0">
+            <Lock size={11} /> Admin
+          </span>
+        )}
+      </div>
+
+      {/* Expanded subtopics panel */}
+      {expanded && (
+        <div className="border-t border-gray-50">
+          <SubtopicList topic={topic} subjectId={subjectId} showToast={showToast} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAIN PAGE
+// ═══════════════════════════════════════════════════════════════════════════════
+export default function TeacherContentPage() {
+  const [subjects,    setSubjects]    = useState([]);
+  const [activeSubj,  setActiveSubj]  = useState(null); // subject object
+  const [topics,      setTopics]      = useState([]);
+  const [loadingSubj, setLoadingSubj] = useState(true);
+  const [loadingTop,  setLoadingTop]  = useState(false);
+  const [showAddTopic,setShowAddTopic]= useState(false);
+  const [confirmDel,  setConfirmDel]  = useState(null); // topic object
+  const [deleting,    setDeleting]    = useState(false);
+  const [toast,       setToast]       = useState(null);
+
+  const showToast = (msg, type = 'success') => setToast({ msg, type });
+
+  // ── Load assigned subjects ────────────────────────────────────────────────
+  useEffect(() => {
+    api.get('/teacher/my-subjects')
+      .then(r => {
+        const list = Array.isArray(r) ? r : (r.data ?? []);
+        setSubjects(list);
+        if (list.length > 0) setActiveSubj(list[0]);
+      })
+      .catch(() => setSubjects([]))
+      .finally(() => setLoadingSubj(false));
+  }, []);
+
+  // ── Load topics when subject changes ──────────────────────────────────────
+  useEffect(() => {
+    if (!activeSubj) return;
+    setLoadingTop(true);
+    setTopics([]);
+    setShowAddTopic(false);
+    api.get('/teacher/topics', { params: { subject_id: activeSubj.id } })
+      .then(r => setTopics(Array.isArray(r) ? r : (r.data ?? [])))
+      .catch(() => setTopics([]))
+      .finally(() => setLoadingTop(false));
+  }, [activeSubj?.id]); // eslint-disable-line
+
+  // ── Add topic ─────────────────────────────────────────────────────────────
+  const handleAddTopic = async (name, description) => {
+    try {
+      const r = await api.post('/teacher/topics', {
+        subject_id: activeSubj.id, name, description,
+        order_index: topics.length,
+      });
+      const created = r.data ?? r;
+      setTopics(prev => [...prev, created]);
+      setShowAddTopic(false);
+      showToast('Topic added!');
+    } catch (err) {
+      showToast(err?.error || err?.message || 'Failed to add topic', 'error');
+    }
+  };
+
+  // ── Edit topic name ───────────────────────────────────────────────────────
+  const handleEditTopic = async (id, name) => {
+    try {
+      const r = await api.put(`/teacher/topics/${id}`, { name });
+      const updated = r.data ?? r;
+      setTopics(prev => prev.map(t => t.id === id ? { ...t, name: updated.name } : t));
+      showToast('Topic updated!');
+    } catch (err) {
+      showToast(err?.error || 'Failed to update topic', 'error');
+    }
+  };
+
+  // ── Delete topic ──────────────────────────────────────────────────────────
+  const handleDeleteTopic = async () => {
+    if (!confirmDel) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/teacher/topics/${confirmDel.id}`);
+      setTopics(prev => prev.filter(t => t.id !== confirmDel.id));
+      showToast('Topic deleted.');
+    } catch (err) {
+      showToast(err?.error || 'Failed to delete topic', 'error');
+    } finally {
+      setDeleting(false);
+      setConfirmDel(null);
+    }
+  };
+
+  // ── Counts ─────────────────────────────────────────────────────────────────
+  const myTopicsCount    = topics.filter(t => t.created_by_me).length;
+  const adminTopicsCount = topics.filter(t => !t.created_by_me).length;
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <TopNav />
+
+      {/* ── Page header ── */}
+      <div className="bg-[#0a4a3f] px-4 py-5">
+        <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
+          <div>
+            <p className="text-white/50 text-xs mb-1">Teacher</p>
+            <h1 className="text-white text-xl font-bold">Content Management</h1>
+            <p className="text-white/60 text-sm mt-0.5">
+              Manage topics and subtopics for your assigned subjects
+            </p>
+          </div>
+          <Link to="/teacher/dashboard"
+            className="flex items-center gap-1.5 text-white/70 hover:text-white text-sm transition-colors">
+            ← Dashboard
+          </Link>
+        </div>
+      </div>
+
+      <div className="max-w-4xl mx-auto px-4 py-6">
+
+        {/* ── No subjects assigned ── */}
+        {!loadingSubj && subjects.length === 0 && (
+          <div className="bg-amber-50 border border-amber-100 rounded-2xl p-8 text-center">
+            <BookOpen size={32} className="mx-auto mb-3 text-amber-300" />
+            <p className="text-sm font-semibold text-amber-800">No subjects assigned yet</p>
+            <p className="text-xs text-amber-600 mt-1">
+              Ask your admin to assign you a subject before you can manage content.
+            </p>
+          </div>
+        )}
+
+        {loadingSubj && (
+          <div className="flex justify-center py-16">
+            <Loader2 size={24} className="animate-spin text-teal-400" />
+          </div>
+        )}
+
+        {!loadingSubj && subjects.length > 0 && (
+          <>
+            {/* ── Subject tab strip ── */}
+            <div className="flex gap-2 flex-wrap mb-6">
+              {subjects.map(s => (
+                <button
+                  key={s.id}
+                  onClick={() => setActiveSubj(s)}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-colors border
+                    ${activeSubj?.id === s.id
+                      ? 'bg-teal-500 text-white border-teal-500'
+                      : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300 hover:text-teal-600'}`}
+                >
+                  {s.icon_emoji && <span>{s.icon_emoji}</span>}
+                  {s.name}
+                  {s.exam_board_code && (
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold
+                      ${activeSubj?.id === s.id ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                      {s.exam_board_code}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {/* ── Stats bar ── */}
+            {!loadingTop && activeSubj && (
+              <div className="flex items-center gap-4 mb-4 text-xs text-gray-500">
+                <span className="flex items-center gap-1">
+                  <Layers size={12} className="text-teal-500" />
+                  <strong className="text-gray-700">{topics.length}</strong> total topics
+                </span>
+                <span className="flex items-center gap-1">
+                  <FileText size={12} className="text-teal-500" />
+                  <strong className="text-gray-700">{myTopicsCount}</strong> created by you
+                </span>
+                {adminTopicsCount > 0 && (
+                  <span className="flex items-center gap-1">
+                    <Lock size={11} className="text-gray-400" />
+                    <strong className="text-gray-700">{adminTopicsCount}</strong> by admin
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* ── Topics list ── */}
+            {loadingTop ? (
+              <div className="flex justify-center py-12">
+                <Loader2 size={20} className="animate-spin text-teal-400" />
+              </div>
+            ) : (
+              <>
+                {topics.length === 0 && !showAddTopic && (
+                  <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center mb-3">
+                    <Layers size={32} className="mx-auto mb-3 text-gray-200" />
+                    <p className="text-sm text-gray-400">
+                      No topics yet for <strong>{activeSubj?.name}</strong>.<br />
+                      Add your first topic to get started.
+                    </p>
+                  </div>
+                )}
+
+                {topics.map(topic => (
+                  <TopicCard
+                    key={topic.id}
+                    topic={topic}
+                    subjectId={activeSubj.id}
+                    showToast={showToast}
+                    onEdit={handleEditTopic}
+                    onDelete={t => setConfirmDel(t)}
+                  />
+                ))}
+
+                {/* ── Add topic row ── */}
+                {showAddTopic ? (
+                  <AddRow
+                    placeholder="Topic name e.g. Cell Biology"
+                    onAdd={handleAddTopic}
+                    onCancel={() => setShowAddTopic(false)}
+                  />
+                ) : (
+                  <button
+                    onClick={() => setShowAddTopic(true)}
+                    className="w-full flex items-center justify-center gap-2 border-2 border-dashed
+                      border-gray-200 rounded-2xl py-4 text-sm text-gray-400 hover:border-teal-300
+                      hover:text-teal-600 transition-colors"
+                  >
+                    <Plus size={15} /> Add a new topic
+                  </button>
+                )}
+              </>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* ── Topic delete confirmation ── */}
+      {confirmDel && (
+        <ConfirmModal
+          message={`Delete topic "${confirmDel.name}"? All its subtopics will also be removed from students' view.`}
+          onConfirm={handleDeleteTopic}
+          onCancel={() => setConfirmDel(null)}
+          loading={deleting}
+        />
+      )}
+
+      {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+    </div>
+  );
+}
