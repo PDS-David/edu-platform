@@ -115,7 +115,7 @@ export default function SettingsPage() {
     setPwErrors({});
     setPwSaving(true);
     try {
-      await api.put('/auth/change-password', {
+      await api.put('/auth/password', {
         current_password: pwForm.current_password,
         new_password:     pwForm.new_password,
       });
