@@ -12,8 +12,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Link }                        from 'react-router-dom';
-import api                             from '../../services/api';
-import TopNav                          from '../../components/TopNav';
+import api                             from '../services/api';
+import TopNav                          from '../components/TopNav';
 import {
   BookOpen, Plus, ChevronDown, ChevronUp, ChevronRight,
   Pencil, Trash2, Loader2, CheckCircle, AlertTriangle,
@@ -246,7 +246,7 @@ function SubtopicList({ topic, subjectId, showToast }) {
                   </button>
                 </div>
               ) : (
-                <Lock size={11} className="text-gray-300 shrink-0opacity-0 group-hover:opacity-100" title="Admin-created" />
+                <Lock size={11} className="text-gray-300 shrink-0 opacity-0 group-hover:opacity-100" title="Admin-created" />
               )}
             </>
           )}
