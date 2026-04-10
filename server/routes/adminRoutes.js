@@ -131,12 +131,12 @@ Rules:
       const qResult = await sequelize.query(
         `INSERT INTO questions
            (question_text, marks, explanation, options, correct_answer,
-            subtopic_id, submitted_by, is_active,
-            created_at, updated_at)
+            subtopic_id, submitted_by, status, is_ai_generated,
+            ai_generation_source, source, is_active, created_at, updated_at)
          VALUES
            (:question_text, :marks, :explanation, :options::jsonb, :correct_answer,
-            :subtopic_id, :submitted_by, true,
-            NOW(), NOW())
+            :subtopic_id, :submitted_by, 'approved', true,
+            'gemini-2.0-flash', 'ai_generated', true, NOW(), NOW())
          RETURNING id`,
         {
           replacements: {
@@ -429,6 +429,40 @@ router.get('/questions/pending', protect, adminOnly, async (req, res) => {
     });
   } catch (err) {
     console.error('[GET /admin/questions/pending] Error:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /questions/bulk-approve  ← MUST be before /:id/approve
+// ─────────────────────────────────────────────────────────────────────────────
+router.patch('/questions/bulk-approve', protect, adminOnly, async (req, res) => {
+  const { question_ids } = req.body;
+
+  if (!Array.isArray(question_ids) || question_ids.length === 0) {
+    return res.status(400).json({ success: false, error: 'question_ids must be a non-empty array' });
+  }
+
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (question_ids.some(id => !UUID_RE.test(id))) {
+    return res.status(400).json({ success: false, error: 'All question_ids must be valid UUIDs' });
+  }
+
+  try {
+    await sequelize.query(
+      `UPDATE questions
+       SET status = 'approved', updated_at = NOW()
+       WHERE id = ANY(:ids::uuid[])`,
+      { replacements: { ids: question_ids }, type: QueryTypes.UPDATE }
+    );
+
+    return res.json({
+      success: true,
+      message: `${question_ids.length} question${question_ids.length !== 1 ? 's' : ''} approved`,
+      approved_count: question_ids.length,
+    });
+  } catch (err) {
+    console.error('[PATCH /admin/questions/bulk-approve]', err.message);
     return res.status(500).json({ success: false, error: err.message });
   }
 });
