@@ -5,6 +5,7 @@
 //   POST /api/quizzes/attempt               → submit a completed quiz attempt
 //   GET  /api/quizzes/attempt/:attemptId    → get attempt results with AI marking
 //   GET  /api/quizzes/history/:studentId/:subtopicId → past attempts list
+//   GET  /api/quizzes/history               → logged-in student's past attempts (query param)
 //   GET  /api/quizzes                       → placeholder (kept for compatibility)
 //
 // ADDED (Task 4):
@@ -544,6 +545,36 @@ router.get('/history/:studentId/:subtopicId', protect, async (req, res) => {
   } catch (err) {
     console.error('[GET /quizzes/history] Error:', err.message);
     return res.status(500).json({ success: false, error: 'Failed to fetch quiz history' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/quizzes/history?subtopic_id=:id   (TASK ADDITION)
+// Returns the logged-in student's past quiz attempts for a subtopic.
+// Uses query param instead of path params — consumed by QuizHistoryPage.
+// ---------------------------------------------------------------------------
+router.get('/history', protect, async (req, res) => {
+  const { subtopic_id } = req.query;
+  if (!subtopic_id) {
+    return res.status(400).json({ success: false, error: 'subtopic_id query param required' });
+  }
+  try {
+    const rows = await sequelize.query(
+      `SELECT id, score, total_marks, time_taken_ms, created_at
+       FROM quiz_attempts
+       WHERE student_id = :studentId
+         AND subtopic_id = :subtopicId
+       ORDER BY created_at DESC
+       LIMIT 20`,
+      {
+        replacements: { studentId: req.user.id, subtopicId: subtopic_id },
+        type: QueryTypes.SELECT,
+      }
+    );
+    return res.json({ success: true, data: rows });
+  } catch (err) {
+    console.error('[GET /quizzes/history]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 
