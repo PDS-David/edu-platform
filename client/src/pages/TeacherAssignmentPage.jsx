@@ -1,8 +1,8 @@
 // client/src/pages/admin/TeacherAssignmentPage.jsx
 // Admin page: assign subjects + exam types to teachers.
 // - "Exam Type" is the canonical label everywhere (no "exam board" / "curriculum").
-// - All 12 exam types always appear in the dropdown.
-// - Selecting an exam type populates the Subject dropdown from the API.
+// - All 12 exam types load dynamically from /api/exam-boards on dialog open.
+// - Selecting an exam type populates the Subject dropdown from /api/exam-boards/:code/subjects.
 
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
@@ -12,22 +12,23 @@ import {
 } from 'lucide-react';
 import TopNav from '../../components/TopNav';
 
-// ── Full static list — used as fallback and for the "add" dialog ──────────────
-const ALL_EXAM_TYPES = [
-  { id: 1,  code: 'JAMB',    name: 'JAMB / UTME',             icon: '🎓' },
-  { id: 2,  code: 'WAEC',    name: 'WAEC',                    icon: '📘' },
-  { id: 3,  code: 'GCE_OL',  name: 'GCE O-Levels',            icon: '📗' },
-  { id: 4,  code: 'NECO',    name: 'NECO',                    icon: '📙' },
-  { id: 5,  code: 'IELTS',   name: 'IELTS',                   icon: '🌍' },
-  { id: 6,  code: 'TOEFL',   name: 'TOEFL',                   icon: '🇺🇸' },
-  { id: 7,  code: 'SAT',     name: 'SAT',                     icon: '🎯' },
-  { id: 8,  code: 'GCE_AL',  name: 'GCE A-Levels',            icon: '🏫' },
-  { id: 9,  code: 'JUPEB',   name: 'JUPEB',                   icon: '📚' },
-  { id: 10, code: 'LANG_EN', name: 'Language Lab. – English', icon: '🇬🇧' },
-  { id: 11, code: 'LANG_FR', name: 'Language Lab. – French',  icon: '🇫🇷' },
-  { id: 12, code: 'LANG_YO', name: 'Language Lab. – Yoruba',  icon: '🌟' },
+// ── Fallback static list (shown instantly; replaced by API data) ──────────────
+const FALLBACK_EXAM_TYPES = [
+  { id: null, code: 'JAMB',    name: 'JAMB / UTME',             icon_emoji: '🎓' },
+  { id: null, code: 'WAEC',    name: 'WAEC',                    icon_emoji: '📘' },
+  { id: null, code: 'GCE_OL',  name: 'GCE O-Levels',            icon_emoji: '📗' },
+  { id: null, code: 'NECO',    name: 'NECO',                    icon_emoji: '📙' },
+  { id: null, code: 'IELTS',   name: 'IELTS',                   icon_emoji: '🌍' },
+  { id: null, code: 'TOEFL',   name: 'TOEFL',                   icon_emoji: '🇺🇸' },
+  { id: null, code: 'SAT',     name: 'SAT',                     icon_emoji: '🎯' },
+  { id: null, code: 'GCE_AL',  name: 'GCE A-Levels',            icon_emoji: '🏫' },
+  { id: null, code: 'JUPEB',   name: 'JUPEB',                   icon_emoji: '📚' },
+  { id: null, code: 'LANG_EN', name: 'Language Lab. – English', icon_emoji: '🇬🇧' },
+  { id: null, code: 'LANG_FR', name: 'Language Lab. – French',  icon_emoji: '🇫🇷' },
+  { id: null, code: 'LANG_YO', name: 'Language Lab. – Yoruba',  icon_emoji: '🌟' },
 ];
 
+// ── Toast ─────────────────────────────────────────────────────────────────────
 function Toast({ msg, type, onClose }) {
   return (
     <div className={`fixed bottom-6 right-4 z-50 flex items-center gap-2.5 px-5 py-3 rounded-2xl shadow-xl text-sm font-semibold text-white
@@ -43,7 +44,9 @@ function Toast({ msg, type, onClose }) {
 
 // ── Add Assignment Dialog ─────────────────────────────────────────────────────
 function AddAssignmentDialog({ teachers, onClose, onSaved }) {
-  const [examTypes,    setExamTypes]    = useState(ALL_EXAM_TYPES);
+  const [examTypes,    setExamTypes]    = useState(FALLBACK_EXAM_TYPES);
+  const [loadingTypes, setLoadingTypes] = useState(true);
+
   const [subjects,     setSubjects]     = useState([]);
   const [loadingSubj,  setLoadingSubj]  = useState(false);
 
@@ -54,27 +57,28 @@ function AddAssignmentDialog({ teachers, onClose, onSaved }) {
   const [saving,       setSaving]       = useState(false);
   const [error,        setError]        = useState('');
 
-  // Fetch live exam types from API on mount (fall back to static list on error)
+  // ── 1. Load exam boards dynamically on mount ───────────────────────────────
   useEffect(() => {
     const apiBase = import.meta.env.VITE_API_URL || '/api';
+    setLoadingTypes(true);
     fetch(`${apiBase}/exam-boards`)
       .then(r => r.json())
       .then(json => {
         const list = Array.isArray(json) ? json : (json.data || []);
-        if (list.length > 0) setExamTypes(list.map(b => ({ ...b, icon: b.icon_emoji })));
+        if (list.length > 0) setExamTypes(list);
       })
-      .catch(() => {}); // stay with static list
+      .catch(() => { /* keep fallback list */ })
+      .finally(() => setLoadingTypes(false));
   }, []);
 
-  // When exam type changes → fetch its subjects
+  // ── 2. Load subjects when exam type changes ────────────────────────────────
   useEffect(() => {
     setSubjectId('');
     setSubjects([]);
     if (!examTypeCode) return;
 
-    // Also store the numeric id for the assignment payload
     const found = examTypes.find(e => e.code === examTypeCode);
-    setExamTypeId(found?.id || '');
+    setExamTypeId(found?.id ?? '');
 
     setLoadingSubj(true);
     const apiBase = import.meta.env.VITE_API_URL || '/api';
@@ -85,6 +89,7 @@ function AddAssignmentDialog({ teachers, onClose, onSaved }) {
       .finally(() => setLoadingSubj(false));
   }, [examTypeCode, examTypes]);
 
+  // ── Save ──────────────────────────────────────────────────────────────────
   const handleSave = async () => {
     if (!teacherId || !examTypeCode || !subjectId) {
       setError('Please fill in all fields.');
@@ -110,6 +115,7 @@ function AddAssignmentDialog({ teachers, onClose, onSaved }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2">
@@ -124,7 +130,8 @@ function AddAssignmentDialog({ teachers, onClose, onSaved }) {
         </div>
 
         <div className="space-y-4">
-          {/* Teacher */}
+
+          {/* ── Teacher ── */}
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1.5">Teacher *</label>
             <div className="relative">
@@ -145,28 +152,36 @@ function AddAssignmentDialog({ teachers, onClose, onSaved }) {
             </div>
           </div>
 
-          {/* Exam Type */}
+          {/* ── Exam Type (dynamic) ── */}
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1.5">Exam Type *</label>
             <div className="relative">
-              <select
-                value={examTypeCode}
-                onChange={e => setExamTypeCode(e.target.value)}
-                className="w-full appearance-none border border-gray-200 rounded-xl px-4 py-2.5 pr-9 text-sm
-                  bg-white focus:outline-none focus:ring-2 focus:ring-teal-300"
-              >
-                <option value="">Select exam type…</option>
-                {examTypes.map(et => (
-                  <option key={et.code} value={et.code}>
-                    {et.icon || et.icon_emoji || ''} {et.name}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              {loadingTypes ? (
+                <div className="flex items-center gap-2 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-400 bg-gray-50">
+                  <Loader2 size={13} className="animate-spin" /> Loading exam types…
+                </div>
+              ) : (
+                <>
+                  <select
+                    value={examTypeCode}
+                    onChange={e => setExamTypeCode(e.target.value)}
+                    className="w-full appearance-none border border-gray-200 rounded-xl px-4 py-2.5 pr-9 text-sm
+                      bg-white focus:outline-none focus:ring-2 focus:ring-teal-300"
+                  >
+                    <option value="">Select exam type…</option>
+                    {examTypes.map(et => (
+                      <option key={et.code} value={et.code}>
+                        {et.icon_emoji || ''} {et.name}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                </>
+              )}
             </div>
           </div>
 
-          {/* Subject — populates from selected exam type */}
+          {/* ── Subject (populates from selected exam type) ── */}
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1.5">Subject *</label>
             <div className="relative">
@@ -185,22 +200,48 @@ function AddAssignmentDialog({ teachers, onClose, onSaved }) {
                       disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
                   >
                     <option value="">
-                      {examTypeCode ? (subjects.length > 0 ? 'Select a subject…' : 'No subjects yet for this exam type') : 'Select exam type first'}
+                      {examTypeCode
+                        ? subjects.length > 0
+                          ? 'Select a subject…'
+                          : 'No subjects found for this exam type'
+                        : 'Select exam type first'}
                     </option>
                     {subjects.map(s => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                        {s.level && s.level !== 'All' ? ` (${s.level})` : ''}
+                      </option>
                     ))}
                   </select>
                   <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                 </>
               )}
             </div>
+
+            {/* Subject count badge */}
+            {examTypeCode && subjects.length > 0 && !loadingSubj && (
+              <p className="text-xs text-teal-600 mt-1">
+                ✅ {subjects.length} subject{subjects.length !== 1 ? 's' : ''} available
+              </p>
+            )}
+
+            {/* Warning when no subjects */}
             {examTypeCode && subjects.length === 0 && !loadingSubj && (
               <p className="text-xs text-amber-600 mt-1">
-                ⚠️ No subjects exist for this exam type yet. Add subjects first via Content Management.
+                ⚠️ No subjects exist for this exam type yet. Run the seed SQL or add subjects via Content Management.
               </p>
             )}
           </div>
+
+          {/* Subject description preview */}
+          {subjectId && (() => {
+            const found = subjects.find(s => String(s.id) === String(subjectId));
+            return found?.description ? (
+              <p className="text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2">
+                📖 {found.description}
+              </p>
+            ) : null;
+          })()}
 
           {error && (
             <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
