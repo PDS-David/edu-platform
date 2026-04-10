@@ -1,33 +1,34 @@
 /**
- * useCatalog.js
+ * useCatalog.js  (src/hooks/useCatalog.js)
  * ─────────────────────────────────────────────────────────────────────────────
- * Shared hook that provides:
- *   • examTypes  – all active exam types from /catalog/types
- *   • fetchSubjectsForType(typeId) – fetches + caches subjects per type
- *   • subjectCache  – { [typeId]: Subject[] }
- *   • loadingTypes / loadingSubjects
+ * Shared hook providing:
+ *   • examTypes            – all active exam types from /catalog/types
+ *   • fetchSubjectsForType – fetches subjects per type (caches NON-EMPTY results only)
+ *   • subjectCache         – { [typeId]: Subject[] }
+ *   • loadingTypes / loadingSubject
+ *   • invalidateCache      – call after adding/editing subjects in CatalogPanel
  *
- * Drop this file next to your other hooks (e.g. src/hooks/useCatalog.js).
- * Import it wherever you need exam types or dynamic subject lists.
- *
- * Usage:
- *   const { examTypes, loadingTypes, fetchSubjectsForType, subjectCache } = useCatalog();
+ * Cache rules:
+ *   - Exam types: cached for the browser session (set once, never stale)
+ *   - Subjects:   cached ONLY when the API returns ≥1 subjects.
+ *                 Empty results are NOT cached — adding a subject and then
+ *                 re-selecting the same exam type always triggers a fresh fetch.
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../services/api';
 
-// ── Module-level cache so re-mounts don't re-fetch ───────────────────────────
-let _examTypesCache = null;          // null = not yet fetched
-let _subjectCache   = {};            // { [typeId]: Subject[] }
-const _pendingTypes    = new Set();  // typeIds currently being fetched
+// ── Module-level store (survives re-renders and re-mounts) ────────────────────
+let _examTypesCache = null;       // null = not yet fetched; [] = fetched but empty
+let _subjectCache   = {};         // { [typeId]: Subject[] }  — only non-empty arrays
+const _inFlight     = new Set();  // typeIds currently being fetched (dedup guard)
 
 // ─────────────────────────────────────────────────────────────────────────────
 export function useCatalog() {
   const [examTypes,      setExamTypes]      = useState(_examTypesCache || []);
-  const [loadingTypes,   setLoadingTypes]   = useState(!_examTypesCache);
+  const [loadingTypes,   setLoadingTypes]   = useState(_examTypesCache === null);
   const [subjectCache,   setSubjectCache]   = useState({ ..._subjectCache });
-  const [loadingSubject, setLoadingSubject] = useState(false); // true while any subject fetch is in flight
+  const [loadingSubject, setLoadingSubject] = useState(false);
   const mounted = useRef(true);
 
   useEffect(() => {
@@ -35,14 +36,18 @@ export function useCatalog() {
     return () => { mounted.current = false; };
   }, []);
 
-  // ── Fetch exam types once (module-level cache) ──────────────────────────────
+  // ── Fetch exam types once per session ──────────────────────────────────────
   useEffect(() => {
-    if (_examTypesCache) return; // already fetched
+    if (_examTypesCache !== null) {
+      setExamTypes(_examTypesCache);
+      setLoadingTypes(false);
+      return;
+    }
 
     let cancelled = false;
     (async () => {
       try {
-        const res = await api.get('/catalog/types');
+        const res  = await api.get('/catalog/types');
         const list = res?.success ? (res.data || []) : [];
         _examTypesCache = list;
         if (!cancelled && mounted.current) {
@@ -50,56 +55,84 @@ export function useCatalog() {
           setLoadingTypes(false);
         }
       } catch {
-        _examTypesCache = _examTypesCache || []; // don't retry on error
+        if (!_examTypesCache) _examTypesCache = [];
         if (!cancelled && mounted.current) setLoadingTypes(false);
       }
     })();
 
     return () => { cancelled = true; };
-  }, []); // eslint-disable-line
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Fetch subjects for a specific exam type (with per-type cache) ───────────
+  // ── Fetch subjects for a given typeId ─────────────────────────────────────
+  // KEY RULE: only serve from cache if cached array is NON-EMPTY.
+  // Empty results are never cached so that after an admin adds a subject in
+  // Catalog Management the next modal open always gets fresh data.
   const fetchSubjectsForType = useCallback(async (typeId) => {
     if (!typeId) return [];
 
-    // Already cached
-    if (_subjectCache[typeId]) {
+    // Serve from cache only if we have real subjects stored
+    if (_subjectCache[typeId] && _subjectCache[typeId].length > 0) {
       setSubjectCache(c => ({ ...c, [typeId]: _subjectCache[typeId] }));
       return _subjectCache[typeId];
     }
 
-    // Already in-flight (deduplicate)
-    if (_pendingTypes.has(typeId)) return [];
+    // Deduplicate concurrent calls for the same typeId
+    if (_inFlight.has(typeId)) return [];
 
-    _pendingTypes.add(typeId);
+    _inFlight.add(typeId);
     if (mounted.current) setLoadingSubject(true);
 
     try {
-      const res = await api.get(`/catalog/types/${typeId}/subjects`);
+      const res      = await api.get(`/catalog/types/${typeId}/subjects`);
       const subjects = res?.success ? (res.data || []) : [];
-      _subjectCache[typeId] = subjects;
-      if (mounted.current) setSubjectCache(c => ({ ...c, [typeId]: subjects }));
+
+      // Only cache non-empty results
+      if (subjects.length > 0) {
+        _subjectCache[typeId] = subjects;
+        if (mounted.current) setSubjectCache(c => ({ ...c, [typeId]: subjects }));
+      }
+
       return subjects;
     } catch {
       return [];
     } finally {
-      _pendingTypes.delete(typeId);
+      _inFlight.delete(typeId);
       if (mounted.current) setLoadingSubject(false);
     }
   }, []);
 
-  // ── Helper: invalidate cache (call after Catalog Management saves) ──────────
+  // ── Invalidate cache ───────────────────────────────────────────────────────
+  // invalidateCache(typeId)  — bust one type's subject cache
+  // invalidateCache()        — full reset (exam types + all subjects)
   const invalidateCache = useCallback((typeId) => {
-    if (typeId) {
+    if (typeId !== undefined) {
       delete _subjectCache[typeId];
-      setSubjectCache(c => { const next = { ...c }; delete next[typeId]; return next; });
+      setSubjectCache(c => {
+        const next = { ...c };
+        delete next[typeId];
+        return next;
+      });
     } else {
-      // full reset
       _examTypesCache = null;
       _subjectCache   = {};
       setExamTypes([]);
       setSubjectCache({});
       setLoadingTypes(true);
+    }
+  }, []);
+
+  // ── Force re-fetch exam types (for manual Refresh button) ─────────────────
+  const refreshExamTypes = useCallback(async () => {
+    _examTypesCache = null;
+    if (mounted.current) setLoadingTypes(true);
+    try {
+      const res  = await api.get('/catalog/types');
+      const list = res?.success ? (res.data || []) : [];
+      _examTypesCache = list;
+      if (mounted.current) { setExamTypes(list); setLoadingTypes(false); }
+    } catch {
+      _examTypesCache = [];
+      if (mounted.current) setLoadingTypes(false);
     }
   }, []);
 
@@ -110,7 +143,7 @@ export function useCatalog() {
     loadingSubject,
     fetchSubjectsForType,
     invalidateCache,
-    /** Convenience: subjects already in cache for a given typeId */
+    refreshExamTypes,
     getSubjects: (typeId) => _subjectCache[typeId] || [],
   };
 }
