@@ -1,3 +1,4 @@
+'use strict';
 // server/services/remediationService.js
 // Adaptive remediation engine: detects weak concepts and generates
 // targeted AI practice questions for each student automatically.
@@ -5,36 +6,19 @@
 // Exported:
 //   generateRemediationSet(studentId) → { studentId, conceptSets: [...] }
 //
-// Steps:
-//   1. Fetch the student's weak concepts (mastery < 0.5)
-//   2. For each weak concept generate QUESTIONS_PER_CONCEPT AI questions
-//   3. Store generated questions in the DB (questions table, concept linked via question_concepts)
-//   4. Return the full set so the caller can serve them immediately
-//
-// Consumed by:
-//   Any route that wants to trigger adaptive remediation, e.g.:
-//     POST /api/student/remediation
-
-'use strict';
+// v4 AI COST CONTROL:
+//   Removed GoogleGenerativeAI import and _model singleton / getModel().
+//   generateAIQuestion() now calls generate() from services/ai.js.
+//   withTimeout() wrapper preserved — it now wraps generate() directly.
 
 const { QueryTypes }      = require('sequelize');
 const sequelize           = require('../config/database');
 const { getWeakConcepts } = require('./weakConceptService');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+// v4: central AI hub replaces inline GoogleGenerativeAI + getModel() singleton
+const { generate }        = require('./ai');
 
 const QUESTIONS_PER_CONCEPT = 5;
 const AI_TIMEOUT_MS         = 12000;
-
-// ---------------------------------------------------------------------------
-// Gemini singleton (reuses same pattern as aiService.js)
-// ---------------------------------------------------------------------------
-let _model = null;
-function getModel() {
-  if (_model) return _model;
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  _model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-  return _model;
-}
 
 function withTimeout(promise, ms = AI_TIMEOUT_MS) {
   return Promise.race([
@@ -47,8 +31,6 @@ function withTimeout(promise, ms = AI_TIMEOUT_MS) {
 
 // ---------------------------------------------------------------------------
 // generateAIQuestion
-// Produces a single MCQ (4 options, one correct) for a concept.
-// Returns a parsed question object or null on failure.
 // ---------------------------------------------------------------------------
 async function generateAIQuestion(concept, studentId) {
   const prompt = `
@@ -85,13 +67,11 @@ Respond ONLY with a JSON object in this exact format (no other text, no code fen
 `.trim();
 
   try {
-    const model  = getModel();
-    const result = await withTimeout(model.generateContent(prompt));
-    const text   = result.response.text().trim();
+    // v4: withTimeout wraps generate() directly — same timeout behaviour as before
+    const text   = await withTimeout(generate(prompt, 'remediation'));
     const clean  = text.replace(/```json|```/g, '').trim();
     const parsed = JSON.parse(clean);
 
-    // Basic validation
     if (
       !parsed.question_text ||
       !Array.isArray(parsed.options) ||
@@ -115,12 +95,9 @@ Respond ONLY with a JSON object in this exact format (no other text, no code fen
 
 // ---------------------------------------------------------------------------
 // persistQuestion
-// Saves a generated question + its options to the DB and links to the concept.
-// Returns the saved question ID, or null on failure.
 // ---------------------------------------------------------------------------
 async function persistQuestion(question, concept, studentId) {
   try {
-    // 1. Insert into questions table
     const qRows = await sequelize.query(
       `INSERT INTO questions
          (id, question_text, question_type, question_sub_type,
@@ -146,7 +123,6 @@ async function persistQuestion(question, concept, studentId) {
 
     const questionId = qRows[0].id;
 
-    // 2. Insert answer options
     for (const opt of question.options) {
       await sequelize.query(
         `INSERT INTO answer_options (id, question_id, option_text, is_correct)
@@ -162,7 +138,6 @@ async function persistQuestion(question, concept, studentId) {
       );
     }
 
-    // 3. Link question to concept in question_concepts
     await sequelize.query(
       `INSERT INTO question_concepts (id, question_id, concept_id, weight, created_at)
        VALUES (gen_random_uuid(), :questionId, :conceptId, 1, NOW())
@@ -173,7 +148,6 @@ async function persistQuestion(question, concept, studentId) {
       }
     );
 
-    // 4. Update stored explanation back onto the question row
     if (question.explanation) {
       await sequelize.query(
         `UPDATE questions SET explanation = :explanation WHERE id = :questionId`,
@@ -194,7 +168,6 @@ async function persistQuestion(question, concept, studentId) {
 async function generateRemediationSet(studentId) {
   if (!studentId) throw new Error('studentId is required');
 
-  // Step 1 – identify weak concepts
   const weakConcepts = await getWeakConcepts(studentId);
 
   if (weakConcepts.length === 0) {
@@ -207,11 +180,9 @@ async function generateRemediationSet(studentId) {
 
   const conceptSets = [];
 
-  // Step 2 & 3 – generate and persist questions for each weak concept
   for (const concept of weakConcepts) {
     const generatedQuestions = [];
 
-    // Generate QUESTIONS_PER_CONCEPT questions concurrently for speed
     const questionPromises = Array.from({ length: QUESTIONS_PER_CONCEPT }, () =>
       generateAIQuestion(concept, studentId)
     );
@@ -233,11 +204,11 @@ async function generateRemediationSet(studentId) {
     }
 
     conceptSets.push({
-      concept_id:     concept.id,
-      concept_name:   concept.name,
-      mastery_score:  concept.mastery_score,
-      difficulty:     concept.difficulty_level,
-      questions:      generatedQuestions,
+      concept_id:      concept.id,
+      concept_name:    concept.name,
+      mastery_score:   concept.mastery_score,
+      difficulty:      concept.difficulty_level,
+      questions:       generatedQuestions,
       questions_count: generatedQuestions.length,
     });
 
@@ -256,5 +227,5 @@ async function generateRemediationSet(studentId) {
 
 module.exports = {
   generateRemediationSet,
-  generateAIQuestion, // exported for unit-testing
+  generateAIQuestion,
 };
