@@ -119,7 +119,7 @@ export default function OnboardingPage() {
     if (subjects.includes(id)) {
       setSubjects(prev => prev.filter(s => s !== id));
     } else {
-      if (subjects.length >= 3) return; // free plan limit
+      if (subjects.length >= 10) return; // max 10 subjects
       setSubjects(prev => [...prev, id]);
     }
   };
@@ -171,8 +171,8 @@ export default function OnboardingPage() {
           {step === 1 && (
             <>
               <h2 className="text-xl font-bold text-gray-900 mb-1">Select your subjects</h2>
-              <p className="text-sm text-gray-500 mb-1">Pick up to 3 subjects (free plan)</p>
-              <p className="text-xs text-teal-600 font-medium mb-4">{subjects.length}/3 selected</p>
+              <p className="text-sm text-gray-500 mb-1">Pick your subjects — 14-day free trial, full access</p>
+              <p className="text-xs text-teal-600 font-medium mb-4">{subjects.length} selected</p>
 
               {loadingS ? (
                 <div className="flex justify-center py-8">
@@ -186,7 +186,7 @@ export default function OnboardingPage() {
                 <div className="grid grid-cols-2 gap-2 max-h-72 overflow-y-auto">
                   {allSubs.map(s => {
                     const sel    = subjects.includes(s.id);
-                    const locked = !sel && subjects.length >= 3;
+                    const locked = !sel && subjects.length >= 10;
                     return (
                       <button
                         key={s.id}
@@ -208,8 +208,8 @@ export default function OnboardingPage() {
                 </div>
               )}
 
-              {subjects.length >= 3 && (
-                <p className="text-xs text-amber-600 mt-2">Upgrade to unlock more subjects</p>
+              {subjects.length >= 10 && (
+                <p className="text-xs text-amber-600 mt-2">Maximum 10 subjects selected</p>
               )}
             </>
           )}

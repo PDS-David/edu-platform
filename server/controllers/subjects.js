@@ -144,52 +144,34 @@ const getSubject = async (req, res) => {
  */
 const createSubject = async (req, res) => {
   try {
-    const {
-      name,
-      code,
-      description,
-      category,
-      level,
-      icon,
-      color
-    } = req.body;
+    const { name, code, description, level, exam_board_id } = req.body;
 
-    if (!name || !code) {
+    if (!name || !code || !exam_board_id) {
       return res.status(400).json({
         success: false,
-        error:
-          'Please provide name and code',
+        error: 'name, code, and exam_board_id are required',
       });
     }
 
-    const result =
-      await sequelize.query(
-        `
-        INSERT INTO subjects
-          (name, code, description,
-           category, level, icon, color)
-        VALUES
-          ($1,$2,$3,$4,$5,$6,$7)
-        RETURNING *
-        `,
-        {
-          bind: [
-            name,
-            code,
-            description,
-            category,
-            level,
-            icon,
-            color
-          ],
-
-          type: QueryTypes.INSERT,
-        }
-      );
+    const result = await sequelize.query(
+      `INSERT INTO subjects (exam_board_id, name, code, description, level, is_active, created_at, updated_at)
+       VALUES (:exam_board_id, :name, UPPER(:code), :description, :level, true, NOW(), NOW())
+       RETURNING *`,
+      {
+        replacements: {
+          exam_board_id,
+          name,
+          code,
+          description: description || null,
+          level:       level       || null,
+        },
+        type: QueryTypes.SELECT,
+      }
+    );
 
     res.status(201).json({
       success: true,
-      data: result[0][0],
+      data: result[0],
     });
 
   } catch (error) {
