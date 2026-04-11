@@ -14,6 +14,10 @@
 //     Correct → mastery_score += 0.1   (clamped to 1.0)
 //     Wrong   → mastery_score -= 0.05  (clamped to 0.0)
 //   Attempts counter is incremented on every answer.
+//
+// ADDED (Task 10):
+//   GET /api/quizzes/history (query-param version) — consumed by QuizHistoryPage.
+//   BUG 4 FIX: COALESCE(qa.percentage, qa.accuracy_pct, 0) handles both column name variants.
 
 'use strict';
 
@@ -517,6 +521,7 @@ router.get('/attempt/:attemptId', protect, async (req, res) => {
 // ---------------------------------------------------------------------------
 // GET /api/quizzes/history/:studentId/:subtopicId
 // Returns past quiz attempts for a student on a specific subtopic.
+// NOTE: this path-param route must be registered BEFORE the query-param /history
 // ---------------------------------------------------------------------------
 router.get('/history/:studentId/:subtopicId', protect, async (req, res) => {
   const { studentId, subtopicId } = req.params;
@@ -549,32 +554,50 @@ router.get('/history/:studentId/:subtopicId', protect, async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// GET /api/quizzes/history?subtopic_id=:id   (TASK ADDITION)
-// Returns the logged-in student's past quiz attempts for a subtopic.
-// Uses query param instead of path params — consumed by QuizHistoryPage.
+// GET /api/quizzes/history?subtopic_id=UUID   (Task 10 — consumed by QuizHistoryPage)
+// Returns the logged-in student's past quiz attempts, optionally filtered by subtopic.
+// BUG 4 FIX: COALESCE handles both `percentage` and `accuracy_pct` column name variants
+//            depending on which migration was run on the target DB.
 // ---------------------------------------------------------------------------
 router.get('/history', protect, async (req, res) => {
   const { subtopic_id } = req.query;
-  if (!subtopic_id) {
-    return res.status(400).json({ success: false, error: 'subtopic_id query param required' });
+  const studentId = req.user.id;
+
+  const filters      = ['qa.student_id = :studentId'];
+  const replacements = { studentId };
+
+  if (subtopic_id) {
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_RE.test(subtopic_id)) {
+      return res.status(400).json({ success: false, error: 'Invalid subtopic_id' });
+    }
+    filters.push('qa.subtopic_id = :subtopicId');
+    replacements.subtopicId = subtopic_id;
   }
+
   try {
-    const rows = await sequelize.query(
-      `SELECT id, score, total_marks, time_taken_ms, created_at
-       FROM quiz_attempts
-       WHERE student_id = :studentId
-         AND subtopic_id = :subtopicId
-       ORDER BY created_at DESC
-       LIMIT 20`,
-      {
-        replacements: { studentId: req.user.id, subtopicId: subtopic_id },
-        type: QueryTypes.SELECT,
-      }
+    const attempts = await sequelize.query(
+      `SELECT
+         qa.id,
+         qa.score,
+         qa.total_marks,
+         COALESCE(qa.percentage, qa.accuracy_pct, 0) AS accuracy_pct,
+         qa.total_time_ms,
+         qa.created_at,
+         qa.subtopic_id,
+         st.name AS subtopic_name
+       FROM quiz_attempts qa
+       LEFT JOIN subtopics st ON st.id = qa.subtopic_id
+       WHERE ${filters.join(' AND ')}
+       ORDER BY qa.created_at DESC
+       LIMIT 30`,
+      { replacements, type: QueryTypes.SELECT }
     );
-    return res.json({ success: true, data: rows });
+
+    return res.status(200).json({ success: true, data: attempts });
   } catch (err) {
     console.error('[GET /quizzes/history]', err.message);
-    return res.status(500).json({ success: false, error: err.message });
+    return res.status(500).json({ success: false, error: 'Failed to fetch quiz history' });
   }
 });
 
@@ -582,7 +605,11 @@ router.get('/history', protect, async (req, res) => {
 // GET /api/quizzes   (placeholder — kept for compatibility)
 // ---------------------------------------------------------------------------
 router.get('/', protect, async (_req, res) => {
-  return res.status(200).json({ success: true, data: [], message: 'Use /api/quizzes/attempt-count or /api/quizzes/attempt' });
+  return res.status(200).json({
+    success: true,
+    data: [],
+    message: 'Use /api/quizzes/attempt-count or /api/quizzes/attempt',
+  });
 });
 
 module.exports = router;
