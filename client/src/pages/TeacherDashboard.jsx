@@ -11,7 +11,7 @@ import {
 import TopNav       from '../components/TopNav';
 import { useAuth }  from '../context/AuthContext';
 
-// ── Shared helpers ────────────────────────────────────────────────────────────
+// â”€â”€ Shared helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const accColor = (pct) => {
   if (!pct && pct !== 0) return 'text-gray-400';
   if (pct >= 70) return 'text-green-600';
@@ -40,7 +40,7 @@ function Toast({ msg, type, onClose }) {
   );
 }
 
-// ── Classes tab ───────────────────────────────────────────────────────────────
+// â”€â”€ Classes tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function ClassesTab({ onViewAnalytics }) {
   const [classes,    setClasses]    = useState([]);
   const [loading,    setLoading]    = useState(true);
@@ -126,7 +126,7 @@ function ClassesTab({ onViewAnalytics }) {
               <div>
                 <p className="font-semibold text-gray-900">{cls.name}</p>
                 <p className="text-xs text-gray-400 mt-0.5">
-                  {cls.student_count} students · Avg accuracy {cls.avg_accuracy ?? '—'}%
+                  {cls.student_count} students Â· Avg accuracy {cls.avg_accuracy ?? 'â€”'}%
                 </p>
               </div>
               <button
@@ -155,7 +155,7 @@ function ClassesTab({ onViewAnalytics }) {
   );
 }
 
-// ── Analytics tab ─────────────────────────────────────────────────────────────
+// â”€â”€ Analytics tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function AnalyticsTab({ cls }) {
   const [data,       setData]       = useState(null);
   const [loading,    setLoading]    = useState(true);
@@ -213,7 +213,7 @@ function AnalyticsTab({ cls }) {
     <div className="space-y-5">
       <div className="flex items-center gap-2">
         <BarChart2 size={16} className="text-teal-500" />
-        <p className="font-semibold text-gray-800">{cls.name} — Analytics</p>
+        <p className="font-semibold text-gray-800">{cls.name} â€” Analytics</p>
       </div>
 
       {data.weak_topics?.length > 0 && (
@@ -240,7 +240,7 @@ function AnalyticsTab({ cls }) {
           <button onClick={runGapAnalysis} disabled={gapLoading}
             className="flex items-center gap-1.5 bg-teal-500 hover:bg-teal-600 disabled:opacity-60 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
             {gapLoading ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
-            {gapLoading ? 'Analysing…' : 'Run AI Analysis'}
+            {gapLoading ? 'Analysingâ€¦' : 'Run AI Analysis'}
           </button>
         </div>
         {gapData === null && <p className="text-xs text-gray-400">Click to run AI analysis of your class gaps.</p>}
@@ -281,11 +281,11 @@ function AnalyticsTab({ cls }) {
                   return (
                     <tr key={i} className={`border-b border-gray-50 ${inactive ? 'bg-red-50' : ''}`}>
                       <td className="py-2 font-medium text-gray-700">{s.name}</td>
-                      <td className={`py-2 text-center font-bold ${accColor(s.accuracy_pct)}`}>{s.accuracy_pct ?? '—'}%</td>
+                      <td className={`py-2 text-center font-bold ${accColor(s.accuracy_pct)}`}>{s.accuracy_pct ?? 'â€”'}%</td>
                       <td className="py-2 text-center text-gray-500">{s.attempts}</td>
                       <td className="py-2 text-center text-amber-600">{s.streak}d</td>
                       <td className="py-2 text-center text-gray-400">
-                        {s.days_since_active !== null ? `${s.days_since_active}d ago` : '—'}
+                        {s.days_since_active !== null ? `${s.days_since_active}d ago` : 'â€”'}
                       </td>
                       <td className="py-2 text-center">
                         {inactive && (
@@ -310,7 +310,7 @@ function AnalyticsTab({ cls }) {
   );
 }
 
-// ── Test Builder tab ──────────────────────────────────────────────────────────
+// â”€â”€ Test Builder tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function TestBuilderTab() {
   const [step,        setStep]        = useState(1);
   const [classes,     setClasses]     = useState([]);
@@ -326,7 +326,7 @@ function TestBuilderTab() {
 
   useEffect(() => {
     api.get('/teacher/classes').then(r => setClasses(r.data || [])).catch(() => {});
-    api.get('/subjects').then(r => setSubjects(r.data || [])).catch(() => {});
+    api.get('/subjects', { params: { for_test_builder: true } }).then(r => setSubjects(r.data || [])).catch(() => {});
   }, []);
 
   const create = async () => {
@@ -363,11 +363,11 @@ function TestBuilderTab() {
   if (step === 2 && createdTest) return (
     <div className="space-y-4">
       <div className="bg-teal-50 border border-teal-200 rounded-2xl p-6 text-center">
-        <div className="text-3xl mb-2">✅</div>
+        <div className="text-3xl mb-2">âœ…</div>
         <p className="font-bold text-gray-900 text-lg">{createdTest.title}</p>
         <p className="text-sm text-gray-500 mt-1">
-          {createdTest.question_count} questions · {createdTest.time_limit_minutes || form.time_limit_minutes} min
-          {createdTest.due_date ? ` · Due ${new Date(createdTest.due_date).toLocaleDateString('en-GB')}` : ''}
+          {createdTest.question_count} questions Â· {createdTest.time_limit_minutes || form.time_limit_minutes} min
+          {createdTest.due_date ? ` Â· Due ${new Date(createdTest.due_date).toLocaleDateString('en-GB')}` : ''}
         </p>
         <div className="mt-4 flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-4 py-3">
           <span className="text-xs font-mono text-gray-600 flex-1 truncate">{shareLink}</span>
@@ -396,7 +396,7 @@ function TestBuilderTab() {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-gray-500">Configure a test — questions are auto-selected from the question bank.</p>
+      <p className="text-sm text-gray-500">Configure a test â€” questions are auto-selected from the question bank.</p>
 
       <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
         <div>
@@ -453,14 +453,14 @@ function TestBuilderTab() {
       <button onClick={create} disabled={creating || !form.title.trim()}
         className="w-full bg-teal-500 hover:bg-teal-600 disabled:opacity-50 text-white font-semibold py-3 rounded-xl text-sm transition-colors flex items-center justify-center gap-2">
         {creating ? <Loader2 size={16} className="animate-spin" /> : <PenTool size={16} />}
-        {creating ? 'Creating Test…' : 'Create Test'}
+        {creating ? 'Creating Testâ€¦' : 'Create Test'}
       </button>
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 export default function TeacherDashboard() {
   const { user }                           = useAuth();
   const navigate                           = useNavigate();
@@ -484,7 +484,7 @@ export default function TeacherDashboard() {
   };
 
   // Load the teacher's assigned subjects from the server.
-  // The API returns { success: true, data: [...] } — we unpack .data.
+  // The API returns { success: true, data: [...] } â€” we unpack .data.
   useEffect(() => {
     api.get('/teacher/my-subjects')
       .then(r => {
@@ -504,13 +504,13 @@ export default function TeacherDashboard() {
     <div className="min-h-screen bg-gray-50">
       <TopNav />
 
-      {/* ── Header ── */}
+      {/* â”€â”€ Header â”€â”€ */}
       <div className="bg-[#0a4a3f] px-4 py-5">
         <div className="max-w-4xl mx-auto flex items-start justify-between gap-4">
           <div>
             <p className="text-white/50 text-xs mb-1">Teacher Dashboard</p>
             <h1 className="text-white text-xl font-bold">
-              Welcome back, {displayName} 👋
+              Welcome back, {displayName} ðŸ‘‹
             </h1>
           </div>
           {hasSubjects && (
@@ -525,8 +525,8 @@ export default function TeacherDashboard() {
         </div>
       </div>
 
-      {/* ── Subject assignment status banner ────────────────────────────────── */}
-      {/* Only render once loading is complete — prevents flash of amber banner */}
+      {/* â”€â”€ Subject assignment status banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* Only render once loading is complete â€” prevents flash of amber banner */}
       {!subjectsLoading && (
         <div className={`border-b px-4 py-3 ${
           hasSubjects ? 'bg-teal-50 border-teal-100' : 'bg-amber-50 border-amber-100'
@@ -541,13 +541,13 @@ export default function TeacherDashboard() {
                     .map(s =>
                       `${s.icon_emoji ? s.icon_emoji + ' ' : ''}${s.name}${s.exam_board_code ? ` (${s.exam_board_code})` : ''}`
                     )
-                    .join(' · ')}
+                    .join(' Â· ')}
                 </p>
                 <Link
                   to="/teacher/resources"
                   className="ml-auto text-xs font-semibold text-teal-700 hover:text-teal-900 shrink-0 flex items-center gap-1"
                 >
-                  <BookOpen size={12} /> Manage Resources →
+                  <BookOpen size={12} /> Manage Resources â†’
                 </Link>
               </>
             ) : (
@@ -563,7 +563,7 @@ export default function TeacherDashboard() {
         </div>
       )}
 
-      {/* ── Tab bar ── */}
+      {/* â”€â”€ Tab bar â”€â”€ */}
       <div className="bg-white border-b border-gray-100 sticky top-14 z-30">
         <div className="max-w-4xl mx-auto px-4 flex gap-1 overflow-x-auto">
           {tabs.map(t => {
