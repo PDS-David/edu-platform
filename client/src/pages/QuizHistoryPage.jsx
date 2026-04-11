@@ -1,149 +1,144 @@
 // client/src/pages/QuizHistoryPage.jsx
-// TASK 10: Shows past quiz attempts for a given subtopic.
 // URL: /student/subtopic/:subtopicId/quiz-history
-// Calls: GET /api/quizzes/history?subtopic_id=:subtopicId
+// Shows a student's past quiz attempts for a subtopic.
 
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Loader2, Trophy, Clock, Target, ArrowRight } from 'lucide-react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import api from '../services/api';
+import TopNav from '../components/TopNav';
+import { Loader2, ChevronLeft, Trophy, Clock, Target, RotateCcw } from 'lucide-react';
+
+function fmtTime(ms) {
+  if (!ms) return '—';
+  const s = Math.round(ms / 1000);
+  return `${Math.floor(s / 60)}m ${s % 60}s`;
+}
+
+function fmtDate(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
 
 export default function QuizHistoryPage() {
   const { subtopicId } = useParams();
-  const navigate = useNavigate();
-
+  const navigate       = useNavigate();
   const [attempts, setAttempts] = useState([]);
+  const [subtopic, setSubtopic] = useState(null);
   const [loading,  setLoading]  = useState(true);
-  const [error,    setError]    = useState('');
 
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      try {
-        const res = await api.get('/quizzes/history', { params: { subtopic_id: subtopicId } });
-        setAttempts(res.data || []);
-      } catch {
-        setError('Failed to load quiz history.');
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
+    if (!subtopicId) return;
+    Promise.all([
+      api.get(`/subtopics/${subtopicId}`).catch(() => null),
+      api.get(`/quizzes/history`, { params: { subtopic_id: subtopicId } }).catch(() => null),
+    ]).then(([subRes, histRes]) => {
+      if (subRes?.data) setSubtopic(subRes.data);
+      const list = histRes?.data ?? histRes ?? [];
+      setAttempts(Array.isArray(list) ? list : []);
+    }).finally(() => setLoading(false));
   }, [subtopicId]);
 
-  const formatDate = (iso) => {
-    if (!iso) return '—';
-    return new Date(iso).toLocaleDateString('en-GB', {
-      day: 'numeric', month: 'short', year: 'numeric',
-    });
-  };
-
-  const formatTime = (ms) => {
-    if (!ms) return '—';
-    const s = Math.round(ms / 1000);
-    if (s < 60) return `${s}s`;
-    return `${Math.floor(s / 60)}m ${s % 60}s`;
-  };
-
-  const gradeBadge = (pct) => {
-    if (pct >= 80) return 'bg-green-100 text-green-700';
-    if (pct >= 60) return 'bg-blue-100 text-blue-700';
-    if (pct >= 40) return 'bg-yellow-100 text-yellow-700';
-    return 'bg-red-100 text-red-700';
-  };
+  const best = attempts.length
+    ? Math.max(...attempts.map(a => Math.round(a.accuracy_pct ?? (a.score / (a.total_marks || 1)) * 100)))
+    : null;
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-100 px-4 py-3 flex items-center gap-3">
-        <button
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 transition-colors"
-        >
-          <ChevronLeft className="w-4 h-4" /> Back
-        </button>
-        <span className="text-gray-300">|</span>
-        <h1 className="text-sm font-semibold text-gray-800">Quiz History</h1>
+      <TopNav />
+
+      <div className="bg-[#0a4a3f] px-4 py-5">
+        <div className="max-w-3xl mx-auto flex items-center gap-4">
+          <button onClick={() => navigate(-1)} className="text-white/60 hover:text-white transition-colors">
+            <ChevronLeft size={20} />
+          </button>
+          <div>
+            <p className="text-white/50 text-xs mb-0.5">Quiz History</p>
+            <h1 className="text-white text-lg font-bold">{subtopic?.name || 'Subtopic'}</h1>
+          </div>
+        </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 py-6">
-
-        {loading && (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-7 h-7 text-indigo-400 animate-spin" />
+      <div className="max-w-3xl mx-auto px-4 py-6">
+        {/* Summary */}
+        {attempts.length > 0 && (
+          <div className="grid grid-cols-3 gap-3 mb-6">
+            <div className="bg-white border border-gray-100 rounded-2xl p-4 text-center">
+              <p className="text-2xl font-bold text-teal-600">{attempts.length}</p>
+              <p className="text-xs text-gray-400 mt-0.5">Attempts</p>
+            </div>
+            <div className="bg-white border border-gray-100 rounded-2xl p-4 text-center">
+              <p className="text-2xl font-bold text-teal-600">{best}%</p>
+              <p className="text-xs text-gray-400 mt-0.5">Best score</p>
+            </div>
+            <div className="bg-white border border-gray-100 rounded-2xl p-4 text-center">
+              <p className="text-2xl font-bold text-teal-600">
+                {Math.round(attempts.reduce((s, a) => s + (a.accuracy_pct ?? 0), 0) / attempts.length)}%
+              </p>
+              <p className="text-xs text-gray-400 mt-0.5">Average</p>
+            </div>
           </div>
         )}
 
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
-            {error}
+        {loading ? (
+          <div className="flex justify-center py-16">
+            <Loader2 size={24} className="animate-spin text-teal-400" />
           </div>
-        )}
-
-        {!loading && !error && attempts.length === 0 && (
-          <div className="text-center py-20">
-            <Trophy className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-500 font-medium">No attempts yet</p>
-            <p className="text-gray-400 text-sm mt-1">Complete a quiz to see your history here.</p>
+        ) : attempts.length === 0 ? (
+          <div className="text-center py-16 text-gray-400">
+            <Trophy size={36} className="mx-auto mb-3 opacity-30" />
+            <p className="text-sm font-medium">No quiz attempts yet</p>
+            <p className="text-xs mt-1">Take a quiz to see your history here</p>
             <button
-              onClick={() => navigate(-1)}
-              className="mt-5 bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors"
+              onClick={() => navigate(`/student/subtopic/${subtopicId}?tab=quiz`)}
+              className="mt-4 flex items-center gap-2 mx-auto bg-teal-500 hover:bg-teal-600 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
             >
-              Start a Quiz
+              <RotateCcw size={13} /> Take a Quiz
             </button>
           </div>
-        )}
-
-        {!loading && attempts.length > 0 && (
+        ) : (
           <div className="space-y-3">
-            <p className="text-xs text-gray-400 mb-1">{attempts.length} attempt{attempts.length !== 1 ? 's' : ''} recorded</p>
             {attempts.map((attempt, i) => {
-              const pct = attempt.total_marks > 0
-                ? Math.round((attempt.score / attempt.total_marks) * 100)
-                : 0;
+              const pct = Math.round(attempt.accuracy_pct ?? ((attempt.score / (attempt.total_marks || 1)) * 100));
+              const scoreColor = pct >= 70 ? 'text-green-600' : pct >= 40 ? 'text-amber-600' : 'text-red-500';
               return (
-                <div
-                  key={attempt.id}
-                  className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-4 flex items-center gap-4"
-                >
-                  {/* Rank / number */}
-                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-500 flex-shrink-0">
-                    {i + 1}
+                <div key={attempt.id || i} className="bg-white border border-gray-100 rounded-2xl p-4 flex items-center gap-4">
+                  <div className={`text-2xl font-bold w-14 text-center shrink-0 ${scoreColor}`}>
+                    {pct}%
                   </div>
-
-                  {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${gradeBadge(pct)}`}>
-                        {pct}%
-                      </span>
-                      <span className="text-xs text-gray-400">
-                        {attempt.score}/{attempt.total_marks} marks
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-gray-400">
+                    <p className="text-sm font-semibold text-gray-800">
+                      {attempt.score ?? '—'} / {attempt.total_marks ?? attempt.total ?? '—'} correct
+                    </p>
+                    <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-400">
                       <span className="flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {formatTime(attempt.time_taken_ms)}
+                        <Clock size={11} /> {fmtTime(attempt.total_time_ms)}
                       </span>
-                      <span className="flex items-center gap-1">
-                        <Target className="w-3 h-3" />
-                        {formatDate(attempt.created_at)}
-                      </span>
+                      <span>{fmtDate(attempt.created_at || attempt.submitted_at)}</span>
                     </div>
                   </div>
-
-                  {/* Link to results */}
-                  <button
-                    onClick={() => navigate(`/student/quiz-results/${attempt.id}`)}
-                    className="flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-700 font-medium flex-shrink-0"
-                  >
-                    Review <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
+                  {attempt.id && (
+                    <Link
+                      to={`/student/quiz-results/${attempt.id}`}
+                      state={{ subtopicId, subtopicName: subtopic?.name }}
+                      className="text-xs text-teal-600 hover:text-teal-800 font-medium px-3 py-1.5 border border-teal-200 rounded-lg transition-colors shrink-0"
+                    >
+                      Review
+                    </Link>
+                  )}
                 </div>
               );
             })}
           </div>
+        )}
+
+        {/* Retry button */}
+        {!loading && (
+          <button
+            onClick={() => navigate(`/student/subtopic/${subtopicId}?tab=quiz`)}
+            className="mt-6 w-full flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 hover:border-teal-300 hover:text-teal-600 text-gray-400 rounded-2xl py-4 text-sm transition-colors"
+          >
+            <RotateCcw size={14} /> Take another quiz
+          </button>
         )}
       </div>
     </div>
