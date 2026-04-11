@@ -3,19 +3,18 @@
 // Teacher Topic & Subtopic Management
 // URL: /teacher/content
 //
-// Flow:
-//   1. Teacher picks one of their assigned subjects from a tab strip
-//   2. Sees all topics for that subject (admin-created + their own)
-//   3. Can add / edit / delete their own topics (admin topics are read-only)
-//   4. Expands a topic to see its subtopics
-//   5. Can add / edit / delete their own subtopics within any topic
+// TASK 14: Added ConceptList component embedded under each subtopic row.
+//   - Import ConceptList from '../components/ConceptList'
+//   - Each subtopic row now wraps in a block div with ConceptList below it
+//   - Removed the old standalone concept_count badge (ConceptList toggle shows count)
 
 import { useState, useEffect, useRef } from 'react';
 import { Link }                        from 'react-router-dom';
 import api                             from '../services/api';
 import TopNav                          from '../components/TopNav';
+import ConceptList                     from '../components/ConceptList';
 import {
-  BookOpen, Plus, ChevronDown, ChevronUp, ChevronRight,
+  BookOpen, Plus, ChevronDown, ChevronUp,
   Pencil, Trash2, Loader2, CheckCircle, AlertTriangle,
   X, Save, Layers, FileText, Lock,
 } from 'lucide-react';
@@ -90,7 +89,7 @@ function ConfirmModal({ message, onConfirm, onCancel, loading }) {
   );
 }
 
-// ── Add-item row (used for both new topics and new subtopics) ─────────────────
+// ── Add-item row ──────────────────────────────────────────────────────────────
 function AddRow({ placeholder, onAdd, onCancel }) {
   const [name, setName] = useState('');
   const [desc, setDesc] = useState('');
@@ -145,7 +144,7 @@ function SubtopicList({ topic, subjectId, showToast }) {
   const [loading,     setLoading]     = useState(true);
   const [showAdd,     setShowAdd]     = useState(false);
   const [editingId,   setEditingId]   = useState(null);
-  const [confirmDel,  setConfirmDel]  = useState(null); // subtopic obj
+  const [confirmDel,  setConfirmDel]  = useState(null);
   const [deleting,    setDeleting]    = useState(false);
 
   const load = () => {
@@ -208,52 +207,50 @@ function SubtopicList({ topic, subjectId, showToast }) {
 
   return (
     <div className="px-5 pb-4 pt-1">
-      {/* Subtopics */}
       {subtopics.length === 0 && !showAdd && (
         <p className="text-xs text-gray-400 py-2">No subtopics yet. Add one below.</p>
       )}
 
       {subtopics.map(sub => (
-        <div key={sub.id}
-          className="flex items-center gap-2 py-2 border-b border-gray-50 last:border-0 group">
-          {/* dot */}
-          <div className="w-1.5 h-1.5 rounded-full bg-teal-400 shrink-0" />
+        // TASK 14: wrapped in block div so ConceptList renders below each row
+        <div key={sub.id} className="border-b border-gray-50 last:border-0">
+          {/* Subtopic row */}
+          <div className="flex items-center gap-2 py-2 group">
+            <div className="w-1.5 h-1.5 rounded-full bg-teal-400 shrink-0" />
 
-          {editingId === sub.id && sub.created_by_me ? (
-            <InlineEdit
-              value={sub.name}
-              onSave={v => handleEdit(sub.id, v)}
-              onCancel={() => setEditingId(null)}
-              placeholder="Subtopic name"
-            />
-          ) : (
-            <>
-              <span className="text-sm text-gray-700 flex-1">{sub.name}</span>
-              {sub.concept_count > 0 && (
-                <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-md shrink-0">
-                  {sub.concept_count} concept{sub.concept_count !== 1 ? 's' : ''}
-                </span>
-              )}
-              {sub.created_by_me ? (
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                  <button onClick={() => setEditingId(sub.id)}
-                    className="p-1 rounded text-gray-400 hover:text-teal-600 hover:bg-teal-50 transition-colors">
-                    <Pencil size={12} />
-                  </button>
-                  <button onClick={() => setConfirmDel(sub)}
-                    className="p-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
-                    <Trash2 size={12} />
-                  </button>
-                </div>
-              ) : (
-                <Lock size={11} className="text-gray-300 shrink-0 opacity-0 group-hover:opacity-100" title="Admin-created" />
-              )}
-            </>
-          )}
+            {editingId === sub.id && sub.created_by_me ? (
+              <InlineEdit
+                value={sub.name}
+                onSave={v => handleEdit(sub.id, v)}
+                onCancel={() => setEditingId(null)}
+                placeholder="Subtopic name"
+              />
+            ) : (
+              <>
+                <span className="text-sm text-gray-700 flex-1">{sub.name}</span>
+                {sub.created_by_me ? (
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                    <button onClick={() => setEditingId(sub.id)}
+                      className="p-1 rounded text-gray-400 hover:text-teal-600 hover:bg-teal-50 transition-colors">
+                      <Pencil size={12} />
+                    </button>
+                    <button onClick={() => setConfirmDel(sub)}
+                      className="p-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                ) : (
+                  <Lock size={11} className="text-gray-300 shrink-0 opacity-0 group-hover:opacity-100" title="Admin-created" />
+                )}
+              </>
+            )}
+          </div>
+
+          {/* TASK 14: Concept management embedded below each subtopic */}
+          <ConceptList subtopic={sub} showToast={showToast} />
         </div>
       ))}
 
-      {/* Add subtopic */}
       {showAdd ? (
         <AddRow
           placeholder="Subtopic name e.g. Cell Division"
@@ -287,15 +284,12 @@ function TopicCard({ topic, subjectId, showToast, onEdit, onDelete }) {
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-3">
-      {/* Topic header row */}
       <div className="flex items-center gap-3 px-5 py-4">
-        {/* Expand toggle */}
         <button onClick={() => setExpanded(e => !e)}
           className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors shrink-0">
           {expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
         </button>
 
-        {/* Name — editable inline */}
         {editing ? (
           <InlineEdit
             value={topic.name}
@@ -307,14 +301,12 @@ function TopicCard({ topic, subjectId, showToast, onEdit, onDelete }) {
           <span className="text-sm font-semibold text-gray-800 flex-1">{topic.name}</span>
         )}
 
-        {/* Subtopic count badge */}
         {!editing && (
           <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full shrink-0">
             {topic.subtopic_count} subtopic{topic.subtopic_count !== 1 ? 's' : ''}
           </span>
         )}
 
-        {/* Action buttons — only for teacher-created topics */}
         {!editing && topic.created_by_me && (
           <div className="flex gap-1 shrink-0">
             <button onClick={() => setEditing(true)}
@@ -328,7 +320,6 @@ function TopicCard({ topic, subjectId, showToast, onEdit, onDelete }) {
           </div>
         )}
 
-        {/* Lock icon for admin topics */}
         {!editing && !topic.created_by_me && (
           <span title="Created by admin — read only"
             className="flex items-center gap-1 text-xs text-gray-300 shrink-0">
@@ -337,7 +328,6 @@ function TopicCard({ topic, subjectId, showToast, onEdit, onDelete }) {
         )}
       </div>
 
-      {/* Expanded subtopics panel */}
       {expanded && (
         <div className="border-t border-gray-50">
           <SubtopicList topic={topic} subjectId={subjectId} showToast={showToast} />
@@ -351,19 +341,18 @@ function TopicCard({ topic, subjectId, showToast, onEdit, onDelete }) {
 // MAIN PAGE
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function TeacherContentPage() {
-  const [subjects,    setSubjects]    = useState([]);
-  const [activeSubj,  setActiveSubj]  = useState(null); // subject object
-  const [topics,      setTopics]      = useState([]);
-  const [loadingSubj, setLoadingSubj] = useState(true);
-  const [loadingTop,  setLoadingTop]  = useState(false);
-  const [showAddTopic,setShowAddTopic]= useState(false);
-  const [confirmDel,  setConfirmDel]  = useState(null); // topic object
-  const [deleting,    setDeleting]    = useState(false);
-  const [toast,       setToast]       = useState(null);
+  const [subjects,     setSubjects]     = useState([]);
+  const [activeSubj,   setActiveSubj]   = useState(null);
+  const [topics,       setTopics]       = useState([]);
+  const [loadingSubj,  setLoadingSubj]  = useState(true);
+  const [loadingTop,   setLoadingTop]   = useState(false);
+  const [showAddTopic, setShowAddTopic] = useState(false);
+  const [confirmDel,   setConfirmDel]   = useState(null);
+  const [deleting,     setDeleting]     = useState(false);
+  const [toast,        setToast]        = useState(null);
 
   const showToast = (msg, type = 'success') => setToast({ msg, type });
 
-  // ── Load assigned subjects ────────────────────────────────────────────────
   useEffect(() => {
     api.get('/teacher/my-subjects')
       .then(r => {
@@ -375,7 +364,6 @@ export default function TeacherContentPage() {
       .finally(() => setLoadingSubj(false));
   }, []);
 
-  // ── Load topics when subject changes ──────────────────────────────────────
   useEffect(() => {
     if (!activeSubj) return;
     setLoadingTop(true);
@@ -387,7 +375,6 @@ export default function TeacherContentPage() {
       .finally(() => setLoadingTop(false));
   }, [activeSubj?.id]); // eslint-disable-line
 
-  // ── Add topic ─────────────────────────────────────────────────────────────
   const handleAddTopic = async (name, description) => {
     try {
       const r = await api.post('/teacher/topics', {
@@ -403,7 +390,6 @@ export default function TeacherContentPage() {
     }
   };
 
-  // ── Edit topic name ───────────────────────────────────────────────────────
   const handleEditTopic = async (id, name) => {
     try {
       const r = await api.put(`/teacher/topics/${id}`, { name });
@@ -415,7 +401,6 @@ export default function TeacherContentPage() {
     }
   };
 
-  // ── Delete topic ──────────────────────────────────────────────────────────
   const handleDeleteTopic = async () => {
     if (!confirmDel) return;
     setDeleting(true);
@@ -431,7 +416,6 @@ export default function TeacherContentPage() {
     }
   };
 
-  // ── Counts ─────────────────────────────────────────────────────────────────
   const myTopicsCount    = topics.filter(t => t.created_by_me).length;
   const adminTopicsCount = topics.filter(t => !t.created_by_me).length;
 
@@ -439,14 +423,13 @@ export default function TeacherContentPage() {
     <div className="min-h-screen bg-gray-50">
       <TopNav />
 
-      {/* ── Page header ── */}
       <div className="bg-[#0a4a3f] px-4 py-5">
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
           <div>
             <p className="text-white/50 text-xs mb-1">Teacher</p>
             <h1 className="text-white text-xl font-bold">Content Management</h1>
             <p className="text-white/60 text-sm mt-0.5">
-              Manage topics and subtopics for your assigned subjects
+              Manage topics, subtopics and concepts for your assigned subjects
             </p>
           </div>
           <Link to="/teacher/dashboard"
@@ -458,7 +441,6 @@ export default function TeacherContentPage() {
 
       <div className="max-w-4xl mx-auto px-4 py-6">
 
-        {/* ── No subjects assigned ── */}
         {!loadingSubj && subjects.length === 0 && (
           <div className="bg-amber-50 border border-amber-100 rounded-2xl p-8 text-center">
             <BookOpen size={32} className="mx-auto mb-3 text-amber-300" />
@@ -477,7 +459,6 @@ export default function TeacherContentPage() {
 
         {!loadingSubj && subjects.length > 0 && (
           <>
-            {/* ── Subject tab strip ── */}
             <div className="flex gap-2 flex-wrap mb-6">
               {subjects.map(s => (
                 <button
@@ -500,7 +481,6 @@ export default function TeacherContentPage() {
               ))}
             </div>
 
-            {/* ── Stats bar ── */}
             {!loadingTop && activeSubj && (
               <div className="flex items-center gap-4 mb-4 text-xs text-gray-500">
                 <span className="flex items-center gap-1">
@@ -520,7 +500,6 @@ export default function TeacherContentPage() {
               </div>
             )}
 
-            {/* ── Topics list ── */}
             {loadingTop ? (
               <div className="flex justify-center py-12">
                 <Loader2 size={20} className="animate-spin text-teal-400" />
@@ -548,7 +527,6 @@ export default function TeacherContentPage() {
                   />
                 ))}
 
-                {/* ── Add topic row ── */}
                 {showAddTopic ? (
                   <AddRow
                     placeholder="Topic name e.g. Cell Biology"
@@ -571,7 +549,6 @@ export default function TeacherContentPage() {
         )}
       </div>
 
-      {/* ── Topic delete confirmation ── */}
       {confirmDel && (
         <ConfirmModal
           message={`Delete topic "${confirmDel.name}"? All its subtopics will also be removed from students' view.`}

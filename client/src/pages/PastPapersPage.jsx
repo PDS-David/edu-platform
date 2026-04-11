@@ -1,13 +1,20 @@
 // client/src/pages/PastPapersPage.jsx
 // Route: /past-papers  (public — no auth required, good for SEO)
 // Filterable grid of past papers: exam board, subject, year range.
+//
+// FIX v1.1 — BUG 1:
+//   Replaced undefined `API` variable with `BASE_URL` derived from VITE_API_URL.
+//   Line was: href={`${API.replace('/api', '')}${p.file_url}`}
+//   Now:      href={`${BASE_URL}${p.file_url}`}
 
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
 import { FileText, Download, Filter, Loader2, BookOpen } from 'lucide-react';
-import branding from '../config/branding';
 import PublicNav from '../components/PublicNav';
+
+// ── BUG 1 FIX: derive base URL from env var (strip /api suffix) ────────────────
+const BASE_URL = (import.meta.env.VITE_API_URL || '/api').replace('/api', '');
 
 const EXAM_BOARDS = [
   { code: 'JAMB',    name: '🎓 JAMB/UTME' },
@@ -166,8 +173,9 @@ export default function PastPapersPage() {
                   )}
                 </div>
 
+                {/* BUG 1 FIX: was `${API.replace('/api', '')}${p.file_url}` — API was undefined */}
                 <a
-                  href={`${API.replace('/api', '')}${p.file_url}`}
+                  href={`${BASE_URL}${p.file_url}`}
                   download
                   className="flex items-center justify-center gap-2 w-full bg-gray-900 hover:bg-gray-800 text-white text-xs font-semibold py-2 rounded-xl transition-colors"
                 >

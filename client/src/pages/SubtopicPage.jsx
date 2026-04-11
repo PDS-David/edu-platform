@@ -4,10 +4,9 @@
 // Three tabs: Resources | Practice Questions (MCQ/Smart Answers/Structured) | Quiz
 //
 // FIX v1.1: Replaced raw axios with api instance from services/api.js
-//   - Removed: import axios, const API, const authHeader
-//   - Added:   import api
-//   - Response shape updated: api interceptor returns response.data directly,
-//     so responses are already { success, data, ... }
+// FIX v1.2 (BUG 2): Removed localStorage from PracticeTab — blocked in sandbox.
+//   - useState(false) only for `dismissed`
+//   - onDismiss just calls setDismissed(true), no localStorage.setItem
 
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom';
@@ -66,7 +65,6 @@ function ResourcesTab({ subtopicId, subtopic, subtopicName, onComplete }) {
   const handleGenerateNotes = async () => {
     setNotesLoading(true);
     try {
-      // api interceptor returns response.data directly
       const r = await api.post('/ai/notes/generate', {
         subject_id: subtopic?.subject_id,
         topic_name: subtopicName,
@@ -193,9 +191,8 @@ function PracticeTab({ subtopicId, subjectId, onComplete }) {
   const [current,   setCurrent]   = useState(0);
   const [phase,     setPhase]     = useState('quiz');
   const [score,     setScore]     = useState(0);
-  const [dismissed, setDismissed] = useState(
-    () => localStorage.getItem('smart_tooltip_dismissed') === '1'
-  );
+  // BUG 2 FIX: removed localStorage.getItem — state only, no persistence needed
+  const [dismissed, setDismissed] = useState(false);
 
   const loadQuestions = async (type) => {
     setLoading(true);
@@ -205,7 +202,6 @@ function PracticeTab({ subtopicId, subjectId, onComplete }) {
     try {
       const params = { count: 8, question_sub_type: type };
       if (subjectId) params.subject_id = subjectId;
-      // api interceptor returns response.data directly
       const r = await api.get('/questions/random', { params });
       setQuestions(r.data || []);
     } catch {
@@ -267,7 +263,8 @@ function PracticeTab({ subtopicId, subjectId, onComplete }) {
         <OpenAnswerQuestion key={questions[current]?.id} question={questions[current]}
           questionNumber={current + 1} totalQuestions={questions.length} type="smart"
           dismissed={dismissed}
-          onDismiss={() => { setDismissed(true); localStorage.setItem('smart_tooltip_dismissed', '1'); }}
+          // BUG 2 FIX: removed localStorage.setItem — session state only
+          onDismiss={() => setDismissed(true)}
           onNext={() => handleAnswer(null)} onPrev={current > 0 ? () => setCurrent(c => c - 1) : null} />
       ) : (
         <StructuredQuestion key={questions[current]?.id} question={questions[current]}
@@ -300,7 +297,6 @@ function MCQQuestion({ question, questionNumber, totalQuestions, onAnswer, onPre
     if (!selected || submitting || result) return;
     setSubmitting(true);
     try {
-      // api interceptor returns response.data directly
       const res = await api.post(`/questions/${question.id}/answer`, {
         selected_option_id: selected,
         time_taken_ms:      Date.now() - startTime.current,
@@ -426,9 +422,9 @@ function OpenAnswerQuestion({ question, questionNumber, totalQuestions, dismisse
     setLoading(true);
     try {
       const r = await api.post('/ai/explain', {
-        question_id:      question.id,
+        question_id:        question.id,
         selected_option_id: null,
-        typed_answer:     answer,
+        typed_answer:       answer,
       });
       setResult(r.explanation || 'AI feedback submitted.');
     } catch { setResult('AI marking not available. Continue to next question.'); }
@@ -528,7 +524,7 @@ function CompletionCard({ score, total, onTakeQuiz, onRetry }) {
   return (
     <div className="bg-teal-50 border border-teal-100 rounded-2xl p-8 text-center">
       <div className="text-4xl mb-3">🤩</div>
-      <h3 className="text-lg font-bold text-teal-600 mb-2">Keep Going, You're Almost There!</h3>
+      <h3 className="text-lg font-bold teal-600 mb-2">Keep Going, You're Almost There!</h3>
       <p className="text-sm text-gray-600 mb-1">
         Nice job! 🎉 Now, take the quiz and get{' '}
         <span className="text-teal-600 font-medium">detailed feedback</span> on every answer with our{' '}
@@ -558,7 +554,6 @@ export default function SubtopicPage() {
   const [loading,   setLoading]   = useState(true);
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'resources');
 
-  // ── Load subtopic data ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!subtopicId) return;
     setLoading(true);
@@ -567,7 +562,6 @@ export default function SubtopicPage() {
       api.get(`/subtopics/${subtopicId}/adjacent`),
     ])
       .then(([subRes, adjRes]) => {
-        // api interceptor returns response.data directly
         setSubtopic(subRes.data);
         setAdjacent(adjRes.data || { previous: null, next: null });
       })
@@ -575,7 +569,6 @@ export default function SubtopicPage() {
       .finally(() => setLoading(false));
   }, [subtopicId]);
 
-  // ── Load progress ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!user || !subtopicId) return;
     api.get(`/subtopics/${subtopicId}/progress`)
@@ -583,7 +576,6 @@ export default function SubtopicPage() {
       .catch(() => {});
   }, [user, subtopicId]);
 
-  // ── Update tab from URL ────────────────────────────────────────────────────
   useEffect(() => {
     const tab = searchParams.get('tab');
     if (tab) setActiveTab(tab);
@@ -600,16 +592,15 @@ export default function SubtopicPage() {
   );
 
   const isQuizTab     = activeTab === 'quiz';
-  const subtopicName  = subtopic?.name         || 'Subtopic';
-  const subjectName   = subtopic?.subject_name || '';
-  const topicName     = subtopic?.topic_name   || '';
+  const subtopicName  = subtopic?.name            || 'Subtopic';
+  const subjectName   = subtopic?.subject_name    || '';
+  const topicName     = subtopic?.topic_name      || '';
   const examBoardName = subtopic?.exam_board_name || '';
 
   return (
     <div className={`min-h-screen ${isQuizTab ? 'bg-[#0a4a3f]' : 'bg-gray-50'}`}>
       <TopNav />
 
-      {/* Sub-topic navigation bar */}
       <div className={`sticky top-14 z-40 border-b ${isQuizTab ? 'bg-[#0a4a3f] border-white/10' : 'bg-white border-gray-100'}`}>
         <div className="max-w-3xl mx-auto px-4 py-2.5 flex items-center gap-4">
           <div className="flex items-center gap-2 shrink-0">
@@ -635,7 +626,6 @@ export default function SubtopicPage() {
               { id: 'quiz',      label: 'Quiz',               icon: FileText,   key: 'quiz_completed'      },
             ].map(tab => {
               const done     = progress[tab.key];
-              const Icon     = tab.icon;
               const isActive = activeTab === tab.id;
               return (
                 <button key={tab.id} onClick={() => setActiveTab(tab.id)}
@@ -666,7 +656,6 @@ export default function SubtopicPage() {
         </div>
       </div>
 
-      {/* Breadcrumb */}
       {!isQuizTab && (
         <div className="max-w-3xl mx-auto px-4 pt-3">
           <nav className="flex items-center gap-1 text-xs text-gray-400 flex-wrap">
@@ -679,7 +668,6 @@ export default function SubtopicPage() {
         </div>
       )}
 
-      {/* Tab content */}
       <div className={`max-w-3xl mx-auto px-4 ${isQuizTab ? 'py-6' : 'py-5'}`}>
         {activeTab === 'resources' && (
           <ResourcesTab subtopicId={subtopicId} subtopic={subtopic} subtopicName={subtopicName} onComplete={handleTabComplete} />
