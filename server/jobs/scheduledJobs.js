@@ -1,5 +1,5 @@
 // server/jobs/scheduledJobs.js
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // FIXES in this version:
 //   1. Weekly digest user query uses last_activity_date (not last_login).
 //   2. Streak nudge query casts created_at::date to avoid date/timestamp mismatch.
@@ -7,7 +7,7 @@
 //   4. node-cron graceful fallback if package missing.
 //   5. FIX-1: Added `start` alias on module.exports so server.js call
 //      `scheduledJobs.start()` works alongside `scheduledJobs.startJobs()`.
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 let cron;
 try {
@@ -21,9 +21,9 @@ const { QueryTypes } = require('sequelize');
 const sequelize      = require('../config/database');
 const { sendWeeklyDigest, sendStreakNudge } = require('../services/emailService');
 
-// ── Weekly digest — every Monday 9am WAT ─────────────────────────────────────
+// â”€â”€ Weekly digest â€” every Monday 9am WAT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function runWeeklyDigest() {
-  console.log('[jobs] Running weekly digest…');
+  console.log('[jobs] Running weekly digestâ€¦');
   try {
     const users = await sequelize.query(
       `SELECT id, first_name, email
@@ -77,8 +77,8 @@ async function runWeeklyDigest() {
         );
 
         await sendWeeklyDigest(user, {
-          best_subject:        bestRow?.subject_name || '—',
-          weakest_topic:       weakRow?.topic        || '—',
+          best_subject:        bestRow?.subject_name || 'â€”',
+          weakest_topic:       weakRow?.topic        || 'â€”',
           weakest_subtopic_id: weakRow?.subtopic_id  || null,
           streak:              userRow?.study_streak_days || 0,
           accuracy_pct:        accRow?.pct           || 0,
@@ -92,9 +92,9 @@ async function runWeeklyDigest() {
   }
 }
 
-// ── Streak nudge — every day at 6pm WAT ──────────────────────────────────────
+// â”€â”€ Streak nudge â€” every day at 6pm WAT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function runStreakNudge() {
-  console.log('[jobs] Running streak nudge…');
+  console.log('[jobs] Running streak nudgeâ€¦');
   try {
     const users = await sequelize.query(
       `SELECT id, first_name, email,
@@ -130,6 +130,30 @@ async function runStreakNudge() {
   }
 }
 
+
+// ── Expire free trials ────────────────────────────────────────────────────────
+// Runs daily at midnight WAT. Moves any free_trial accounts whose
+// subscription_expires_at has passed to 'expired' so that subscriptionGuard
+// correctly applies the 5-question daily cap to ex-trial users.
+async function runTrialExpiry() {
+  try {
+    const { QueryTypes } = require('sequelize');
+    const sequelize = require('../config/database');
+    const result = await sequelize.query(
+      `UPDATE users
+       SET    subscription_status = 'expired',
+              updated_at          = NOW()
+       WHERE  subscription_status   = 'free_trial'
+         AND  subscription_expires_at IS NOT NULL
+         AND  subscription_expires_at < NOW()`,
+      { type: QueryTypes.UPDATE }
+    );
+    console.log('[jobs] Trial expiry: updated', result[1] ?? 0, 'account(s) to expired');
+  } catch (err) {
+    console.error('[jobs] runTrialExpiry error:', err.message);
+  }
+}
+
 // ── Start all scheduled jobs ──────────────────────────────────────────────────
 function startJobs() {
   if (!cron) {
@@ -149,13 +173,20 @@ function startJobs() {
     timezone:  'Africa/Lagos',
   });
 
-  console.log('✅ Scheduled jobs started (weekly digest Mon 9am + streak nudge daily 6pm WAT)');
+  // Daily trial expiry check — midnight WAT
+  cron.schedule('0 0 * * *', runTrialExpiry, {
+    scheduled: true,
+    timezone:  'Africa/Lagos',
+  });
+
+  console.log('✅ Scheduled jobs started (weekly digest Mon 9am + streak nudge 6pm + trial expiry midnight WAT)');
 }
 
 module.exports = {
   startJobs,
   runWeeklyDigest,
   runStreakNudge,
-  // FIX-1: alias so server.js `scheduledJobs.start()` works without changes
+  runTrialExpiry,
+  // alias so server.js `scheduledJobs.start()` works without changes
   start: startJobs,
 };
