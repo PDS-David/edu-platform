@@ -16,8 +16,9 @@ client/.env.local
 
 # ── Database dumps ────────────────────────────────────────────────────────────
 *.dump
-*.sql
-database/
+*_dump.sql
+*_dump.txt
+database/*.dump
 
 # ── Logs ─────────────────────────────────────────────────────────────────────
 server/logs/
