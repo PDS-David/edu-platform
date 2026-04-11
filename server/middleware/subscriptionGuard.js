@@ -47,35 +47,38 @@ module.exports = async (req, res, next) => {
       return next();
     }
 
+    // Active free trial — full unlimited access for 14 days
     const isActiveTrial =
       user.subscription_status === 'free_trial' &&
       user.subscription_expires_at &&
       new Date(user.subscription_expires_at) > new Date();
 
-    const dailyLimit = isActiveTrial ? 20 : 5;
+    if (isActiveTrial) return next();
 
-    const countResult = await sequelize.query(
-      `SELECT COUNT(*)::INTEGER AS count
-       FROM practice_attempts
-       WHERE student_id = :userId
-         AND attempted_at > NOW() - INTERVAL '24 hours'`,
-      { replacements: { userId: req.user.id }, type: QueryTypes.SELECT }
-    );
+    // Expired trial or plain free — 5 questions per day
+    const dailyLimit = 5;
 
-    const attemptCount = parseInt(countResult[0].count) || 0;
-
-    if (attemptCount < dailyLimit) {
+    let attemptCount = 0;
+    try {
+      const countResult = await sequelize.query(
+        `SELECT COUNT(*)::INTEGER AS count
+         FROM practice_attempts
+         WHERE student_id = :userId
+           AND attempted_at > NOW() - INTERVAL '24 hours'`,
+        { replacements: { userId: req.user.id }, type: QueryTypes.SELECT }
+      );
+      attemptCount = parseInt(countResult[0].count) || 0;
+    } catch {
+      // practice_attempts table not yet created — allow access
       return next();
     }
 
-    const message = isActiveTrial
-      ? `You have used your ${dailyLimit} free trial questions today. Upgrade for unlimited access.`
-      : `You have used your ${dailyLimit} free daily questions. Upgrade to continue learning.`;
+    if (attemptCount < dailyLimit) return next();
 
     return res.status(403).json({
       success: false,
       error: 'free_limit_reached',
-      message,
+      message: `Your 14-day free trial has ended. Upgrade to continue learning.`,
       attempts_used: attemptCount,
       attempts_allowed: dailyLimit,
       upgrade_url: '/pricing',

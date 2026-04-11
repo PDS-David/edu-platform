@@ -97,11 +97,13 @@ exports.register = async (req, res, next) => {
          (email, password, first_name, last_name, role,
           verification_token, verification_token_expires,
           is_active, is_verified, subscription_status,
+          subscription_expires_at,
           created_at, updated_at)
        VALUES
          (:email, :password, :first_name, :last_name, :role,
           :verificationToken, :verificationTokenExpires,
-          true, false, 'free',
+          true, false, 'free_trial',
+          NOW() + INTERVAL '14 days',
           NOW(), NOW())
        RETURNING
          id, email, first_name, last_name, role,
