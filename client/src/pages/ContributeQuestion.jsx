@@ -8,6 +8,12 @@
 //   - Essay mode: replaces options with a model_answer textarea + mark_scheme
 //   - source field (optional) for attribution
 //   - Link to view pending questions after submission
+//
+// v1.3 FIX (BUG 3):
+//   - Added useAuth import to read user.role
+//   - "View My Pending Questions" link only shown to teachers/admins
+//   - "My Pending" header link only shown to teachers/admins
+//   - "Back to Dashboard" navigates to role-appropriate dashboard
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect } from 'react';
@@ -17,14 +23,18 @@ import {
   Loader, BookOpen, ArrowLeft, FileText, Eye,
 } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
-const CURRENT_YEAR = new Date().getFullYear();
-const YEARS        = Array.from({ length: CURRENT_YEAR - 1989 }, (_, i) => CURRENT_YEAR - i);
+const CURRENT_YEAR  = new Date().getFullYear();
+const YEARS         = Array.from({ length: CURRENT_YEAR - 1989 }, (_, i) => CURRENT_YEAR - i);
 const OPTION_LABELS = ['A', 'B', 'C', 'D', 'E', 'F'];
 
 // ─────────────────────────────────────────────────────────────────────────────
 export default function ContributeQuestion() {
-  const navigate = useNavigate();
+  const navigate    = useNavigate();
+  // BUG 3 FIX: read user.role to conditionally show teacher-only links
+  const { user }    = useAuth();
+  const isTeacher   = ['teacher', 'admin'].includes(user?.role);
 
   const [examBoards,    setExamBoards]    = useState([]);
   const [subjects,      setSubjects]      = useState([]);
@@ -39,12 +49,12 @@ export default function ContributeQuestion() {
     year:           '',
     topic:          '',
     difficulty:     'medium',
-    question_type:  'mcq',   // ← NEW: 'mcq' | 'essay'
+    question_type:  'mcq',
     question_text:  '',
     explanation:    '',
-    model_answer:   '',      // ← NEW: for essay questions
-    mark_scheme:    '',      // ← NEW: essay marking guide
-    source:         '',      // ← NEW: optional attribution
+    model_answer:   '',
+    mark_scheme:    '',
+    source:         '',
   });
 
   const [options, setOptions] = useState([
@@ -77,24 +87,23 @@ export default function ContributeQuestion() {
       .catch(() => setSubjects([]));
   }, [form.exam_board_id, examBoards]);
 
-  const handleField    = (key, val) => { setForm(f => ({ ...f, [key]: val })); setErrors(e => ({ ...e, [key]: '' })); };
-  const handleOptText  = (i, val)   => setOptions(p => p.map((o, idx) => idx === i ? { ...o, text: val } : o));
-  const handleCorrect  = (i)        => { setOptions(p => p.map((o, idx) => ({ ...o, is_correct: idx === i }))); setErrors(e => ({ ...e, options: '' })); };
-  const addOption      = ()         => { if (options.length < 6) setOptions(p => [...p, { text: '', is_correct: false }]); };
-  const removeOption   = (i)        => { if (options.length > 2) setOptions(p => p.filter((_, idx) => idx !== i)); };
-  const handleHint     = (i, val)   => setHints(p => p.map((h, idx) => idx === i ? val : h));
+  const handleField   = (key, val) => { setForm(f => ({ ...f, [key]: val })); setErrors(e => ({ ...e, [key]: '' })); };
+  const handleOptText = (i, val)   => setOptions(p => p.map((o, idx) => idx === i ? { ...o, text: val } : o));
+  const handleCorrect = (i)        => { setOptions(p => p.map((o, idx) => ({ ...o, is_correct: idx === i }))); setErrors(e => ({ ...e, options: '' })); };
+  const addOption     = ()         => { if (options.length < 6) setOptions(p => [...p, { text: '', is_correct: false }]); };
+  const removeOption  = (i)        => { if (options.length > 2) setOptions(p => p.filter((_, idx) => idx !== i)); };
+  const handleHint    = (i, val)   => setHints(p => p.map((h, idx) => idx === i ? val : h));
 
   const validate = () => {
     const e = {};
-    if (!form.exam_board_id)          e.exam_board_id = 'Please select an exam type';
-    if (!form.question_text.trim())   e.question_text = 'Question text is required';
+    if (!form.exam_board_id)        e.exam_board_id = 'Please select an exam type';
+    if (!form.question_text.trim()) e.question_text = 'Question text is required';
     if (form.question_text.trim().length < 10) e.question_text = 'Question is too short (min 10 chars)';
-
     if (isEssay) {
-      if (!form.model_answer.trim())  e.model_answer = 'A model answer is required for essay questions';
+      if (!form.model_answer.trim()) e.model_answer = 'A model answer is required for essay questions';
     } else {
       const filled = options.filter(o => o.text.trim());
-      if (filled.length < 2)          e.options = 'At least 2 options must have text';
+      if (filled.length < 2)              e.options = 'At least 2 options must have text';
       if (!options.some(o => o.is_correct)) e.options = 'Please mark the correct answer';
     }
     setErrors(e);
@@ -104,27 +113,23 @@ export default function ContributeQuestion() {
   const handleSubmit = async () => {
     if (!validate()) return;
     setSubmitting(true);
-
     const payload = {
-      exam_board_id:  parseInt(form.exam_board_id, 10),
-      subject_id:     form.subject_id  ? parseInt(form.subject_id, 10)  : null,
-      year:           form.year        ? parseInt(form.year, 10)         : null,
-      topic:          form.topic       || null,
-      difficulty:     form.difficulty,
-      question_type:  form.question_type,
-      question_text:  form.question_text.trim(),
-      explanation:    form.explanation.trim() || null,
-      source:         form.source.trim()      || null,
-      hints:          hints.filter(h => h.trim()),
-      // MCQ only
+      exam_board_id: parseInt(form.exam_board_id, 10),
+      subject_id:    form.subject_id ? parseInt(form.subject_id, 10) : null,
+      year:          form.year       ? parseInt(form.year, 10)        : null,
+      topic:         form.topic      || null,
+      difficulty:    form.difficulty,
+      question_type: form.question_type,
+      question_text: form.question_text.trim(),
+      explanation:   form.explanation.trim() || null,
+      source:        form.source.trim()      || null,
+      hints:         hints.filter(h => h.trim()),
       options: isEssay
         ? []
         : options.filter(o => o.text.trim()).map(o => ({ text: o.text.trim(), is_correct: o.is_correct })),
-      // Essay only
-      model_answer:   isEssay ? form.model_answer.trim() : null,
-      mark_scheme:    isEssay ? form.mark_scheme.trim()  : null,
+      model_answer: isEssay ? form.model_answer.trim() : null,
+      mark_scheme:  isEssay ? form.mark_scheme.trim()  : null,
     };
-
     try {
       const res = await api.post('/questions/submit', payload);
       if (res.success) {
@@ -157,12 +162,15 @@ export default function ContributeQuestion() {
             Thank you for contributing to EAC!
           </p>
           <div className="flex flex-col gap-3">
-            <Link
-              to="/teacher/pending-questions"
-              className="flex items-center justify-center gap-2 border-2 border-teal-200 text-teal-700 hover:bg-teal-50 font-semibold py-3 rounded-xl transition-colors"
-            >
-              <Eye className="w-4 h-4" /> View My Pending Questions
-            </Link>
+            {/* BUG 3 FIX: only show this link to teachers/admins — students get 403 on this route */}
+            {isTeacher && (
+              <Link
+                to="/teacher/pending-questions"
+                className="flex items-center justify-center gap-2 border-2 border-teal-200 text-teal-700 hover:bg-teal-50 font-semibold py-3 rounded-xl transition-colors"
+              >
+                <Eye className="w-4 h-4" /> View My Pending Questions
+              </Link>
+            )}
             <button
               onClick={() => {
                 setSubmitted(false);
@@ -174,8 +182,9 @@ export default function ContributeQuestion() {
             >
               Submit Another Question
             </button>
+            {/* BUG 3 FIX: navigate to role-appropriate dashboard instead of navigate(-1) */}
             <button
-              onClick={() => navigate(-1)}
+              onClick={() => isTeacher ? navigate('/teacher/dashboard') : navigate('/student/dashboard')}
               className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-xl transition-colors"
             >
               Back to Dashboard
@@ -208,12 +217,15 @@ export default function ContributeQuestion() {
             </h1>
             <p className="text-sm text-gray-500">Help build the question bank for all students</p>
           </div>
-          <Link
-            to="/teacher/pending-questions"
-            className="flex items-center gap-1.5 text-xs text-teal-700 bg-teal-50 border border-teal-200 px-3 py-1.5 rounded-xl hover:bg-teal-100 transition-colors font-semibold"
-          >
-            <Eye className="w-3.5 h-3.5" /> My Pending
-          </Link>
+          {/* BUG 3 FIX: only show pending link to teachers/admins */}
+          {isTeacher && (
+            <Link
+              to="/teacher/pending-questions"
+              className="flex items-center gap-1.5 text-xs text-teal-700 bg-teal-50 border border-teal-200 px-3 py-1.5 rounded-xl hover:bg-teal-100 transition-colors font-semibold"
+            >
+              <Eye className="w-3.5 h-3.5" /> My Pending
+            </Link>
+          )}
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-6 space-y-6">
@@ -267,7 +279,6 @@ export default function ContributeQuestion() {
               )}
               {errors.exam_board_id && <p className="text-red-500 text-xs mt-1">{errors.exam_board_id}</p>}
             </div>
-
             <div>
               <label className={labelClass}>Subject</label>
               <select
@@ -421,7 +432,7 @@ export default function ContributeQuestion() {
             </div>
           )}
 
-          {/* Hints (both types) */}
+          {/* Hints */}
           <div>
             <div className="flex items-center gap-2 mb-3">
               <Lightbulb className="w-4 h-4 text-amber-500" />
@@ -440,7 +451,7 @@ export default function ContributeQuestion() {
             </div>
           </div>
 
-          {/* Source / Attribution */}
+          {/* Source */}
           <div>
             <label className={labelClass}>
               Source / Authority
