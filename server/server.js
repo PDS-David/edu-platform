@@ -25,11 +25,8 @@ if (process.env.NODE_ENV === 'production') {
 
 // ── ENV VALIDATION ────────────────────────────────────────────────────────────
 (function validateEnv() {
-  // Always required
   const required = ['JWT_SECRET', 'PORT'];
 
-  // In production, we need either DATABASE_URL (Render linked PG)
-  // or all individual DB_* vars (manual setup)
   const isProduction = process.env.NODE_ENV === 'production';
   if (isProduction && !process.env.DATABASE_URL) {
     required.push('DB_PASSWORD', 'DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER');
@@ -71,7 +68,6 @@ const ALLOWED_ORIGINS = [
   'http://localhost:5173',
   'http://localhost:3000',
   'http://localhost:5000',
-  // Production frontend — always allowed regardless of env vars
   'https://aischoolonair.onrender.com',
   process.env.CLIENT_URL,
   process.env.PROD_CLIENT_URL,
@@ -97,8 +93,7 @@ app.use(requestLogger);
 // ── DATABASE ──────────────────────────────────────────────────────────────────
 const db = require('./config/database');
 
-// Import all models so Sequelize registers them before sync runs.
-// Add any additional models your project has to this list.
+// Import all models so Sequelize registers them.
 const modelPaths = [
   './models/User',
   './models/ExamBoard',
@@ -127,9 +122,6 @@ const modelPaths = [
 for (const modelPath of modelPaths) {
   try {
     const modelExport = require(modelPath);
-    // Some models export a factory function (sequelize) => Model
-    // Others (like User) self-register by importing the db instance directly.
-    // Call factory functions so they register with Sequelize.
     if (typeof modelExport === 'function' && modelExport.length === 1) {
       modelExport(db);
     }
@@ -138,47 +130,22 @@ for (const modelPath of modelPaths) {
   }
 }
 
-// Load associations if you have a central associations file
 try {
   require('./models/associations');
 } catch (e) {
-  // No associations file — that's fine
+  // No associations file — fine
 }
 
 async function initDatabase() {
   try {
     await db.authenticate();
     logger.info('✅ DB connected');
-
-    // ── One-time migration: fix teacher_id column type mismatch ──────────────
-    // The TeacherSubject model defines teacher_id as INTEGER, but the column
-    // may have been created earlier as TEXT/VARCHAR. Postgres won't cast it
-    // automatically, so we do it explicitly here before alter-sync runs.
-    //
-    // This is a no-op after the first successful run:
-    //   • If the column is already INTEGER  → ALTER throws, caught silently.
-    //   • If the table doesn't exist yet    → ALTER throws, caught silently.
-    //   • If the data cannot be cast        → ALTER throws; fix bad rows first.
-    try {
-      await db.query(`
-        ALTER TABLE teacher_subjects
-        ALTER COLUMN teacher_id TYPE INTEGER
-        USING teacher_id::INTEGER;
-      `);
-      logger.info('✅ teacher_subjects.teacher_id cast to INTEGER');
-    } catch (migrationErr) {
-      // Already INTEGER, table absent, or no rows to cast — all safe to ignore.
-      logger.info('ℹ️  teacher_id migration skipped: ' + migrationErr.message);
-    }
-
-    // alter: true — safely creates missing tables and adds missing columns
-    // without dropping existing data.
-    // Never use force: true in production — it wipes all tables.
-    await db.sync({ alter: true });
-    logger.info('✅ DB tables synced');
+    // Schema is managed entirely via manual migration files (migration_001–004).
+    // db.sync is intentionally disabled — it conflicts with UUID columns
+    // and causes crash loops on Render.
+    logger.info('✅ DB ready (schema managed via migrations)');
   } catch (err) {
-    logger.error('❌ DB initialisation failed', { error: err.message });
-    // Exit so Render auto-restarts the service and retries the connection.
+    logger.error('❌ DB connection failed', { error: err.message });
     process.exit(1);
   }
 }
@@ -193,38 +160,38 @@ try {
 } catch {}
 
 // ── ROUTES ───────────────────────────────────────────────────────────────────
-const authRoutes        = require('./routes/authRoutes');
-const aiRoutes          = require('./routes/aiRoutes');
-const adminRoutes       = require('./routes/adminRoutes');
-const teacherRoutes     = require('./routes/teacherRoutes');
-const userRoutes        = require('./routes/users');
-const examBoardsRoutes  = require('./routes/examBoardsRoutes');
-const subjectRoutes     = require('./routes/subjects');
-const topicsRoutes      = require('./routes/topicsRoutes');
-const subtopicRoutes    = require('./routes/subtopicRoutes');
-const resourceRoutes    = require('./routes/resourceRoutes');
-const coursesRoutes     = require('./routes/courses');
-const enrollmentsRoutes = require('./routes/enrollments');
-const quizzesRoutes     = require('./routes/quizzes');
-const questionsRoutes   = require('./routes/questionsRoutes');
-const analyticsRoutes   = require('./routes/analyticsRoutes');
-const notesRoutes       = require('./routes/notesRoutes');
-const videosRoutes      = require('./routes/videosRoutes');
-const pastPaperRoutes   = require('./routes/pastPaperRoutes');
-const paymentRoutes     = require('./routes/paymentRoutes');
-const catalogRoutes     = require('./routes/catalogRoutes');
+const authRoutes          = require('./routes/authRoutes');
+const aiRoutes            = require('./routes/aiRoutes');
+const adminRoutes         = require('./routes/adminRoutes');
+const teacherRoutes       = require('./routes/teacherRoutes');
+const userRoutes          = require('./routes/users');
+const examBoardsRoutes    = require('./routes/examBoardsRoutes');
+const subjectRoutes       = require('./routes/subjects');
+const topicsRoutes        = require('./routes/topicsRoutes');
+const subtopicRoutes      = require('./routes/subtopicRoutes');
+const resourceRoutes      = require('./routes/resourceRoutes');
+const coursesRoutes       = require('./routes/courses');
+const enrollmentsRoutes   = require('./routes/enrollments');
+const quizzesRoutes       = require('./routes/quizzes');
+const questionsRoutes     = require('./routes/questionsRoutes');
+const analyticsRoutes     = require('./routes/analyticsRoutes');
+const notesRoutes         = require('./routes/notesRoutes');
+const videosRoutes        = require('./routes/videosRoutes');
+const pastPaperRoutes     = require('./routes/pastPaperRoutes');
+const paymentRoutes       = require('./routes/paymentRoutes');
+const catalogRoutes       = require('./routes/catalogRoutes');
 const notificationsRoutes = require('./routes/notificationsRoutes');
-const studentRoutes     = require('./routes/studentRoutes');
-const conceptRoutes     = require('./routes/conceptRoutes');
-const curriculumRoutes = require('./routes/curriculumRoutes');
+const studentRoutes       = require('./routes/studentRoutes');
+const conceptRoutes       = require('./routes/conceptRoutes');
+const curriculumRoutes    = require('./routes/curriculumRoutes');
 
 // Optional routes — skip if file missing
-let aiChatRoute         = null;
-let quizGeneratorRoute  = null;
-let studyPlannerRoute   = null;
-let explanationRoute    = null;
-let examTypeActivation  = null;
-let analyticsLegacy     = null;
+let aiChatRoute        = null;
+let quizGeneratorRoute = null;
+let studyPlannerRoute  = null;
+let explanationRoute   = null;
+let examTypeActivation = null;
+let analyticsLegacy    = null;
 
 try { aiChatRoute        = require('./routes/aiChatRoute');        } catch {}
 try { quizGeneratorRoute = require('./routes/quizGeneratorRoute'); } catch {}
@@ -233,22 +200,22 @@ try { explanationRoute   = require('./routes/explanationRoute');   } catch {}
 try { examTypeActivation = require('./routes/examTypeActivation'); } catch {}
 try { analyticsLegacy    = require('./routes/analytics');          } catch {}
 
-// ── Serve uploaded files (resources, videos) ─────────────────────────────────
+// ── Serve uploaded files ──────────────────────────────────────────────────────
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ── Public routes ─────────────────────────────────────────────────────────────
 app.use('/api/auth',        authRoutes);
 app.use('/api/exam-boards', examBoardsRoutes);
-app.use('/api/curriculum', curriculumRoutes);
+app.use('/api/curriculum',  curriculumRoutes);
 
 // ── Protected routes ──────────────────────────────────────────────────────────
 app.use('/api/ai', protect, subscriptionGuard, aiLimiter, aiRoutes);
-if (aiChatRoute)        app.use('/api/ai',             protect, subscriptionGuard, aiLimiter, aiChatRoute);
-if (quizGeneratorRoute) app.use('/api/quiz-generator',  protect, quizGeneratorRoute);
-if (studyPlannerRoute)  app.use('/api/study-planner',   protect, studyPlannerRoute);
-if (explanationRoute)   app.use('/api/explanations',    protect, explanationRoute);
-if (examTypeActivation) app.use('/api/exam-types',      protect, examTypeActivation);
-if (analyticsLegacy)    app.use('/api/analytics',       protect, analyticsLegacy);
+if (aiChatRoute)        app.use('/api/ai',            protect, subscriptionGuard, aiLimiter, aiChatRoute);
+if (quizGeneratorRoute) app.use('/api/quiz-generator', protect, quizGeneratorRoute);
+if (studyPlannerRoute)  app.use('/api/study-planner',  protect, studyPlannerRoute);
+if (explanationRoute)   app.use('/api/explanations',   protect, explanationRoute);
+if (examTypeActivation) app.use('/api/exam-types',     protect, examTypeActivation);
+if (analyticsLegacy)    app.use('/api/analytics',      protect, analyticsLegacy);
 
 app.use('/api/admin',         protect, adminRoutes);
 app.use('/api/teacher',       protect, teacherRoutes);
@@ -300,18 +267,13 @@ app.listen(PORT, () => {
   console.log(`🌐 Local:  http://localhost:${PORT}`);
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TASK 13 ADDITION: Start scheduled jobs on server boot.
-// Placed after app.listen() — safe to run after routes are registered.
-// ─────────────────────────────────────────────────────────────────────────────
-
+// ── SCHEDULED JOBS ────────────────────────────────────────────────────────────
 try {
   const scheduledJobs = require('./jobs/scheduledJobs');
   if (typeof scheduledJobs.start === 'function') {
     scheduledJobs.start();
     console.log('[server] Scheduled jobs started.');
   } else {
-    // Module auto-runs on require (no exported start function)
     console.log('[server] Scheduled jobs loaded.');
   }
 } catch (e) {
