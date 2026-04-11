@@ -1,14 +1,15 @@
 // server/routes/adminRoutes.js
 // Admin-only endpoints.
 //
-// PROMPT 1 CHANGES:
-//   - POST /api/admin/generate-questions now writes is_ai_generated = TRUE,
-//     ai_generation_source = 'gemini-2.0-flash', and concept_hint (if Gemini
-//     returns one) into the questions table.
-//   - Gemini prompt updated to optionally return a concept_hint per question.
-//   - concept_hint exposed in the generate-questions response so the admin UI
-//     can preview it without a round-trip.
-//   - All other endpoints are unchanged.
+// PATCH CHANGES APPLIED:
+//   - POST /api/admin/generate-questions writes is_ai_generated=TRUE,
+//     ai_generation_source='gemini-2.0-flash', status='approved', source='ai_generated'
+//   - PATCH /api/admin/questions/bulk-approve  (Task 7)
+//   - GET  /api/admin/users                    (Task 12 — used by TeacherAssignmentPanel)
+//   - PUT  /api/admin/users/:id/role
+//   - PUT  /api/admin/users/:id/deactivate
+//   - DELETE /api/admin/users/:id
+//   - GET  /api/admin/users/stats
 
 const express    = require('express');
 const router     = express.Router();
@@ -34,9 +35,7 @@ const getGeminiModel = () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/admin/generate-questions
 // Body: { subject_id, topic, exam_board, count, difficulty }
-//
-// PROMPT 1: Gemini now returns concept_hint per question.
-//           INSERT writes is_ai_generated=TRUE, ai_generation_source, concept_hint.
+// Inserts questions with status='approved', is_ai_generated=true, source='ai_generated'
 // ─────────────────────────────────────────────────────────────────────────────
 router.post('/generate-questions', protect, adminOnly, async (req, res) => {
   const {
@@ -65,7 +64,6 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
   const subjectName = subjects[0].name;
 
   // ── Build Gemini prompt ───────────────────────────────────────────────────
-  // PROMPT 1: concept_hint added to the JSON shape so we can store it.
   const prompt = `Generate ${count} ${difficulty} ${exam_board} exam MCQ questions on the topic "${topic}" for Nigerian secondary school ${subjectName} students.
 
 Return ONLY a valid JSON array with no preamble, no markdown, no backticks. Each element must follow this exact shape:
@@ -121,7 +119,7 @@ Rules:
     const examBoardId = boardRows[0]?.id || null;
 
     // ── Insert questions + options into DB ────────────────────────────────────
-    // PROMPT 1: is_ai_generated, ai_generation_source, concept_hint now persisted.
+    // status='approved' so questions are immediately available without manual review
     let inserted = 0;
     const insertedQuestions = [];
 
@@ -131,12 +129,14 @@ Rules:
       const qResult = await sequelize.query(
         `INSERT INTO questions
            (question_text, marks, explanation, options, correct_answer,
-            subtopic_id, submitted_by, status, is_ai_generated,
-            ai_generation_source, source, is_active, created_at, updated_at)
+            subtopic_id, submitted_by, status, source,
+            is_ai_generated, ai_generation_source, is_active,
+            created_at, updated_at)
          VALUES
            (:question_text, :marks, :explanation, :options::jsonb, :correct_answer,
-            :subtopic_id, :submitted_by, 'approved', true,
-            'gemini-2.0-flash', 'ai_generated', true, NOW(), NOW())
+            :subtopic_id, :submitted_by, 'approved', 'ai_generated',
+            true, 'gemini-2.0-flash', true,
+            NOW(), NOW())
          RETURNING id`,
         {
           replacements: {
@@ -159,15 +159,16 @@ Rules:
       insertedQuestions.push({
         id:            questionId,
         question_text: q.question_text,
+        concept_hint:  q.concept_hint || null,
       });
     }
 
     return res.status(200).json({
       success:   true,
-      message:   `Generated ${questions.length}, inserted ${inserted} questions (status: pending)`,
+      message:   `Generated ${questions.length}, inserted ${inserted} questions (status: approved)`,
       generated: questions.length,
       inserted,
-      questions: insertedQuestions, // preview for admin UI
+      questions: insertedQuestions,
     });
 
   } catch (err) {
@@ -296,7 +297,6 @@ router.delete('/teacher-assignments/:id', protect, adminOnly, async (req, res) =
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/platform-stats', protect, adminOnly, async (req, res) => {
   try {
-    // Run each query independently so one missing table doesn't kill the whole response
     const safeQuery = async (sql, fallback) => {
       try {
         const rows = await sequelize.query(sql, { type: QueryTypes.SELECT });
@@ -388,7 +388,7 @@ router.post('/send-weekly-digest', protect, adminOnly, async (req, res) => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/admin/questions/pending
-// PROMPT 1: now includes is_ai_generated, ai_generation_source, concept_hint
+// Includes is_ai_generated, ai_generation_source in response
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/questions/pending', protect, adminOnly, async (req, res) => {
   const limit  = Math.min(parseInt(req.query.limit  || '10'), 50);
@@ -403,6 +403,7 @@ router.get('/questions/pending', protect, adminOnly, async (req, res) => {
         `SELECT q.id, q.question_text, q.marks,
                 q.explanation, q.created_at,
                 q.correct_answer, q.options,
+                q.is_ai_generated, q.ai_generation_source,
                 st.name AS subtopic_name,
                 s.name  AS subject_name,
                 eb.code AS exam_board_code,
@@ -434,7 +435,8 @@ router.get('/questions/pending', protect, adminOnly, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PATCH /questions/bulk-approve  ← MUST be before /:id/approve
+// PATCH /api/admin/questions/bulk-approve
+// MUST be registered BEFORE /:id/approve to prevent Express matching 'bulk-approve' as an id
 // ─────────────────────────────────────────────────────────────────────────────
 router.patch('/questions/bulk-approve', protect, adminOnly, async (req, res) => {
   const { question_ids } = req.body;
@@ -522,6 +524,123 @@ router.delete('/questions/:id', protect, adminOnly, async (req, res) => {
       { replacements: { id: req.params.id }, type: QueryTypes.DELETE }
     );
     return res.json({ success: true, message: 'Question deleted' });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// USER MANAGEMENT ROUTES  (used by admin dashboard TeacherAssignmentPanel)
+// GET /users/stats must come BEFORE GET /users/:id to avoid param capture
+// ═════════════════════════════════════════════════════════════════════════════
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/admin/users/stats
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/users/stats', protect, adminOnly, async (req, res) => {
+  try {
+    const rows = await sequelize.query(
+      `SELECT
+         COUNT(*)::INTEGER AS total,
+         COUNT(*) FILTER (WHERE role='student')::INTEGER AS students,
+         COUNT(*) FILTER (WHERE role='teacher')::INTEGER AS teachers,
+         COUNT(*) FILTER (WHERE subscription_status='active')::INTEGER AS active_subscriptions
+       FROM users WHERE is_active = true`,
+      { type: QueryTypes.SELECT }
+    );
+    return res.json({ success: true, data: rows[0] });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/admin/users?role=teacher&search=...&page=1&limit=20
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/users', protect, adminOnly, async (req, res) => {
+  const { role, search, page = 1, limit = 20 } = req.query;
+  const filters      = ['u.is_active = true'];
+  const replacements = {
+    limit:  parseInt(limit)  || 20,
+    offset: ((parseInt(page) || 1) - 1) * (parseInt(limit) || 20),
+  };
+
+  if (role) {
+    filters.push('u.role = :role');
+    replacements.role = role;
+  }
+  if (search) {
+    filters.push(`(u.first_name ILIKE :search OR u.last_name ILIKE :search OR u.email ILIKE :search)`);
+    replacements.search = `%${search}%`;
+  }
+
+  const where = `WHERE ${filters.join(' AND ')}`;
+  try {
+    const [countRows, users] = await Promise.all([
+      sequelize.query(
+        `SELECT COUNT(*)::INTEGER AS total FROM users u ${where}`,
+        { replacements, type: QueryTypes.SELECT }
+      ),
+      sequelize.query(
+        `SELECT u.id, u.first_name, u.last_name, u.email, u.role,
+                u.is_active, u.subscription_status, u.last_login, u.created_at
+         FROM users u ${where}
+         ORDER BY u.created_at DESC
+         LIMIT :limit OFFSET :offset`,
+        { replacements, type: QueryTypes.SELECT }
+      ),
+    ]);
+    return res.json({ success: true, total: countRows[0]?.total || 0, data: users });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PUT /api/admin/users/:id/role
+// ─────────────────────────────────────────────────────────────────────────────
+router.put('/users/:id/role', protect, adminOnly, async (req, res) => {
+  const { role } = req.body;
+  if (!['student', 'teacher', 'admin'].includes(role)) {
+    return res.status(400).json({ success: false, error: 'Invalid role' });
+  }
+  try {
+    await sequelize.query(
+      `UPDATE users SET role = :role, updated_at = NOW() WHERE id = :id`,
+      { replacements: { role, id: req.params.id }, type: QueryTypes.UPDATE }
+    );
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PUT /api/admin/users/:id/deactivate
+// ─────────────────────────────────────────────────────────────────────────────
+router.put('/users/:id/deactivate', protect, adminOnly, async (req, res) => {
+  const { is_active } = req.body;
+  try {
+    await sequelize.query(
+      `UPDATE users SET is_active = :isActive, updated_at = NOW() WHERE id = :id`,
+      { replacements: { isActive: !!is_active, id: req.params.id }, type: QueryTypes.UPDATE }
+    );
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DELETE /api/admin/users/:id  (soft delete — sets is_active = false)
+// ─────────────────────────────────────────────────────────────────────────────
+router.delete('/users/:id', protect, adminOnly, async (req, res) => {
+  try {
+    await sequelize.query(
+      `UPDATE users SET is_active = false, updated_at = NOW() WHERE id = :id`,
+      { replacements: { id: req.params.id }, type: QueryTypes.UPDATE }
+    );
+    return res.json({ success: true });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
