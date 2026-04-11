@@ -8,7 +8,7 @@
 //
 // This model exists primarily so sequelize.sync({ alter: true }) creates/
 // maintains the users table correctly. All queries in the routes use raw SQL
-// (QueryTypes.SELECT etc.) rather than Sequelize model methods — that is fine
+// (QueryTypes.SELECT etc.) rather than Sequelize model methods â€” that is fine
 // and intentional; the model is the schema source of truth.
 
 const { DataTypes, Model } = require('sequelize');
@@ -16,14 +16,14 @@ const bcrypt               = require('bcryptjs');
 const sequelize            = require('../config/database');
 
 class User extends Model {
-  // ── Instance helpers ──────────────────────────────────────────────────────
+  // â”€â”€ Instance helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   /** Compare a plain-text password against the stored hash. */
   async comparePassword(plainText) {
     return bcrypt.compare(plainText, this.password);
   }
 
-  /** Return a safe subset of the user — never expose the password hash. */
+  /** Return a safe subset of the user â€” never expose the password hash. */
   toSafeJSON() {
     const obj = this.toJSON();
     delete obj.password;
@@ -33,7 +33,7 @@ class User extends Model {
 
 User.init(
   {
-    // ── Identity ─────────────────────────────────────────────────────────────
+    // â”€â”€ Identity â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     id: {
       type:         DataTypes.UUID,
       defaultValue: DataTypes.UUIDV4,
@@ -50,7 +50,7 @@ User.init(
       allowNull: false,
     },
 
-    // ── Profile ───────────────────────────────────────────────────────────────
+    // â”€â”€ Profile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     first_name: {
       type:      DataTypes.STRING(100),
       allowNull: true,
@@ -72,7 +72,7 @@ User.init(
       allowNull: true,
     },
 
-    // ── Role & status ─────────────────────────────────────────────────────────
+    // â”€â”€ Role & status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     role: {
       type:         DataTypes.ENUM('student', 'teacher', 'admin'),
       allowNull:    false,
@@ -84,11 +84,11 @@ User.init(
       defaultValue: true,
     },
 
-    // ── Subscription ──────────────────────────────────────────────────────────
+    // â”€â”€ Subscription â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // subscription_status used in: protect middleware, loginWithSubscription,
     // users/stats query, users/:id query
     subscription_status: {
-      type:         DataTypes.ENUM('free', 'active', 'expired', 'cancelled'),
+      type:         DataTypes.ENUM('free', 'free_trial', 'active', 'expired', 'cancelled'),
       allowNull:    false,
       defaultValue: 'free',
     },
@@ -97,7 +97,7 @@ User.init(
       allowNull: true,
     },
 
-    // ── Email verification ────────────────────────────────────────────────────
+    // â”€â”€ Email verification â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     is_verified: {
       type:         DataTypes.BOOLEAN,
       allowNull:    false,
@@ -112,7 +112,7 @@ User.init(
       allowNull: true,
     },
 
-    // ── Password reset ────────────────────────────────────────────────────────
+    // â”€â”€ Password reset â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     reset_password_token: {
       type:      DataTypes.STRING(255),
       allowNull: true,
@@ -122,7 +122,7 @@ User.init(
       allowNull: true,
     },
 
-    // ── Onboarding & preferences ──────────────────────────────────────────────
+    // â”€â”€ Onboarding & preferences â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // onboarding_complete used in: PATCH /users/preferences, GET /users/:id
     onboarding_complete: {
       type:         DataTypes.BOOLEAN,
@@ -149,7 +149,7 @@ User.init(
       defaultValue: 'evening',
     },
 
-    // ── Gamification ─────────────────────────────────────────────────────────
+    // â”€â”€ Gamification â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // xp_points used in: GET /users/:id
     xp_points: {
       type:         DataTypes.INTEGER,
@@ -163,7 +163,7 @@ User.init(
       defaultValue: 0,
     },
 
-    // ── Activity tracking ─────────────────────────────────────────────────────
+    // â”€â”€ Activity tracking â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // last_login used in: GET /users (list), GET /users/:id
     last_login: {
       type:      DataTypes.DATE,
@@ -175,9 +175,9 @@ User.init(
     modelName:  'User',
     tableName:  'users',
     timestamps: true,           // Sequelize manages created_at / updated_at
-    underscored: true,          // maps createdAt → created_at, etc.
+    underscored: true,          // maps createdAt â†’ created_at, etc.
 
-    // ── Indexes ───────────────────────────────────────────────────────────────
+    // â”€â”€ Indexes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     indexes: [
       { unique: true, fields: ['email'] },
       { fields: ['role'] },
@@ -187,7 +187,7 @@ User.init(
       { fields: ['verification_token'],    where: { verification_token:    { [require('sequelize').Op.ne]: null } } },
     ],
 
-    // ── Hooks ─────────────────────────────────────────────────────────────────
+    // â”€â”€ Hooks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     hooks: {
       // Hash password before every create and update that changes it
       beforeCreate: async (user) => {
@@ -204,7 +204,7 @@ User.init(
       },
     },
 
-    // ── Default scope — never return password in queries ──────────────────────
+    // â”€â”€ Default scope â€” never return password in queries â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     defaultScope: {
       attributes: { exclude: ['password'] },
     },
@@ -218,3 +218,7 @@ User.init(
 );
 
 module.exports = User;
+const { DataTypes } = require('sequelize');
+
+module.exports = (sequelize) => {
+  const Video = sequelize.define('Video', {
