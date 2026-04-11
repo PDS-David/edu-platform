@@ -1,14 +1,12 @@
 // server/jobs/scheduledJobs.js
 // ─────────────────────────────────────────────────────────────────────────────
 // FIXES in this version:
-//   1. Weekly digest user query now correctly uses last_activity_date
-//      (the actual column name on users table, not last_login).
-//   2. Streak nudge query fixed — the CASE expression was mixing CURRENT_DATE
-//      (date) with created_at (timestamp) without explicit cast, causing
-//      "operator does not exist: date - timestamp" on strict pg setups.
-//   3. Added try/catch around individual email sends — one failure no longer
-//      stops the rest of the batch.
-//   4. node-cron install hint is now more actionable.
+//   1. Weekly digest user query uses last_activity_date (not last_login).
+//   2. Streak nudge query casts created_at::date to avoid date/timestamp mismatch.
+//   3. Per-user try/catch so one failure doesn't stop the batch.
+//   4. node-cron graceful fallback if package missing.
+//   5. FIX-1: Added `start` alias on module.exports so server.js call
+//      `scheduledJobs.start()` works alongside `scheduledJobs.startJobs()`.
 // ─────────────────────────────────────────────────────────────────────────────
 
 let cron;
@@ -27,7 +25,6 @@ const { sendWeeklyDigest, sendStreakNudge } = require('../services/emailService'
 async function runWeeklyDigest() {
   console.log('[jobs] Running weekly digest…');
   try {
-    // FIX: use last_activity_date (the correct column; last_login is not updated by practice)
     const users = await sequelize.query(
       `SELECT id, first_name, email
        FROM users
@@ -80,11 +77,11 @@ async function runWeeklyDigest() {
         );
 
         await sendWeeklyDigest(user, {
-          best_subject:         bestRow?.subject_name || '—',
-          weakest_topic:        weakRow?.topic        || '—',
-          weakest_subtopic_id:  weakRow?.subtopic_id  || null,
-          streak:               userRow?.study_streak_days || 0,
-          accuracy_pct:         accRow?.pct           || 0,
+          best_subject:        bestRow?.subject_name || '—',
+          weakest_topic:       weakRow?.topic        || '—',
+          weakest_subtopic_id: weakRow?.subtopic_id  || null,
+          streak:              userRow?.study_streak_days || 0,
+          accuracy_pct:        accRow?.pct           || 0,
         });
       } catch (e) {
         console.warn(`[jobs] digest failed for ${user.email}:`, e.message);
@@ -99,7 +96,6 @@ async function runWeeklyDigest() {
 async function runStreakNudge() {
   console.log('[jobs] Running streak nudge…');
   try {
-    // FIX: cast created_at to date explicitly to avoid type-mismatch error
     const users = await sequelize.query(
       `SELECT id, first_name, email,
               CASE
@@ -134,7 +130,7 @@ async function runStreakNudge() {
   }
 }
 
-// ── Export ────────────────────────────────────────────────────────────────────
+// ── Start all scheduled jobs ──────────────────────────────────────────────────
 function startJobs() {
   if (!cron) {
     console.warn('[jobs] Scheduled jobs NOT started (node-cron missing).');
@@ -156,4 +152,10 @@ function startJobs() {
   console.log('✅ Scheduled jobs started (weekly digest Mon 9am + streak nudge daily 6pm WAT)');
 }
 
-module.exports = { startJobs, runWeeklyDigest, runStreakNudge };
+module.exports = {
+  startJobs,
+  runWeeklyDigest,
+  runStreakNudge,
+  // FIX-1: alias so server.js `scheduledJobs.start()` works without changes
+  start: startJobs,
+};
