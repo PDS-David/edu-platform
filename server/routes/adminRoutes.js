@@ -10,12 +10,18 @@
 //   - PUT  /api/admin/users/:id/deactivate
 //   - DELETE /api/admin/users/:id
 //   - GET  /api/admin/users/stats
+//
+// v4 AI COST CONTROL:
+//   Removed inline getGeminiModel() helper.
+//   POST /generate-questions now calls generate() from services/ai.js.
 
 const express    = require('express');
 const router     = express.Router();
 const { QueryTypes } = require('sequelize');
 const sequelize  = require('../config/database');
 const { protect } = require('../middleware/auth');
+// v4: central AI hub replaces inline getGeminiModel() helper
+const { generate } = require('../services/ai');
 
 // ── Admin guard ───────────────────────────────────────────────────────────────
 const adminOnly = (req, res, next) => {
@@ -23,13 +29,6 @@ const adminOnly = (req, res, next) => {
     return res.status(403).json({ success: false, error: 'Admin access required' });
   }
   next();
-};
-
-// ── Gemini helper ─────────────────────────────────────────────────────────────
-const getGeminiModel = () => {
-  const { GoogleGenerativeAI } = require('@google/generative-ai');
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  return genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -63,7 +62,7 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
   }
   const subjectName = subjects[0].name;
 
-  // ── Build Gemini prompt ───────────────────────────────────────────────────
+  // ── Build prompt ──────────────────────────────────────────────────────────
   const prompt = `Generate ${count} ${difficulty} ${exam_board} exam MCQ questions on the topic "${topic}" for Nigerian secondary school ${subjectName} students.
 
 Return ONLY a valid JSON array with no preamble, no markdown, no backticks. Each element must follow this exact shape:
@@ -92,9 +91,8 @@ Rules:
 - Do NOT include numbering, preambles, or any text outside the JSON array`;
 
   try {
-    const model  = getGeminiModel();
-    const result = await model.generateContent(prompt);
-    const raw    = result.response.text().trim();
+    // v4: single generate() call replaces getGeminiModel() + generateContent()
+    const raw = await generate(prompt, 'generate-questions');
 
     // Strip any accidental markdown fences
     const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
@@ -103,7 +101,7 @@ Rules:
     try {
       questions = JSON.parse(cleaned);
     } catch {
-      console.error('[generate-questions] Gemini returned non-JSON:', cleaned.slice(0, 300));
+      console.error('[generate-questions] AI returned non-JSON:', cleaned.slice(0, 300));
       return res.status(502).json({ success: false, error: 'AI returned invalid JSON. Try again.' });
     }
 
@@ -119,7 +117,6 @@ Rules:
     const examBoardId = boardRows[0]?.id || null;
 
     // ── Insert questions + options into DB ────────────────────────────────────
-    // status='approved' so questions are immediately available without manual review
     let inserted = 0;
     const insertedQuestions = [];
 
@@ -233,7 +230,6 @@ router.get('/teacher-assignments', protect, adminOnly, async (req, res) => {
     );
     return res.json({ success: true, count: rows.length, data: rows });
   } catch (err) {
-    // teacher_subjects table may not exist yet — return empty
     if (err.message.includes('teacher_subjects') || err.message.includes('does not exist')) {
       return res.json({ success: true, count: 0, data: [] });
     }
@@ -388,7 +384,6 @@ router.post('/send-weekly-digest', protect, adminOnly, async (req, res) => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/admin/questions/pending
-// Includes is_ai_generated, ai_generation_source in response
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/questions/pending', protect, adminOnly, async (req, res) => {
   const limit  = Math.min(parseInt(req.query.limit  || '10'), 50);
@@ -530,13 +525,10 @@ router.delete('/questions/:id', protect, adminOnly, async (req, res) => {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-// USER MANAGEMENT ROUTES  (used by admin dashboard TeacherAssignmentPanel)
+// USER MANAGEMENT ROUTES
 // GET /users/stats must come BEFORE GET /users/:id to avoid param capture
 // ═════════════════════════════════════════════════════════════════════════════
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /api/admin/users/stats
-// ─────────────────────────────────────────────────────────────────────────────
 router.get('/users/stats', protect, adminOnly, async (req, res) => {
   try {
     const rows = await sequelize.query(
@@ -554,9 +546,6 @@ router.get('/users/stats', protect, adminOnly, async (req, res) => {
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /api/admin/users?role=teacher&search=...&page=1&limit=20
-// ─────────────────────────────────────────────────────────────────────────────
 router.get('/users', protect, adminOnly, async (req, res) => {
   const { role, search, page = 1, limit = 20 } = req.query;
   const filters      = ['u.is_active = true'];
@@ -596,9 +585,6 @@ router.get('/users', protect, adminOnly, async (req, res) => {
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PUT /api/admin/users/:id/role
-// ─────────────────────────────────────────────────────────────────────────────
 router.put('/users/:id/role', protect, adminOnly, async (req, res) => {
   const { role } = req.body;
   if (!['student', 'teacher', 'admin'].includes(role)) {
@@ -615,9 +601,6 @@ router.put('/users/:id/role', protect, adminOnly, async (req, res) => {
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PUT /api/admin/users/:id/deactivate
-// ─────────────────────────────────────────────────────────────────────────────
 router.put('/users/:id/deactivate', protect, adminOnly, async (req, res) => {
   const { is_active } = req.body;
   try {
@@ -631,9 +614,6 @@ router.put('/users/:id/deactivate', protect, adminOnly, async (req, res) => {
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DELETE /api/admin/users/:id  (soft delete — sets is_active = false)
-// ─────────────────────────────────────────────────────────────────────────────
 router.delete('/users/:id', protect, adminOnly, async (req, res) => {
   try {
     await sequelize.query(
