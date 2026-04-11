@@ -6,6 +6,11 @@
 //   POST /api/ai/explain       — explain why an answer is right/wrong
 //   POST /api/ai/hint          — get a hint for a question
 //   POST /api/ai/notes/generate — generate AI revision notes for a subtopic
+//
+// v4 AI COST CONTROL:
+//   Removed inline getGeminiModel() helper.
+//   All 4 generateContent calls now route through services/ai.js generate().
+//   GEMINI_API_KEY guard preserved exactly — only the call site changes.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const express  = require('express');
@@ -13,17 +18,10 @@ const router   = express.Router();
 const { protect }            = require('../middleware/auth');
 const { QueryTypes }         = require('sequelize');
 const sequelize              = require('../config/database');
-
-// Gemini helper — reuses same pattern throughout the codebase
-function getGeminiModel(modelName = 'gemini-2.0-flash') {
-  const { GoogleGenerativeAI } = require('@google/generative-ai');
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  return genAI.getGenerativeModel({ model: modelName });
-}
+// v4: central AI hub replaces inline getGeminiModel() helper
+const { generate }           = require('../services/ai');
 
 // ── POST /api/ai/chat ─────────────────────────────────────────────────────────
-// General AI chat — used by AIChatWidget.
-// Falls back to aiOrchestrator if available, otherwise uses direct Gemini call.
 router.post('/chat', protect, async (req, res) => {
   try {
     const { message, context = {}, session_id } = req.body;
@@ -31,23 +29,21 @@ router.post('/chat', protect, async (req, res) => {
       return res.status(400).json({ success: false, error: 'message is required' });
     }
 
-    // Try to use the full orchestrator first (if it exists)
     let reply = null;
     try {
       const { orchestrate } = require('../services/aiOrchestrator');
       const result = await orchestrate({ message, context, conversationHistory: [] });
       reply = result.reply;
     } catch {
-      // Fallback: direct Gemini call
+      // Fallback: direct AI call via central hub
       if (!process.env.GEMINI_API_KEY) {
         return res.status(503).json({ success: false, error: 'AI not configured' });
       }
-      const model  = getGeminiModel();
       const system = `You are AISchoolonair, a friendly AI tutor for Nigerian secondary school students.
 Subject: ${context.subject_name || 'General'}. Subtopic: ${context.subtopic_name || ''}.
 Give concise, curriculum-aligned answers suited for WAEC/JAMB/NECO preparation.`;
-      const result = await model.generateContent(`${system}\n\nStudent: ${message}\nAISchoolonair:`);
-      reply = result.response.text().trim();
+      // v4: generate() replaces getGeminiModel() + model.generateContent()
+      reply = await generate(`${system}\n\nStudent: ${message}\nAISchoolonair:`, 'chat');
     }
 
     return res.status(200).json({ success: true, reply });
@@ -58,9 +54,6 @@ Give concise, curriculum-aligned answers suited for WAEC/JAMB/NECO preparation.`
 });
 
 // ── POST /api/ai/explain ──────────────────────────────────────────────────────
-// Called after a student answers a question.
-// Body: { question_id, selected_option_id, typed_answer? }
-// Returns: { success, explanation }
 router.post('/explain', protect, async (req, res) => {
   const { question_id, selected_option_id, typed_answer } = req.body;
 
@@ -69,7 +62,6 @@ router.post('/explain', protect, async (req, res) => {
   }
 
   try {
-    // Fetch question + correct option
     const questions = await sequelize.query(
       `SELECT q.question_text, q.explanation, q.correct_answer,
               ao.option_text AS selected_text,
@@ -89,12 +81,10 @@ router.post('/explain', protect, async (req, res) => {
 
     const q = questions[0];
 
-    // If we already have a stored explanation and the student didn't type an essay, return it
     if (q?.explanation && !typed_answer) {
       return res.status(200).json({ success: true, explanation: q.explanation });
     }
 
-    // Generate AI explanation
     if (!process.env.GEMINI_API_KEY) {
       return res.status(200).json({
         success:     true,
@@ -102,11 +92,8 @@ router.post('/explain', protect, async (req, res) => {
       });
     }
 
-    const model = getGeminiModel();
-
     let prompt;
     if (typed_answer) {
-      // Essay marking
       prompt = `You are an expert Nigerian exam marker (WAEC/JAMB/NECO standard).
 A student answered this question:
 
@@ -132,10 +119,9 @@ Explain in 2-3 sentences why the correct answer is right and briefly why the oth
 Be concise and curriculum-aligned.`;
     }
 
-    const result      = await model.generateContent(prompt);
-    const explanation = result.response.text().trim();
+    // v4: generate() replaces getGeminiModel() + model.generateContent()
+    const explanation = await generate(prompt, 'explain');
 
-    // Cache explanation on the question row for future use (non-blocking)
     if (!typed_answer && explanation) {
       sequelize.query(
         `UPDATE questions SET explanation = :explanation WHERE id = :id AND (explanation IS NULL OR explanation = '')`,
@@ -151,9 +137,6 @@ Be concise and curriculum-aligned.`;
 });
 
 // ── POST /api/ai/hint ─────────────────────────────────────────────────────────
-// Called when a student clicks "Get AI Hint" in PracticeMode or QuizTab.
-// Body: { question_id, selected_option_id?, hint_level? }
-// Returns: { success, hint, hints (array) }
 router.post('/hint', protect, async (req, res) => {
   const { question_id, selected_option_id, hint_level = 1 } = req.body;
 
@@ -162,7 +145,6 @@ router.post('/hint', protect, async (req, res) => {
   }
 
   try {
-    // Fetch question
     const questions = await sequelize.query(
       `SELECT question_text, correct_answer, concept_hint,
               (SELECT option_text FROM answer_options WHERE question_id = q.id AND is_correct = true LIMIT 1) AS correct_text
@@ -172,7 +154,6 @@ router.post('/hint', protect, async (req, res) => {
 
     const q = questions[0];
 
-    // If concept_hint is stored, return it directly as first hint
     if (q?.concept_hint && hint_level === 1) {
       return res.status(200).json({
         success: true,
@@ -181,13 +162,11 @@ router.post('/hint', protect, async (req, res) => {
       });
     }
 
-    // Generate AI hint
     if (!process.env.GEMINI_API_KEY) {
       const fallback = 'Think carefully about the key concepts in this question. Re-read it slowly.';
       return res.status(200).json({ success: true, hint: fallback, hints: [fallback] });
     }
 
-    const model  = getGeminiModel();
     const prompt = `You are a helpful tutor for Nigerian secondary school students.
 A student is stuck on this question:
 "${q?.question_text || 'Question not available'}"
@@ -197,15 +176,16 @@ Each hint should be a single sentence. Focus on the concept being tested, not th
 Return ONLY the hints as a JSON array of strings, e.g.: ["Hint 1...", "Hint 2..."]
 No preamble, no markdown.`;
 
-    const result = await model.generateContent(prompt);
-    const raw    = result.response.text().trim().replace(/```json|```/g, '').trim();
+    // v4: generate() replaces getGeminiModel() + model.generateContent()
+    const raw = await generate(prompt, 'hint');
+    const cleaned = raw.replace(/```json|```/g, '').trim();
 
     let hints;
     try {
-      hints = JSON.parse(raw);
-      if (!Array.isArray(hints)) hints = [raw];
+      hints = JSON.parse(cleaned);
+      if (!Array.isArray(hints)) hints = [cleaned];
     } catch {
-      hints = [raw];
+      hints = [cleaned];
     }
 
     return res.status(200).json({
@@ -220,9 +200,6 @@ No preamble, no markdown.`;
 });
 
 // ── POST /api/ai/notes/generate ───────────────────────────────────────────────
-// Called from ResourcesTab in SubtopicPage — generates AI revision notes.
-// Body: { subject_id, topic_name, subtopic_id? }
-// Returns: { success, notes }
 router.post('/notes/generate', protect, async (req, res) => {
   const { subject_id, topic_name, subtopic_id } = req.body;
 
@@ -231,7 +208,6 @@ router.post('/notes/generate', protect, async (req, res) => {
   }
 
   try {
-    // Get subject name for context
     let subjectName = '';
     if (subject_id) {
       const subjects = await sequelize.query(
@@ -245,7 +221,6 @@ router.post('/notes/generate', protect, async (req, res) => {
       }
     }
 
-    // Check if notes already stored
     if (subtopic_id) {
       const existing = await sequelize.query(
         `SELECT content_html FROM notes WHERE subtopic_id = :subtopicId LIMIT 1`,
@@ -260,7 +235,6 @@ router.post('/notes/generate', protect, async (req, res) => {
       return res.status(503).json({ success: false, error: 'AI not configured' });
     }
 
-    const model  = getGeminiModel();
     const prompt = `You are an expert Nigerian secondary school tutor writing revision notes.
 Subject: ${subjectName || 'General'}
 Topic: ${topic_name}
@@ -273,10 +247,9 @@ Write concise, exam-focused revision notes for this topic. Structure as:
 Keep each bullet point to 1-2 sentences. Use clear, simple English suitable for SS2/SS3 students.
 Total length: under 300 words. Plain text only — no markdown, no headers with #.`;
 
-    const result = await model.generateContent(prompt);
-    const notes  = result.response.text().trim();
+    // v4: generate() replaces getGeminiModel() + model.generateContent()
+    const notes = await generate(prompt, 'notes');
 
-    // Store notes (non-blocking)
     if (subtopic_id && notes) {
       sequelize.query(
         `INSERT INTO notes (id, student_id, subtopic_id, content_html, created_at, updated_at)
