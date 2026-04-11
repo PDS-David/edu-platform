@@ -1,13 +1,13 @@
+'use strict';
 // server/routes/studentRoutes.js
 // ─────────────────────────────────────────────────────────────────────────────
-// FIXES in this version:
-//   1. GET /student/tests — now reads from test_assignments JOIN custom_tests
-//      (the correct schema) instead of a test_assignments table that has a
-//      different shape.
-//   2. GET /student/test/:testId — reads questions via test_questions JOIN
-//      questions (correct schema).
-//   3. POST /student/test/:testId/submit — correctly resolves testId through
-//      test_assignments → custom_tests.
+// Student-specific endpoints:
+//   POST /api/students/join-class          — join a class with join code
+//   GET  /api/students/performance         — performance data for dashboard
+//   POST /api/students/remediation         — generate targeted AI questions
+//   GET  /api/students/remediation/status  — check if student has weak concepts
+//   POST /api/students/test/:testId/submit — submit a teacher-assigned test
+//   GET  /api/students/test/:testId        — get test details for StudentTestPage
 // ─────────────────────────────────────────────────────────────────────────────
 
 const express        = require('express');
@@ -16,194 +16,123 @@ const { QueryTypes } = require('sequelize');
 const sequelize      = require('../config/database');
 const { protect }    = require('../middleware/auth');
 
-// ── POST /api/student/join-class ──────────────────────────────────────────────
+const UUID_REGEX  = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isValidUUID = (v) => UUID_REGEX.test(v);
+
+// ── POST /api/students/join-class ─────────────────────────────────────────────
 router.post('/join-class', protect, async (req, res) => {
   const { join_code } = req.body;
-  const student_id    = req.user.id;
-  if (!join_code) return res.status(400).json({ success: false, error: 'join_code is required' });
-
+  if (!join_code?.trim()) {
+    return res.status(400).json({ success: false, error: 'join_code is required' });
+  }
   try {
     const classes = await sequelize.query(
-      `SELECT id, name FROM classes WHERE UPPER(join_code) = UPPER(:join_code)`,
-      { replacements: { join_code: join_code.trim() }, type: QueryTypes.SELECT }
+      `SELECT id, name FROM classes WHERE UPPER(join_code) = UPPER(:code)`,
+      { replacements: { code: join_code.trim() }, type: QueryTypes.SELECT }
     );
-    if (!classes.length) return res.status(404).json({ success: false, error: 'Invalid join code' });
+    if (!classes.length) {
+      return res.status(404).json({ success: false, error: 'Invalid join code. Please check and try again.' });
+    }
     const cls = classes[0];
-
     await sequelize.query(
       `INSERT INTO class_memberships (id, class_id, student_id, joined_at)
-       VALUES (gen_random_uuid(), :class_id, :student_id, NOW())
+       VALUES (gen_random_uuid(), :classId, :studentId, NOW())
        ON CONFLICT (class_id, student_id) DO NOTHING`,
-      { replacements: { class_id: cls.id, student_id }, type: QueryTypes.INSERT }
+      { replacements: { classId: cls.id, studentId: req.user.id }, type: QueryTypes.INSERT }
     );
-    return res.json({ success: true, data: { class_id: cls.id, class_name: cls.name } });
+    return res.status(200).json({ success: true, message: `Joined "${cls.name}" successfully`, data: { class_name: cls.name } });
   } catch (err) {
+    console.error('[POST /students/join-class]', err.message);
     return res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// ── GET /api/student/tests ────────────────────────────────────────────────────
-// FIX: now reads from test_assignments JOIN custom_tests (correct schema).
-router.get('/tests', protect, async (req, res) => {
-  try {
-    const rows = await sequelize.query(
-      `SELECT
-         ct.id,
-         ct.title,
-         ct.duration_minutes       AS time_limit_minutes,
-         ta.due_date,
-         ta.submitted_at,
-         ta.percentage             AS accuracy_pct,
-         u.first_name || ' ' || u.last_name AS teacher_name
-       FROM test_assignments ta
-       JOIN custom_tests ct ON ct.id = ta.test_id
-       JOIN users u         ON u.id  = ct.teacher_id
-       WHERE ta.student_id = :student_id
-       ORDER BY ta.assigned_at DESC`,
-      { replacements: { student_id: req.user.id }, type: QueryTypes.SELECT }
-    );
-    return res.json({ success: true, data: rows });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// ── GET /api/student/test/:testId ─────────────────────────────────────────────
-// FIX: reads via test_questions JOIN questions (correct schema).
-router.get('/test/:testId', protect, async (req, res) => {
-  const { testId } = req.params;
-  try {
-    const tests = await sequelize.query(
-      `SELECT ct.id, ct.title, ct.duration_minutes AS time_limit_minutes,
-              u.first_name || ' ' || u.last_name AS teacher_name
-       FROM custom_tests ct
-       JOIN users u ON u.id = ct.teacher_id
-       WHERE ct.id = :testId`,
-      { replacements: { testId }, type: QueryTypes.SELECT }
-    );
-    if (!tests.length) return res.status(404).json({ success: false, error: 'Test not found' });
-    const test = tests[0];
-
-    const questions = await sequelize.query(
-      `SELECT q.id, q.question_text, q.difficulty, q.question_sub_type,
-              tq.question_order,
-              json_agg(
-                json_build_object(
-                  'id',          ao.id,
-                  'option_text', ao.option_text,
-                  'order_index', ao.order_index
-                ) ORDER BY ao.order_index
-              ) AS options
-       FROM test_questions tq
-       JOIN questions q      ON q.id  = tq.question_id
-       JOIN answer_options ao ON ao.question_id = q.id
-       WHERE tq.test_id = :testId
-       GROUP BY q.id, tq.question_order
-       ORDER BY tq.question_order`,
-      { replacements: { testId }, type: QueryTypes.SELECT }
-    );
-
-    test.questions = questions;
-    return res.json({ success: true, data: test });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// ── POST /api/student/test/:testId/submit ─────────────────────────────────────
-// testId here is the custom_tests.id (same as what we pass to the student).
-router.post('/test/:testId/submit', protect, async (req, res) => {
-  const { testId }                  = req.params;
-  const { answers = [], total_time_ms } = req.body;
-  const student_id                  = req.user.id;
+// ── GET /api/students/performance ─────────────────────────────────────────────
+// Returns performance data for a student's subject (for My Performance tab)
+router.get('/performance', protect, async (req, res) => {
+  const { subject_id } = req.query;
+  const studentId = req.user.id;
 
   try {
-    let correct = 0;
-    for (const ans of answers) {
-      if (!ans.selected_option_id) continue;
-      const rows = await sequelize.query(
-        `SELECT is_correct FROM answer_options
-         WHERE id = :optId AND question_id = :qId`,
-        {
-          replacements: { optId: ans.selected_option_id, qId: ans.question_id },
-          type: QueryTypes.SELECT,
-        }
-      );
-      if (rows[0]?.is_correct) correct++;
+    const filters      = ['sp.student_id = :studentId'];
+    const replacements = { studentId };
+
+    if (subject_id && isValidUUID(subject_id)) {
+      filters.push('st.subject_id = :subjectId');
+      replacements.subjectId = subject_id;
     }
 
-    const total       = answers.length;
-    const accuracy_pct = total > 0 ? Math.round((correct / total) * 100) : 0;
-    const percentage   = accuracy_pct;
+    const [subtopicPerf, studyTime] = await Promise.all([
+      sequelize.query(
+        `SELECT
+           st.id, st.name,
+           CASE WHEN sp.resources_completed AND sp.practice_completed AND sp.quiz_completed
+                THEN 'complete' ELSE 'in_progress' END AS completion,
+           COUNT(pa.id)::INTEGER  AS attempts,
+           ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 1) AS score_avg,
+           MAX(pa.attempted_at) AS last_attempt,
+           CASE WHEN COUNT(pa.id) >= 2 AND
+                     (SELECT ROUND(AVG(CASE WHEN pa2.is_correct THEN 100.0 ELSE 0 END),1)
+                      FROM practice_attempts pa2
+                      JOIN questions q2 ON q2.id = pa2.question_id
+                      WHERE pa2.student_id = sp.student_id AND q2.subtopic_id = st.id
+                      ORDER BY pa2.attempted_at DESC LIMIT 3) >
+                     (SELECT ROUND(AVG(CASE WHEN pa3.is_correct THEN 100.0 ELSE 0 END),1)
+                      FROM practice_attempts pa3
+                      JOIN questions q3 ON q3.id = pa3.question_id
+                      WHERE pa3.student_id = sp.student_id AND q3.subtopic_id = st.id
+                      ORDER BY pa3.attempted_at ASC LIMIT 3)
+                THEN 'up'
+                ELSE 'down' END AS trend
+         FROM subtopic_progress sp
+         JOIN subtopics st ON sp.subtopic_id = st.id
+         LEFT JOIN practice_attempts pa ON pa.student_id = sp.student_id
+           AND pa.question_id IN (SELECT id FROM questions WHERE subtopic_id = st.id)
+         WHERE ${filters.join(' AND ')}
+         GROUP BY st.id, st.name, sp.resources_completed, sp.practice_completed, sp.quiz_completed, sp.student_id
+         ORDER BY score_avg ASC NULLS LAST`,
+        { replacements, type: QueryTypes.SELECT }
+      ),
+      sequelize.query(
+        `SELECT COALESCE(SUM(time_taken_ms), 0)::BIGINT AS total_ms
+         FROM practice_attempts
+         WHERE student_id = :studentId
+           AND attempted_at > NOW() - INTERVAL '30 days'`,
+        { replacements: { studentId }, type: QueryTypes.SELECT }
+      ),
+    ]);
 
-    // Find the test_assignment row for this student
-    const assignment = await sequelize.query(
-      `SELECT id FROM test_assignments WHERE test_id = :testId AND student_id = :student_id`,
-      { replacements: { testId, student_id }, type: QueryTypes.SELECT }
-    );
+    const totalMs    = parseInt(studyTime[0]?.total_ms || 0);
+    const perfMins   = Math.floor(totalMs / 60000);
+    const perfSecs   = Math.floor((totalMs % 60000) / 1000);
 
-    if (assignment.length) {
-      // Update existing assignment
-      await sequelize.query(
-        `UPDATE test_assignments
-         SET is_submitted = true, submitted_at = NOW(),
-             score_obtained = :score, percentage = :pct, auto_graded = true
-         WHERE id = :id`,
-        {
-          replacements: { id: assignment[0].id, score: correct, pct: percentage },
-          type: QueryTypes.UPDATE,
-        }
-      );
-    }
+    const strengthRows = subtopicPerf.filter(r => (r.score_avg || 0) >= 60).slice(0, 5);
+    const weaknessRows = subtopicPerf.filter(r => (r.score_avg || 100) < 60).slice(0, 5);
 
-    // Also persist into test_submissions for the teacher view
-    await sequelize.query(
-      `INSERT INTO test_submissions
-         (id, assignment_id, student_id, answers, score, total, accuracy_pct, total_time_ms)
-       SELECT gen_random_uuid(), ta.id, :student_id, :answers::jsonb,
-              :score, :total, :accuracy_pct, :total_time_ms
-       FROM test_assignments ta
-       WHERE ta.test_id = :testId AND ta.student_id = :student_id
-       ON CONFLICT (assignment_id, student_id)
-       DO UPDATE SET answers = :answers::jsonb, score = :score, total = :total,
-                     accuracy_pct = :accuracy_pct, total_time_ms = :total_time_ms,
-                     submitted_at = NOW()`,
-      {
-        replacements: {
-          student_id,
-          answers:      JSON.stringify(answers),
-          score:        correct,
-          total,
-          accuracy_pct,
-          total_time_ms: total_time_ms || null,
-          testId,
-        },
-        type: QueryTypes.INSERT,
-      }
-    );
-
-    return res.json({ success: true, data: { correct, total, accuracy_pct } });
+    return res.status(200).json({
+      success: true,
+      data: {
+        strength_rows: strengthRows,
+        weakness_rows: weaknessRows,
+        perf_mins:     perfMins,
+        perf_secs:     perfSecs,
+        study_dates:   [], // Placeholder — expand if needed
+      },
+    });
   } catch (err) {
-    console.error('[POST /student/test/submit]', err.message);
+    console.error('[GET /students/performance]', err.message);
     return res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// POST /api/students/remediation
+// ── POST /api/students/remediation ───────────────────────────────────────────
 // Generates targeted AI practice questions for the student's weak concepts.
 // Returns { conceptSets: [{ concept_name, mastery_score, questions: [...] }] }
-// No body required — uses req.user.id from JWT.
-// ─────────────────────────────────────────────────────────────────────────────
 router.post('/remediation', protect, async (req, res) => {
   try {
     const { generateRemediationSet } = require('../services/remediationService');
     const result = await generateRemediationSet(req.user.id);
-
-    return res.status(200).json({
-      success: true,
-      data:    result,
-    });
+    return res.status(200).json({ success: true, data: result });
   } catch (err) {
     console.error('[POST /students/remediation]', err.message);
     return res.status(500).json({
@@ -213,16 +142,12 @@ router.post('/remediation', protect, async (req, res) => {
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /api/students/remediation/status
-// Returns whether the student has any weak concepts without generating questions.
-// Useful for the dashboard to decide whether to show the remediation prompt.
-// ─────────────────────────────────────────────────────────────────────────────
+// ── GET /api/students/remediation/status ─────────────────────────────────────
+// Returns whether student has weak concepts without generating questions.
 router.get('/remediation/status', protect, async (req, res) => {
   try {
     const { getWeakConcepts } = require('../services/weakConceptService');
     const weakConcepts = await getWeakConcepts(req.user.id);
-
     return res.status(200).json({
       success:            true,
       has_weak_concepts:  weakConcepts.length > 0,
@@ -235,6 +160,126 @@ router.get('/remediation/status', protect, async (req, res) => {
     });
   } catch (err) {
     console.error('[GET /students/remediation/status]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── GET /api/students/test/:testId ───────────────────────────────────────────
+// Returns test details + questions for StudentTestPage.jsx
+router.get('/test/:testId', protect, async (req, res) => {
+  const { testId } = req.params;
+  if (!isValidUUID(testId)) {
+    return res.status(400).json({ success: false, error: 'Invalid test ID' });
+  }
+  try {
+    const tests = await sequelize.query(
+      `SELECT ct.id, ct.title, ct.duration_minutes, ct.total_marks,
+              u.first_name || ' ' || u.last_name AS teacher_name
+       FROM custom_tests ct
+       JOIN users u ON u.id = ct.teacher_id
+       WHERE ct.id = :testId AND ct.is_published = true`,
+      { replacements: { testId }, type: QueryTypes.SELECT }
+    );
+    if (!tests.length) {
+      return res.status(404).json({ success: false, error: 'Test not found' });
+    }
+    const test = tests[0];
+
+    const questions = await sequelize.query(
+      `SELECT q.id, q.question_text, q.marks, q.difficulty,
+              tq.question_order,
+              COALESCE(
+                (SELECT json_agg(json_build_object('id', ao.id, 'option_text', ao.option_text) ORDER BY ao.id)
+                 FROM answer_options ao WHERE ao.question_id = q.id),
+                q.options
+              ) AS options
+       FROM test_questions tq
+       JOIN questions q ON q.id = tq.question_id
+       WHERE tq.test_id = :testId
+       ORDER BY tq.question_order ASC`,
+      { replacements: { testId }, type: QueryTypes.SELECT }
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: { ...test, questions },
+    });
+  } catch (err) {
+    console.error(`[GET /students/test/${testId}]`, err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── POST /api/students/test/:testId/submit ───────────────────────────────────
+// Submits a student's test answers.
+// Body: { answers: [{ question_id, selected_option_id }], total_time_ms }
+router.post('/test/:testId/submit', protect, async (req, res) => {
+  const { testId } = req.params;
+  if (!isValidUUID(testId)) {
+    return res.status(400).json({ success: false, error: 'Invalid test ID' });
+  }
+
+  const { answers = [], total_time_ms = 0 } = req.body;
+  if (!Array.isArray(answers) || answers.length === 0) {
+    return res.status(400).json({ success: false, error: 'answers array is required' });
+  }
+
+  try {
+    // Resolve correct options for all questions
+    const questionIds = answers.map(a => a.question_id).filter(Boolean);
+    const correctRows = await sequelize.query(
+      `SELECT question_id, id AS option_id FROM answer_options
+       WHERE question_id = ANY(:questionIds) AND is_correct = true`,
+      { replacements: { questionIds }, type: QueryTypes.SELECT }
+    );
+    const correctMap = {};
+    for (const r of correctRows) {
+      correctMap[r.question_id] = String(r.option_id);
+    }
+
+    let correct = 0;
+    const total  = answers.length;
+
+    for (const answer of answers) {
+      const isCorrect = answer.selected_option_id
+        ? String(answer.selected_option_id) === correctMap[answer.question_id]
+        : false;
+      if (isCorrect) correct++;
+
+      // Record practice attempt
+      sequelize.query(
+        `INSERT INTO practice_attempts (id, student_id, question_id, is_correct, time_taken_ms, attempted_at)
+         VALUES (gen_random_uuid(), :studentId, :questionId, :isCorrect, :timeTaken, NOW())
+         ON CONFLICT DO NOTHING`,
+        {
+          replacements: {
+            studentId:  req.user.id,
+            questionId: answer.question_id,
+            isCorrect:  isCorrect,
+            timeTaken:  answer.time_taken_ms || 0,
+          },
+          type: QueryTypes.INSERT,
+        }
+      ).catch(() => {});
+    }
+
+    const accuracyPct = total > 0 ? Math.round((correct / total) * 100) : 0;
+
+    // Mark test assignment as completed
+    sequelize.query(
+      `UPDATE test_assignments SET completed_at = NOW(), score = :score
+       WHERE test_id = :testId AND student_id = :studentId`,
+      { replacements: { score: correct, testId, studentId: req.user.id }, type: QueryTypes.UPDATE }
+    ).catch(() => {});
+
+    return res.status(200).json({
+      success:      true,
+      correct,
+      total,
+      accuracy_pct: accuracyPct,
+    });
+  } catch (err) {
+    console.error(`[POST /students/test/${testId}/submit]`, err.message);
     return res.status(500).json({ success: false, error: err.message });
   }
 });
