@@ -28,14 +28,13 @@ import SubjectPage               from './pages/SubjectPage';
 import SubtopicPage              from './pages/SubtopicPage';
 import QuizPage                  from './pages/QuizPage';
 import QuizResultsPage           from './pages/QuizResultsPage';
+import QuizHistoryPage           from './pages/QuizHistoryPage';
 import MockExamPage              from './pages/MockExamPage';
 import PastPapersPage            from './pages/PastPapersPage';
 import OnboardingPage            from './pages/OnboardingPage';
 import StudentTestPage           from './pages/StudentTestPage';
 import ImageMarkingPage          from './pages/ImageMarkingPage';
 import SettingsPage              from './pages/SettingsPage';
-// TASK 10 ADDITION: QuizHistoryPage import
-import QuizHistoryPage           from './pages/QuizHistoryPage';
 
 // ── WhatsApp floating contact button ─────────────────────────────────────────
 const WhatsAppButton = () => {
@@ -115,6 +114,9 @@ function App() {
             element={<PrivateRoute allowedRoles={['student']}><QuizPage /></PrivateRoute>} />
           <Route path="/student/quiz-results/:attemptId"
             element={<PrivateRoute allowedRoles={['student']}><QuizResultsPage /></PrivateRoute>} />
+          {/* TASK 10: Quiz history route — must come before the generic subtopic param route */}
+          <Route path="/student/subtopic/:subtopicId/quiz-history"
+            element={<PrivateRoute allowedRoles={['student']}><QuizHistoryPage /></PrivateRoute>} />
           <Route path="/student/mock/:subjectId"
             element={<PrivateRoute allowedRoles={['student']}><MockExamPage /></PrivateRoute>} />
           <Route path="/student/test/:testId"
@@ -123,15 +125,6 @@ function App() {
             element={<PrivateRoute allowedRoles={['student']}><PracticeMode /></PrivateRoute>} />
           <Route path="/student/mark-image"
             element={<PrivateRoute allowedRoles={['student']}><ImageMarkingPage /></PrivateRoute>} />
-          {/* TASK 10 ADDITION: Quiz history route for a specific subtopic */}
-          <Route
-            path="/student/subtopic/:subtopicId/quiz-history"
-            element={
-              <PrivateRoute allowedRoles={['student']}>
-                <QuizHistoryPage />
-              </PrivateRoute>
-            }
-          />
           <Route path="/onboarding"
             element={<PrivateRoute allowedRoles={['student']}><OnboardingPage /></PrivateRoute>} />
           <Route path="/contribute"
