@@ -17,18 +17,18 @@ import PublicNav from '../components/PublicNav';
 const BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/api$/, '');
 
 const EXAM_BOARDS = [
-  { code: 'JAMB',    name: '🎓 JAMB/UTME' },
-  { code: 'WAEC',    name: '📘 WAEC' },
-  { code: 'OLEVEL',  name: '📗 O-Levels' },
-  { code: 'NECO',    name: '📙 NECO' },
-  { code: 'IELTS',   name: '🌍 IELTS' },
-  { code: 'TOEFL',   name: '🇺🇸 TOEFL' },
-  { code: 'SAT',     name: '🎯 SAT' },
-  { code: 'GCE_AL',  name: "🎓 GCE A'Levels" },
-  { code: 'JUPEB',   name: '📚 JUPEB' },
-  { code: 'LANG_EN', name: '🇬🇧 Language Lab – English' },
-  { code: 'LANG_FR', name: '🇫🇷 Language Lab – French' },
-  { code: 'LANG_YO', name: '🌍 Language Lab – Yoruba' },
+  { code: 'JAMB',    name: ' JAMB/UTME' },
+  { code: 'WAEC',    name: ' WAEC' },
+  { code: 'OLEVEL',  name: ' O-Levels' },
+  { code: 'NECO',    name: ' NECO' },
+  { code: 'IELTS',   name: ' IELTS' },
+  { code: 'TOEFL',   name: ' TOEFL' },
+  { code: 'SAT',     name: ' SAT' },
+  { code: 'GCE_AL',  name: " GCE A'Levels" },
+  { code: 'JUPEB',   name: ' JUPEB' },
+  { code: 'LANG_EN', name: ' Language Lab – English' },
+  { code: 'LANG_FR', name: ' Language Lab – French' },
+  { code: 'LANG_YO', name: ' Language Lab – Yoruba' },
 ];
 const YEAR_MIN = 2015;
 const YEAR_MAX = new Date().getFullYear();

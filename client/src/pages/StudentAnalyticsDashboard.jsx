@@ -398,7 +398,7 @@ export default function StudentAnalyticsDashboard() {
               {/* Study advice */}
               {prediction.studyAdvice && (
                 <div className="bg-purple-50 rounded-xl p-3">
-                  <p className="text-xs font-semibold text-purple-700 mb-1">✦ Study advice</p>
+                  <p className="text-xs font-semibold text-purple-700 mb-1"> Study advice</p>
                   <p className="text-sm text-gray-600 leading-relaxed">{prediction.studyAdvice}</p>
                 </div>
               )}

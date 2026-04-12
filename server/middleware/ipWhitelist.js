@@ -22,9 +22,9 @@ const ADMIN_WHITELIST = (process.env.ADMIN_WHITELIST_IPS || '')
   .filter(Boolean);
 
 if (ADMIN_WHITELIST.length > 0) {
-  console.log(`🔒 Admin IP whitelist active: ${ADMIN_WHITELIST.join(', ')}`);
+  console.log(` Admin IP whitelist active: ${ADMIN_WHITELIST.join(', ')}`);
 } else {
-  console.warn('⚠️  ADMIN_WHITELIST_IPS not set — admin routes are IP-unrestricted');
+  console.warn('  ADMIN_WHITELIST_IPS not set — admin routes are IP-unrestricted');
 }
 
 module.exports = function ipWhitelist(req, res, next) {

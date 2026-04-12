@@ -75,16 +75,16 @@ const ResetPassword = () => {
           >
             <div className="absolute top-0 right-0 w-40 h-40 rounded-full opacity-10"
               style={{ background: 'radial-gradient(circle, #818cf8, transparent)', transform: 'translate(30%,-30%)' }} />
-            <div className="text-5xl mb-5">🔑</div>
+            <div className="text-5xl mb-5"></div>
             <h2 className="text-2xl xl:text-3xl font-bold text-white mb-3">Create a new password</h2>
             <p className="text-gray-300 text-sm leading-relaxed max-w-xs mb-6">
               Choose a strong, unique password that you haven't used before for your EAC account.
             </p>
             <div className="space-y-2 max-w-xs">
               {[
-                '✅ At least 6 characters long',
-                '✅ Mix of letters and numbers recommended',
-                '✅ Avoid easily guessed words',
+                ' At least 6 characters long',
+                ' Mix of letters and numbers recommended',
+                ' Avoid easily guessed words',
               ].map((tip, i) => (
                 <p key={i} className="text-indigo-200 text-xs">{tip}</p>
               ))}

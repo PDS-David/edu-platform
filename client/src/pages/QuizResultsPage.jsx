@@ -177,7 +177,7 @@ export default function QuizResultsPage() {
 
   if (error || !data) return (
     <div className="min-h-screen bg-[#0a4a3f] flex flex-col items-center justify-center gap-4 px-6 text-center">
-      <div className="text-4xl">😕</div>
+      <div className="text-4xl"></div>
       <p className="text-white font-semibold">{error || 'No results found.'}</p>
       <button onClick={() => navigate(-1)}
         className="mt-2 text-teal-400 hover:text-teal-300 text-sm font-medium flex items-center gap-1">

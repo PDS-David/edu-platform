@@ -145,8 +145,8 @@ async function importConcepts(filePath, { dryRun = false } = {}) {
     throw new Error(`File not found: ${filePath}`);
   }
 
-  console.log(`\n📂  Reading: ${filePath}`);
-  console.log(dryRun ? '🔍  DRY RUN — no changes will be written\n' : '');
+  console.log(`\n  Reading: ${filePath}`);
+  console.log(dryRun ? '  DRY RUN — no changes will be written\n' : '');
 
   // ── 2. Parse CSV ─────────────────────────────────────────────────────────
   const { headers, rows } = await parseCSV(filePath);
@@ -161,11 +161,11 @@ async function importConcepts(filePath, { dryRun = false } = {}) {
     );
   }
 
-  console.log(`📋  Header columns: ${headers.join(', ')}`);
-  console.log(`📝  Data rows found: ${rows.length}\n`);
+  console.log(`  Header columns: ${headers.join(', ')}`);
+  console.log(`  Data rows found: ${rows.length}\n`);
 
   if (rows.length === 0) {
-    console.log('⚠️  No data rows — nothing to import.');
+    console.log('  No data rows — nothing to import.');
     return { inserted: 0, skipped: 0, errors: [] };
   }
 
@@ -178,15 +178,15 @@ async function importConcepts(filePath, { dryRun = false } = {}) {
   });
 
   if (allErrors.length > 0) {
-    console.error('❌  Validation failed — no rows imported:\n');
+    console.error('  Validation failed — no rows imported:\n');
     allErrors.forEach(e => console.error(e));
     throw new Error(`Validation failed with ${allErrors.length} error(s). Fix the CSV and retry.`);
   }
 
-  console.log('✅  All rows passed validation.\n');
+  console.log('  All rows passed validation.\n');
 
   if (dryRun) {
-    console.log(`✅  DRY RUN complete — ${rows.length} row(s) validated, nothing written.`);
+    console.log(`  DRY RUN complete — ${rows.length} row(s) validated, nothing written.`);
     return { inserted: 0, skipped: 0, errors: [], dryRun: true };
   }
 
@@ -250,7 +250,7 @@ async function importConcepts(filePath, { dryRun = false } = {}) {
       // Duplicate check
       const dupKey = `${subtopicId}:${conceptName.toLowerCase()}`;
       if (dupSet.has(dupKey)) {
-        console.log(`  ⏭️  Line ${lineNo}: SKIPPED duplicate — "${conceptName}" already exists in subtopic ${subtopicId}`);
+        console.log(`    Line ${lineNo}: SKIPPED duplicate — "${conceptName}" already exists in subtopic ${subtopicId}`);
         skipped++;
         continue;
       }
@@ -280,10 +280,10 @@ async function importConcepts(filePath, { dryRun = false } = {}) {
         // Add to local set so we catch in-file duplicates too
         dupSet.add(dupKey);
         inserted++;
-        console.log(`  ✅  Line ${lineNo}: INSERT "${conceptName}" (difficulty ${difficultyLevel})`);
+        console.log(`    Line ${lineNo}: INSERT "${conceptName}" (difficulty ${difficultyLevel})`);
       } catch (rowErr) {
         const msg = `Line ${lineNo}: DB error for "${conceptName}" — ${rowErr.message}`;
-        console.error(`  ❌  ${msg}`);
+        console.error(`    ${msg}`);
         rowErrors.push(msg);
       }
     }
@@ -328,12 +328,12 @@ async function main() {
 
   try {
     await sequelize.authenticate();
-    console.log('🔌  Database connected');
+    console.log('  Database connected');
 
     const result = await importConcepts(filePath, { dryRun });
 
     console.log('\n─────────────────────────────────');
-    console.log('📊  Import summary:');
+    console.log('  Import summary:');
     console.log(`    Inserted : ${result.inserted}`);
     console.log(`    Skipped  : ${result.skipped}  (duplicates)`);
     if (result.dryRun) console.log('    Mode     : DRY RUN (nothing written)');
@@ -341,7 +341,7 @@ async function main() {
 
     process.exit(0);
   } catch (err) {
-    console.error('\n❌  Import failed:', err.message);
+    console.error('\n  Import failed:', err.message);
     process.exit(1);
   } finally {
     await sequelize.close();

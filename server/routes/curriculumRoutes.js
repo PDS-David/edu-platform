@@ -7,7 +7,7 @@ const sequelize = require('../config/database');
 
 router.get('/', async (req, res) => {
   try {
-    // ✅ FIXED: removed "full_name"
+    //  FIXED: removed "full_name"
     const examBoards = await sequelize.query(
       `SELECT id, code, name, icon_emoji
        FROM exam_boards
@@ -34,7 +34,7 @@ router.get('/', async (req, res) => {
           }
         );
       } catch (err) {
-        console.error('❌ Subjects query failed:', err.message);
+        console.error(' Subjects query failed:', err.message);
       }
 
       const subjectsWithTopics = [];
@@ -54,7 +54,7 @@ router.get('/', async (req, res) => {
             }
           );
         } catch (err) {
-          console.error('❌ Topics query failed:', err.message);
+          console.error(' Topics query failed:', err.message);
         }
 
         const topicsWithSubtopics = [];
@@ -74,7 +74,7 @@ router.get('/', async (req, res) => {
               }
             );
           } catch (err) {
-            console.error('❌ Subtopics query failed:', err.message);
+            console.error(' Subtopics query failed:', err.message);
           }
 
           topicsWithSubtopics.push({
@@ -102,7 +102,7 @@ router.get('/', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('🔥 FULL ERROR in /api/curriculum:', error);
+    console.error(' FULL ERROR in /api/curriculum:', error);
 
     return res.status(500).json({
       success: false,

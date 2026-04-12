@@ -504,7 +504,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
           }
         );
 
-        console.log(`[Webhook] ✅ Subscription activated for user ${userId}, plan ${plan.plan_name}`);
+        console.log(`[Webhook]  Subscription activated for user ${userId}, plan ${plan.plan_name}`);
         break;
       }
 
@@ -516,7 +516,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
            WHERE transaction_reference = :reference`,
           { replacements: { reference }, type: QueryTypes.UPDATE }
         );
-        console.log(`[Webhook] ❌ Payment failed for reference ${reference}`);
+        console.log(`[Webhook]  Payment failed for reference ${reference}`);
         break;
       }
 

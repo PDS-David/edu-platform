@@ -179,7 +179,7 @@ function startJobs() {
     timezone:  'Africa/Lagos',
   });
 
-  console.log('✅ Scheduled jobs started (weekly digest Mon 9am + streak nudge 6pm + trial expiry midnight WAT)');
+  console.log(' Scheduled jobs started (weekly digest Mon 9am + streak nudge 6pm + trial expiry midnight WAT)');
 }
 
 module.exports = {

@@ -253,7 +253,7 @@ export default function SubjectPage() {
             onClick={() => setModalMode('resources')}
             className="flex items-center gap-2 border border-gray-200 text-gray-700 text-sm font-medium px-5 py-2.5 rounded-full hover:bg-gray-50 transition-colors"
           >
-            <span className="text-base">📄</span> Resources
+            <span className="text-base"></span> Resources
             <ArrowRight size={14} className="text-gray-400" />
           </button>
 
@@ -262,8 +262,8 @@ export default function SubjectPage() {
             onClick={() => setModalMode('practice')}
             className="flex items-center gap-2 border border-gray-200 text-gray-700 text-sm font-medium px-5 py-2.5 rounded-full hover:bg-gray-50 transition-colors relative"
           >
-            <span className="text-base">🎯</span> Practice Questions
-            <span className="bg-teal-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">AI ✦</span>
+            <span className="text-base"></span> Practice Questions
+            <span className="bg-teal-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">AI </span>
             <ArrowRight size={14} className="text-gray-400" />
           </button>
 
@@ -272,8 +272,8 @@ export default function SubjectPage() {
             onClick={() => setModalMode('quiz')}
             className="flex items-center gap-2 border border-gray-200 text-gray-700 text-sm font-medium px-5 py-2.5 rounded-full hover:bg-gray-50 transition-colors relative"
           >
-            <span className="text-base">📝</span> Quiz
-            <span className="bg-teal-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">AI ✦</span>
+            <span className="text-base"></span> Quiz
+            <span className="bg-teal-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">AI </span>
             <ArrowRight size={14} className="text-gray-400" />
           </button>
         </div>

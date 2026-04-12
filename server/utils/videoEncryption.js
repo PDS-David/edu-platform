@@ -127,7 +127,7 @@ function encryptVideo({ inputPath, videoId, serverBaseUrl }) {
         // Relative URL for database storage
         const playlistUrl = `/uploads/videos/hls/${videoId}/master.m3u8`;
 
-        console.log(`[VideoEncryption] ✅ Video ${videoId} encrypted. ${segments.length} segments.`);
+        console.log(`[VideoEncryption]  Video ${videoId} encrypted. ${segments.length} segments.`);
 
         resolve({
           playlistUrl,
@@ -137,7 +137,7 @@ function encryptVideo({ inputPath, videoId, serverBaseUrl }) {
         });
       })
       .on('error', (err) => {
-        console.error(`[VideoEncryption] ❌ FFmpeg error for video ${videoId}:`, err.message);
+        console.error(`[VideoEncryption]  FFmpeg error for video ${videoId}:`, err.message);
         reject(new Error(`FFmpeg encryption failed: ${err.message}`));
       })
       .run();

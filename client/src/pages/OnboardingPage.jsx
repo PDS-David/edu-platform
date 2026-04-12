@@ -28,9 +28,9 @@ const GOALS = [
 const DAYS  = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 const TIMES = [
-  { value: 'morning',   label: 'Morning',   note: '6am – 10am',  emoji: '🌅' },
-  { value: 'afternoon', label: 'Afternoon', note: '12pm – 4pm',  emoji: '☀️' },
-  { value: 'evening',   label: 'Evening',   note: '6pm – 10pm',  emoji: '🌙', featured: true },
+  { value: 'morning',   label: 'Morning',   note: '6am – 10am',  emoji: '' },
+  { value: 'afternoon', label: 'Afternoon', note: '12pm – 4pm',  emoji: '' },
+  { value: 'evening',   label: 'Evening',   note: '6pm – 10pm',  emoji: '', featured: true },
 ];
 
 const extractList = (r) => {
@@ -198,7 +198,7 @@ export default function OnboardingPage() {
                                    'border-gray-200 hover:border-teal-300'
                         }`}
                       >
-                        <span className="text-lg">{s.icon_emoji || '📚'}</span>
+                        <span className="text-lg">{s.icon_emoji || ''}</span>
                         <p className={`text-xs font-semibold ${sel ? 'text-teal-700' : 'text-gray-700'}`}>
                           {s.name}
                         </p>
@@ -323,7 +323,7 @@ export default function OnboardingPage() {
               >
                 {saving
                   ? <><Loader2 size={13} className="animate-spin" /> Saving…</>
-                  : <>Let's go! 🚀</>
+                  : <>Let's go! </>
                 }
               </button>
             )}

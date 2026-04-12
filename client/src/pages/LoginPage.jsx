@@ -70,7 +70,7 @@ const LoginPage = () => {
               style={{ background: 'radial-gradient(circle, #a78bfa, transparent)', transform: 'translate(-30%, 30%)' }} />
 
             <h1 className="text-3xl xl:text-4xl font-bold text-white leading-tight mb-4 relative z-10">
-              Welcome Back! 👋
+              Welcome Back! 
             </h1>
             <p className="text-gray-300 text-sm xl:text-base max-w-xs leading-relaxed relative z-10 mb-6">
               Sign in to continue your exam preparation journey. Your progress and study data are waiting for you.

@@ -362,10 +362,10 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
 function EndScreen({ score, total, subjectName, onRetry, onBack }) {
   const pct   = Math.round((score / total) * 100);
   const grade =
-    pct >= 80 ? { label: 'Excellent!',  color: 'text-green-600',  ring: 'border-green-300',  emoji: '🏆' } :
-    pct >= 60 ? { label: 'Good Job!',   color: 'text-blue-600',   ring: 'border-blue-300',   emoji: '👍' } :
-    pct >= 40 ? { label: 'Keep Going!', color: 'text-yellow-600', ring: 'border-yellow-300', emoji: '💪' } :
-                { label: 'Keep Trying', color: 'text-red-600',    ring: 'border-red-300',    emoji: '📚' };
+    pct >= 80 ? { label: 'Excellent!',  color: 'text-green-600',  ring: 'border-green-300',  emoji: '' } :
+    pct >= 60 ? { label: 'Good Job!',   color: 'text-blue-600',   ring: 'border-blue-300',   emoji: '' } :
+    pct >= 40 ? { label: 'Keep Going!', color: 'text-yellow-600', ring: 'border-yellow-300', emoji: '' } :
+                { label: 'Keep Trying', color: 'text-red-600',    ring: 'border-red-300',    emoji: '' };
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
@@ -493,7 +493,7 @@ export default function PracticeMode() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center max-w-sm w-full">
-          <div className="text-4xl mb-3">😔</div>
+          <div className="text-4xl mb-3"></div>
           <p className="text-gray-600 mb-6 text-sm">{errMsg}</p>
           <div className="flex gap-3">
             <button
@@ -520,7 +520,7 @@ export default function PracticeMode() {
         {/* Remediation banner — shown when launched from weakness analysis */}
         {isRemediation && (
           <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-center gap-2.5">
-            <span className="text-base">🎯</span>
+            <span className="text-base"></span>
             <div>
               <span className="text-xs font-bold text-amber-800">Targeted follow-up</span>
               {conceptName && (

@@ -5,9 +5,9 @@ const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImE3Zjg5YjRlLWQzZjIt
 
 try {
   const decoded = jwt.verify(token, process.env.JWT_SECRET);
-  console.log("VALID TOKEN ✅");
+  console.log("VALID TOKEN ");
   console.log(decoded);
 } catch (err) {
-  console.error("INVALID TOKEN ❌");
+  console.error("INVALID TOKEN ");
   console.error(err.message);
 }

@@ -95,8 +95,8 @@ export const AuthProvider = ({ children }) => {
         remember_me: rememberMe,
       });
 
-      const token          = response.token;        // ✅ top-level
-      const user           = response.data?.user;   // ✅ nested under data
+      const token          = response.token;        //  top-level
+      const user           = response.data?.user;   //  nested under data
       const normalizedUser = normalizeUser(user);
 
       if (!token || token === 'undefined') {
@@ -127,8 +127,8 @@ export const AuthProvider = ({ children }) => {
       //   { success: true, token: '...', data: { user: {...} } }
       const response = await authAPI.register(userData);
 
-      const token          = response.token;        // ✅ top-level
-      const user           = response.data?.user;   // ✅ nested under data
+      const token          = response.token;        //  top-level
+      const user           = response.data?.user;   //  nested under data
       const normalizedUser = normalizeUser(user);
 
       if (!token || token === 'undefined') {

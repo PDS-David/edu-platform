@@ -64,10 +64,10 @@ const CatalogPanel = () => {
 
   const [typeForm, setTypeForm] = useState({
     code: '', name: '', full_name: '', description: '',
-    country: 'Nigeria', icon_emoji: '📚', display_order: '',
+    country: 'Nigeria', icon_emoji: '', display_order: '',
   });
   const [subjectForm, setSubjectForm] = useState({
-    name: '', code: '', description: '', icon_emoji: '📖',
+    name: '', code: '', description: '', icon_emoji: '',
     color: '#16A34A', category: 'General', level: '',
   });
 
@@ -118,7 +118,7 @@ const CatalogPanel = () => {
 
   const openAddType = () => {
     setEditingType(null);
-    setTypeForm({ code: '', name: '', full_name: '', description: '', country: 'Nigeria', icon_emoji: '📚', display_order: '' });
+    setTypeForm({ code: '', name: '', full_name: '', description: '', country: 'Nigeria', icon_emoji: '', display_order: '' });
     setShowTypeModal(true);
   };
 
@@ -130,7 +130,7 @@ const CatalogPanel = () => {
       full_name:     type.full_name     || '',
       description:   type.description   || '',
       country:       type.country       || 'Nigeria',
-      icon_emoji:    type.icon_emoji    || '📚',
+      icon_emoji:    type.icon_emoji    || '',
       display_order: type.display_order || '',
     });
     setShowTypeModal(true);
@@ -139,7 +139,7 @@ const CatalogPanel = () => {
   const openAddSubject = (typeId) => {
     setEditingSubject(null);
     setActiveTypeId(typeId);
-    setSubjectForm({ name: '', code: '', description: '', icon_emoji: '📖', color: '#16A34A', category: 'General', level: '' });
+    setSubjectForm({ name: '', code: '', description: '', icon_emoji: '', color: '#16A34A', category: 'General', level: '' });
     setShowSubjectModal(true);
   };
 
@@ -150,7 +150,7 @@ const CatalogPanel = () => {
       name:        subject.name        || '',
       code:        subject.code        || '',
       description: subject.description || '',
-      icon_emoji:  subject.icon_emoji  || '📖',
+      icon_emoji:  subject.icon_emoji  || '',
       color:       subject.color       || '#16A34A',
       category:    subject.category    || 'General',
       level:       subject.level       || '',
@@ -273,7 +273,7 @@ const CatalogPanel = () => {
                   ? <ChevronDown size={18} className="text-gray-400 shrink-0" />
                   : <ChevronRight size={18} className="text-gray-400 shrink-0" />
                 }
-                <span className="text-2xl leading-none">{type.icon_emoji || '📚'}</span>
+                <span className="text-2xl leading-none">{type.icon_emoji || ''}</span>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-bold text-gray-900">{type.name}</span>
@@ -348,7 +348,7 @@ const CatalogPanel = () => {
                           className="w-8 h-8 rounded-lg flex items-center justify-center text-base shrink-0"
                           style={{ backgroundColor: (subject.color || '#16A34A') + '20' }}
                         >
-                          {subject.icon_emoji || '📚'}
+                          {subject.icon_emoji || ''}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
@@ -415,7 +415,7 @@ const CatalogPanel = () => {
                   type="text"
                   value={typeForm.icon_emoji}
                   onChange={(e) => setTypeForm(f => ({ ...f, icon_emoji: e.target.value }))}
-                  placeholder="📚"
+                  placeholder=""
                   className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
               </div>
@@ -544,7 +544,7 @@ const CatalogPanel = () => {
                   type="text"
                   value={subjectForm.icon_emoji}
                   onChange={(e) => setSubjectForm(f => ({ ...f, icon_emoji: e.target.value }))}
-                  placeholder="📖"
+                  placeholder=""
                   className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
               </div>
@@ -672,7 +672,7 @@ const TeacherAssignmentPanel = () => {
       ]);
       if (aRes?.success) setAssignments(aRes.data || []);
       if (tRes?.data)    setTeachers(tRes.data    || []);
-    } catch { showToast('Failed to load data', 'error'); }
+    } catch (err) { console.warn('[TeacherAssignment] load failed:', err?.error); }
     finally  { setLoading(false); }
   };
 
@@ -885,7 +885,7 @@ const TeacherAssignmentPanel = () => {
                     ? <option disabled>Loading…</option>
                     : examTypes.filter(et => et.is_active !== false).map(et => (
                         <option key={et.id} value={et.id}>
-                          {et.icon_emoji || '📚'} {et.name} ({et.code})
+                          {et.icon_emoji || ''} {et.name} ({et.code})
                         </option>
                       ))
                   }
@@ -942,7 +942,7 @@ const TeacherAssignmentPanel = () => {
                               : 'border-transparent hover:border-purple-200 hover:bg-gray-50'
                           }`}
                         >
-                          <span className="text-base">{s.icon_emoji || '📚'}</span>
+                          <span className="text-base">{s.icon_emoji || ''}</span>
                           <span className={`flex-1 text-sm font-medium ${selected ? 'text-purple-800' : 'text-gray-800'}`}>
                             {s.name}
                           </span>
@@ -1089,7 +1089,7 @@ const AIGeneratePanel = () => {
                     .filter(et => et.is_active !== false)
                     .map(et => (
                       <option key={et.code} value={et.code}>
-                        {et.icon_emoji || '📚'} {et.name}
+                        {et.icon_emoji || ''} {et.name}
                       </option>
                     ))
               }
@@ -1144,7 +1144,7 @@ const AIGeneratePanel = () => {
               Generated Questions Preview ({previewQuestions.length})
             </p>
             <span className="text-[10px] font-bold bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full">
-              ✦ AI • Pending Review
+               AI • Pending Review
             </span>
           </div>
           <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
@@ -1209,8 +1209,10 @@ const UserManagementPanel = () => {
       });
       setUsers(r.data || []);
       setTotal(r.total || 0);
-    } catch {
-      showToast('Failed to load users', 'error');
+    } catch (err) {
+      // Silent retry — don't show intrusive toast for background load failures
+      console.warn('[UserManagement] fetch failed:', err?.error || err?.message);
+      setUsers([]);
     } finally {
       setLoading(false);
     }
@@ -1348,7 +1350,7 @@ const UserManagementPanel = () => {
                   <td className="px-4 py-3">
                     <span className={subBadge(u.subscription_status)}>{u.subscription_status || 'free'}</span>
                   </td>
-                  <td className="px-4 py-3 hidden sm:table-cell text-gray-400 text-xs">{fmtDate(u.last_login)}</td>
+                  <td className="px-4 py-3 hidden sm:table-cell text-gray-400 text-xs">{u.last_login ? fmtDate(u.last_login) : <span className="text-gray-300">—</span>}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <select

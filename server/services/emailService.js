@@ -57,9 +57,9 @@ async function send(to, subject, html) {
 
 async function sendWelcomeEmail(user) {
   const name = user.first_name || user.firstName || 'Student';
-  await send(user.email, 'Welcome to AISchoolonair! 🎓', `
+  await send(user.email, 'Welcome to AISchoolonair! ', `
     <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px">
-      <h1 style="color:#0a4a3f;font-size:24px;margin-bottom:8px">Welcome to AISchoolonair, ${name}! 🎓</h1>
+      <h1 style="color:#0a4a3f;font-size:24px;margin-bottom:8px">Welcome to AISchoolonair, ${name}! </h1>
       <p style="color:#555;line-height:1.6">
         You now have access to <strong>5 free practice questions per day</strong> across
         JAMB, WAEC and NECO subjects. Each question comes with instant AI feedback so
@@ -92,7 +92,7 @@ async function sendWeeklyDigest(user, stats) {
     ? `${APP_URL}/student/subtopic/${weakest_subtopic_id}?tab=practice`
     : `${APP_URL}/student/dashboard`;
 
-  await send(user.email, `${name}, here's your AISchoolonair week in review 📊`, `
+  await send(user.email, `${name}, here's your AISchoolonair week in review `, `
     <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px">
       <h1 style="color:#0a4a3f;font-size:20px;margin-bottom:4px">Your week in review, ${name}</h1>
       <p style="color:#888;font-size:13px;margin-bottom:20px">Here's how you did this week</p>
@@ -107,7 +107,7 @@ async function sendWeeklyDigest(user, stats) {
         </div>
         <div style="background:#fdf2f8;border-radius:12px;padding:14px">
           <p style="color:#888;font-size:11px;margin:0 0 4px">Study streak</p>
-          <p style="color:#701a75;font-weight:700;font-size:16px;margin:0">${streak} days 🔥</p>
+          <p style="color:#701a75;font-weight:700;font-size:16px;margin:0">${streak} days </p>
         </div>
         <div style="background:#fef2f2;border-radius:12px;padding:14px">
           <p style="color:#888;font-size:11px;margin:0 0 4px">Needs work</p>
@@ -128,9 +128,9 @@ async function sendWeeklyDigest(user, stats) {
 
 async function sendStreakNudge(user, daysSince) {
   const name = user.first_name || 'Student';
-  await send(user.email, `${name}, your study streak is at risk! ⚡`, `
+  await send(user.email, `${name}, your study streak is at risk! `, `
     <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px;text-align:center">
-      <div style="font-size:48px;margin-bottom:12px">⚡</div>
+      <div style="font-size:48px;margin-bottom:12px"></div>
       <h1 style="color:#0a4a3f;font-size:20px">Don't break your streak, ${name}!</h1>
       <p style="color:#555;line-height:1.6">
         You haven't practised in <strong>${daysSince} days</strong>.
@@ -152,9 +152,9 @@ async function sendPaymentConfirmation(user, plan, endDate) {
     ? endDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })
     : String(endDate);
 
-  await send(user.email, `Payment confirmed — ${planName} activated ✅`, `
+  await send(user.email, `Payment confirmed — ${planName} activated `, `
     <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px">
-      <h1 style="color:#0a4a3f;font-size:20px;margin-bottom:4px">Payment confirmed, ${name}! ✅</h1>
+      <h1 style="color:#0a4a3f;font-size:20px;margin-bottom:4px">Payment confirmed, ${name}! </h1>
       <p style="color:#555;line-height:1.6">
         Your <strong>${planName}</strong> is now active. You have unlimited access to all
         practice questions, AI explanations, and quiz features until <strong>${expiry}</strong>.
@@ -227,7 +227,7 @@ async function sendPaymentReceipt({ email, firstName, planName, amount, referenc
 async function sendVerificationEmail({ email, first_name, token }) {
   const name = first_name || 'Student';
   const link = `${APP_URL}/verify-email?token=${token}`;
-  await send(email, 'Verify your AISchoolonair email address ✉️', `
+  await send(email, 'Verify your AISchoolonair email address ', `
     <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px">
       <h1 style="color:#0a4a3f;font-size:22px;margin-bottom:8px">Hi ${name}, please verify your email</h1>
       <p style="color:#555;line-height:1.6">
@@ -248,7 +248,7 @@ async function sendVerificationEmail({ email, first_name, token }) {
 async function sendPasswordResetEmail({ email, first_name, token }) {
   const name = first_name || 'Student';
   const link = `${APP_URL}/reset-password?token=${token}`;
-  await send(email, 'Reset your AISchoolonair password 🔒', `
+  await send(email, 'Reset your AISchoolonair password ', `
     <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px">
       <h1 style="color:#0a4a3f;font-size:22px;margin-bottom:8px">Password reset request</h1>
       <p style="color:#555;line-height:1.6">

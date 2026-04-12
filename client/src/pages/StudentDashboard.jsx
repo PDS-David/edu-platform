@@ -1,7 +1,7 @@
 // client/src/pages/StudentDashboard.jsx
 // AI Buddy-style student dashboard:
 // - Top nav (TopNav component)
-// - "Hi, [Name] 🐝" header
+// - "Hi, [Name] " header
 // - Curriculum dropdown (all exam boards from DB)
 // - Resources tab + My Performance tab
 // - No left sidebar
@@ -27,23 +27,23 @@ import api from '../services/api';
 
 // ─── Subject icon map ─────────────────────────────────────────────────────────
 const SUBJECT_ICONS = {
-  'Biology':          { icon: '🧬', bg: '#DCFCE7', color: '#16A34A' },
-  'Chemistry':        { icon: '⚗️',  bg: '#FEF9C3', color: '#CA8A04' },
-  'Physics':          { icon: '⚡',  bg: '#DBEAFE', color: '#2563EB' },
-  'Mathematics':      { icon: '📐',  bg: '#EDE9FE', color: '#7C3AED' },
-  'English Language': { icon: '✍️',  bg: '#FCE7F3', color: '#DB2777' },
-  'English':          { icon: '✍️',  bg: '#FCE7F3', color: '#DB2777' },
-  'Economics':        { icon: '📈',  bg: '#FFEDD5', color: '#EA580C' },
-  'Business Studies': { icon: '💼',  bg: '#FEF3C7', color: '#D97706' },
-  'Computer Science': { icon: '💻',  bg: '#CFFAFE', color: '#0891B2' },
-  'Geography':        { icon: '🌍',  bg: '#D1FAE5', color: '#059669' },
-  'History':          { icon: '📜',  bg: '#FEE2E2', color: '#DC2626' },
-  'Government':       { icon: '🏛️',  bg: '#E0E7FF', color: '#4338CA' },
-  'Literature':       { icon: '📚',  bg: '#FDF2F8', color: '#9333EA' },
-  'Accounting':       { icon: '🧾',  bg: '#ECFDF5', color: '#10B981' },
-  'Agriculture':      { icon: '🌾',  bg: '#FEF9C3', color: '#65A30D' },
-  'French':           { icon: '🇫🇷',  bg: '#EFF6FF', color: '#3B82F6' },
-  'default':          { icon: '📖',  bg: '#EFF6FF', color: '#14B8A6' },
+  'Biology':          { icon: '', bg: '#DCFCE7', color: '#16A34A' },
+  'Chemistry':        { icon: '',  bg: '#FEF9C3', color: '#CA8A04' },
+  'Physics':          { icon: '',  bg: '#DBEAFE', color: '#2563EB' },
+  'Mathematics':      { icon: '',  bg: '#EDE9FE', color: '#7C3AED' },
+  'English Language': { icon: '',  bg: '#FCE7F3', color: '#DB2777' },
+  'English':          { icon: '',  bg: '#FCE7F3', color: '#DB2777' },
+  'Economics':        { icon: '',  bg: '#FFEDD5', color: '#EA580C' },
+  'Business Studies': { icon: '',  bg: '#FEF3C7', color: '#D97706' },
+  'Computer Science': { icon: '',  bg: '#CFFAFE', color: '#0891B2' },
+  'Geography':        { icon: '',  bg: '#D1FAE5', color: '#059669' },
+  'History':          { icon: '',  bg: '#FEE2E2', color: '#DC2626' },
+  'Government':       { icon: '',  bg: '#E0E7FF', color: '#4338CA' },
+  'Literature':       { icon: '',  bg: '#FDF2F8', color: '#9333EA' },
+  'Accounting':       { icon: '',  bg: '#ECFDF5', color: '#10B981' },
+  'Agriculture':      { icon: '',  bg: '#FEF9C3', color: '#65A30D' },
+  'French':           { icon: '',  bg: '#EFF6FF', color: '#3B82F6' },
+  'default':          { icon: '',  bg: '#EFF6FF', color: '#14B8A6' },
 };
 
 const getSubjectIcon = (name) => {
@@ -362,8 +362,8 @@ export default function StudentDashboard() {
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Hi, {firstName} 🐝</h1>
-            <p className="text-sm text-gray-400 mt-0.5">Welcome back! Let's make progress together today. 🚀</p>
+            <h1 className="text-xl font-bold text-gray-900">Hi, {firstName} </h1>
+            <p className="text-sm text-gray-400 mt-0.5">Welcome back! Let's make progress together today. </p>
           </div>
 
           {/* Curriculum dropdown — shows all boards from DB */}
@@ -372,7 +372,7 @@ export default function StudentDashboard() {
               onClick={() => setBoardDropOpen(o => !o)}
               className="flex items-center gap-2 bg-gray-900 text-white text-xs font-semibold px-3 py-2 rounded-lg hover:bg-gray-800 transition-colors"
             >
-              {selectedBoard?.icon_emoji || '📘'} {selectedBoard?.name || 'Select Curriculum'}
+              {selectedBoard?.icon_emoji || ''} {selectedBoard?.name || 'Select Curriculum'}
               <ChevronDown size={13} />
             </button>
             {boardDropOpen && (
@@ -383,7 +383,7 @@ export default function StudentDashboard() {
                     onClick={() => { setSelectedBoard(b); setBoardDropOpen(false); }}
                     className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 flex items-center gap-2 ${selectedBoard?.id === b.id ? 'font-semibold text-teal-600' : 'text-gray-700'}`}
                   >
-                    <span>{b.icon_emoji || '📘'}</span> {b.name}
+                    <span>{b.icon_emoji || ''}</span> {b.name}
                   </button>
                 ))}
               </div>
@@ -447,7 +447,7 @@ export default function StudentDashboard() {
                 </>
               ) : (
                 <div className="bg-white rounded-2xl border border-gray-100 p-6 text-center shadow-sm">
-                  <div className="text-3xl mb-2">📚</div>
+                  <div className="text-3xl mb-2"></div>
                   <p className="text-sm text-gray-500">No subjects available yet.</p>
                   <p className="text-xs text-gray-400 mt-1">Select a curriculum above to get started.</p>
                 </div>
@@ -590,7 +590,7 @@ export default function StudentDashboard() {
                       onClick={() => { setSelectedPerfSub(s); setPerfDropOpen(false); }}
                       className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 flex items-center gap-2 ${selectedPerfSub?.id === s.id ? 'font-semibold text-teal-600' : 'text-gray-700'}`}
                     >
-                      <span>{s.icon_emoji || '📚'}</span> {s.name}
+                      <span>{s.icon_emoji || ''}</span> {s.name}
                     </button>
                   ))}
                 </div>
@@ -633,7 +633,7 @@ export default function StudentDashboard() {
                     <span className="w-3 h-3 rounded-sm bg-green-500 shrink-0" />
                     <h3 className="text-sm font-bold text-gray-800">Area of Strength</h3>
                     <span className="ml-auto text-[10px] text-gray-400">(Based on quizzes)</span>
-                    <span className="text-2xl">⭐</span>
+                    <span className="text-2xl"></span>
                   </div>
                   <PerfTable
                     rows={strengthRows}
@@ -647,7 +647,7 @@ export default function StudentDashboard() {
                     <span className="w-3 h-3 rounded-sm bg-red-400 shrink-0" />
                     <h3 className="text-sm font-bold text-gray-800">Area of Weakness</h3>
                     <span className="ml-auto text-[10px] text-gray-400">(Based on quizzes)</span>
-                    <span className="text-2xl">🦉</span>
+                    <span className="text-2xl"></span>
                   </div>
                   <PerfTable
                     rows={weaknessRows}

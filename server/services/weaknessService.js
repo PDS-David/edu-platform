@@ -85,7 +85,7 @@ async function updateLearningGaps(studentId, weaknesses) {
 }
 
 /**
- * 🔥 NEW: Concept-level weakness (for question engine)
+ *  NEW: Concept-level weakness (for question engine)
  */
 async function getWeakConcepts(student_id, subtopic_id, limit = 5) {
   const result = await sequelize.query(
@@ -109,7 +109,7 @@ async function getWeakConcepts(student_id, subtopic_id, limit = 5) {
 }
 
 /**
- * 🔥 NEW: Split weak vs strong
+ *  NEW: Split weak vs strong
  */
 function splitConceptsByWeakness(concepts, weakConcepts) {
   const weakIds = new Set(weakConcepts.map(c => c.id));
