@@ -3,7 +3,7 @@ const { DataTypes } = require('sequelize');
 module.exports = (sequelize) => {
   const AiChatSession = sequelize.define('AiChatSession', {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-    studentId: { type: DataTypes.INTEGER, allowNull: false, field: 'student_id' },
+    studentId: { type: DataTypes.UUID, allowNull: false, field: 'student_id' },
     title: { type: DataTypes.STRING },
     isActive: { type: DataTypes.BOOLEAN, defaultValue: true, field: 'is_active' },
     metadata: { type: DataTypes.JSONB },

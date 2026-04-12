@@ -3,7 +3,7 @@ const { DataTypes } = require('sequelize');
 module.exports = (sequelize) => {
   const Note = sequelize.define('Note', {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-    userId: { type: DataTypes.INTEGER, allowNull: false, field: 'user_id' },
+    userId: { type: DataTypes.UUID, allowNull: false, field: 'user_id' },
     subtopicId: { type: DataTypes.INTEGER, field: 'subtopic_id' },
     title: { type: DataTypes.STRING },
     content: { type: DataTypes.TEXT, allowNull: false },

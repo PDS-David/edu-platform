@@ -3,7 +3,7 @@ const { DataTypes } = require('sequelize');
 module.exports = (sequelize) => {
   const PracticeAttempt = sequelize.define('PracticeAttempt', {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-    studentId: { type: DataTypes.INTEGER, allowNull: false, field: 'student_id' },
+    studentId: { type: DataTypes.UUID, allowNull: false, field: 'student_id' },
     questionId: { type: DataTypes.INTEGER, allowNull: false, field: 'question_id' },
     attemptedAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW, field: 'attempted_at' },
     isCorrect: { type: DataTypes.BOOLEAN, field: 'is_correct' },

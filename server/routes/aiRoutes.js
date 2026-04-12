@@ -269,4 +269,44 @@ Total length: under 300 words. Plain text only — no markdown, no headers with 
   }
 });
 
+// ── POST /api/ai/mark-image ───────────────────────────────────────────────────
+router.post('/mark-image', protect, async (req, res) => {
+  const { image_base64, question_text, max_marks = 10 } = req.body;
+  if (!image_base64) return res.status(400).json({ success: false, error: 'image_base64 is required' });
+
+  if (!process.env.GEMINI_API_KEY) {
+    return res.status(503).json({ success: false, error: 'AI marking not configured' });
+  }
+
+  try {
+    const { GoogleGenerativeAI } = require('@google/generative-ai');
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || 'gemini-2.0-flash' });
+
+    const prompt = `You are a Nigerian exam marker. Mark this student's handwritten answer.
+Question: "${question_text || 'Not specified'}"
+Maximum marks: ${max_marks}
+Award marks fairly. Return ONLY valid JSON: {"marks_awarded": N, "feedback": "2-3 sentences", "strengths": "what was good", "improvements": "what to improve"}`;
+
+    const result = await model.generateContent([
+      prompt,
+      { inlineData: { mimeType: 'image/jpeg', data: image_base64.replace(/^data:image\/\w+;base64,/, '') } }
+    ]);
+
+    const raw    = result.response.text().replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(raw);
+    return res.json({
+      success:       true,
+      marks_awarded: Math.min(parsed.marks_awarded || 0, max_marks),
+      max_marks,
+      feedback:      parsed.feedback || '',
+      strengths:     parsed.strengths || '',
+      improvements:  parsed.improvements || '',
+    });
+  } catch (err) {
+    console.error('[POST /ai/mark-image]', err.message);
+    return res.status(500).json({ success: false, error: 'Image marking failed: ' + err.message });
+  }
+});
+
 module.exports = router;
