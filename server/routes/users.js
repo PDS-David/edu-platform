@@ -162,7 +162,11 @@ router.put('/:id/deactivate', protect, authorize('admin'), async (req, res) => {
 //         daily_goal: 50, study_days: ['Mon','Tue'], study_time: 'evening' }
 // ─────────────────────────────────────────────────────────────────────────────
 router.patch('/preferences', protect, async (req, res) => {
-  const { exam_boards, subject_ids, daily_goal } = req.body;
+  const { exam_boards, subject_ids, daily_goal,
+          preferred_study_days, preferred_study_time } = req.body;
+  // SettingsPage sends preferred_study_days as a JSON string directly
+  if (preferred_study_days !== undefined) req.body.study_days = JSON.parse(preferred_study_days || '[]');
+  if (preferred_study_time !== undefined) req.body.study_time = preferred_study_time;
   const userId = req.user.id;
 
   try {
@@ -219,7 +223,7 @@ router.patch('/preferences', protect, async (req, res) => {
          WHERE id = :userId`,
         {
           replacements: {
-            days:   req.body.study_days,
+            days:   JSON.stringify(req.body.study_days),
             time:   req.body.study_time || 'evening',
             userId,
           },

@@ -106,19 +106,19 @@ function UploadTab({ showToast }) {
   };
 
   const handleUpload = async () => {
-    if (!file || !form.subject_id || !form.title.trim()) {
-      showToast('Please select a file, subject, and title.', 'error');
+    if (!file || !form.title.trim()) {
+      showToast('Please select a file and enter a title.', 'error');
       return;
     }
     setUploading(true);
     setProgress(0);
 
     const fd = new FormData();
-    fd.append('file',       file);
-    fd.append('subject_id', form.subject_id);
-    fd.append('title',      form.title.trim());
+    fd.append('file',  file);
+    fd.append('title', form.title.trim());
     if (form.topic_id)    fd.append('topic_id',    form.topic_id);
     if (form.subtopic_id) fd.append('subtopic_id', form.subtopic_id);
+    if (form.description) fd.append('description', form.description);
 
     try {
       // Use raw fetch for upload progress (axios doesn't stream progress well here)
@@ -254,7 +254,7 @@ function UploadTab({ showToast }) {
 
       <button
         onClick={handleUpload}
-        disabled={uploading || !file || !form.subject_id || !form.title.trim()}
+        disabled={uploading || !file || !form.title.trim()}
         className="w-full bg-teal-500 hover:bg-teal-600 disabled:opacity-50 text-white font-semibold
           py-3 rounded-xl text-sm transition-colors flex items-center justify-center gap-2"
       >

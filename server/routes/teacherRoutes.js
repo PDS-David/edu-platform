@@ -554,8 +554,8 @@ router.delete('/concepts/:id', protect, teacherOnly, async (req, res) => {
 router.get('/questions', protect, teacherOnly, async (req, res) => {
   try {
     const rows = await sequelize.query(
-      `SELECT q.id, q.question_text, q.status, q.difficulty,
-              q.explanation, q.options, q.created_at,
+      `SELECT q.id, q.question_text, q.difficulty,
+              q.explanation, q.options, q.correct_answer, q.created_at,
               s.name AS subject_name
        FROM questions q
        LEFT JOIN subtopics  st ON st.id = q.subtopic_id
@@ -564,14 +564,48 @@ router.get('/questions', protect, teacherOnly, async (req, res) => {
        WHERE q.submitted_by = :teacherId
        ORDER BY q.created_at DESC
        LIMIT 100`,
-      {
-        replacements: { teacherId: req.user.id },
-        type: QueryTypes.SELECT,
-      }
+      { replacements: { teacherId: req.user.id }, type: QueryTypes.SELECT }
     );
     return res.json({ success: true, data: rows });
   } catch (err) {
-    console.error('[GET /teacher/questions]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/teacher/questions — submit a question (auto-approved)
+router.post('/questions', protect, teacherOnly, async (req, res) => {
+  const { question_text, subtopic_id, difficulty = 'medium', explanation, options } = req.body;
+  if (!question_text?.trim()) return res.status(400).json({ success: false, error: 'question_text is required' });
+  if (!Array.isArray(options) || options.length < 2) return res.status(400).json({ success: false, error: 'At least 2 options required' });
+
+  const correctOption = options.find(o => o.is_correct);
+  if (!correctOption) return res.status(400).json({ success: false, error: 'One option must be marked correct' });
+
+  try {
+    const result = await sequelize.query(
+      `INSERT INTO questions
+         (question_text, subtopic_id, submitted_by, difficulty, explanation,
+          options, correct_answer, type, is_active, created_at, updated_at)
+       VALUES
+         (:question_text, :subtopic_id, :submitted_by, :difficulty, :explanation,
+          :options::jsonb, :correct_answer, 'mcq', true, NOW(), NOW())
+       RETURNING id`,
+      {
+        replacements: {
+          question_text:  question_text.trim(),
+          subtopic_id:    subtopic_id ? parseInt(subtopic_id) : null,
+          submitted_by:   req.user.id,
+          difficulty,
+          explanation:    explanation?.trim() || null,
+          options:        JSON.stringify(options.map(o => ({ option_text: o.option_text || o.text, is_correct: !!o.is_correct }))),
+          correct_answer: correctOption.option_text || correctOption.text,
+        },
+        type: QueryTypes.SELECT,
+      }
+    );
+    return res.status(201).json({ success: true, data: { id: result[0].id }, message: 'Question submitted successfully' });
+  } catch (err) {
+    console.error('[POST /teacher/questions]', err.message);
     return res.status(500).json({ success: false, error: err.message });
   }
 });
