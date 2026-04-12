@@ -122,7 +122,8 @@ function UploadTab({ showToast }) {
 
     try {
       // Use raw fetch for upload progress (axios doesn't stream progress well here)
-      const apiBase = import.meta.env.VITE_API_URL || '/api';
+      const rawBase = import.meta.env.VITE_API_URL || '';
+      const apiBase = rawBase.endsWith('/api') ? rawBase : (rawBase ? `${rawBase}/api` : '/api');
       const token   = localStorage.getItem('token') || sessionStorage.getItem('token') ||
                       document.cookie.match(/token=([^;]+)/)?.[1] || '';
 
@@ -214,7 +215,7 @@ function UploadTab({ showToast }) {
         <select value={form.subject_id} onChange={e => setForm(f => ({ ...f, subject_id: e.target.value }))} className={sel}>
           <option value="">Select subject…</option>
           {subjects.map(s => (
-            <option key={s.id} value={s.id}>{s.icon_emoji} {s.name} {s.exam_board_code ? `(${s.exam_board_code})` : ''}</option>
+            <option key={s.id} value={s.id}>{s.icon_emoji || '📚'} {s.name} {s.exam_board_code ? `(${s.exam_board_code})` : ''}</option>
           ))}
         </select>
       </div>

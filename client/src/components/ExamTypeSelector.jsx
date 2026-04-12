@@ -30,7 +30,8 @@ const ExamTypeSelector = ({
 
   const fetchExamTypes = async () => {
     try {
-      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const _rawBase = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const apiBase = _rawBase.endsWith('/api') ? _rawBase : `${_rawBase}/api`;
       const response = await fetch(`${apiBase}/exam-boards`);
       if (!response.ok) throw new Error(`Server responded with ${response.status}`);
       const json = await response.json();

@@ -39,7 +39,7 @@ const ResetPassword = () => {
     setLoading(true);
     try {
       const res  = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/auth/reset-password`,
+        `${((import.meta.env.VITE_API_URL||'http://localhost:5000').endsWith('/api')?(import.meta.env.VITE_API_URL||'http://localhost:5000'):`${import.meta.env.VITE_API_URL||'http://localhost:5000'}/api`)}/auth/reset-password`,
         {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },

@@ -173,7 +173,7 @@ function ResourcesTab({ subtopicId, subtopic, subtopicName, onComplete }) {
           )}
           {activeRes?.id === res.id && res.resource_type === 'audio' && (
             <audio controls className="w-full mt-2"
-              src={`${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}${res.file_url}`} />
+              src={`${(import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/api$/, '')}${res.file_url}`} />
           )}
         </div>
       ))}

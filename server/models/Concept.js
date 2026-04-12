@@ -11,7 +11,7 @@ module.exports = (sequelize) => {
     imageUrl: { type: DataTypes.STRING, field: 'image_url' },
     orderIndex: { type: DataTypes.INTEGER, defaultValue: 0, field: 'order_index' },
     isActive: { type: DataTypes.BOOLEAN, defaultValue: true, field: 'is_active' },
-    createdBy: { type: DataTypes.INTEGER, field: 'created_by' },
+    createdBy: { type: DataTypes.UUID, field: 'created_by' },
   }, {
     tableName: 'concepts',
     underscored: true,

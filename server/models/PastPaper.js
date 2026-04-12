@@ -12,7 +12,7 @@ module.exports = (sequelize) => {
     markschemeUrl: { type: DataTypes.TEXT, field: 'markscheme_url' },
     isPremium: { type: DataTypes.BOOLEAN, defaultValue: false, field: 'is_premium' },
     isActive: { type: DataTypes.BOOLEAN, defaultValue: true, field: 'is_active' },
-    uploadedBy: { type: DataTypes.INTEGER, field: 'uploaded_by' },
+    uploadedBy: { type: DataTypes.UUID, field: 'uploaded_by' },
   }, {
     tableName: 'past_papers',
     underscored: true,

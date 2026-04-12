@@ -10,7 +10,7 @@ module.exports = (sequelize) => {
     passingScore: { type: DataTypes.INTEGER, defaultValue: 70, field: 'passing_score' },
     isPremium: { type: DataTypes.BOOLEAN, defaultValue: false, field: 'is_premium' },
     isActive: { type: DataTypes.BOOLEAN, defaultValue: true, field: 'is_active' },
-    createdBy: { type: DataTypes.INTEGER, field: 'created_by' },
+    createdBy: { type: DataTypes.UUID, field: 'created_by' },
   }, {
     tableName: 'quizzes',
     underscored: true,

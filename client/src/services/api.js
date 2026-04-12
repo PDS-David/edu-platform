@@ -1,8 +1,13 @@
 import axios from 'axios';
 
 // ── Axios instance ────────────────────────────────────────────────────────────
+// VITE_API_URL may be set as 'https://host.onrender.com' or 'https://host.onrender.com/api'
+// Normalise so baseURL always ends with /api
+const rawBase = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const BASE_URL = rawBase.endsWith('/api') ? rawBase : `${rawBase}/api`;
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  baseURL: BASE_URL,
   headers: { 'Content-Type': 'application/json' },
   timeout: 30000, // 30s — AI endpoints can take longer
 });

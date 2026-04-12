@@ -273,7 +273,7 @@ export default function ContributeQuestion() {
                 >
                   <option value="">Select…</option>
                   {examBoards.map(b => (
-                    <option key={b.id} value={b.id}>{b.icon_emoji} {b.name}</option>
+                    <option key={b.id} value={b.id}>{b.icon_emoji || '📚'} {b.name}</option>
                   ))}
                 </select>
               )}
@@ -289,7 +289,7 @@ export default function ContributeQuestion() {
               >
                 <option value="">Any subject</option>
                 {subjects.map(s => (
-                  <option key={s.id} value={s.id}>{s.icon_emoji} {s.name}</option>
+                  <option key={s.id} value={s.id}>{s.icon_emoji || '📚'} {s.name}</option>
                 ))}
               </select>
             </div>
