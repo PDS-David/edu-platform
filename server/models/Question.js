@@ -4,7 +4,7 @@ module.exports = (sequelize) => {
   const Question = sequelize.define('Question', {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
     subtopicId: { type: DataTypes.INTEGER, field: 'subtopic_id' }, // handoff: questions.subtopic_id
-    submittedBy: { type: DataTypes.INTEGER, field: 'submitted_by' }, // handoff: questions.submitted_by
+    submittedBy: { type: DataTypes.UUID, field: 'submitted_by' }, // handoff: questions.submitted_by
     questionText: { type: DataTypes.TEXT, allowNull: false, field: 'question_text' },
     type: { type: DataTypes.ENUM('mcq', 'true_false', 'short_answer', 'essay'), defaultValue: 'mcq' },
     options: { type: DataTypes.JSONB },
