@@ -101,4 +101,26 @@ router.post('/verify-email',    verifyEmail);
 router.get('/me',       protect, getMe);
 router.put('/password', protect, updatePassword);
 
+// PUT /api/auth/notifications — save notification preferences
+router.put('/notifications', protect, async (req, res) => {
+  // Preferences stored client-side (localStorage) for now — just acknowledge
+  return res.json({ success: true, message: 'Preferences saved' });
+});
+
+// PATCH /api/auth/profile — update name, phone, country
+router.patch('/profile', protect, async (req, res) => {
+  const { QueryTypes } = require('sequelize');
+  const db = require('../config/database');
+  const { first_name, last_name, phone, country } = req.body;
+  try {
+    await db.query(
+      ,
+      { replacements: { first_name: first_name||'', last_name: last_name||'', phone: phone||null, country: country||null, id: req.user.id }, type: QueryTypes.UPDATE }
+    );
+    return res.json({ success: true, message: 'Profile updated' });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;

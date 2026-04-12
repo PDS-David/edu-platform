@@ -126,13 +126,11 @@ Rules:
       const qResult = await sequelize.query(
         `INSERT INTO questions
            (question_text, marks, explanation, options, correct_answer,
-            subtopic_id, submitted_by, status, source,
-            is_ai_generated, ai_generation_source, is_active,
+            subtopic_id, submitted_by, is_active,
             created_at, updated_at)
          VALUES
            (:question_text, :marks, :explanation, :options::jsonb, :correct_answer,
-            :subtopic_id, :submitted_by, 'approved', 'ai_generated',
-            true, 'gemini-2.0-flash', true,
+            :subtopic_id, :submitted_by, true,
             NOW(), NOW())
          RETURNING id`,
         {

@@ -26,17 +26,20 @@ router.post('/join-class', protect, async (req, res) => {
     return res.status(400).json({ success: false, error: 'join_code is required' });
   }
   try {
-    const classes = await sequelize.query(
-      `SELECT id, name FROM classes WHERE UPPER(join_code) = UPPER(:code)`,
-      { replacements: { code: join_code.trim() }, type: QueryTypes.SELECT }
-    );
+    let classes = [];
+    try {
+      classes = await sequelize.query(
+        `SELECT id, name FROM classes WHERE UPPER(join_code) = UPPER(:code)`,
+        { replacements: { code: join_code.trim() }, type: QueryTypes.SELECT }
+      );
+    } catch { return res.status(404).json({ success: false, error: 'Class system not yet active.' }); }
     if (!classes.length) {
       return res.status(404).json({ success: false, error: 'Invalid join code. Please check and try again.' });
     }
     const cls = classes[0];
     await sequelize.query(
-      `INSERT INTO class_memberships (id, class_id, student_id, joined_at)
-       VALUES (gen_random_uuid(), :classId, :studentId, NOW())
+      `INSERT INTO class_memberships (class_id, student_id, joined_at)
+       VALUES (:classId, :studentId, NOW())
        ON CONFLICT (class_id, student_id) DO NOTHING`,
       { replacements: { classId: cls.id, studentId: req.user.id }, type: QueryTypes.INSERT }
     );
@@ -94,7 +97,7 @@ router.get('/performance', protect, async (req, res) => {
         { replacements, type: QueryTypes.SELECT }
       ),
       sequelize.query(
-        `SELECT COALESCE(SUM(time_taken_ms), 0)::BIGINT AS total_ms
+        `SELECT COALESCE(SUM(time_taken_seconds), 0)::BIGINT AS total_ms
          FROM practice_attempts
          WHERE student_id = :studentId
            AND attempted_at > NOW() - INTERVAL '30 days'`,
@@ -102,9 +105,9 @@ router.get('/performance', protect, async (req, res) => {
       ),
     ]);
 
-    const totalMs    = parseInt(studyTime[0]?.total_ms || 0);
-    const perfMins   = Math.floor(totalMs / 60000);
-    const perfSecs   = Math.floor((totalMs % 60000) / 1000);
+    const totalSecs  = parseInt(studyTime[0]?.total_ms || 0);
+    const perfMins   = Math.floor(totalSecs / 60);
+    const perfSecs   = totalSecs % 60;
 
     const strengthRows = subtopicPerf.filter(r => (r.score_avg || 0) >= 60).slice(0, 5);
     const weaknessRows = subtopicPerf.filter(r => (r.score_avg || 100) < 60).slice(0, 5);
@@ -188,11 +191,7 @@ router.get('/test/:testId', protect, async (req, res) => {
     const questions = await sequelize.query(
       `SELECT q.id, q.question_text, q.marks, q.difficulty,
               tq.question_order,
-              COALESCE(
-                (SELECT json_agg(json_build_object('id', ao.id, 'option_text', ao.option_text) ORDER BY ao.id)
-                 FROM answer_options ao WHERE ao.question_id = q.id),
-                q.options
-              ) AS options
+              q.options
        FROM test_questions tq
        JOIN questions q ON q.id = tq.question_id
        WHERE tq.test_id = :testId
@@ -227,36 +226,37 @@ router.post('/test/:testId/submit', protect, async (req, res) => {
   try {
     // Resolve correct options for all questions
     const questionIds = answers.map(a => a.question_id).filter(Boolean);
-    const correctRows = await sequelize.query(
-      `SELECT question_id, id AS option_id FROM answer_options
-       WHERE question_id = ANY(:questionIds) AND is_correct = true`,
+    // Use correct_answer from questions table (JSONB options approach)
+    const questionRows = await sequelize.query(
+      `SELECT id, correct_answer FROM questions WHERE id = ANY(:questionIds::int[])`,
       { replacements: { questionIds }, type: QueryTypes.SELECT }
     );
     const correctMap = {};
-    for (const r of correctRows) {
-      correctMap[r.question_id] = String(r.option_id);
+    for (const r of questionRows) {
+      correctMap[r.id] = String(r.correct_answer || '');
     }
 
     let correct = 0;
     const total  = answers.length;
 
     for (const answer of answers) {
-      const isCorrect = answer.selected_option_id
+      const isCorrect = answer.selected_answer !== undefined
+        ? String(answer.selected_answer).trim().toLowerCase() === (correctMap[answer.question_id] || '').trim().toLowerCase()
+        : answer.selected_option_id
         ? String(answer.selected_option_id) === correctMap[answer.question_id]
         : false;
       if (isCorrect) correct++;
 
       // Record practice attempt
       sequelize.query(
-        `INSERT INTO practice_attempts (id, student_id, question_id, is_correct, time_taken_ms, attempted_at)
-         VALUES (gen_random_uuid(), :studentId, :questionId, :isCorrect, :timeTaken, NOW())
-         ON CONFLICT DO NOTHING`,
+        `INSERT INTO practice_attempts (student_id, question_id, is_correct, time_taken_seconds, attempted_at)
+         VALUES (:studentId, :questionId, :isCorrect, :timeTaken, NOW())`,
         {
           replacements: {
             studentId:  req.user.id,
             questionId: answer.question_id,
             isCorrect:  isCorrect,
-            timeTaken:  answer.time_taken_ms || 0,
+            timeTaken:  Math.round((answer.time_taken_ms || 0) / 1000),
           },
           type: QueryTypes.INSERT,
         }
