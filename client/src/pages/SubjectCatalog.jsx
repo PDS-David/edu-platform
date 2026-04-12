@@ -31,7 +31,8 @@ const SubjectCatalog = () => {
 
     try {
       // FIXED: Use environment variable for API base URL
-      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const _sc = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const API_BASE = _sc.endsWith('/api') ? _sc : `${_sc}/api`;
       const response = await fetch(`${API_BASE}/exam-boards/${selectedBoard}/subjects`);
 
       if (!response.ok) {

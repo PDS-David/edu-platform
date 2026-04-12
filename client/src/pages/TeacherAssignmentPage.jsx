@@ -59,7 +59,8 @@ function AddAssignmentDialog({ teachers, onClose, onSaved }) {
 
   // ── 1. Load exam boards dynamically on mount ───────────────────────────────
   useEffect(() => {
-    const apiBase = import.meta.env.VITE_API_URL || '/api';
+    const _ta = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const apiBase = _ta.endsWith('/api') ? _ta : `${_ta}/api`;
     setLoadingTypes(true);
     fetch(`${apiBase}/exam-boards`)
       .then(r => r.json())
@@ -81,7 +82,8 @@ function AddAssignmentDialog({ teachers, onClose, onSaved }) {
     setExamTypeId(found?.id ?? '');
 
     setLoadingSubj(true);
-    const apiBase = import.meta.env.VITE_API_URL || '/api';
+    const _ta = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const apiBase = _ta.endsWith('/api') ? _ta : `${_ta}/api`;
     fetch(`${apiBase}/exam-boards/${examTypeCode}/subjects`)
       .then(r => r.json())
       .then(json => setSubjects(Array.isArray(json) ? json : (json.data || [])))

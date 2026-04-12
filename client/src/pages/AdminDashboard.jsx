@@ -273,7 +273,7 @@ const CatalogPanel = () => {
                   ? <ChevronDown size={18} className="text-gray-400 shrink-0" />
                   : <ChevronRight size={18} className="text-gray-400 shrink-0" />
                 }
-                <span className="text-2xl leading-none">{type.icon_emoji}</span>
+                <span className="text-2xl leading-none">{type.icon_emoji || '📚'}</span>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-bold text-gray-900">{type.name}</span>

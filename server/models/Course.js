@@ -14,7 +14,7 @@ module.exports = (sequelize) => {
     level: { type: DataTypes.STRING },
     durationHours: { type: DataTypes.DECIMAL(5, 1), field: 'duration_hours' },
     isActive: { type: DataTypes.BOOLEAN, defaultValue: true, field: 'is_active' },
-    createdBy: { type: DataTypes.INTEGER, field: 'created_by' },
+    createdBy: { type: DataTypes.UUID, field: 'created_by' },
   }, {
     tableName: 'courses',
     underscored: true,

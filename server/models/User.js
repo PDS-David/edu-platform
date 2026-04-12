@@ -218,7 +218,3 @@ User.init(
 );
 
 module.exports = User;
-const { DataTypes } = require('sequelize');
-
-module.exports = (sequelize) => {
-  const Video = sequelize.define('Video', {

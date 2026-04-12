@@ -13,7 +13,7 @@ module.exports = (sequelize) => {
     isPremium: { type: DataTypes.BOOLEAN, defaultValue: false, field: 'is_premium' },
     orderIndex: { type: DataTypes.INTEGER, defaultValue: 0, field: 'order_index' },
     isActive: { type: DataTypes.BOOLEAN, defaultValue: true, field: 'is_active' },
-    uploadedBy: { type: DataTypes.INTEGER, field: 'uploaded_by' },
+    uploadedBy: { type: DataTypes.UUID, field: 'uploaded_by' },
     provider: { type: DataTypes.STRING }, // e.g. youtube, vimeo, s3
     externalId: { type: DataTypes.STRING, field: 'external_id' },
   }, {

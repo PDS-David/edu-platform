@@ -57,7 +57,10 @@ function randomToken() {
 // =============================================================================
 exports.register = async (req, res, next) => {
   try {
-    const { email, password, first_name = '', last_name = '', role = 'student' } = req.body;
+    const { email, password, role = 'student' } = req.body;
+    // Accept both camelCase (frontend) and snake_case (API clients)
+    const first_name = (req.body.first_name || req.body.firstName || '').trim();
+    const last_name  = (req.body.last_name  || req.body.lastName  || first_name).trim();
 
     // ── Validation ────────────────────────────────────────────────────────────
     if (!email || !password) {

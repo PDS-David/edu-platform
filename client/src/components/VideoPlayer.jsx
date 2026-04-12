@@ -99,7 +99,7 @@ export default function VideoPlayer({ videoId, onComplete }) {
     if (!videoData || !videoRef.current) return;
 
     const video    = videoRef.current;
-    const streamUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/videos/stream/${videoId}/master.m3u8`;
+    const streamUrl = `${(import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/api$/, '')}/videos/stream/${videoId}/master.m3u8`;
 
     const initHls = () => {
       // Destroy previous instance
