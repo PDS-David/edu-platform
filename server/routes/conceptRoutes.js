@@ -367,7 +367,7 @@ router.get('/:id/questions', protect, async (req, res) => {
   try {
     const questions = await sequelize.query(
       `SELECT
-         q.id, q.question_text, q.question_type, q.question_sub_type,
+         q.id, q.question_text, q.type AS question_type,
          q.difficulty, q.marks, q.topic, q.status, q.subtopic_id,
          qc.weight, qc.id AS mapping_id
        FROM question_concepts qc

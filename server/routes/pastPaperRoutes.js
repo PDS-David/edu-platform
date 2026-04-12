@@ -96,10 +96,9 @@ router.post('/', protect, teacherOrAdmin, upload.single('file'), async (req, res
   const fileUrl = `/uploads/past-papers/${req.file.filename}`;
   try {
     const result = await sequelize.query(
-      `INSERT INTO past_papers
-         (id, subject_id, exam_board, year, paper_type, title, file_url, file_size_bytes, created_by, created_at)
+      `INSERT INTO past_papers (subject_id, exam_board, year, paper_type, title, file_url, file_size_bytes, created_by, created_at)
        VALUES
-         (gen_random_uuid(), :subject_id, :exam_board, :year, :paper_type, :title,
+         (:subject_id, :exam_board, :year, :paper_type, :title,
           :file_url, :file_size_bytes, :created_by, NOW())
        RETURNING id`,
       {

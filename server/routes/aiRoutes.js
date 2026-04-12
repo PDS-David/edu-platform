@@ -66,9 +66,9 @@ router.post('/explain', protect, async (req, res) => {
       `SELECT q.question_text, q.explanation, q.correct_answer,
               ao.option_text AS selected_text,
               ao.is_correct  AS selected_is_correct,
-              (SELECT option_text FROM answer_options WHERE question_id = q.id AND is_correct = true LIMIT 1) AS correct_text
+              q.correct_answer AS correct_text
        FROM questions q
-       LEFT JOIN answer_options ao ON ao.id = :selectedOptionId
+       -- selected option resolved client-side
        WHERE q.id = :questionId`,
       {
         replacements: {
@@ -147,7 +147,7 @@ router.post('/hint', protect, async (req, res) => {
   try {
     const questions = await sequelize.query(
       `SELECT question_text, correct_answer, concept_hint,
-              (SELECT option_text FROM answer_options WHERE question_id = q.id AND is_correct = true LIMIT 1) AS correct_text
+              q.correct_answer AS correct_text
        FROM questions q WHERE q.id = :questionId`,
       { replacements: { questionId: question_id }, type: QueryTypes.SELECT }
     );
@@ -253,7 +253,7 @@ Total length: under 300 words. Plain text only — no markdown, no headers with 
     if (subtopic_id && notes) {
       sequelize.query(
         `INSERT INTO notes (id, student_id, subtopic_id, content_html, created_at, updated_at)
-         VALUES (gen_random_uuid(), :studentId, :subtopicId, :content, NOW(), NOW())
+         VALUES (:studentId, :subtopicId, :content, NOW(), NOW())
          ON CONFLICT (student_id, subtopic_id) DO UPDATE SET content_html = :content, updated_at = NOW()`,
         {
           replacements: { studentId: req.user.id, subtopicId: subtopic_id, content: notes },
