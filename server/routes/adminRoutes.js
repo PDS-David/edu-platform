@@ -624,4 +624,56 @@ router.delete('/users/:id', protect, adminOnly, async (req, res) => {
   }
 });
 
+// ── /admin/teacher-subjects — alias for TeacherAssignmentPage ────────────────
+router.get('/teacher-subjects', protect, adminOnly, async (req, res) => {
+  try {
+    const rows = await sequelize.query(
+      `SELECT ts.id, ts.teacher_id, ts.subject_id, ts.exam_board_id, ts.is_active, ts.assigned_at,
+              u.first_name || ' ' || u.last_name AS teacher_name, u.email,
+              s.name AS subject_name, eb.code AS exam_board_code
+       FROM teacher_subjects ts
+       JOIN users u ON u.id = ts.teacher_id
+       JOIN subjects s ON s.id = ts.subject_id
+       LEFT JOIN exam_boards eb ON eb.id = ts.exam_board_id
+       WHERE ts.is_active = true
+       ORDER BY u.last_name, s.name`,
+      { type: QueryTypes.SELECT }
+    );
+    return res.json({ success: true, count: rows.length, data: rows });
+  } catch (err) {
+    if (err.message.includes('teacher_subjects') || err.message.includes('does not exist')) {
+      return res.json({ success: true, count: 0, data: [] });
+    }
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/teacher-subjects', protect, adminOnly, async (req, res) => {
+  const { teacher_id, subject_id, exam_board_id } = req.body;
+  if (!teacher_id || !subject_id) return res.status(400).json({ success: false, error: 'teacher_id and subject_id required' });
+  try {
+    await sequelize.query(
+      `INSERT INTO teacher_subjects (teacher_id, subject_id, exam_board_id, assigned_by, is_active, assigned_at)
+       VALUES (:teacherId, :subjectId, :examBoardId, :adminId, true, NOW())
+       ON CONFLICT (teacher_id, subject_id) DO UPDATE SET is_active = true, assigned_by = :adminId, assigned_at = NOW()`,
+      { replacements: { teacherId: teacher_id, subjectId: parseInt(subject_id), examBoardId: exam_board_id ? parseInt(exam_board_id) : null, adminId: req.user.id }, type: QueryTypes.INSERT }
+    );
+    return res.json({ success: true, message: 'Teacher assigned to subject' });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.delete('/teacher-subjects/:id', protect, adminOnly, async (req, res) => {
+  try {
+    await sequelize.query(
+      `UPDATE teacher_subjects SET is_active = false WHERE id = :id`,
+      { replacements: { id: parseInt(req.params.id) }, type: QueryTypes.UPDATE }
+    );
+    return res.json({ success: true, message: 'Assignment removed' });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;

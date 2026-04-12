@@ -3,7 +3,7 @@ const { DataTypes } = require('sequelize');
 module.exports = (sequelize) => {
   const SubtopicProgress = sequelize.define('SubtopicProgress', {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-    studentId: { type: DataTypes.INTEGER, allowNull: false, field: 'student_id' },
+    studentId: { type: DataTypes.UUID, allowNull: false, field: 'student_id' },
     subtopicId: { type: DataTypes.INTEGER, allowNull: false, field: 'subtopic_id' },
     resourcesCompleted: { type: DataTypes.BOOLEAN, defaultValue: false, field: 'resources_completed' },
     practiceCompleted: { type: DataTypes.BOOLEAN, defaultValue: false, field: 'practice_completed' },

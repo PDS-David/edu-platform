@@ -155,4 +155,38 @@ router.post('/:id/answer', protect, async (req, res) => {
   }
 });
 
+// ── POST /api/questions/submit — ContributeQuestion page ─────────────────────
+router.post('/submit', protect, async (req, res) => {
+  const { question_text, subtopic_id, difficulty = 'medium', explanation, options, correct_answer } = req.body;
+  if (!question_text?.trim()) return res.status(400).json({ success: false, error: 'question_text is required' });
+  if (!Array.isArray(options) || options.length < 2) return res.status(400).json({ success: false, error: 'At least 2 options required' });
+
+  const correctOpt = options.find(o => o.is_correct);
+  const correctAns = correct_answer || correctOpt?.option_text || correctOpt?.text || '';
+
+  try {
+    const result = await sequelize.query(
+      `INSERT INTO questions (question_text, subtopic_id, submitted_by, difficulty, explanation, options, correct_answer, type, is_active, created_at, updated_at)
+       VALUES (:question_text, :subtopic_id, :submitted_by, :difficulty, :explanation, :options::jsonb, :correct_answer, 'mcq', true, NOW(), NOW())
+       RETURNING id`,
+      {
+        replacements: {
+          question_text:  question_text.trim(),
+          subtopic_id:    subtopic_id ? parseInt(subtopic_id) : null,
+          submitted_by:   req.user.id,
+          difficulty,
+          explanation:    explanation?.trim() || null,
+          options:        JSON.stringify(options.map(o => ({ option_text: o.option_text || o.text || '', is_correct: !!o.is_correct }))),
+          correct_answer: correctAns,
+        },
+        type: QueryTypes.SELECT,
+      }
+    );
+    return res.status(201).json({ success: true, message: 'Question submitted — thank you!', data: { id: result[0].id } });
+  } catch (err) {
+    console.error('[POST /questions/submit]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;

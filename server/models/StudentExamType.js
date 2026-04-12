@@ -3,7 +3,7 @@ const { DataTypes } = require('sequelize');
 module.exports = (sequelize) => {
   const StudentExamType = sequelize.define('StudentExamType', {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-    studentId: { type: DataTypes.INTEGER, allowNull: false, field: 'student_id' },
+    studentId: { type: DataTypes.UUID, allowNull: false, field: 'student_id' },
     examBoardId: { type: DataTypes.INTEGER, allowNull: false, field: 'exam_board_id' },
     isActive: { type: DataTypes.BOOLEAN, defaultValue: true, field: 'is_active' },
   }, {

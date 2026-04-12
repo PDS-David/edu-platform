@@ -3,7 +3,7 @@ const { DataTypes } = require('sequelize');
 module.exports = (sequelize) => {
   const Payment = sequelize.define('Payment', {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-    userId: { type: DataTypes.INTEGER, allowNull: false, field: 'user_id' },
+    userId: { type: DataTypes.UUID, allowNull: false, field: 'user_id' },
     courseId: { type: DataTypes.INTEGER, field: 'course_id' },
     amount: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
     currency: { type: DataTypes.STRING(10), defaultValue: 'GBP' },
