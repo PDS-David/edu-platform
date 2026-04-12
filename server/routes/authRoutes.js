@@ -114,7 +114,13 @@ router.patch('/profile', protect, async (req, res) => {
   const { first_name, last_name, phone, country } = req.body;
   try {
     await db.query(
-      ,
+      `UPDATE users SET
+         first_name = COALESCE(NULLIF(:first_name,''), first_name),
+         last_name  = COALESCE(NULLIF(:last_name,''),  last_name),
+         phone      = COALESCE(:phone, phone),
+         country    = COALESCE(:country, country),
+         updated_at = NOW()
+       WHERE id = :id`,
       { replacements: { first_name: first_name||'', last_name: last_name||'', phone: phone||null, country: country||null, id: req.user.id }, type: QueryTypes.UPDATE }
     );
     return res.json({ success: true, message: 'Profile updated' });

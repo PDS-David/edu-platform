@@ -45,7 +45,7 @@ router.post('/', protect, teacherOrAdmin, async (req, res) => {
   try {
     const result = await sequelize.query(
       `INSERT INTO revision_notes (id, subtopic_id, title, content_html, created_by, created_at, updated_at)
-       VALUES (gen_random_uuid(), :subtopic_id, :title, :content_html, :created_by, NOW(), NOW())
+       VALUES (:subtopic_id, :title, :content_html, :created_by, NOW(), NOW())
        RETURNING id`,
       { replacements: { subtopic_id, title, content_html, created_by: req.user.id }, type: QueryTypes.INSERT }
     );

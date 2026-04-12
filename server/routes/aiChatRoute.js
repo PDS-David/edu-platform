@@ -143,8 +143,8 @@ router.post('/chat', protect, subscriptionGuard, async (req, res) => {
     let sessionId = session_id || null;
     if (!sessionId) {
       const newSession = await sequelize.query(
-        `INSERT INTO ai_chat_sessions (id, student_id, subject_id, subtopic_id)
-         VALUES (gen_random_uuid(), :studentId, :subjectId, :subtopicId)
+        `INSERT INTO ai_chat_sessions (student_id, subject_id, subtopic_id)
+         VALUES (:studentId, :subjectId, :subtopicId)
          RETURNING id`,
         {
           replacements: {
@@ -230,13 +230,13 @@ router.post('/chat', protect, subscriptionGuard, async (req, res) => {
       : result.reply;
 
     await sequelize.query(
-      `INSERT INTO ai_chat_messages (id, session_id, role, content)
-       VALUES (gen_random_uuid(), :sessionId, 'user', :content)`,
+      `INSERT INTO ai_chat_messages (session_id, role, content)
+       VALUES (:sessionId, 'user', :content)`,
       { replacements: { sessionId, content: message }, type: QueryTypes.INSERT }
     );
     await sequelize.query(
-      `INSERT INTO ai_chat_messages (id, session_id, role, content)
-       VALUES (gen_random_uuid(), :sessionId, 'assistant', :content)`,
+      `INSERT INTO ai_chat_messages (session_id, role, content)
+       VALUES (:sessionId, 'assistant', :content)`,
       { replacements: { sessionId, content: assistantContent }, type: QueryTypes.INSERT }
     );
     await sequelize.query(
@@ -340,8 +340,8 @@ router.post('/chat/stream', protect, subscriptionGuard, async (req, res) => {
     let sessionId = session_id || null;
     if (!sessionId) {
       const newSession = await sequelize.query(
-        `INSERT INTO ai_chat_sessions (id, student_id, subject_id, subtopic_id)
-         VALUES (gen_random_uuid(), :studentId, :subjectId, NULL)
+        `INSERT INTO ai_chat_sessions (student_id, subject_id, subtopic_id)
+         VALUES (:studentId, :subjectId, NULL)
          RETURNING id`,
         { replacements: { studentId, subjectId: subject_id || null }, type: QueryTypes.SELECT }
       );
@@ -378,13 +378,13 @@ router.post('/chat/stream', protect, subscriptionGuard, async (req, res) => {
 
     // Persist messages
     await sequelize.query(
-      `INSERT INTO ai_chat_messages (id, session_id, role, content)
-       VALUES (gen_random_uuid(), :sessionId, 'user', :content)`,
+      `INSERT INTO ai_chat_messages (session_id, role, content)
+       VALUES (:sessionId, 'user', :content)`,
       { replacements: { sessionId, content: message }, type: QueryTypes.INSERT }
     );
     await sequelize.query(
-      `INSERT INTO ai_chat_messages (id, session_id, role, content)
-       VALUES (gen_random_uuid(), :sessionId, 'assistant', :content)`,
+      `INSERT INTO ai_chat_messages (session_id, role, content)
+       VALUES (:sessionId, 'assistant', :content)`,
       { replacements: { sessionId, content: fullReply.slice(0, 5000) }, type: QueryTypes.INSERT }
     );
     await sequelize.query(
