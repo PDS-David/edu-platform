@@ -34,7 +34,7 @@ if (process.env.NODE_ENV === 'production') {
 
   const missing = required.filter((key) => !process.env[key]);
   if (missing.length > 0) {
-    console.error(`❌ Missing required environment variables: ${missing.join(', ')}`);
+    console.error(` Missing required environment variables: ${missing.join(', ')}`);
     process.exit(1);
   }
 })();
@@ -47,9 +47,9 @@ app.set('trust proxy', 1);
 const clientDist = path.join(__dirname, '..', 'client', 'dist');
 if (fs.existsSync(clientDist)) {
   app.use(express.static(clientDist));
-  console.log('✅ Serving React frontend from client/dist');
+  console.log(' Serving React frontend from client/dist');
 } else {
-  console.log('ℹ️  client/dist not found — expecting separate frontend service (Render Static Site)');
+  console.log('ℹ  client/dist not found — expecting separate frontend service (Render Static Site)');
 }
 
 // ── CORE MIDDLEWARE ───────────────────────────────────────────────────────────
@@ -139,13 +139,13 @@ try {
 async function initDatabase() {
   try {
     await db.authenticate();
-    logger.info('✅ DB connected');
+    logger.info(' DB connected');
     // Schema is managed entirely via manual migration files (migration_001–004).
     // db.sync is intentionally disabled — it conflicts with UUID columns
     // and causes crash loops on Render.
-    logger.info('✅ DB ready (schema managed via migrations)');
+    logger.info(' DB ready (schema managed via migrations)');
   } catch (err) {
-    logger.error('❌ DB connection failed', { error: err.message });
+    logger.error(' DB connection failed', { error: err.message });
     process.exit(1);
   }
 }
@@ -263,8 +263,8 @@ app.use((err, _req, res, _next) => {
 // ── START SERVER ──────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🌐 Local:  http://localhost:${PORT}`);
+  console.log(` Server running on port ${PORT}`);
+  console.log(` Local:  http://localhost:${PORT}`);
 });
 
 // ── SCHEDULED JOBS ────────────────────────────────────────────────────────────

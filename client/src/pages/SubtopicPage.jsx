@@ -88,7 +88,7 @@ function ResourcesTab({ subtopicId, subtopic, subtopicName, onComplete }) {
     } catch { /* ignore */ }
   };
 
-  const typeIcon   = (type) => type === 'video' ? '🎥' : type === 'audio' ? '🔊' : '📄';
+  const typeIcon   = (type) => type === 'video' ? '' : type === 'audio' ? '' : '';
   const formatSize = (bytes) => {
     if (!bytes) return '';
     return bytes < 1024 * 1024 ? `${Math.round(bytes / 1024)} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -102,7 +102,7 @@ function ResourcesTab({ subtopicId, subtopic, subtopicName, onComplete }) {
 
   if (resources.length === 0) return (
     <div className="text-center py-12 text-gray-400">
-      <div className="text-4xl mb-3">📂</div>
+      <div className="text-4xl mb-3"></div>
       <p className="text-sm">No resources uploaded yet for this subtopic.</p>
       <p className="text-xs mt-1">Check back soon!</p>
     </div>
@@ -241,7 +241,7 @@ function PracticeTab({ subtopicId, subjectId, onComplete }) {
               subTab === t.id ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-100'
             }`}>
             {t.label}
-            {t.ai && <span className="text-[9px] font-bold text-teal-400">✦</span>}
+            {t.ai && <span className="text-[9px] font-bold text-teal-400"></span>}
           </button>
         ))}
       </div>
@@ -250,7 +250,7 @@ function PracticeTab({ subtopicId, subjectId, onComplete }) {
         <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-teal-400" /></div>
       ) : questions.length === 0 ? (
         <div className="text-center py-12 text-gray-400">
-          <div className="text-4xl mb-3">📝</div>
+          <div className="text-4xl mb-3"></div>
           <p className="text-sm">No {subTab} questions available yet for this subtopic.</p>
         </div>
       ) : phase === 'done' ? (
@@ -442,9 +442,9 @@ function OpenAnswerQuestion({ question, questionNumber, totalQuestions, dismisse
       </div>
       {!dismissed && (
         <div className="mx-5 mb-3 bg-gray-900 text-white rounded-xl p-3 flex items-start gap-3">
-          <span className="text-xl shrink-0">🤖</span>
+          <span className="text-xl shrink-0"></span>
           <div className="flex-1">
-            <p className="text-xs leading-relaxed">Upon submission, you'll receive a detailed analysis of your answer and personalised feedback to help you improve! 🚀</p>
+            <p className="text-xs leading-relaxed">Upon submission, you'll receive a detailed analysis of your answer and personalised feedback to help you improve! </p>
           </div>
           <button onClick={onDismiss} className="text-gray-400 hover:text-white text-lg shrink-0">×</button>
         </div>
@@ -470,7 +470,7 @@ function OpenAnswerQuestion({ question, questionNumber, totalQuestions, dismisse
         <button onClick={result ? onNext : handleAIMarker} disabled={loading || (!result && !answer.trim())}
           className="flex-1 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-200 disabled:text-gray-400 text-white font-semibold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2">
           {loading && <Loader2 size={14} className="animate-spin" />}
-          {result ? 'Next Question' : loading ? 'Marking…' : 'AI Marker ✦'}
+          {result ? 'Next Question' : loading ? 'Marking…' : 'AI Marker '}
         </button>
         <span className="text-xs text-gray-400 shrink-0">{questionNumber} of {totalQuestions}</span>
       </div>
@@ -523,12 +523,12 @@ function CompletionCard({ score, total, onTakeQuiz, onRetry }) {
   const pct = Math.round((score / total) * 100);
   return (
     <div className="bg-teal-50 border border-teal-100 rounded-2xl p-8 text-center">
-      <div className="text-4xl mb-3">🤩</div>
+      <div className="text-4xl mb-3"></div>
       <h3 className="text-lg font-bold teal-600 mb-2">Keep Going, You're Almost There!</h3>
       <p className="text-sm text-gray-600 mb-1">
-        Nice job! 🎉 Now, take the quiz and get{' '}
+        Nice job!  Now, take the quiz and get{' '}
         <span className="text-teal-600 font-medium">detailed feedback</span> on every answer with our{' '}
-        <span className="text-teal-600 font-medium">AI-powered marking scheme</span>. Let's level up! 🚀
+        <span className="text-teal-600 font-medium">AI-powered marking scheme</span>. Let's level up! 
       </p>
       <p className="text-xs text-gray-400 mb-6">Score: {score}/{total} ({pct}%)</p>
       <button onClick={onTakeQuiz}

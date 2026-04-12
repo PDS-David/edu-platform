@@ -92,7 +92,7 @@ export default function PaymentVerify() {
             <p className="text-gray-500 text-sm mb-1">{message}</p>
             {planName && (
               <p className="text-green-700 font-semibold text-sm mb-6">
-                Welcome to {planName} 🎉
+                Welcome to {planName} 
               </p>
             )}
             <Link

@@ -372,7 +372,7 @@ function InProgressScreen({ subtopicId, subtopic, selectedPaper, onFinish, navig
                 onClick={() => setHintOpen(true)}
                 className="flex items-center gap-1.5 border border-white/30 text-white/80 hover:text-white hover:border-white/60 text-xs font-semibold px-3 py-1.5 rounded-full transition-colors"
               >
-                <Lightbulb size={13} /> Need Hint? Ask AI 💡
+                <Lightbulb size={13} /> Need Hint? Ask AI 
               </button>
               {hintHover && !hintOpen && (
                 <div className="absolute left-0 top-full mt-1 bg-amber-400 text-gray-900 text-xs rounded-xl px-3 py-2 w-64 shadow-lg z-20">
@@ -575,7 +575,7 @@ function HintModal({ question, onClose }) {
           <X size={18} />
         </button>
         <h2 className="text-center text-lg font-bold mb-4 bg-gradient-to-r from-teal-500 to-purple-500 bg-clip-text text-transparent">
-          Hint 💡
+          Hint 
         </h2>
         {loading ? (
           <div className="flex justify-center py-8">
@@ -661,9 +661,9 @@ function ResultsScreen({ subtopicId, subtopic, attemptId, onRevise, onQuizComple
   const isCorrect = qData.is_correct;
 
   const STAT_CARDS = [
-    { icon: '🏆', label: 'Total Score',  value: `${score}/${totalMarks}`, border: 'border-l-green-400' },
-    { icon: '⏱',  label: 'Time Taken',  value: `${tm}m ${ts}s`,          border: 'border-l-purple-400' },
-    { icon: '🎯', label: 'Accuracy',     value: `${accuracy}%`,            border: 'border-l-pink-400' },
+    { icon: '', label: 'Total Score',  value: `${score}/${totalMarks}`, border: 'border-l-green-400' },
+    { icon: '',  label: 'Time Taken',  value: `${tm}m ${ts}s`,          border: 'border-l-purple-400' },
+    { icon: '', label: 'Accuracy',     value: `${accuracy}%`,            border: 'border-l-pink-400' },
   ];
 
   return (
@@ -713,7 +713,7 @@ function ResultsScreen({ subtopicId, subtopic, attemptId, onRevise, onQuizComple
                 <span className={`flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full ${
                   isCorrect ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'
                 }`}>
-                  {isCorrect ? '✓ Correct' : '✗ Incorrect'}
+                  {isCorrect ? ' Correct' : ' Incorrect'}
                 </span>
                 {qData.difficulty && <DiffBadge level={qData.difficulty} />}
                 {qData.time_taken && (
@@ -748,7 +748,7 @@ function ResultsScreen({ subtopicId, subtopic, attemptId, onRevise, onQuizComple
                   onClick={() => setSchemeOpen(p => ({ ...p, [selectedQ]: !p[selectedQ] }))}
                   className="w-full flex items-center justify-between bg-teal-600/30 hover:bg-teal-600/40 border border-teal-500/30 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition-colors"
                 >
-                  <span>✦ Detailed Marking Scheme</span>
+                  <span> Detailed Marking Scheme</span>
                   {schemeOpen[selectedQ] ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                   <span className="text-teal-300 text-[11px]">{schemeOpen[selectedQ] ? 'Hide' : 'Show'}</span>
                 </button>

@@ -7,16 +7,16 @@ import api from '../services/api';
 
 // ── Country codes ─────────────────────────────────────────────────────────────
 const COUNTRY_CODES = [
-  { code: 'NG', dial: '+234', flag: '🇳🇬', name: 'Nigeria' },
-  { code: 'GH', dial: '+233', flag: '🇬🇭', name: 'Ghana' },
-  { code: 'KE', dial: '+254', flag: '🇰🇪', name: 'Kenya' },
-  { code: 'ZA', dial: '+27',  flag: '🇿🇦', name: 'South Africa' },
-  { code: 'GB', dial: '+44',  flag: '🇬🇧', name: 'United Kingdom' },
-  { code: 'US', dial: '+1',   flag: '🇺🇸', name: 'United States' },
-  { code: 'SG', dial: '+65',  flag: '🇸🇬', name: 'Singapore' },
-  { code: 'IN', dial: '+91',  flag: '🇮🇳', name: 'India' },
-  { code: 'AU', dial: '+61',  flag: '🇦🇺', name: 'Australia' },
-  { code: 'CA', dial: '+1',   flag: '🇨🇦', name: 'Canada' },
+  { code: 'NG', dial: '+234', flag: '', name: 'Nigeria' },
+  { code: 'GH', dial: '+233', flag: '', name: 'Ghana' },
+  { code: 'KE', dial: '+254', flag: '', name: 'Kenya' },
+  { code: 'ZA', dial: '+27',  flag: '', name: 'South Africa' },
+  { code: 'GB', dial: '+44',  flag: '', name: 'United Kingdom' },
+  { code: 'US', dial: '+1',   flag: '', name: 'United States' },
+  { code: 'SG', dial: '+65',  flag: '', name: 'Singapore' },
+  { code: 'IN', dial: '+91',  flag: '', name: 'India' },
+  { code: 'AU', dial: '+61',  flag: '', name: 'Australia' },
+  { code: 'CA', dial: '+1',   flag: '', name: 'Canada' },
 ];
 
 // ── Grades per curriculum ─────────────────────────────────────────────────────
@@ -54,21 +54,21 @@ const GRADE_MAP = {
 // ── FIX A: Hardcoded fallback curricula used if the API call fails ─────────────
 // This means the Curriculum dropdown is ALWAYS populated, even offline.
 const FALLBACK_CURRICULA = [
-  { id: null, code: 'JAMB',    name: 'JAMB/UTME',              icon_emoji: '📚' },
-  { id: null, code: 'WAEC',    name: 'WAEC/NECO (SSCE)',        icon_emoji: '📚' },
-  { id: null, code: 'BECE',    name: 'Junior WAEC (BECE)',      icon_emoji: '📚' },
-  { id: null, code: 'GCE_AL',  name: "GCE A' Levels",          icon_emoji: '🎓' },
-  { id: null, code: 'JUPEB',   name: 'JUPEB',                   icon_emoji: '🏛️' },
-  { id: null, code: 'CAMBAL',  name: 'Cambridge A Level',       icon_emoji: '📚' },
-  { id: null, code: 'CAMBOL',  name: 'Cambridge O Level',       icon_emoji: '📚' },
-  { id: null, code: 'AQAAL',   name: 'AQA A Level',             icon_emoji: '📚' },
-  { id: null, code: 'EDXAL',   name: 'Edexcel A Level',         icon_emoji: '📚' },
-  { id: null, code: 'IELTS',   name: 'IELTS',                   icon_emoji: '📚' },
-  { id: null, code: 'TOEFL',   name: 'TOEFL',                   icon_emoji: '📚' },
-  { id: null, code: 'SAT',     name: 'SAT',                     icon_emoji: '📚' },
-  { id: null, code: 'LANG_EN', name: 'Language Lab – English',  icon_emoji: '🇬🇧' },
-  { id: null, code: 'LANG_FR', name: 'Language Lab – French',   icon_emoji: '🇫🇷' },
-  { id: null, code: 'LANG_YO', name: 'Language Lab – Yoruba',   icon_emoji: '🌍' },
+  { id: null, code: 'JAMB',    name: 'JAMB/UTME',              icon_emoji: '' },
+  { id: null, code: 'WAEC',    name: 'WAEC/NECO (SSCE)',        icon_emoji: '' },
+  { id: null, code: 'BECE',    name: 'Junior WAEC (BECE)',      icon_emoji: '' },
+  { id: null, code: 'GCE_AL',  name: "GCE A' Levels",          icon_emoji: '' },
+  { id: null, code: 'JUPEB',   name: 'JUPEB',                   icon_emoji: '' },
+  { id: null, code: 'CAMBAL',  name: 'Cambridge A Level',       icon_emoji: '' },
+  { id: null, code: 'CAMBOL',  name: 'Cambridge O Level',       icon_emoji: '' },
+  { id: null, code: 'AQAAL',   name: 'AQA A Level',             icon_emoji: '' },
+  { id: null, code: 'EDXAL',   name: 'Edexcel A Level',         icon_emoji: '' },
+  { id: null, code: 'IELTS',   name: 'IELTS',                   icon_emoji: '' },
+  { id: null, code: 'TOEFL',   name: 'TOEFL',                   icon_emoji: '' },
+  { id: null, code: 'SAT',     name: 'SAT',                     icon_emoji: '' },
+  { id: null, code: 'LANG_EN', name: 'Language Lab – English',  icon_emoji: '' },
+  { id: null, code: 'LANG_FR', name: 'Language Lab – French',   icon_emoji: '' },
+  { id: null, code: 'LANG_YO', name: 'Language Lab – Yoruba',   icon_emoji: '' },
 ];
 
 // ── Resolve grade options for a curriculum ───────────────────────────────────
@@ -554,8 +554,8 @@ const RegisterPage = () => {
                   </label>
                   <div className="flex gap-2 pt-1">
                     {[
-                      { value: 'student', label: '🎓 Student', desc: 'Access lessons & practice exams' },
-                      { value: 'teacher', label: '📖 Teacher', desc: 'Upload resources & teach subjects' },
+                      { value: 'student', label: ' Student', desc: 'Access lessons & practice exams' },
+                      { value: 'teacher', label: ' Teacher', desc: 'Upload resources & teach subjects' },
                     ].map(opt => (
                       <button
                         key={opt.value}

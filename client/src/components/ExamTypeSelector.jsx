@@ -46,18 +46,18 @@ const ExamTypeSelector = ({
 
   // Full static fallback — all 12 exam types
   const getStaticTypes = () => [
-    { id: 1,  code: 'JAMB',    name: 'JAMB / UTME',             icon_emoji: '🎓' },
-    { id: 2,  code: 'WAEC',    name: 'WAEC',                    icon_emoji: '📘' },
-    { id: 3,  code: 'GCE_OL',  name: 'GCE O-Levels',            icon_emoji: '📗' },
-    { id: 4,  code: 'NECO',    name: 'NECO',                    icon_emoji: '📙' },
-    { id: 5,  code: 'IELTS',   name: 'IELTS',                   icon_emoji: '🌍' },
-    { id: 6,  code: 'TOEFL',   name: 'TOEFL',                   icon_emoji: '🇺🇸' },
-    { id: 7,  code: 'SAT',     name: 'SAT',                     icon_emoji: '🎯' },
-    { id: 8,  code: 'GCE_AL',  name: 'GCE A-Levels',            icon_emoji: '🏫' },
-    { id: 9,  code: 'JUPEB',   name: 'JUPEB',                   icon_emoji: '📚' },
-    { id: 10, code: 'LANG_EN', name: 'Language Lab. – English', icon_emoji: '🇬🇧' },
-    { id: 11, code: 'LANG_FR', name: 'Language Lab. – French',  icon_emoji: '🇫🇷' },
-    { id: 12, code: 'LANG_YO', name: 'Language Lab. – Yoruba',  icon_emoji: '🌟' },
+    { id: 1,  code: 'JAMB',    name: 'JAMB / UTME',             icon_emoji: '' },
+    { id: 2,  code: 'WAEC',    name: 'WAEC',                    icon_emoji: '' },
+    { id: 3,  code: 'GCE_OL',  name: 'GCE O-Levels',            icon_emoji: '' },
+    { id: 4,  code: 'NECO',    name: 'NECO',                    icon_emoji: '' },
+    { id: 5,  code: 'IELTS',   name: 'IELTS',                   icon_emoji: '' },
+    { id: 6,  code: 'TOEFL',   name: 'TOEFL',                   icon_emoji: '' },
+    { id: 7,  code: 'SAT',     name: 'SAT',                     icon_emoji: '' },
+    { id: 8,  code: 'GCE_AL',  name: 'GCE A-Levels',            icon_emoji: '' },
+    { id: 9,  code: 'JUPEB',   name: 'JUPEB',                   icon_emoji: '' },
+    { id: 10, code: 'LANG_EN', name: 'Language Lab. – English', icon_emoji: '' },
+    { id: 11, code: 'LANG_FR', name: 'Language Lab. – French',  icon_emoji: '' },
+    { id: 12, code: 'LANG_YO', name: 'Language Lab. – Yoruba',  icon_emoji: '' },
   ];
 
   const sizeClasses = {
@@ -94,7 +94,7 @@ const ExamTypeSelector = ({
             transition-all duration-200 hover:border-green-400
           `}
         >
-          {includeAll && <option value="">🌟 All Exam Types</option>}
+          {includeAll && <option value=""> All Exam Types</option>}
           {types.map(t => (
             <option key={t.id} value={t.code}>
               {t.icon_emoji || ''} {t.name}

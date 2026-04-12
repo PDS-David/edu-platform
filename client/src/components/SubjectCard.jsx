@@ -12,34 +12,34 @@ const SubjectCard = ({ subject, examBoard, showExamBoard = true }) => {
 
   // Subject icons mapping
   const subjectIcons = {
-    'Mathematics': '🧮',
-    'Physics': '⚡',
-    'Chemistry': '🧪',
-    'Biology': '🧬',
-    'English': '📝',
-    'English Language': '📝',
-    'Literature': '📚',
-    'Economics': '📊',
-    'Government': '🏛️',
-    'Commerce': '💼',
-    'Geography': '🌍',
-    'History': '📜',
-    'Civic Education': '⚖️',
-    'Computer Science': '💻',
-    'Agricultural Science': '🌾',
-    'Technical Drawing': '📐',
-    'Further Mathematics': '🔢',
-    'Accounting': '💰',
-    'Business Studies': '💼',
-    'French': '🇫🇷',
-    'Igbo': '🗣️',
-    'Yoruba': '🗣️',
-    'Hausa': '🗣️',
-    'Islamic Studies': '☪️',
-    'Christian Religious Studies': '✝️'
+    'Mathematics': '',
+    'Physics': '',
+    'Chemistry': '',
+    'Biology': '',
+    'English': '',
+    'English Language': '',
+    'Literature': '',
+    'Economics': '',
+    'Government': '',
+    'Commerce': '',
+    'Geography': '',
+    'History': '',
+    'Civic Education': '',
+    'Computer Science': '',
+    'Agricultural Science': '',
+    'Technical Drawing': '',
+    'Further Mathematics': '',
+    'Accounting': '',
+    'Business Studies': '',
+    'French': '',
+    'Igbo': '',
+    'Yoruba': '',
+    'Hausa': '',
+    'Islamic Studies': '',
+    'Christian Religious Studies': ''
   };
 
-  const icon = subject.icon_emoji || subjectIcons[subject.name] || '📖';
+  const icon = subject.icon_emoji || subjectIcons[subject.name] || '';
 
   const handleAccessResources = () => {
     // Navigate to the SubjectPage which has Resources/Practice/Quiz tabs
@@ -96,7 +96,7 @@ const SubjectCard = ({ subject, examBoard, showExamBoard = true }) => {
         <div className="grid grid-cols-2 gap-4 mb-5">
           {/* Practice Questions */}
           <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
-            <span className="text-3xl">📝</span>
+            <span className="text-3xl"></span>
             <div>
               <div className="text-lg font-bold text-gray-900">
                 {subject.question_count?.toLocaleString() || '500+'}
@@ -107,7 +107,7 @@ const SubjectCard = ({ subject, examBoard, showExamBoard = true }) => {
 
           {/* Video Lessons */}
           <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg">
-            <span className="text-3xl">🎥</span>
+            <span className="text-3xl"></span>
             <div>
               <div className="text-lg font-bold text-gray-900">
                 {subject.video_count?.toLocaleString() || '100+'}
@@ -118,7 +118,7 @@ const SubjectCard = ({ subject, examBoard, showExamBoard = true }) => {
 
           {/* Revision Notes */}
           <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
-            <span className="text-3xl">📚</span>
+            <span className="text-3xl"></span>
             <div>
               <div className="text-lg font-bold text-gray-900">
                 {subject.notes_count?.toLocaleString() || '200+'}
@@ -129,7 +129,7 @@ const SubjectCard = ({ subject, examBoard, showExamBoard = true }) => {
 
           {/* Past Papers */}
           <div className="flex items-center gap-3 p-3 bg-orange-50 rounded-lg">
-            <span className="text-3xl">📄</span>
+            <span className="text-3xl"></span>
             <div>
               <div className="text-lg font-bold text-gray-900">
                 {subject.past_papers_count?.toLocaleString() || '50+'}

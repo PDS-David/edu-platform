@@ -10,7 +10,7 @@
  * selectedBoard   string | ''     – currently selected exam type code
  * onBoardChange   fn(code)        – called when selection changes
  * showLabel       bool (true)     – show "Select Type" label above dropdown
- * showAll         bool (true)     – show the "🌟 All Types" blank option
+ * showAll         bool (true)     – show the " All Types" blank option
  * className       string ('')     – extra classes on wrapper
  * size            'small' | 'medium' | 'large'  (default 'medium')
  * filterActive    bool (true)     – when true, only show active types
@@ -71,11 +71,11 @@ const ExamBoardSelector = ({
             hover:border-green-400
           `}
         >
-          {showAll && <option value="">🌟 All Types</option>}
+          {showAll && <option value=""> All Types</option>}
 
           {visibleTypes.map(board => (
             <option key={board.id} value={board.code}>
-              {board.icon_emoji || '📚'} {board.name}
+              {board.icon_emoji || ''} {board.name}
             </option>
           ))}
         </select>

@@ -47,14 +47,14 @@ const ForgotPassword = () => {
           >
             <div className="absolute top-0 right-0 w-40 h-40 rounded-full opacity-10"
               style={{ background: 'radial-gradient(circle, #818cf8, transparent)', transform: 'translate(30%,-30%)' }} />
-            <div className="text-5xl mb-5">🔐</div>
+            <div className="text-5xl mb-5"></div>
             <h2 className="text-2xl xl:text-3xl font-bold text-white mb-3">Forgot your password?</h2>
             <p className="text-gray-300 text-sm leading-relaxed max-w-xs">
               No worries — it happens to everyone. Enter your registered email address and we'll send you a secure reset link.
             </p>
             <div className="mt-6 bg-white/5 rounded-xl p-4 border border-white/10 max-w-xs">
               <p className="text-indigo-200 text-xs leading-relaxed">
-                🛡️ For your security, the reset link expires in <strong className="text-white">1 hour</strong>. If you don't see the email, check your spam folder.
+                 For your security, the reset link expires in <strong className="text-white">1 hour</strong>. If you don't see the email, check your spam folder.
               </p>
             </div>
           </div>

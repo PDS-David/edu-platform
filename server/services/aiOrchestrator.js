@@ -7,7 +7,7 @@ const { generateQuizByTopic }                   = require('./quizGenerator');
 const { formatMemoryBlock }                     = require('./userMemory');
 const tools                                     = require('../tools');
 
-// ✅ FIXED: removed duplicate prompt builders
+//  FIXED: removed duplicate prompt builders
 const {
   shouldCallTool,
   detectConfusion,

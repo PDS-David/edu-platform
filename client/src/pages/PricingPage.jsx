@@ -204,7 +204,7 @@ export default function PricingPage() {
         )}
 
         {/* Crown + heading */}
-        <div className="text-5xl mb-3 select-none">👑</div>
+        <div className="text-5xl mb-3 select-none"></div>
         <h1 className="text-2xl font-bold text-white text-center mb-6 leading-snug">
           Unlock your Full<br />Learning Potential!
         </h1>
@@ -338,7 +338,7 @@ export function UpgradeWall({ score, max, time, accuracy, onRevise }) {
             </div>
           )}
 
-          <div className="text-4xl">👑</div>
+          <div className="text-4xl"></div>
           <h2 className="text-xl font-bold text-white text-center leading-snug">
             Unlock your Full<br />Learning Potential!
           </h2>

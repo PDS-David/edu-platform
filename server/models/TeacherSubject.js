@@ -8,22 +8,22 @@ module.exports = (sequelize) => {
       primaryKey: true,
     },
     teacherId: {
-      type: DataTypes.UUID,       // ✅ matches users.id (uuid)
+      type: DataTypes.UUID,       //  matches users.id (uuid)
       allowNull: false,
       field: 'teacher_id',
     },
     subjectId: {
-      type: DataTypes.INTEGER,    // ✅ matches subjects.id (integer)
+      type: DataTypes.INTEGER,    //  matches subjects.id (integer)
       allowNull: false,
       field: 'subject_id',
     },
     examBoardId: {
-      type: DataTypes.INTEGER,    // ✅ matches exam_boards.id (integer)
+      type: DataTypes.INTEGER,    //  matches exam_boards.id (integer)
       allowNull: true,
       field: 'exam_board_id',
     },
     assignedBy: {
-      type: DataTypes.UUID,       // ✅ matches users.id (uuid)
+      type: DataTypes.UUID,       //  matches users.id (uuid)
       allowNull: true,
       field: 'assigned_by',
     },

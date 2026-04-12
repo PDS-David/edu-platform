@@ -93,7 +93,7 @@ function ExamQuestion({ question, questionNumber, selected, onSelect }) {
 function MarkingScreen() {
   return (
     <div className="min-h-screen bg-[#0a4a3f] flex flex-col items-center justify-center gap-5 px-6 text-center">
-      <div className="text-5xl animate-bounce">🤖</div>
+      <div className="text-5xl animate-bounce"></div>
       <p className="text-white text-xl font-bold">Marking your exam…</p>
       <p className="text-white/60 text-sm">The AI examiner is reviewing all 40 answers.</p>
       <Loader2 size={28} className="text-teal-400 animate-spin mt-2" />

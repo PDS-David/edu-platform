@@ -22,10 +22,10 @@ const STATS = [
 ];
 
 const CHALLENGES = [
-  { emoji: '📭', title: 'No Exam Feedback',         desc: 'Students submit answers with zero explanation of what went wrong or how to improve.' },
-  { emoji: '🔍', title: 'Limited Practice Questions', desc: 'Reliable, curriculum-aligned question banks are scarce and scattered across the web.' },
-  { emoji: '📉', title: 'No Performance Tracking',   desc: 'Neither students nor teachers have clear visibility into strengths, weaknesses, or trends.' },
-  { emoji: '💸', title: 'Private Tuition Costs',      desc: 'Quality private tutoring can cost ₦50,000+ per month — out of reach for most families.' },
+  { emoji: '', title: 'No Exam Feedback',         desc: 'Students submit answers with zero explanation of what went wrong or how to improve.' },
+  { emoji: '', title: 'Limited Practice Questions', desc: 'Reliable, curriculum-aligned question banks are scarce and scattered across the web.' },
+  { emoji: '', title: 'No Performance Tracking',   desc: 'Neither students nor teachers have clear visibility into strengths, weaknesses, or trends.' },
+  { emoji: '', title: 'Private Tuition Costs',      desc: 'Quality private tutoring can cost ₦50,000+ per month — out of reach for most families.' },
 ];
 
 const FEATURES = [
@@ -38,16 +38,16 @@ const FEATURES = [
 ];
 
 const SUBJECTS = [
-  { emoji: '🧮', name: 'Mathematics',         tag: 'WAEC · NECO · JAMB · IGCSE' },
-  { emoji: '⚡', name: 'Physics',             tag: 'WAEC · NECO · JAMB · IGCSE' },
-  { emoji: '🧪', name: 'Chemistry',           tag: 'WAEC · NECO · JAMB · IGCSE' },
-  { emoji: '🧬', name: 'Biology',             tag: 'WAEC · NECO · JAMB · IGCSE' },
-  { emoji: '📝', name: 'English Language',    tag: 'WAEC · NECO · JAMB · IGCSE' },
-  { emoji: '📊', name: 'Economics',           tag: 'WAEC · NECO · JAMB · IGCSE' },
-  { emoji: '💻', name: 'Computer Science',    tag: 'WAEC · NECO · JAMB · IGCSE' },
-  { emoji: '💼', name: 'Business Studies',    tag: 'WAEC · NECO · JAMB · IGCSE' },
-  { emoji: '🔢', name: 'Further Mathematics', tag: 'WAEC · NECO · A-Level'      },
-  { emoji: '🌍', name: 'Geography',           tag: 'WAEC · NECO · JAMB · IGCSE' },
+  { emoji: '', name: 'Mathematics',         tag: 'WAEC · NECO · JAMB · IGCSE' },
+  { emoji: '', name: 'Physics',             tag: 'WAEC · NECO · JAMB · IGCSE' },
+  { emoji: '', name: 'Chemistry',           tag: 'WAEC · NECO · JAMB · IGCSE' },
+  { emoji: '', name: 'Biology',             tag: 'WAEC · NECO · JAMB · IGCSE' },
+  { emoji: '', name: 'English Language',    tag: 'WAEC · NECO · JAMB · IGCSE' },
+  { emoji: '', name: 'Economics',           tag: 'WAEC · NECO · JAMB · IGCSE' },
+  { emoji: '', name: 'Computer Science',    tag: 'WAEC · NECO · JAMB · IGCSE' },
+  { emoji: '', name: 'Business Studies',    tag: 'WAEC · NECO · JAMB · IGCSE' },
+  { emoji: '', name: 'Further Mathematics', tag: 'WAEC · NECO · A-Level'      },
+  { emoji: '', name: 'Geography',           tag: 'WAEC · NECO · JAMB · IGCSE' },
 ];
 
 const COMPARISON = [
@@ -127,7 +127,7 @@ export default function LandingPage() {
           {/* Left */}
           <div className="text-white space-y-6">
             <span className="inline-block bg-white/15 text-white text-xs font-bold px-3 py-1.5 rounded-full tracking-wide uppercase">
-              🎓 Nigeria's #1 Exam Prep Platform
+               Nigeria's #1 Exam Prep Platform
             </span>
             <h1 className="text-3xl sm:text-4xl xl:text-5xl font-extrabold leading-tight">
               Ace Your JAMB, WAEC &amp; NECO with AI-Powered Practice
@@ -157,7 +157,7 @@ export default function LandingPage() {
                   <p className="text-xs text-gray-400 font-medium">Student Dashboard</p>
                   <p className="font-bold text-gray-900 text-sm">Mathematics</p>
                 </div>
-                <span className="bg-green-100 text-green-700 text-[11px] font-bold px-2 py-1 rounded-full">On Track ✓</span>
+                <span className="bg-green-100 text-green-700 text-[11px] font-bold px-2 py-1 rounded-full">On Track </span>
               </div>
 
               {/* Fake donut chart */}
@@ -194,7 +194,7 @@ export default function LandingPage() {
 
               {/* Fake stat row */}
               <div className="grid grid-cols-2 gap-2">
-                {[['🏆 Score', '84%'], ['🔥 Streak', '7 days']].map(([l, v]) => (
+                {[[' Score', '84%'], [' Streak', '7 days']].map(([l, v]) => (
                   <div key={l} className="bg-gray-50 rounded-xl px-3 py-2 text-center">
                     <p className="text-[10px] text-gray-400">{l}</p>
                     <p className="text-sm font-bold text-gray-800">{v}</p>
@@ -275,9 +275,9 @@ export default function LandingPage() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
-              { step: '01', title: 'Register free',      desc: 'Create an account, pick your exam board and subjects. Get 5 practice questions every day at no cost.',      icon: '📝' },
-              { step: '02', title: 'Practice daily',     desc: 'Answer curriculum-aligned MCQs. Get instant AI explanations and marking-scheme feedback on every answer.',    icon: '🎯' },
-              { step: '03', title: 'Track & improve',    desc: 'See your weak topics, score trends, and predicted grade. Upgrade for unlimited practice and mock exams.',     icon: '📈' },
+              { step: '01', title: 'Register free',      desc: 'Create an account, pick your exam board and subjects. Get 5 practice questions every day at no cost.',      icon: '' },
+              { step: '02', title: 'Practice daily',     desc: 'Answer curriculum-aligned MCQs. Get instant AI explanations and marking-scheme feedback on every answer.',    icon: '' },
+              { step: '03', title: 'Track & improve',    desc: 'See your weak topics, score trends, and predicted grade. Upgrade for unlimited practice and mock exams.',     icon: '' },
             ].map(({ step, title, desc, icon }) => (
               <div key={step} className="flex flex-col items-center text-center gap-4">
                 <div className="relative">
@@ -345,7 +345,7 @@ export default function LandingPage() {
             {/* Annual — featured */}
             <div className="relative bg-[#1e3a8a] rounded-2xl overflow-hidden shadow-xl">
               <div className="bg-amber-400 text-gray-900 text-[10px] font-black text-center py-1.5 tracking-wide uppercase">
-                🔥 Save 75% — Most Popular
+                 Save 75% — Most Popular
               </div>
               <div className="p-5 space-y-3">
                 <p className="text-white font-bold text-base">12 Months</p>
@@ -410,7 +410,7 @@ export default function LandingPage() {
               <div key={name} className="bg-white rounded-2xl border border-gray-100 p-5 space-y-3 shadow-sm">
                 <div className="flex">
                   {[...Array(5)].map((_, i) => (
-                    <span key={i} className="text-amber-400 text-xs">★</span>
+                    <span key={i} className="text-amber-400 text-xs"></span>
                   ))}
                 </div>
                 <p className="text-gray-700 text-xs leading-relaxed italic">"{quote}"</p>

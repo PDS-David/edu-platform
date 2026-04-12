@@ -10,7 +10,7 @@ if (!process.env.GEMINI_API_KEY) {
 }
 
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
-console.log(`🤖 Gemini model loaded: ${GEMINI_MODEL}`);
+console.log(` Gemini model loaded: ${GEMINI_MODEL}`);
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({
@@ -19,7 +19,7 @@ const model = genAI.getGenerativeModel({
 });
 
 const FALLBACK_REPLY =
-  'AISchoolonair AI is temporarily unavailable. Please try again later. 📚';
+  'AISchoolonair AI is temporarily unavailable. Please try again later. ';
 
 function isQuotaOrAvailabilityError(err) {
   const msg = err?.message || '';

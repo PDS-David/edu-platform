@@ -169,7 +169,7 @@ const SubjectCatalog = () => {
           {/* ── No Board Selected Prompt ── */}
           {!loading && !error && !selectedBoard && (
             <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
-              <div className="text-6xl">🎓</div>
+              <div className="text-6xl"></div>
               <h3 className="text-xl font-bold text-gray-900">Select an Examination Type</h3>
               <p className="text-gray-500 max-w-sm">
                 Choose an examination type above — JAMB, WAEC, A-Levels, English Language Lab and more — to see all available subjects.
@@ -208,7 +208,7 @@ const SubjectCatalog = () => {
           {/* ── Empty State (board selected but no subjects returned) ── */}
           {!loading && !error && selectedBoard && filteredSubjects.length === 0 && (
             <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
-              <div className="text-6xl">📭</div>
+              <div className="text-6xl"></div>
               <h3 className="text-xl font-bold text-gray-900">No subjects found</h3>
               <p className="text-gray-500 max-w-sm">
                 {searchQuery

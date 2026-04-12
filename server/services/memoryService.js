@@ -502,7 +502,7 @@ function formatMemoryContext({ profile, weakTopics, memories }) {
       `\n  XP: ${profile.xp_points || 0}` +
       `\n  Trend: ${profile.accuracy_trend || 'stable'}` +
       (profile.active_gap_count > 0
-        ? `\n  ⚠️  Active learning gaps: ${profile.active_gap_count} (${profile.critical_gap_count} critical)`
+        ? `\n    Active learning gaps: ${profile.active_gap_count} (${profile.critical_gap_count} critical)`
         : '')
     );
 

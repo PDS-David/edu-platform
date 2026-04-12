@@ -113,7 +113,7 @@ router.post('/types', protect, async (req, res) => {
           full_name:     full_name    || name,
           description:   description  || null,
           country:       country      || 'Nigeria',
-          icon_emoji:    icon_emoji   || '📚',
+          icon_emoji:    icon_emoji   || '',
           display_order: order,
         },
         type: QueryTypes.SELECT,

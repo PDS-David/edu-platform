@@ -328,7 +328,7 @@ export default function ImageMarkingPage() {
 
         {/* Header */}
         <div style={S.header}>
-          <h1 style={S.title}>📸 AI Answer Marking</h1>
+          <h1 style={S.title}> AI Answer Marking</h1>
           <p style={S.subtitle}>
             Take a photo of your handwritten answer, upload it, and get instant AI feedback and a mark.
           </p>
@@ -348,7 +348,7 @@ export default function ImageMarkingPage() {
                   onDrop={onDrop} onDragOver={onDragOver} onDragLeave={onDragLeave}
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  <div style={{ fontSize: 40, marginBottom: 12 }}>📷</div>
+                  <div style={{ fontSize: 40, marginBottom: 12 }}></div>
                   <p style={{ fontWeight: 600, color: '#374151', margin: '0 0 4px' }}>
                     Drag & drop your photo here, or click to browse
                   </p>
@@ -365,10 +365,10 @@ export default function ImageMarkingPage() {
                 <div style={{ textAlign: 'center' }}>
                   <div style={S.previewWrap}>
                     <img src={imagePreview} alt="Answer preview" style={S.previewImg} />
-                    <button type="button" style={S.clearBtn} onClick={clearImage} title="Remove image">✕</button>
+                    <button type="button" style={S.clearBtn} onClick={clearImage} title="Remove image"></button>
                   </div>
                   <p style={{ fontSize: 13, color: '#6b7280', marginTop: 8 }}>
-                    ✅ {imageFile?.name} ({(imageFile?.size / 1024).toFixed(0)} KB)
+                     {imageFile?.name} ({(imageFile?.size / 1024).toFixed(0)} KB)
                   </p>
                 </div>
               )}
@@ -456,13 +456,13 @@ export default function ImageMarkingPage() {
             </div>
 
             {error && (
-              <div style={S.errorBox}><span>⚠️</span> {error}</div>
+              <div style={S.errorBox}><span></span> {error}</div>
             )}
 
             <button type="submit" style={S.submitBtn} disabled={loading}>
               {loading
                 ? <><div style={S.spinner} /> Marking your answer…</>
-                : '🤖 Mark My Answer'
+                : ' Mark My Answer'
               }
             </button>
           </form>
@@ -474,14 +474,14 @@ export default function ImageMarkingPage() {
 
             {result.readabilityNote && (
               <div style={S.readabilityWarning}>
-                <span>⚠️</span>
+                <span></span>
                 <span><strong>Handwriting note:</strong> {result.readabilityNote}</span>
               </div>
             )}
 
             <div style={S.resultCard}>
               <h2 style={{ fontSize: 20, fontWeight: 700, color: '#111827', marginBottom: 20 }}>
-                📊 Marking Results
+                 Marking Results
               </h2>
 
               <div style={S.scoreRow}>
@@ -505,16 +505,16 @@ export default function ImageMarkingPage() {
 
               {result.strengths?.length > 0 && (
                 <div style={S.listSection}>
-                  <div style={S.listTitle}>✅ Strengths</div>
+                  <div style={S.listTitle}> Strengths</div>
                   {result.strengths.map((s, i) => (
-                    <div key={i} style={S.listItem('strength')}><span>✓</span> {s}</div>
+                    <div key={i} style={S.listItem('strength')}><span></span> {s}</div>
                   ))}
                 </div>
               )}
 
               {result.improvements?.length > 0 && (
                 <div style={S.listSection}>
-                  <div style={S.listTitle}>📈 Areas for Improvement</div>
+                  <div style={S.listTitle}> Areas for Improvement</div>
                   {result.improvements.map((imp, i) => (
                     <div key={i} style={S.listItem('improvement')}><span>→</span> {imp}</div>
                   ))}
@@ -523,7 +523,7 @@ export default function ImageMarkingPage() {
 
               {result.modelAnswer && (
                 <div style={S.modelAnswerBox}>
-                  <div style={S.modelAnswerTitle}>💡 Model Answer / Key Points</div>
+                  <div style={S.modelAnswerTitle}> Model Answer / Key Points</div>
                   <div style={S.modelAnswerText}>{result.modelAnswer}</div>
                 </div>
               )}
@@ -546,7 +546,7 @@ export default function ImageMarkingPage() {
                 setQuestionText(''); setMarkScheme('');
               }}
             >
-              📸 Mark Another Answer
+               Mark Another Answer
             </button>
           </div>
         )}

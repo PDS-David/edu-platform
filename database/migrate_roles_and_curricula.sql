@@ -66,35 +66,35 @@ END$$;
 INSERT INTO exam_boards (code, name, full_name, description, country, icon_emoji, display_order, is_active, created_at, updated_at)
 VALUES ('GCE_AL', 'GCE A'' Levels', 'General Certificate of Education Advanced Level',
   'GCE Advanced Level examinations, recognised across West Africa and the UK.',
-  'NG', '🎓', 15, true, NOW(), NOW())
+  'NG', '', 15, true, NOW(), NOW())
 ON CONFLICT (code) DO UPDATE SET name=EXCLUDED.name, is_active=true, updated_at=NOW();
 
 -- JUPEB
 INSERT INTO exam_boards (code, name, full_name, description, country, icon_emoji, display_order, is_active, created_at, updated_at)
 VALUES ('JUPEB', 'JUPEB', 'Joint Universities Preliminary Examinations Board',
   'Nigerian pre-degree programme accepted for direct 200-Level entry.',
-  'NG', '🏛️', 16, true, NOW(), NOW())
+  'NG', '', 16, true, NOW(), NOW())
 ON CONFLICT (code) DO UPDATE SET name=EXCLUDED.name, is_active=true, updated_at=NOW();
 
 -- Language Lab — English
 INSERT INTO exam_boards (code, name, full_name, description, country, icon_emoji, display_order, is_active, created_at, updated_at)
 VALUES ('LANG_EN', 'Language Lab – English', 'Language Laboratory: English Language',
   'Spoken and written English language training for proficiency and examination preparation.',
-  'NG', '🇬🇧', 20, true, NOW(), NOW())
+  'NG', '', 20, true, NOW(), NOW())
 ON CONFLICT (code) DO UPDATE SET name=EXCLUDED.name, is_active=true, updated_at=NOW();
 
 -- Language Lab — French
 INSERT INTO exam_boards (code, name, full_name, description, country, icon_emoji, display_order, is_active, created_at, updated_at)
 VALUES ('LANG_FR', 'Language Lab – French', 'Language Laboratory: French Language',
   'Spoken and written French language training from beginner to advanced level.',
-  'NG', '🇫🇷', 21, true, NOW(), NOW())
+  'NG', '', 21, true, NOW(), NOW())
 ON CONFLICT (code) DO UPDATE SET name=EXCLUDED.name, is_active=true, updated_at=NOW();
 
 -- Language Lab — Yoruba
 INSERT INTO exam_boards (code, name, full_name, description, country, icon_emoji, display_order, is_active, created_at, updated_at)
 VALUES ('LANG_YO', 'Language Lab – Yoruba', 'Language Laboratory: Yoruba Language',
   'Yoruba language training covering oral, written and cultural aspects.',
-  'NG', '🌍', 22, true, NOW(), NOW())
+  'NG', '', 22, true, NOW(), NOW())
 ON CONFLICT (code) DO UPDATE SET name=EXCLUDED.name, is_active=true, updated_at=NOW();
 
 -- ─────────────────────────────────────────────────────────────

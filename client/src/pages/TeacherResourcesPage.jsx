@@ -215,7 +215,7 @@ function UploadTab({ showToast }) {
         <select value={form.subject_id} onChange={e => setForm(f => ({ ...f, subject_id: e.target.value }))} className={sel}>
           <option value="">Select subject…</option>
           {subjects.map(s => (
-            <option key={s.id} value={s.id}>{s.icon_emoji || '📚'} {s.name} {s.exam_board_code ? `(${s.exam_board_code})` : ''}</option>
+            <option key={s.id} value={s.id}>{s.icon_emoji || ''} {s.name} {s.exam_board_code ? `(${s.exam_board_code})` : ''}</option>
           ))}
         </select>
       </div>
@@ -451,7 +451,7 @@ function QuestionsTab({ showToast }) {
   return (
     <div className="max-w-2xl space-y-5">
       <div className="bg-teal-50 border border-teal-100 rounded-2xl px-4 py-3 text-xs text-teal-700">
-        ✅ Questions you submit here are <strong>automatically approved</strong> and will immediately appear in quizzes for your assigned subjects.
+         Questions you submit here are <strong>automatically approved</strong> and will immediately appear in quizzes for your assigned subjects.
       </div>
 
       {/* Question text */}

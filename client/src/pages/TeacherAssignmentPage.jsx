@@ -14,18 +14,18 @@ import TopNav from '../../components/TopNav';
 
 // ── Fallback static list (shown instantly; replaced by API data) ──────────────
 const FALLBACK_EXAM_TYPES = [
-  { id: null, code: 'JAMB',    name: 'JAMB / UTME',             icon_emoji: '🎓' },
-  { id: null, code: 'WAEC',    name: 'WAEC',                    icon_emoji: '📘' },
-  { id: null, code: 'GCE_OL',  name: 'GCE O-Levels',            icon_emoji: '📗' },
-  { id: null, code: 'NECO',    name: 'NECO',                    icon_emoji: '📙' },
-  { id: null, code: 'IELTS',   name: 'IELTS',                   icon_emoji: '🌍' },
-  { id: null, code: 'TOEFL',   name: 'TOEFL',                   icon_emoji: '🇺🇸' },
-  { id: null, code: 'SAT',     name: 'SAT',                     icon_emoji: '🎯' },
-  { id: null, code: 'GCE_AL',  name: 'GCE A-Levels',            icon_emoji: '🏫' },
-  { id: null, code: 'JUPEB',   name: 'JUPEB',                   icon_emoji: '📚' },
-  { id: null, code: 'LANG_EN', name: 'Language Lab. – English', icon_emoji: '🇬🇧' },
-  { id: null, code: 'LANG_FR', name: 'Language Lab. – French',  icon_emoji: '🇫🇷' },
-  { id: null, code: 'LANG_YO', name: 'Language Lab. – Yoruba',  icon_emoji: '🌟' },
+  { id: null, code: 'JAMB',    name: 'JAMB / UTME',             icon_emoji: '' },
+  { id: null, code: 'WAEC',    name: 'WAEC',                    icon_emoji: '' },
+  { id: null, code: 'GCE_OL',  name: 'GCE O-Levels',            icon_emoji: '' },
+  { id: null, code: 'NECO',    name: 'NECO',                    icon_emoji: '' },
+  { id: null, code: 'IELTS',   name: 'IELTS',                   icon_emoji: '' },
+  { id: null, code: 'TOEFL',   name: 'TOEFL',                   icon_emoji: '' },
+  { id: null, code: 'SAT',     name: 'SAT',                     icon_emoji: '' },
+  { id: null, code: 'GCE_AL',  name: 'GCE A-Levels',            icon_emoji: '' },
+  { id: null, code: 'JUPEB',   name: 'JUPEB',                   icon_emoji: '' },
+  { id: null, code: 'LANG_EN', name: 'Language Lab. – English', icon_emoji: '' },
+  { id: null, code: 'LANG_FR', name: 'Language Lab. – French',  icon_emoji: '' },
+  { id: null, code: 'LANG_YO', name: 'Language Lab. – Yoruba',  icon_emoji: '' },
 ];
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
@@ -223,14 +223,14 @@ function AddAssignmentDialog({ teachers, onClose, onSaved }) {
             {/* Subject count badge */}
             {examTypeCode && subjects.length > 0 && !loadingSubj && (
               <p className="text-xs text-teal-600 mt-1">
-                ✅ {subjects.length} subject{subjects.length !== 1 ? 's' : ''} available
+                 {subjects.length} subject{subjects.length !== 1 ? 's' : ''} available
               </p>
             )}
 
             {/* Warning when no subjects */}
             {examTypeCode && subjects.length === 0 && !loadingSubj && (
               <p className="text-xs text-amber-600 mt-1">
-                ⚠️ No subjects exist for this exam type yet. Run the seed SQL or add subjects via Content Management.
+                 No subjects exist for this exam type yet. Run the seed SQL or add subjects via Content Management.
               </p>
             )}
           </div>
@@ -240,7 +240,7 @@ function AddAssignmentDialog({ teachers, onClose, onSaved }) {
             const found = subjects.find(s => String(s.id) === String(subjectId));
             return found?.description ? (
               <p className="text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2">
-                📖 {found.description}
+                 {found.description}
               </p>
             ) : null;
           })()}

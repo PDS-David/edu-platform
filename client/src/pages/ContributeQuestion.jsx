@@ -273,7 +273,7 @@ export default function ContributeQuestion() {
                 >
                   <option value="">Select…</option>
                   {examBoards.map(b => (
-                    <option key={b.id} value={b.id}>{b.icon_emoji || '📚'} {b.name}</option>
+                    <option key={b.id} value={b.id}>{b.icon_emoji || ''} {b.name}</option>
                   ))}
                 </select>
               )}
@@ -289,7 +289,7 @@ export default function ContributeQuestion() {
               >
                 <option value="">Any subject</option>
                 {subjects.map(s => (
-                  <option key={s.id} value={s.id}>{s.icon_emoji || '📚'} {s.name}</option>
+                  <option key={s.id} value={s.id}>{s.icon_emoji || ''} {s.name}</option>
                 ))}
               </select>
             </div>
@@ -354,7 +354,7 @@ export default function ContributeQuestion() {
                         opt.is_correct ? 'border-green-500 bg-green-500 text-white' : 'border-gray-300 hover:border-green-400'
                       }`}
                     >
-                      {opt.is_correct && <span className="text-xs font-bold">✓</span>}
+                      {opt.is_correct && <span className="text-xs font-bold"></span>}
                     </button>
                     <span className="w-6 h-6 bg-gray-100 rounded text-xs font-bold text-gray-600 flex items-center justify-center flex-shrink-0">
                       {OPTION_LABELS[i]}

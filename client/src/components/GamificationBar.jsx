@@ -7,13 +7,13 @@ import api from '../services/api';
 import { Flame, Zap } from 'lucide-react';
 
 const BADGE_META = {
-  first_answer:     { emoji: '⭐', label: 'First Answer'  },
-  streak_3:         { emoji: '🔥', label: '3-Day Streak'  },
-  streak_7:         { emoji: '🔥', label: '7-Day Streak'  },
-  streak_30:        { emoji: '🔥', label: '30-Day Streak' },
-  accuracy_80:      { emoji: '🎯', label: '80% Accuracy'  },
-  quiz_master_10:   { emoji: '🏆', label: 'Quiz Master'   },
-  subject_complete: { emoji: '📚', label: 'Subject Done'  },
+  first_answer:     { emoji: '', label: 'First Answer'  },
+  streak_3:         { emoji: '', label: '3-Day Streak'  },
+  streak_7:         { emoji: '', label: '7-Day Streak'  },
+  streak_30:        { emoji: '', label: '30-Day Streak' },
+  accuracy_80:      { emoji: '', label: '80% Accuracy'  },
+  quiz_master_10:   { emoji: '', label: 'Quiz Master'   },
+  subject_complete: { emoji: '', label: 'Subject Done'  },
 };
 
 const ALL_BADGES = Object.keys(BADGE_META);
