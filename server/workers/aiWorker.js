@@ -13,15 +13,17 @@
 //
 // Or add to server.js startup (see note at the bottom of this file).
 
-const { Worker } = require('bullmq');
-const { QueryTypes } = require('sequelize');
-const sequelize = require('../config/database');
+const { Worker }         = require('bullmq');
+const { QueryTypes }     = require('sequelize');
+const sequelize          = require('../config/database');
 const { getRedisClient } = require('../config/redisClient');
 const {
   generateHint,
   generateExplanation,
   markImage,
 } = require('../services/aiService');
+
+const DEBUG = process.env.LOG_LEVEL === 'debug';
 
 // ── Job handlers ──────────────────────────────────────────────────────────────
 
@@ -151,15 +153,15 @@ const worker = new Worker(
     if (cacheKey) {
       const cached = await redis.get(cacheKey);
       if (cached) {
-        console.log(`[AiWorker] Cache hit for job ${job.id} (${job.name}) key=${cacheKey}`);
+        if (DEBUG) console.log(`[AiWorker] Cache hit for job ${job.id} (${job.name}) key=${cacheKey}`);
         return JSON.parse(cached);
       }
     }
 
     // ── Generate ──────────────────────────────────────────────────────────────
-    console.log(`[AiWorker] Processing job ${job.id} (${job.name})`);
+    if (DEBUG) console.log(`[AiWorker] Processing job ${job.id} (${job.name})`);
     const result = await handler(job.data);
-    console.log(`[AiWorker] Completed job ${job.id} (${job.name})`);
+    if (DEBUG) console.log(`[AiWorker] Completed job ${job.id} (${job.name})`);
 
     // ── Cache store (TTL: 24 h) ───────────────────────────────────────────────
     if (cacheKey) {
