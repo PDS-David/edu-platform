@@ -4,6 +4,9 @@
 //   id (INTEGER), topic_id, subtopic_id, uploaded_by, title,
 //   type (ENUM video/pdf/link/note/image/other), url, content,
 //   description, is_premium, order_index, is_active, created_at, updated_at
+//
+// v2 UUID FIX: removed parseInt() from topic_id and subtopic_id query/body params
+//   (these are UUID foreign keys). parseInt(req.params.id) is kept — resources.id is INTEGER.
 
 const express    = require('express');
 const router     = express.Router();
@@ -88,8 +91,8 @@ router.post(
          RETURNING id`,
         {
           replacements: {
-            topicId:     topic_id    ? parseInt(topic_id)    : null,
-            subtopicId:  subtopic_id ? parseInt(subtopic_id) : null,
+            topicId:     topic_id    || null,   // FIX: was parseInt(topic_id)
+            subtopicId:  subtopic_id || null,   // FIX: was parseInt(subtopic_id)
             uploadedBy:  req.user.id,
             title:       title.trim(),
             type:        resourceType,
@@ -125,9 +128,10 @@ router.get('/', protect, async (req, res) => {
   const { topic_id, subtopic_id, type } = req.query;
   const filters      = ['r.is_active = true'];
   const replacements = {};
-  if (topic_id)    { filters.push('r.topic_id    = :topic_id');    replacements.topic_id    = parseInt(topic_id);    }
-  if (subtopic_id) { filters.push('r.subtopic_id = :subtopic_id'); replacements.subtopic_id = parseInt(subtopic_id); }
-  if (type)        { filters.push('r.type        = :type');         replacements.type        = type;                  }
+  // FIX: was parseInt(topic_id) / parseInt(subtopic_id) — both are UUID foreign keys
+  if (topic_id)    { filters.push('r.topic_id    = :topic_id');    replacements.topic_id    = topic_id;    }
+  if (subtopic_id) { filters.push('r.subtopic_id = :subtopic_id'); replacements.subtopic_id = subtopic_id; }
+  if (type)        { filters.push('r.type        = :type');         replacements.type        = type;        }
 
   try {
     const rows = await sequelize.query(
@@ -151,6 +155,7 @@ router.get('/', protect, async (req, res) => {
 });
 
 // ── GET /api/resources/:id ────────────────────────────────────────────────────
+// resources.id is INTEGER — parseInt(req.params.id) is correct here
 router.get('/:id', protect, async (req, res) => {
   try {
     const rows = await sequelize.query(
@@ -171,6 +176,7 @@ router.get('/:id', protect, async (req, res) => {
 });
 
 // ── DELETE /api/resources/:id ─────────────────────────────────────────────────
+// resources.id is INTEGER — parseInt(req.params.id) is correct here
 router.delete('/:id', protect, authorize('teacher', 'admin'), async (req, res) => {
   try {
     const rows = await sequelize.query(
@@ -182,7 +188,10 @@ router.delete('/:id', protect, authorize('teacher', 'admin'), async (req, res) =
     if (req.user.role === 'teacher' && resource.uploaded_by !== req.user.id) {
       return res.status(403).json({ success: false, error: 'You can only delete your own resources' });
     }
-    await sequelize.query(`UPDATE resources SET is_active = false WHERE id = :id`, { replacements: { id: parseInt(req.params.id) }, type: QueryTypes.UPDATE });
+    await sequelize.query(
+      `UPDATE resources SET is_active = false WHERE id = :id`,
+      { replacements: { id: parseInt(req.params.id) }, type: QueryTypes.UPDATE }
+    );
     const filePath = path.join(__dirname, '..', (resource.url || '').replace(/^\//, ''));
     fs.unlink(filePath, () => {});
     return res.json({ success: true, message: 'Resource deleted' });
