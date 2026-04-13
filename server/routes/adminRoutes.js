@@ -3,9 +3,9 @@
 //
 // PATCH CHANGES APPLIED:
 //   - POST /api/admin/generate-questions writes is_ai_generated=TRUE,
-//     ai_generation_source='gemini-2.0-flash', status='approved', source='ai_generated'
-//   - PATCH /api/admin/questions/bulk-approve  (Task 7)
-//   - GET  /api/admin/users                    (Task 12 — used by TeacherAssignmentPanel)
+//     status='approved', source='ai_generated'
+//   - PATCH /api/admin/questions/bulk-approve
+//   - GET  /api/admin/users
 //   - PUT  /api/admin/users/:id/role
 //   - PUT  /api/admin/users/:id/deactivate
 //   - DELETE /api/admin/users/:id
@@ -17,16 +17,26 @@
 //
 // v5 UUID FIX:
 //   Removed parseInt() from subject_id, exam_board_id, and teacher-subjects PK.
+//
+// v6 SCHEMA FIX:
+//   questions.id          = INTEGER (SERIAL) — not UUID
+//   subjects.id           = INTEGER
+//   questions.submitted_by = INTEGER in DB (UUID in model — mismatch)
+//   Fix: submitted_by omitted from INSERT (DB uses default/NULL)
+//         subject_id safely parsed — numeric string → parseInt, UUID → 400 error
+//         subjects lookup uses id::text cast to avoid integer parse crash
 
-const express    = require('express');
-const router     = express.Router();
+'use strict';
+
+const express        = require('express');
+const router         = express.Router();
 const { QueryTypes } = require('sequelize');
-const sequelize  = require('../config/database');
-const { protect } = require('../middleware/auth');
+const sequelize      = require('../config/database');
+const { protect }    = require('../middleware/auth');
 // v4: central AI hub replaces inline getGeminiModel() helper
-const { generate } = require('../services/ai');
+const { generate }   = require('../services/ai');
 
-// ── Admin guard ───────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 const adminOnly = (req, res, next) => {
   if (req.user?.role !== 'admin') {
     return res.status(403).json({ success: false, error: 'Admin access required' });
@@ -34,10 +44,21 @@ const adminOnly = (req, res, next) => {
   next();
 };
 
+// v6: Safe subject_id parser.
+// subjects.id is INTEGER. The frontend dropdown should send an integer ID.
+// If a UUID-like string arrives (frontend bug) we return a clear 400 instead
+// of crashing with "invalid input syntax for type integer".
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function parseSubjectId(raw) {
+  const s = String(raw || '').trim();
+  if (UUID_RE.test(s)) return null;          // UUID — subjects table uses INTEGER pk
+  const n = parseInt(s, 10);
+  return isNaN(n) ? null : n;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/admin/generate-questions
 // Body: { subject_id, topic, exam_board, count, difficulty }
-// Inserts questions with status='approved', is_ai_generated=true, source='ai_generated'
 // ─────────────────────────────────────────────────────────────────────────────
 router.post('/generate-questions', protect, adminOnly, async (req, res) => {
   const {
@@ -55,10 +76,19 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
     return res.status(400).json({ success: false, error: 'count must be between 1 and 50' });
   }
 
-  // ── Fetch subject name for the prompt ─────────────────────────────────────
+  // v6: subjects.id is INTEGER — validate before querying
+  const safeSubjectId = parseSubjectId(subject_id);
+  if (safeSubjectId === null) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid subject_id. Please reselect a subject from the dropdown.',
+    });
+  }
+
+  // ── Fetch subject name ────────────────────────────────────────────────────
   const subjects = await sequelize.query(
     `SELECT name FROM subjects WHERE id = :id`,
-    { replacements: { id: subject_id }, type: QueryTypes.SELECT }
+    { replacements: { id: safeSubjectId }, type: QueryTypes.SELECT }
   );
   if (!subjects.length) {
     return res.status(404).json({ success: false, error: 'Subject not found' });
@@ -79,7 +109,7 @@ Return ONLY a valid JSON array with no preamble, no markdown, no backticks. Each
       { "option_text": "...", "is_correct": false }
     ],
     "explanation": "...",
-    "concept_hint": "A short 1-sentence conceptual clue that helps a student understand WHY this answer is correct, without giving it away. E.g. 'Think about what happens to osmotic pressure when solute concentration increases.'",
+    "concept_hint": "A short 1-sentence conceptual clue that helps a student understand WHY this answer is correct, without giving it away.",
     "marks": 1,
     "difficulty": "${difficulty}"
   }
@@ -94,10 +124,8 @@ Rules:
 - Do NOT include numbering, preambles, or any text outside the JSON array`;
 
   try {
-    // v4: single generate() call replaces getGeminiModel() + generateContent()
     const raw = await generate(prompt, 'generate-questions');
 
-    // Strip any accidental markdown fences
     const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
 
     let questions;
@@ -112,46 +140,54 @@ Rules:
       return res.status(502).json({ success: false, error: 'AI returned empty question set.' });
     }
 
-    // ── Look up exam_board_id UUID ────────────────────────────────────────────
+    // ── Look up exam_board_id (INTEGER FK) ───────────────────────────────────
     const boardRows = await sequelize.query(
       'SELECT id FROM exam_boards WHERE UPPER(code) = UPPER(:code) LIMIT 1',
       { replacements: { code: exam_board }, type: QueryTypes.SELECT }
     );
     const examBoardId = boardRows[0]?.id || null;
 
-    // ── Insert questions + options into DB ────────────────────────────────────
+    // ── Insert questions into DB ─────────────────────────────────────────────
+    // v6: submitted_by is OMITTED — the column type in DB (INTEGER) conflicts
+    // with req.user.id (UUID). Omitting lets the DB use its default (NULL).
+    // is_ai_generated=TRUE and source='ai_generated' preserve audit trail.
     let inserted = 0;
     const insertedQuestions = [];
 
     for (const q of questions) {
       if (!q.question_text || !Array.isArray(q.options)) continue;
 
-      const qResult = await sequelize.query(
-        `INSERT INTO questions
-           (question_text, marks, explanation, options, correct_answer,
-            subtopic_id, submitted_by, difficulty,
-            is_ai_generated, ai_generation_source, status, source,
-            is_active, created_at, updated_at)
-         VALUES
-           (:question_text, :marks, :explanation, :options::jsonb, :correct_answer,
-            :subtopic_id, :submitted_by, :difficulty,
-            true, 'gemini-2.5-flash', 'approved', 'ai_generated',
-            true, NOW(), NOW())
-         RETURNING id`,
-        {
-          replacements: {
-            question_text:  q.question_text,
-            marks:          q.marks || 1,
-            difficulty:     q.difficulty || difficulty || 'medium',
-            explanation:    q.explanation || '',
-            options:        JSON.stringify(q.options || []),
-            correct_answer: q.correct_answer || (q.options?.find(o => o.is_correct)?.option_text) || '',
-            subtopic_id:    null,
-            submitted_by:   req.user.id,
-          },
-          type: QueryTypes.SELECT,
-        }
-      );
+      let qResult;
+      try {
+        qResult = await sequelize.query(
+          `INSERT INTO questions
+             (question_text, marks, explanation, options, correct_answer,
+              subtopic_id, difficulty,
+              is_ai_generated, ai_generation_source, status, source,
+              is_active, created_at, updated_at)
+           VALUES
+             (:question_text, :marks, :explanation, :options::jsonb, :correct_answer,
+              NULL, :difficulty,
+              true, 'gemini', 'approved', 'ai_generated',
+              true, NOW(), NOW())
+           RETURNING id`,
+          {
+            replacements: {
+              question_text:  q.question_text,
+              marks:          q.marks || 1,
+              difficulty:     q.difficulty || difficulty || 'medium',
+              explanation:    q.explanation || '',
+              options:        JSON.stringify(q.options || []),
+              correct_answer: q.correct_answer ||
+                              (q.options?.find(o => o.is_correct)?.option_text) || '',
+            },
+            type: QueryTypes.SELECT,
+          }
+        );
+      } catch (insertErr) {
+        console.error('[generate-questions] INSERT error:', insertErr.message);
+        continue; // skip this question, try the rest
+      }
 
       const questionId = qResult[0]?.id;
       if (!questionId) continue;
@@ -194,7 +230,7 @@ router.get('/questions/pending-count', protect, adminOnly, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GET /api/admin/subjects — subject list for the generate form
+// GET /api/admin/subjects
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/subjects', protect, adminOnly, async (req, res) => {
   try {
@@ -244,12 +280,20 @@ router.get('/teacher-assignments', protect, adminOnly, async (req, res) => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/admin/teacher-assignments
+// teacher_subjects.subject_id and exam_board_id are INTEGER FKs
 // ─────────────────────────────────────────────────────────────────────────────
 router.post('/teacher-assignments', protect, adminOnly, async (req, res) => {
   const { teacher_id, subject_id, exam_board_id } = req.body;
 
   if (!teacher_id || !subject_id) {
     return res.status(400).json({ success: false, error: 'teacher_id and subject_id are required' });
+  }
+
+  const safeSubjectId   = parseSubjectId(subject_id);
+  const safeExamBoardId = exam_board_id ? parseInt(exam_board_id, 10) || null : null;
+
+  if (safeSubjectId === null) {
+    return res.status(400).json({ success: false, error: 'Invalid subject_id format' });
   }
 
   try {
@@ -261,8 +305,8 @@ router.post('/teacher-assignments', protect, adminOnly, async (req, res) => {
       {
         replacements: {
           teacherId:   teacher_id,
-          subjectId:   subject_id,
-          examBoardId: exam_board_id || null,
+          subjectId:   safeSubjectId,
+          examBoardId: safeExamBoardId,
           adminId:     req.user.id,
         },
         type: QueryTypes.INSERT,
@@ -277,9 +321,11 @@ router.post('/teacher-assignments', protect, adminOnly, async (req, res) => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DELETE /api/admin/teacher-assignments/:id
+// teacher_subjects.id is SERIAL (INTEGER)
 // ─────────────────────────────────────────────────────────────────────────────
 router.delete('/teacher-assignments/:id', protect, adminOnly, async (req, res) => {
-  const { id } = req.params;
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) return res.status(400).json({ success: false, error: 'Invalid id' });
   try {
     await sequelize.query(
       `UPDATE teacher_subjects SET is_active = false WHERE id = :id`,
@@ -299,8 +345,7 @@ router.get('/platform-stats', protect, adminOnly, async (req, res) => {
   try {
     const safeQuery = async (sql, fallback) => {
       try {
-        const rows = await sequelize.query(sql, { type: QueryTypes.SELECT });
-        return rows;
+        return await sequelize.query(sql, { type: QueryTypes.SELECT });
       } catch (e) {
         console.warn('[platform-stats] query skipped:', e.message);
         return fallback;
@@ -319,7 +364,7 @@ router.get('/platform-stats', protect, adminOnly, async (req, res) => {
         [{}]
       ),
       safeQuery(
-        `SELECT COUNT(*)::INTEGER AS total_approved, 0 AS total_pending, 0 AS answered_today, 0 AS answered_this_week FROM questions`,
+        `SELECT COUNT(*)::INTEGER AS total_approved FROM questions WHERE is_active = true`,
         [{}]
       ),
       safeQuery(
@@ -361,7 +406,6 @@ router.get('/platform-stats', protect, adminOnly, async (req, res) => {
         daily_activity: Array.isArray(dailyActivity) ? dailyActivity : [],
       },
     });
-
   } catch (err) {
     console.error('[GET /admin/platform-stats] Error:', err.message);
     return res.status(500).json({ success: false, error: err.message });
@@ -406,16 +450,12 @@ router.get('/questions/pending', protect, adminOnly, async (req, res) => {
                 st.name AS subtopic_name,
                 s.name  AS subject_name,
                 eb.code AS exam_board_code,
-                eb.name AS exam_board_name,
-                u.first_name AS submitter_first_name,
-                u.last_name  AS submitter_last_name,
-                u.email      AS submitter_email
+                eb.name AS exam_board_name
          FROM questions q
          LEFT JOIN subtopics  st ON st.id = q.subtopic_id
          LEFT JOIN topics     tp ON tp.id = st.topic_id
          LEFT JOIN subjects   s  ON s.id  = tp.subject_id
          LEFT JOIN exam_boards eb ON eb.id = s.exam_board_id
-         LEFT JOIN users      u  ON u.id  = q.submitted_by
          WHERE q.is_active = true
          ORDER BY q.created_at DESC
          LIMIT :limit OFFSET :offset`,
@@ -435,7 +475,7 @@ router.get('/questions/pending', protect, adminOnly, async (req, res) => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PATCH /api/admin/questions/bulk-approve
-// MUST be registered BEFORE /:id/approve to prevent Express matching 'bulk-approve' as an id
+// MUST be before /:id/approve to prevent Express matching 'bulk-approve' as id
 // ─────────────────────────────────────────────────────────────────────────────
 router.patch('/questions/bulk-approve', protect, adminOnly, async (req, res) => {
   const { question_ids } = req.body;
@@ -444,23 +484,22 @@ router.patch('/questions/bulk-approve', protect, adminOnly, async (req, res) => 
     return res.status(400).json({ success: false, error: 'question_ids must be a non-empty array' });
   }
 
-  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  if (question_ids.some(id => !UUID_RE.test(id))) {
-    return res.status(400).json({ success: false, error: 'All question_ids must be valid UUIDs' });
+  // questions.id is INTEGER — validate all are numeric
+  const numericIds = question_ids.map(id => parseInt(id, 10)).filter(n => !isNaN(n));
+  if (numericIds.length === 0) {
+    return res.status(400).json({ success: false, error: 'All question_ids must be valid integers' });
   }
 
   try {
     await sequelize.query(
-      `UPDATE questions
-       SET status = 'approved', updated_at = NOW()
-       WHERE id = ANY(:ids::uuid[])`,
-      { replacements: { ids: question_ids }, type: QueryTypes.UPDATE }
+      `UPDATE questions SET status = 'approved', updated_at = NOW()
+       WHERE id = ANY(:ids::integer[])`,
+      { replacements: { ids: numericIds }, type: QueryTypes.UPDATE }
     );
-
     return res.json({
-      success: true,
-      message: `${question_ids.length} question${question_ids.length !== 1 ? 's' : ''} approved`,
-      approved_count: question_ids.length,
+      success:        true,
+      message:        `${numericIds.length} question${numericIds.length !== 1 ? 's' : ''} approved`,
+      approved_count: numericIds.length,
     });
   } catch (err) {
     console.error('[PATCH /admin/questions/bulk-approve]', err.message);
@@ -473,21 +512,19 @@ router.patch('/questions/bulk-approve', protect, adminOnly, async (req, res) => 
 // ─────────────────────────────────────────────────────────────────────────────
 router.put('/questions/:id/review', protect, adminOnly, async (req, res) => {
   const { action, feedback } = req.body;
-  const { id } = req.params;
+  const id = parseInt(req.params.id, 10);
 
   if (!['approve', 'reject'].includes(action)) {
     return res.status(400).json({ success: false, error: 'action must be approve or reject' });
   }
+  if (isNaN(id)) return res.status(400).json({ success: false, error: 'Invalid question id' });
 
   try {
-    const newStatus = action === 'approve' ? 'approved' : 'rejected';
     await sequelize.query(
-      `UPDATE questions
-       SET status = :status, updated_at = NOW()
-       WHERE id = :id`,
-      { replacements: { status: newStatus, id }, type: QueryTypes.UPDATE }
+      `UPDATE questions SET status = :status, updated_at = NOW() WHERE id = :id`,
+      { replacements: { status: action === 'approve' ? 'approved' : 'rejected', id }, type: QueryTypes.UPDATE }
     );
-    return res.json({ success: true, message: `Question ${newStatus}` });
+    return res.json({ success: true, message: `Question ${action === 'approve' ? 'approved' : 'rejected'}` });
   } catch (err) {
     console.error('[PUT /admin/questions/:id/review] Error:', err.message);
     return res.status(500).json({ success: false, error: err.message });
@@ -498,10 +535,12 @@ router.put('/questions/:id/review', protect, adminOnly, async (req, res) => {
 // PATCH /api/admin/questions/:id/approve
 // ─────────────────────────────────────────────────────────────────────────────
 router.patch('/questions/:id/approve', protect, adminOnly, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) return res.status(400).json({ success: false, error: 'Invalid question id' });
   try {
     await sequelize.query(
       `UPDATE questions SET status = 'approved', updated_at = NOW() WHERE id = :id`,
-      { replacements: { id: req.params.id }, type: QueryTypes.UPDATE }
+      { replacements: { id }, type: QueryTypes.UPDATE }
     );
     return res.json({ success: true, message: 'Question approved' });
   } catch (err) {
@@ -513,14 +552,16 @@ router.patch('/questions/:id/approve', protect, adminOnly, async (req, res) => {
 // DELETE /api/admin/questions/:id
 // ─────────────────────────────────────────────────────────────────────────────
 router.delete('/questions/:id', protect, adminOnly, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) return res.status(400).json({ success: false, error: 'Invalid question id' });
   try {
     await sequelize.query(
       `DELETE FROM answer_options WHERE question_id = :id`,
-      { replacements: { id: req.params.id }, type: QueryTypes.DELETE }
+      { replacements: { id }, type: QueryTypes.DELETE }
     );
     await sequelize.query(
       `DELETE FROM questions WHERE id = :id`,
-      { replacements: { id: req.params.id }, type: QueryTypes.DELETE }
+      { replacements: { id }, type: QueryTypes.DELETE }
     );
     return res.json({ success: true, message: 'Question deleted' });
   } catch (err) {
@@ -529,8 +570,8 @@ router.delete('/questions/:id', protect, adminOnly, async (req, res) => {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-// USER MANAGEMENT ROUTES
-// GET /users/stats must come BEFORE GET /users/:id to avoid param capture
+// USER MANAGEMENT
+// GET /users/stats MUST be before GET /users/:id
 // ═════════════════════════════════════════════════════════════════════════════
 
 router.get('/users/stats', protect, adminOnly, async (req, res) => {
@@ -558,10 +599,7 @@ router.get('/users', protect, adminOnly, async (req, res) => {
     offset: ((parseInt(page) || 1) - 1) * (parseInt(limit) || 20),
   };
 
-  if (role) {
-    filters.push('u.role = :role');
-    replacements.role = role;
-  }
+  if (role) { filters.push('u.role = :role'); replacements.role = role; }
   if (search) {
     filters.push(`(u.first_name ILIKE :search OR u.last_name ILIKE :search OR u.email ILIKE :search)`);
     replacements.search = `%${search}%`;
@@ -630,7 +668,7 @@ router.delete('/users/:id', protect, adminOnly, async (req, res) => {
   }
 });
 
-// ── /admin/teacher-subjects — alias for TeacherAssignmentPage ────────────────
+// ── /admin/teacher-subjects — alias kept for TeacherAssignmentPage ────────────
 router.get('/teacher-subjects', protect, adminOnly, async (req, res) => {
   try {
     const rows = await sequelize.query(
@@ -654,16 +692,34 @@ router.get('/teacher-subjects', protect, adminOnly, async (req, res) => {
   }
 });
 
-// FIX 2a: removed parseInt() from subject_id and exam_board_id (both are UUIDs)
+// teacher_subjects.subject_id = INTEGER FK, exam_board_id = INTEGER FK
 router.post('/teacher-subjects', protect, adminOnly, async (req, res) => {
   const { teacher_id, subject_id, exam_board_id } = req.body;
-  if (!teacher_id || !subject_id) return res.status(400).json({ success: false, error: 'teacher_id and subject_id required' });
+  if (!teacher_id || !subject_id) {
+    return res.status(400).json({ success: false, error: 'teacher_id and subject_id required' });
+  }
+
+  const safeSubjectId   = parseSubjectId(subject_id);
+  const safeExamBoardId = exam_board_id ? parseInt(exam_board_id, 10) || null : null;
+
+  if (safeSubjectId === null) {
+    return res.status(400).json({ success: false, error: 'Invalid subject_id format' });
+  }
+
   try {
     await sequelize.query(
       `INSERT INTO teacher_subjects (teacher_id, subject_id, exam_board_id, assigned_by, is_active, assigned_at)
        VALUES (:teacherId, :subjectId, :examBoardId, :adminId, true, NOW())
        ON CONFLICT (teacher_id, subject_id) DO UPDATE SET is_active = true, assigned_by = :adminId, assigned_at = NOW()`,
-      { replacements: { teacherId: teacher_id, subjectId: subject_id, examBoardId: exam_board_id || null, adminId: req.user.id }, type: QueryTypes.INSERT }
+      {
+        replacements: {
+          teacherId:   teacher_id,
+          subjectId:   safeSubjectId,
+          examBoardId: safeExamBoardId,
+          adminId:     req.user.id,
+        },
+        type: QueryTypes.INSERT,
+      }
     );
     return res.json({ success: true, message: 'Teacher assigned to subject' });
   } catch (err) {
@@ -671,12 +727,14 @@ router.post('/teacher-subjects', protect, adminOnly, async (req, res) => {
   }
 });
 
-// FIX 2e: removed parseInt() from req.params.id (teacher_subjects PK is UUID)
+// teacher_subjects.id = SERIAL (INTEGER)
 router.delete('/teacher-subjects/:id', protect, adminOnly, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) return res.status(400).json({ success: false, error: 'Invalid id' });
   try {
     await sequelize.query(
       `UPDATE teacher_subjects SET is_active = false WHERE id = :id`,
-      { replacements: { id: req.params.id }, type: QueryTypes.UPDATE }
+      { replacements: { id }, type: QueryTypes.UPDATE }
     );
     return res.json({ success: true, message: 'Assignment removed' });
   } catch (err) {
