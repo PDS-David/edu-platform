@@ -11,64 +11,58 @@
 // v8  — Added essay-mark task to GEMINI_MODEL_MAP
 // v9  — Downgraded primary; added 503 retry with fallback chain
 // v10 — Switched to gemini-2.0-flash as primary; removed deprecated models
-// v11 — Primary changed to gemini-1.5-flash (universally available to all
-//        accounts including new Tier 1 users).
-//        gemini-2.0-flash and gemini-2.5-flash restricted on new accounts.
-//        Added 404 "no longer available" to fallback trigger conditions.
-// v12 — gemini-1.5-flash and gemini-1.5-pro are DEPRECATED (returning 404).
-//        Primary is now gemini-2.0-flash (stable, widely available).
-//        Fallback chain: gemini-2.0-flash-lite → gemini-2.5-flash.
-//        All 1.5-series models removed from routing config.
+// v11 — Primary changed to gemini-1.5-flash (universally available).
+// v12 — gemini-1.5-x series deprecated (404). Primary: gemini-2.0-flash-001.
 // v13 — Removed Claude entirely. Gemini-only.
-//        complex_reasoning now also handled by Gemini.
-//        No ANTHROPIC_API_KEY required.
-// v14 — Fixed model name strings. Generic names (e.g. "gemini-2.0-flash")
-//        return 404 on the API. Must use exact versioned strings:
-//          gemini-2.0-flash-001
-//          gemini-2.0-flash-lite-001
-//          gemini-2.5-flash-preview-04-17
+// v14 — Fixed model name strings to versioned format.
+// v15 — Migrated from deprecated @google/generative-ai to new @google/genai
+//        SDK (v1.48.0+). Old SDK hit EOL August 2025 and uses v1beta endpoint
+//        which no longer supports current model names.
+//        New SDK uses GoogleGenAI client with ai.models.generateContent().
+//        Model names simplified back to canonical short names (gemini-2.0-flash
+//        etc.) which are correctly resolved by the new SDK on the v1 endpoint.
+//        Removed @anthropic-ai/sdk dependency entirely.
 //
 // Public API (signature unchanged):
 //   generate(prompt, task, options?) → Promise<string>
 // ─────────────────────────────────────────────────────────────────────────────
 
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { GoogleGenAI } = require('@google/genai');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ROUTING CONFIG
 // ═══════════════════════════════════════════════════════════════════════════
 
-// v14: Use exact versioned model name strings — generic aliases return 404.
+// v15: New SDK resolves canonical model names correctly via v1 endpoint.
 const GEMINI_MODEL_MAP = {
-  'generate-questions': 'gemini-2.0-flash-001',
-  'chat':               'gemini-2.0-flash-001',
-  'explain':            'gemini-2.0-flash-001',
-  'hint':               'gemini-2.0-flash-001',
-  'notes':              'gemini-2.0-flash-001',
-  'remediation':        'gemini-2.0-flash-001',
-  'essay-mark':         'gemini-2.0-flash-001',
-  'complex_reasoning':  'gemini-2.0-flash-001',
-  'default':            'gemini-2.0-flash-001',
+  'generate-questions': 'gemini-2.0-flash',
+  'chat':               'gemini-2.0-flash',
+  'explain':            'gemini-2.0-flash',
+  'hint':               'gemini-2.0-flash',
+  'notes':              'gemini-2.0-flash',
+  'remediation':        'gemini-2.0-flash',
+  'essay-mark':         'gemini-2.0-flash',
+  'complex_reasoning':  'gemini-2.0-flash',
+  'default':            'gemini-2.0-flash',
 };
 
 // Fallback chain — tried in order if primary fails (503, 429, 404, etc.)
-//   1. gemini-2.0-flash-001             — primary (stable, widely available)
-//   2. gemini-2.0-flash-lite-001        — lighter/faster, separate quota pool
-//   3. gemini-2.5-flash-preview-04-17   — newest, try last (may be under high demand)
-const FALLBACK_CHAIN = ['gemini-2.0-flash-lite-001', 'gemini-2.5-flash-preview-04-17'];
+//   1. gemini-2.0-flash       — primary (stable, widely available)
+//   2. gemini-2.0-flash-lite  — lighter/faster, separate quota pool
+//   3. gemini-2.5-flash       — newest, try last (may be under high demand)
+const FALLBACK_CHAIN = ['gemini-2.0-flash-lite', 'gemini-2.5-flash'];
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PROVIDER HELPERS
 // ═══════════════════════════════════════════════════════════════════════════
 
-// ── Gemini singleton cache ─────────────────────────────────────────────────
-const _geminiModels = {};
-function _getGeminiModel(modelName) {
-  if (!_geminiModels[modelName]) {
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    _geminiModels[modelName] = genAI.getGenerativeModel({ model: modelName });
+// ── GoogleGenAI singleton ──────────────────────────────────────────────────
+let _ai = null;
+function _getAI() {
+  if (!_ai) {
+    _ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   }
-  return _geminiModels[modelName];
+  return _ai;
 }
 
 // ── Helper: detect ANY retryable/unavailability error from Google ──────────
@@ -105,15 +99,19 @@ async function _callGemini(prompt, task) {
 
   const primaryModel = GEMINI_MODEL_MAP[task] || GEMINI_MODEL_MAP.default;
   const modelsToTry  = [primaryModel, ...FALLBACK_CHAIN];
+  const ai           = _getAI();
 
   for (let i = 0; i < modelsToTry.length; i++) {
     const modelName = modelsToTry[i];
     const isLast    = i === modelsToTry.length - 1;
 
     try {
-      const model  = _getGeminiModel(modelName);
-      const result = await model.generateContent(prompt);
-      const text   = result.response.text();
+      const response = await ai.models.generateContent({
+        model:    modelName,
+        contents: prompt,
+      });
+
+      const text = response.text;
 
       if (!text?.trim()) {
         throw new Error('Empty response from model');
