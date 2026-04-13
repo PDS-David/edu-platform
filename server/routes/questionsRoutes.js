@@ -2,12 +2,17 @@
 // server/routes/questionsRoutes.js
 // GET  /api/questions/random  — fetch questions (JSONB options, correct subtopic join)
 // POST /api/questions/:id/answer — validate answer, record practice_attempt
+//
+// v2 — Essay AI marking now routes through services/ai.js central hub
+//      instead of calling Gemini directly.
 
 const express        = require('express');
 const router         = express.Router();
 const { QueryTypes } = require('sequelize');
 const sequelize      = require('../config/database');
 const { protect }    = require('../middleware/auth');
+// v2: route essay marking through central AI hub
+const { generate }   = require('../services/ai');
 
 let awardXP = () => Promise.resolve();
 try { awardXP = require('../middleware/xpMiddleware').awardXP; } catch {}
@@ -66,7 +71,6 @@ router.get('/random', protect, async (req, res) => {
     return res.json({ success: true, count: questions.length, data: questions });
   } catch (err) {
     console.error('[GET /questions/random]', err.message);
-    // Return empty rather than crashing — frontend handles empty gracefully
     return res.json({ success: true, count: 0, data: [] });
   }
 });
@@ -95,7 +99,7 @@ router.post('/:id/answer', protect, async (req, res) => {
     let feedback     = null;
 
     if (!isEssay) {
-      // MCQ — compare against correct_answer (stored as text) or options JSONB
+      // MCQ — compare against correct_answer
       const correctAnswer = question.correct_answer;
       if (selected_answer !== undefined && selected_answer !== null) {
         isCorrect = String(selected_answer).trim().toLowerCase() ===
@@ -103,26 +107,23 @@ router.post('/:id/answer', protect, async (req, res) => {
       }
       marksAwarded = isCorrect ? (question.marks || 1) : 0;
     } else {
-      // Essay — AI marking or fallback
+      // Essay — AI marking via central hub (services/ai.js)
       if (process.env.GEMINI_API_KEY && essay_response?.trim()) {
         try {
-          const { GoogleGenerativeAI } = require('@google/generative-ai');
-          const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-          const model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || 'gemini-2.0-flash' });
           const prompt = `You are a Nigerian exam marker. Question: "${question.question_text}". Max marks: ${question.marks || 3}. Model answer: "${question.correct_answer || 'Not specified'}". Student answer: "${essay_response.trim()}". Return ONLY JSON: {"marks_awarded": N, "feedback": "...", "is_correct": true/false}`;
-          const result  = await model.generateContent(prompt);
-          const raw     = result.response.text().replace(/```json|```/g, '').trim();
-          const parsed  = JSON.parse(raw);
-          marksAwarded  = Math.min(parsed.marks_awarded || 0, question.marks || 3);
-          isCorrect     = parsed.is_correct || marksAwarded >= (question.marks || 3) * 0.5;
-          feedback      = parsed.feedback;
+          // v2: routes through ai.js instead of calling Gemini directly
+          const raw    = await generate(prompt, 'essay-mark');
+          const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
+          marksAwarded = Math.min(parsed.marks_awarded || 0, question.marks || 3);
+          isCorrect    = parsed.is_correct || marksAwarded >= (question.marks || 3) * 0.5;
+          feedback     = parsed.feedback;
         } catch {
           feedback = question.explanation || 'Submitted for review.';
         }
       }
     }
 
-    // Record practice attempt (non-blocking, safe)
+    // Record practice attempt (non-blocking)
     sequelize.query(
       `INSERT INTO practice_attempts
          (student_id, question_id, is_correct, time_taken_seconds, attempted_at)
@@ -141,12 +142,12 @@ router.post('/:id/answer', protect, async (req, res) => {
     awardXP(req.user.id, 'answer', { is_correct: isCorrect }).catch(() => {});
 
     return res.json({
-      success:       true,
-      is_correct:    isCorrect,
+      success:        true,
+      is_correct:     isCorrect,
       correct_answer: question.correct_answer,
-      explanation:   question.explanation || null,
-      marks_awarded: marksAwarded,
-      max_marks:     question.marks || 1,
+      explanation:    question.explanation || null,
+      marks_awarded:  marksAwarded,
+      max_marks:      question.marks || 1,
       feedback,
     });
   } catch (err) {
