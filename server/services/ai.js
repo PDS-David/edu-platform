@@ -35,22 +35,22 @@ const { GoogleGenAI } = require('@google/genai');
 
 // v15: New SDK resolves canonical model names correctly via v1 endpoint.
 const GEMINI_MODEL_MAP = {
-  'generate-questions': 'gemini-2.0-flash',
-  'chat':               'gemini-2.0-flash',
-  'explain':            'gemini-2.0-flash',
-  'hint':               'gemini-2.0-flash',
-  'notes':              'gemini-2.0-flash',
-  'remediation':        'gemini-2.0-flash',
-  'essay-mark':         'gemini-2.0-flash',
-  'complex_reasoning':  'gemini-2.0-flash',
-  'default':            'gemini-2.0-flash',
+  'generate-questions': 'gemini-2.5-flash',
+  'chat':               'gemini-2.5-flash',
+  'explain':            'gemini-2.5-flash',
+  'hint':               'gemini-2.5-flash',
+  'notes':              'gemini-2.5-flash',
+  'remediation':        'gemini-2.5-flash',
+  'essay-mark':         'gemini-2.5-flash',
+  'complex_reasoning':  'gemini-2.5-flash-preview-05-20',
+  'default':            'gemini-2.5-flash',
 };
 
 // Fallback chain — tried in order if primary fails (503, 429, 404, etc.)
-//   1. gemini-2.0-flash       — primary (stable, widely available)
-//   2. gemini-2.0-flash-lite  — lighter/faster, separate quota pool
-//   3. gemini-2.5-flash       — newest, try last (may be under high demand)
-const FALLBACK_CHAIN = ['gemini-2.0-flash-lite', 'gemini-2.5-flash'];
+//   1. gemini-2.5-flash            — primary (new paid API)
+//   2. gemini-2.5-flash-preview-05-20 — preview fallback
+//   3. gemini-1.5-flash            — stable fallback
+const FALLBACK_CHAIN = ['gemini-2.5-flash-preview-05-20', 'gemini-1.5-flash'];
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PROVIDER HELPERS

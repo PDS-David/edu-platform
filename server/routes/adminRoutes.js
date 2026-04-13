@@ -159,6 +159,7 @@ Rules:
 
       let qResult;
       try {
+        // Try full INSERT with extended columns (added by migration_002)
         qResult = await sequelize.query(
           `INSERT INTO questions
              (question_text, marks, explanation, options, correct_answer,
@@ -168,7 +169,7 @@ Rules:
            VALUES
              (:question_text, :marks, :explanation, :options::jsonb, :correct_answer,
               NULL, :difficulty,
-              true, 'gemini', 'approved', 'ai_generated',
+              true, 'gemini-2.5-flash', 'approved', 'ai_generated',
               true, NOW(), NOW())
            RETURNING id`,
           {
@@ -185,8 +186,37 @@ Rules:
           }
         );
       } catch (insertErr) {
-        console.error('[generate-questions] INSERT error:', insertErr.message);
-        continue; // skip this question, try the rest
+        // Fallback: minimal INSERT without extended columns (pre-migration_002 DB)
+        if (insertErr.message.includes('column') || insertErr.message.includes('does not exist')) {
+          try {
+            qResult = await sequelize.query(
+              `INSERT INTO questions
+                 (question_text, marks, explanation, options, correct_answer,
+                  subtopic_id, is_active, created_at, updated_at)
+               VALUES
+                 (:question_text, :marks, :explanation, :options::jsonb, :correct_answer,
+                  NULL, true, NOW(), NOW())
+               RETURNING id`,
+              {
+                replacements: {
+                  question_text:  q.question_text,
+                  marks:          q.marks || 1,
+                  explanation:    q.explanation || '',
+                  options:        JSON.stringify(q.options || []),
+                  correct_answer: q.correct_answer ||
+                                  (q.options?.find(o => o.is_correct)?.option_text) || '',
+                },
+                type: QueryTypes.SELECT,
+              }
+            );
+          } catch (fallbackErr) {
+            console.error('[generate-questions] Fallback INSERT error:', fallbackErr.message);
+            continue;
+          }
+        } else {
+          console.error('[generate-questions] INSERT error:', insertErr.message);
+          continue;
+        }
       }
 
       const questionId = qResult[0]?.id;
