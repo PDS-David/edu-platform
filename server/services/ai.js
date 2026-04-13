@@ -32,13 +32,13 @@ const CLAUDE_TASKS = new Set(['complex_reasoning']);
 
 // Gemini model per task — preserves the exact models used before v4.
 const GEMINI_MODEL_MAP = {
-  'generate-questions': 'gemini-2.0-flash',
-  'chat':               'gemini-2.0-flash',
-  'explain':            'gemini-2.0-flash',
-  'hint':               'gemini-2.0-flash',
-  'notes':              'gemini-2.0-flash',
-  'remediation':        'gemini-1.5-flash',
-  'default':            'gemini-2.0-flash',
+  'generate-questions': 'gemini-2.5-flash',
+  'chat':               'gemini-2.5-flash',
+  'explain':            'gemini-2.5-flash',
+  'hint':               'gemini-2.5-flash',
+  'notes':              'gemini-2.5-flash',
+  'remediation':        'gemini-2.5-flash',
+  'default':            'gemini-2.5-flash',
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
