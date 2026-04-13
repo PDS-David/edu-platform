@@ -20,8 +20,13 @@
 //        Fallback chain: gemini-2.0-flash-lite → gemini-2.5-flash.
 //        All 1.5-series models removed from routing config.
 // v13 — Removed Claude entirely. Gemini-only.
-//        complex_reasoning now also handled by gemini-2.0-flash.
+//        complex_reasoning now also handled by Gemini.
 //        No ANTHROPIC_API_KEY required.
+// v14 — Fixed model name strings. Generic names (e.g. "gemini-2.0-flash")
+//        return 404 on the API. Must use exact versioned strings:
+//          gemini-2.0-flash-001
+//          gemini-2.0-flash-lite-001
+//          gemini-2.5-flash-preview-04-17
 //
 // Public API (signature unchanged):
 //   generate(prompt, task, options?) → Promise<string>
@@ -33,25 +38,24 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // ROUTING CONFIG
 // ═══════════════════════════════════════════════════════════════════════════
 
-// v12: gemini-2.0-flash is the current stable primary.
-// gemini-1.5-flash and gemini-1.5-pro are deprecated and return 404.
+// v14: Use exact versioned model name strings — generic aliases return 404.
 const GEMINI_MODEL_MAP = {
-  'generate-questions': 'gemini-2.0-flash',
-  'chat':               'gemini-2.0-flash',
-  'explain':            'gemini-2.0-flash',
-  'hint':               'gemini-2.0-flash',
-  'notes':              'gemini-2.0-flash',
-  'remediation':        'gemini-2.0-flash',
-  'essay-mark':         'gemini-2.0-flash',
-  'complex_reasoning':  'gemini-2.0-flash',  // v13: was Claude, now Gemini
-  'default':            'gemini-2.0-flash',
+  'generate-questions': 'gemini-2.0-flash-001',
+  'chat':               'gemini-2.0-flash-001',
+  'explain':            'gemini-2.0-flash-001',
+  'hint':               'gemini-2.0-flash-001',
+  'notes':              'gemini-2.0-flash-001',
+  'remediation':        'gemini-2.0-flash-001',
+  'essay-mark':         'gemini-2.0-flash-001',
+  'complex_reasoning':  'gemini-2.0-flash-001',
+  'default':            'gemini-2.0-flash-001',
 };
 
 // Fallback chain — tried in order if primary fails (503, 429, 404, etc.)
-//   1. gemini-2.0-flash      — primary (stable, widely available)
-//   2. gemini-2.0-flash-lite — lighter/faster, separate quota pool
-//   3. gemini-2.5-flash      — newest, try last (may be under high demand)
-const FALLBACK_CHAIN = ['gemini-2.0-flash-lite', 'gemini-2.5-flash'];
+//   1. gemini-2.0-flash-001             — primary (stable, widely available)
+//   2. gemini-2.0-flash-lite-001        — lighter/faster, separate quota pool
+//   3. gemini-2.5-flash-preview-04-17   — newest, try last (may be under high demand)
+const FALLBACK_CHAIN = ['gemini-2.0-flash-lite-001', 'gemini-2.5-flash-preview-04-17'];
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PROVIDER HELPERS
