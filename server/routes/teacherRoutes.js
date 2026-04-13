@@ -1,5 +1,9 @@
 'use strict';
-// server/routes/teacherRoutes.js — all INTEGER ids, no UUID validation
+// server/routes/teacherRoutes.js
+//
+// v2 UUID FIX: removed parseInt() from subject_id, topic_id, subtopic_id
+//   body/query params — these are UUID foreign keys.
+//   parseInt(req.params.id) is kept for topic/subtopic row PKs (INTEGER).
 
 const express        = require('express');
 const router         = express.Router();
@@ -62,7 +66,8 @@ router.get('/my-subjects', protect, teacherOnly, async (req, res) => {
   }
 });
 
-// ── GET /api/teacher/topics?subject_id=N ─────────────────────────────────────
+// ── GET /api/teacher/topics?subject_id=<uuid> ─────────────────────────────────
+// FIX: was parseInt(subject_id) — subject_id is a UUID foreign key
 router.get('/topics', protect, teacherOnly, async (req, res) => {
   const { subject_id } = req.query;
   if (!subject_id) return res.status(400).json({ success: false, error: 'subject_id is required' });
@@ -74,7 +79,7 @@ router.get('/topics', protect, teacherOnly, async (req, res) => {
        LEFT JOIN subtopics st ON st.topic_id = t.id AND st.is_active = true
        WHERE t.subject_id = :subjectId AND t.is_active = true
        GROUP BY t.id ORDER BY t.order_index ASC NULLS LAST, t.name ASC`,
-      { replacements: { subjectId: parseInt(subject_id) }, type: QueryTypes.SELECT }
+      { replacements: { subjectId: subject_id }, type: QueryTypes.SELECT }
     );
     return res.json({ success: true, data: rows });
   } catch (err) {
@@ -83,6 +88,7 @@ router.get('/topics', protect, teacherOnly, async (req, res) => {
 });
 
 // ── POST /api/teacher/topics ──────────────────────────────────────────────────
+// FIX: was parseInt(subject_id) — subject_id is a UUID foreign key
 router.post('/topics', protect, teacherOnly, async (req, res) => {
   const { subject_id, name, description, order_index = 0 } = req.body;
   if (!subject_id || !name?.trim()) return res.status(400).json({ success: false, error: 'subject_id and name are required' });
@@ -92,7 +98,7 @@ router.post('/topics', protect, teacherOnly, async (req, res) => {
        VALUES (:subjectId, :name, :description, :orderIndex, true, NOW(), NOW())
        RETURNING id, name, description, order_index`,
       {
-        replacements: { subjectId: parseInt(subject_id), name: name.trim(), description: description || null, orderIndex: parseInt(order_index) || 0 },
+        replacements: { subjectId: subject_id, name: name.trim(), description: description || null, orderIndex: parseInt(order_index) || 0 },
         type: QueryTypes.SELECT,
       }
     );
@@ -103,6 +109,7 @@ router.post('/topics', protect, teacherOnly, async (req, res) => {
 });
 
 // ── PUT /api/teacher/topics/:id ───────────────────────────────────────────────
+// topics.id is INTEGER — parseInt(req.params.id) is correct here
 router.put('/topics/:id', protect, teacherOnly, async (req, res) => {
   const { name, description, order_index } = req.body;
   try {
@@ -120,14 +127,19 @@ router.put('/topics/:id', protect, teacherOnly, async (req, res) => {
 });
 
 // ── DELETE /api/teacher/topics/:id ───────────────────────────────────────────
+// topics.id is INTEGER — parseInt(req.params.id) is correct here
 router.delete('/topics/:id', protect, teacherOnly, async (req, res) => {
   try {
-    await sequelize.query(`UPDATE topics SET is_active = false, updated_at = NOW() WHERE id = :id`, { replacements: { id: parseInt(req.params.id) }, type: QueryTypes.UPDATE });
+    await sequelize.query(
+      `UPDATE topics SET is_active = false, updated_at = NOW() WHERE id = :id`,
+      { replacements: { id: parseInt(req.params.id) }, type: QueryTypes.UPDATE }
+    );
     return res.json({ success: true, message: 'Topic deleted' });
   } catch (err) { return res.status(500).json({ success: false, error: err.message }); }
 });
 
-// ── GET /api/teacher/subtopics?topic_id=N ────────────────────────────────────
+// ── GET /api/teacher/subtopics?topic_id=<uuid> ───────────────────────────────
+// FIX: was parseInt(topic_id) — topic_id is a UUID foreign key
 router.get('/subtopics', protect, teacherOnly, async (req, res) => {
   const { topic_id } = req.query;
   if (!topic_id) return res.status(400).json({ success: false, error: 'topic_id is required' });
@@ -136,13 +148,14 @@ router.get('/subtopics', protect, teacherOnly, async (req, res) => {
       `SELECT id, name, description, order_index, is_active
        FROM subtopics WHERE topic_id = :topicId AND is_active = true
        ORDER BY order_index ASC NULLS LAST, name ASC`,
-      { replacements: { topicId: parseInt(topic_id) }, type: QueryTypes.SELECT }
+      { replacements: { topicId: topic_id }, type: QueryTypes.SELECT }
     );
     return res.json({ success: true, data: rows });
   } catch (err) { return res.status(500).json({ success: false, error: err.message }); }
 });
 
 // ── POST /api/teacher/subtopics ───────────────────────────────────────────────
+// FIX: was parseInt(topic_id) and parseInt(subject_id) — both are UUID foreign keys
 router.post('/subtopics', protect, teacherOnly, async (req, res) => {
   const { topic_id, subject_id, name, description, order_index = 0 } = req.body;
   if (!topic_id || !name?.trim()) return res.status(400).json({ success: false, error: 'topic_id and name are required' });
@@ -152,7 +165,7 @@ router.post('/subtopics', protect, teacherOnly, async (req, res) => {
        VALUES (:topicId, :subjectId, :name, :description, :orderIndex, true, NOW(), NOW())
        RETURNING id, name, description, order_index`,
       {
-        replacements: { topicId: parseInt(topic_id), subjectId: subject_id ? parseInt(subject_id) : null, name: name.trim(), description: description || null, orderIndex: parseInt(order_index) || 0 },
+        replacements: { topicId: topic_id, subjectId: subject_id || null, name: name.trim(), description: description || null, orderIndex: parseInt(order_index) || 0 },
         type: QueryTypes.SELECT,
       }
     );
@@ -161,6 +174,7 @@ router.post('/subtopics', protect, teacherOnly, async (req, res) => {
 });
 
 // ── PUT /api/teacher/subtopics/:id ───────────────────────────────────────────
+// subtopics.id is INTEGER — parseInt(req.params.id) is correct here
 router.put('/subtopics/:id', protect, teacherOnly, async (req, res) => {
   const { name, description, order_index } = req.body;
   try {
@@ -173,9 +187,13 @@ router.put('/subtopics/:id', protect, teacherOnly, async (req, res) => {
 });
 
 // ── DELETE /api/teacher/subtopics/:id ────────────────────────────────────────
+// subtopics.id is INTEGER — parseInt(req.params.id) is correct here
 router.delete('/subtopics/:id', protect, teacherOnly, async (req, res) => {
   try {
-    await sequelize.query(`UPDATE subtopics SET is_active = false, updated_at = NOW() WHERE id = :id`, { replacements: { id: parseInt(req.params.id) }, type: QueryTypes.UPDATE });
+    await sequelize.query(
+      `UPDATE subtopics SET is_active = false, updated_at = NOW() WHERE id = :id`,
+      { replacements: { id: parseInt(req.params.id) }, type: QueryTypes.UPDATE }
+    );
     return res.json({ success: true, message: 'Subtopic deleted' });
   } catch (err) { return res.status(500).json({ success: false, error: err.message }); }
 });
@@ -223,7 +241,10 @@ router.post('/classes', protect, teacherOnly, async (req, res) => {
 router.post('/class/:classId/invite', protect, teacherOnly, async (req, res) => {
   const newCode = crypto.randomBytes(3).toString('hex').toUpperCase();
   try {
-    await sequelize.query(`UPDATE classes SET join_code=:code WHERE id=:id AND teacher_id=:teacherId`, { replacements: { code: newCode, id: req.params.classId, teacherId: req.user.id }, type: QueryTypes.UPDATE });
+    await sequelize.query(
+      `UPDATE classes SET join_code=:code WHERE id=:id AND teacher_id=:teacherId`,
+      { replacements: { code: newCode, id: req.params.classId, teacherId: req.user.id }, type: QueryTypes.UPDATE }
+    );
     return res.json({ success: true, join_code: newCode });
   } catch (err) { return res.status(500).json({ success: false, error: err.message }); }
 });
@@ -255,7 +276,10 @@ router.get('/tests', protect, teacherOnly, async (req, res) => {
 // ── POST /api/teacher/nudge/:userId ──────────────────────────────────────────
 router.post('/nudge/:userId', protect, teacherOnly, async (req, res) => {
   try {
-    const users = await sequelize.query(`SELECT first_name, email FROM users WHERE id=:id`, { replacements: { id: req.params.userId }, type: QueryTypes.SELECT });
+    const users = await sequelize.query(
+      `SELECT first_name, email FROM users WHERE id=:id`,
+      { replacements: { id: req.params.userId }, type: QueryTypes.SELECT }
+    );
     if (!users.length) return res.status(404).json({ success: false, error: 'User not found' });
     return res.json({ success: true, message: `Nudge queued for ${users[0].email}` });
   } catch (err) { return res.status(500).json({ success: false, error: err.message }); }
@@ -281,6 +305,7 @@ router.get('/questions', protect, teacherOnly, async (req, res) => {
 });
 
 // ── POST /api/teacher/questions ───────────────────────────────────────────────
+// FIX: was parseInt(subtopic_id) — subtopic_id is a UUID foreign key
 router.post('/questions', protect, teacherOnly, async (req, res) => {
   const { question_text, subtopic_id, difficulty = 'medium', explanation, options } = req.body;
   if (!question_text?.trim()) return res.status(400).json({ success: false, error: 'question_text is required' });
@@ -295,7 +320,7 @@ router.post('/questions', protect, teacherOnly, async (req, res) => {
       {
         replacements: {
           question_text:  question_text.trim(),
-          subtopic_id:    subtopic_id ? parseInt(subtopic_id) : null,
+          subtopic_id:    subtopic_id || null,
           submitted_by:   req.user.id,
           difficulty,
           explanation:    explanation?.trim() || null,
