@@ -10,10 +10,13 @@
 // v7 — Rate limiting:  max 20 AI requests/min per user via Redis (fail-open)
 // v8 — Added essay-mark task to GEMINI_MODEL_MAP
 // v9 — Downgraded primary; added 503 retry with fallback chain
-// v10 — Switched to gemini-2.0-flash as primary (stable, widely available)
-//       Removed deprecated gemini-1.0-pro from fallback chain
-//       Widened error detection to catch 429, UNAVAILABLE, overloaded, etc.
-//       All three models in chain are current and supported as of 2025
+// v10 — Switched to gemini-2.0-flash as primary; removed deprecated models
+// v11 — Primary changed to gemini-1.5-flash (universally available to all
+//        accounts including new Tier 1 users).
+//       gemini-2.0-flash and gemini-2.5-flash restricted on new accounts.
+//       Added 404 "no longer available" to fallback trigger conditions —
+//       previously a 404 from Google would throw immediately without trying
+//       the next model in chain.
 //
 // Public API (signature unchanged):
 //   generate(prompt, task, options?) → Promise<string>
@@ -28,25 +31,26 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // Tasks that warrant Claude (complex multi-step reasoning).
 const CLAUDE_TASKS = new Set(['complex_reasoning']);
 
-// v10: gemini-2.0-flash — stable, supported, handles production load well.
-// Switch to gemini-2.5-flash once Google stabilises its capacity.
+// v11: gemini-1.5-flash is the safest primary — available to ALL Gemini
+// accounts including brand-new Tier 1 users. Both gemini-2.0-flash and
+// gemini-2.5-flash have account-age restrictions for new API users.
 const GEMINI_MODEL_MAP = {
-  'generate-questions': 'gemini-2.0-flash',
-  'chat':               'gemini-2.0-flash',
-  'explain':            'gemini-2.0-flash',
-  'hint':               'gemini-2.0-flash',
-  'notes':              'gemini-2.0-flash',
-  'remediation':        'gemini-2.0-flash',
-  'essay-mark':         'gemini-2.0-flash',
-  'default':            'gemini-2.0-flash',
+  'generate-questions': 'gemini-1.5-flash',
+  'chat':               'gemini-1.5-flash',
+  'explain':            'gemini-1.5-flash',
+  'hint':               'gemini-1.5-flash',
+  'notes':              'gemini-1.5-flash',
+  'remediation':        'gemini-1.5-flash',
+  'essay-mark':         'gemini-1.5-flash',
+  'default':            'gemini-1.5-flash',
 };
 
-// v10: All three are current, non-deprecated models (2025).
-// Tried in order if the primary returns any capacity/availability error.
-//   1. gemini-2.0-flash       — primary (fast, capable, production-ready)
-//   2. gemini-2.0-flash-lite  — lighter variant, separate capacity quota
-//   3. gemini-1.5-flash       — proven fallback, over a year in production
-const FALLBACK_CHAIN = ['gemini-2.0-flash-lite', 'gemini-1.5-flash'];
+// v11: Fallback chain — all universally available models, tried in order
+// if the primary fails for ANY reason (503, 429, 404, etc.)
+//   1. gemini-1.5-flash   — primary (universal availability)
+//   2. gemini-1.5-pro     — higher capability, separate quota
+//   3. gemini-2.5-flash   — newest model, try last (may be overloaded)
+const FALLBACK_CHAIN = ['gemini-1.5-pro', 'gemini-2.5-flash'];
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PROVIDER HELPERS
@@ -62,15 +66,19 @@ function _getGeminiModel(modelName) {
   return _geminiModels[modelName];
 }
 
-// ── Helper: detect any capacity / availability error from Google ──────────────
-function _isCapacityError(err) {
+// ── Helper: detect ANY model unavailability error from Google ─────────────────
+// v11: Now includes 404 "no longer available to new users" — previously this
+// caused an immediate throw without trying the fallback chain.
+function _isRetryableError(err) {
   const msg    = (err?.message || '').toLowerCase();
   const status = err?.status || err?.statusCode || 0;
   return (
     status === 503 ||
     status === 429 ||
+    status === 404 ||
     msg.includes('503') ||
     msg.includes('429') ||
+    msg.includes('404') ||
     msg.includes('service unavailable') ||
     msg.includes('high demand') ||
     msg.includes('unavailable') ||
@@ -78,11 +86,14 @@ function _isCapacityError(err) {
     msg.includes('quota') ||
     msg.includes('resource_exhausted') ||
     msg.includes('too many requests') ||
-    msg.includes('rate limit')
+    msg.includes('rate limit') ||
+    msg.includes('no longer available') ||      // ← v11: catches 404 model restriction
+    msg.includes('not available to new users') || // ← v11: catches account-age restriction
+    msg.includes('not found')                    // ← v11: catches model 404s
   );
 }
 
-// ── v10: Gemini call with automatic retry + fallback chain ────────────────────
+// ── v11: Gemini call with automatic retry + fallback chain ────────────────────
 async function _callGemini(prompt, task) {
   if (!process.env.GEMINI_API_KEY) {
     throw new Error('GEMINI_API_KEY is not configured');
@@ -104,39 +115,34 @@ async function _callGemini(prompt, task) {
         throw new Error('Empty response from model');
       }
 
-      // Log which model actually served the request (helpful for debugging)
+      // Log which model actually served the request
       if (i > 0) {
-        console.log(`[ai.js] Request served by fallback model: ${modelName}`);
+        console.log(`[ai.js] Fallback model served request: ${modelName}`);
       }
 
       return text.trim();
 
     } catch (err) {
-      const isCapacity = _isCapacityError(err);
+      const isRetryable = _isRetryableError(err);
 
-      if (isCapacity && !isLast) {
-        // Retry silently with next model in chain
+      if (isRetryable && !isLast) {
+        // Try next model silently — never surface intermediate failures
         console.warn(
-          `[ai.js] ${modelName} unavailable (${err?.status || 'capacity'}) ` +
+          `[ai.js] ${modelName} failed (${err?.status || err?.message?.slice(0, 60)}) ` +
           `— trying ${modelsToTry[i + 1]}`
         );
         continue;
       }
 
-      // All models exhausted OR non-capacity error.
-      // Raw Google URLs and technical details are NEVER exposed to the frontend.
-      if (isCapacity) {
-        throw Object.assign(
-          new Error('AI is temporarily busy. Please try again in a moment.'),
-          { statusCode: 503 }
-        );
-      }
+      // All models exhausted OR a genuine non-retryable error.
+      // NEVER expose raw Google URLs or technical details to the frontend.
+      console.error(`[ai.js] All models exhausted or fatal error:`, err.message);
 
-      // Non-capacity error (bad prompt format, auth error, etc.)
-      console.error(`[ai.js] Non-capacity error from ${modelName}:`, err.message);
       throw Object.assign(
-        new Error('AI request failed. Please try again.'),
-        { statusCode: 500 }
+        new Error(isRetryable
+          ? 'AI is temporarily busy. Please try again in a moment.'
+          : 'AI request failed. Please try again.'),
+        { statusCode: isRetryable ? 503 : 500 }
       );
     }
   }
