@@ -14,6 +14,9 @@
 // v4 AI COST CONTROL:
 //   Removed inline getGeminiModel() helper.
 //   POST /generate-questions now calls generate() from services/ai.js.
+//
+// v5 UUID FIX:
+//   Removed parseInt() from subject_id, exam_board_id, and teacher-subjects PK.
 
 const express    = require('express');
 const router     = express.Router();
@@ -648,6 +651,7 @@ router.get('/teacher-subjects', protect, adminOnly, async (req, res) => {
   }
 });
 
+// FIX 2a: removed parseInt() from subject_id and exam_board_id (both are UUIDs)
 router.post('/teacher-subjects', protect, adminOnly, async (req, res) => {
   const { teacher_id, subject_id, exam_board_id } = req.body;
   if (!teacher_id || !subject_id) return res.status(400).json({ success: false, error: 'teacher_id and subject_id required' });
@@ -656,7 +660,7 @@ router.post('/teacher-subjects', protect, adminOnly, async (req, res) => {
       `INSERT INTO teacher_subjects (teacher_id, subject_id, exam_board_id, assigned_by, is_active, assigned_at)
        VALUES (:teacherId, :subjectId, :examBoardId, :adminId, true, NOW())
        ON CONFLICT (teacher_id, subject_id) DO UPDATE SET is_active = true, assigned_by = :adminId, assigned_at = NOW()`,
-      { replacements: { teacherId: teacher_id, subjectId: parseInt(subject_id), examBoardId: exam_board_id ? parseInt(exam_board_id) : null, adminId: req.user.id }, type: QueryTypes.INSERT }
+      { replacements: { teacherId: teacher_id, subjectId: subject_id, examBoardId: exam_board_id || null, adminId: req.user.id }, type: QueryTypes.INSERT }
     );
     return res.json({ success: true, message: 'Teacher assigned to subject' });
   } catch (err) {
@@ -664,11 +668,12 @@ router.post('/teacher-subjects', protect, adminOnly, async (req, res) => {
   }
 });
 
+// FIX 2e: removed parseInt() from req.params.id (teacher_subjects PK is UUID)
 router.delete('/teacher-subjects/:id', protect, adminOnly, async (req, res) => {
   try {
     await sequelize.query(
       `UPDATE teacher_subjects SET is_active = false WHERE id = :id`,
-      { replacements: { id: parseInt(req.params.id) }, type: QueryTypes.UPDATE }
+      { replacements: { id: req.params.id }, type: QueryTypes.UPDATE }
     );
     return res.json({ success: true, message: 'Assignment removed' });
   } catch (err) {
