@@ -16,8 +16,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.81.0",
-    "@google/generative-ai": "^0.24.1",
+    "@google/genai": "^1.48.0",
     "ajv": "^8.18.0",
     "axios": "^1.13.6",
     "bcryptjs": "^2.4.3",
