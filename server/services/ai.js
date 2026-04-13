@@ -38,6 +38,7 @@ const GEMINI_MODEL_MAP = {
   'hint':               'gemini-2.5-flash',
   'notes':              'gemini-2.5-flash',
   'remediation':        'gemini-2.5-flash',
+  'essay-mark':         'gemini-2.5-flash', 
   'default':            'gemini-2.5-flash',
 };
 
