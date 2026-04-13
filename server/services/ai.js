@@ -8,6 +8,10 @@
 //                      everything else   → Gemini
 // v6 — Token tracking: console.log estimate for every call (no DB)
 // v7 — Rate limiting:  max 20 AI requests/min per user via Redis (fail-open)
+// v8 — Added essay-mark task to GEMINI_MODEL_MAP
+// v9 — Downgraded primary to gemini-1.5-flash (stable, handles load)
+//      Added automatic 503 retry with fallback chain
+//      Clean user-facing errors — raw Google errors never reach the frontend
 //
 // Public API (signature unchanged from v4):
 //   generate(prompt, task, options?) → Promise<string>
@@ -30,17 +34,23 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // All other tasks use Gemini.
 const CLAUDE_TASKS = new Set(['complex_reasoning']);
 
-// Gemini model per task — preserves the exact models used before v4.
+// v9: Primary model downgraded to gemini-1.5-flash — production-stable,
+// handles high load reliably. Switch back to gemini-2.5-flash once Google
+// stabilises capacity (usually within a few weeks of a new model launch).
 const GEMINI_MODEL_MAP = {
-  'generate-questions': 'gemini-2.5-flash',
-  'chat':               'gemini-2.5-flash',
-  'explain':            'gemini-2.5-flash',
-  'hint':               'gemini-2.5-flash',
-  'notes':              'gemini-2.5-flash',
-  'remediation':        'gemini-2.5-flash',
-  'essay-mark':         'gemini-2.5-flash', 
-  'default':            'gemini-2.5-flash',
+  'generate-questions': 'gemini-1.5-flash',
+  'chat':               'gemini-1.5-flash',
+  'explain':            'gemini-1.5-flash',
+  'hint':               'gemini-1.5-flash',
+  'notes':              'gemini-1.5-flash',
+  'remediation':        'gemini-1.5-flash',
+  'essay-mark':         'gemini-1.5-flash',
+  'default':            'gemini-1.5-flash',
 };
+
+// v9: Fallback chain — tried in order if primary returns 503 (overloaded).
+// gemini-1.5-pro is more capable and has separate capacity quota.
+const FALLBACK_CHAIN = ['gemini-1.5-pro', 'gemini-1.0-pro'];
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PROVIDER HELPERS
@@ -56,15 +66,46 @@ function _getGeminiModel(modelName) {
   return _geminiModels[modelName];
 }
 
-// ── v5: Gemini call ───────────────────────────────────────────────────────────
+// ── v9: Gemini call with automatic retry + fallback chain ─────────────────────
 async function _callGemini(prompt, task) {
   if (!process.env.GEMINI_API_KEY) {
     throw new Error('GEMINI_API_KEY is not configured');
   }
-  const modelName = GEMINI_MODEL_MAP[task] || GEMINI_MODEL_MAP.default;
-  const model     = _getGeminiModel(modelName);
-  const result    = await model.generateContent(prompt);
-  return result.response.text().trim();
+
+  const primaryModel = GEMINI_MODEL_MAP[task] || GEMINI_MODEL_MAP.default;
+  const modelsToTry  = [primaryModel, ...FALLBACK_CHAIN];
+
+  for (let i = 0; i < modelsToTry.length; i++) {
+    const modelName = modelsToTry[i];
+    const isLast    = i === modelsToTry.length - 1;
+
+    try {
+      const model  = _getGeminiModel(modelName);
+      const result = await model.generateContent(prompt);
+      return result.response.text().trim();
+    } catch (err) {
+      const msg   = err?.message || '';
+      const is503 = msg.includes('503') ||
+                    msg.includes('Service Unavailable') ||
+                    msg.includes('high demand') ||
+                    msg.includes('UNAVAILABLE');
+
+      if (is503 && !isLast) {
+        // Auto-retry with next model in chain — transparent to caller
+        console.warn(`[ai.js] ${modelName} overloaded (503) — trying ${modelsToTry[i + 1]}`);
+        continue;
+      }
+
+      // All models exhausted or non-503 error — throw clean user-facing error.
+      // Raw Google error messages (with googleapis.com URLs) never reach frontend.
+      throw Object.assign(
+        new Error(is503
+          ? 'AI is temporarily busy. Please try again in a moment.'
+          : 'AI request failed. Please try again.'),
+        { statusCode: is503 ? 503 : 500 }
+      );
+    }
+  }
 }
 
 // ── v5: Claude call (no new npm install — uses SDK if already present) ────────
