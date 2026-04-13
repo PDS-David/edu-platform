@@ -1,18 +1,10 @@
+'use strict';
 // server/routes/aiChatRoute.js
 // ============================================================================
 // PRIMARY AI CHAT ENTRY POINT — AISchoolonair
 //
-// Changes from previous version:
-//   + Integrates memoryService (getMemoryForPrompt, storeConversation)
-//   + updateLearningProfile() fires in background BEFORE the orchestrator
-//     so the memory context is always fresh when the AI responds
-//   + Streaming-ready: set ENABLE_STREAMING=true in .env to use SSE streaming
-//   + Session tracking enhanced: subject + subtopic recorded on session row
-//   + Structured error handling with error codes
-//   + POST /api/ai/chat/stream endpoint added (SSE, opt-in)
-//
-// DOES NOT MODIFY:
-//   aiOrchestrator.js, aiService.js, userMemory.js, any existing routes
+// v2 — Migrated streaming endpoint from deprecated @google/generative-ai
+//      to @google/genai SDK. Uses ai.models.generateContentStream().
 //
 // Response format:
 //   { success, reply, structured, intent, db_results_found, session_id,
@@ -28,6 +20,7 @@ const { QueryTypes }       = require('sequelize');
 const sequelize            = require('../config/database');
 const { orchestrate }      = require('../services/aiOrchestrator');
 const { fetchUserMemory }  = require('../services/userMemory');
+const { GoogleGenAI }      = require('@google/genai');
 const {
   getMemoryForPrompt,
   storeConversation,
@@ -46,8 +39,6 @@ function geminiAvailable() {
 
 // ============================================================================
 // GET /api/ai/chat/session
-// Restore the most recent active session for a student.
-// Unchanged behaviour from previous version.
 // ============================================================================
 router.get('/chat/session', protect, async (req, res) => {
   const { subject_id, subtopic_id } = req.query;
@@ -94,14 +85,6 @@ router.get('/chat/session', protect, async (req, res) => {
 
 // ============================================================================
 // POST /api/ai/chat
-// Primary chat endpoint. Full pipeline:
-//   1. Validate input
-//   2. Resolve or create session
-//   3. Background: update learning profile (non-blocking)
-//   4. Fetch conversation history + full memory context (parallel)
-//   5. Call orchestrator with enriched memory
-//   6. Persist messages + store conversation memory
-//   7. Return structured response with next_action suggestion
 // ============================================================================
 router.post('/chat', protect, subscriptionGuard, async (req, res) => {
   const { message, context = {}, session_id } = req.body;
@@ -139,7 +122,6 @@ router.post('/chat', protect, subscriptionGuard, async (req, res) => {
   } = context;
 
   try {
-    // ── 1. Resolve or create session ────────────────────────────────────────
     let sessionId = session_id || null;
     if (!sessionId) {
       const newSession = await sequelize.query(
@@ -158,28 +140,18 @@ router.post('/chat', protect, subscriptionGuard, async (req, res) => {
       sessionId = newSession[0]?.id;
     }
 
-    // ── 2. Background: refresh learning profile (fire-and-forget) ──────────
-    // We do NOT await this — it runs in the background while we fetch memory.
-    // On first request the profile may be stale by one turn; acceptable.
     updateLearningProfile(studentId, { subjectId: subject_id }).catch((err) => {
       console.warn('[AI Chat] updateLearningProfile background error:', err.message);
     });
 
-    // ── 3. Fetch conversation history + full memory in parallel ─────────────
     const [historyRows, legacyMemory, enrichedMemory] = await Promise.all([
-
-      // Last 10 raw messages from this session (existing behaviour)
       sequelize.query(
         `SELECT role, content FROM ai_chat_messages
          WHERE session_id = :sessionId
          ORDER BY created_at DESC LIMIT 10`,
         { replacements: { sessionId }, type: QueryTypes.SELECT }
       ),
-
-      // Legacy userMemory (enrolled courses + subtopic progress) — unchanged
       fetchUserMemory({ studentId, subjectId: subject_id }),
-
-      // NEW: enriched memory from memoryService (performance profile + long-term memories)
       getMemoryForPrompt(studentId, { subjectId: subject_id }),
     ]);
 
@@ -188,20 +160,14 @@ router.post('/chat', protect, subscriptionGuard, async (req, res) => {
       content: m.content,
     }));
 
-    // ── 4. Build combined memory block ──────────────────────────────────────
-    // userMemory.formatMemoryBlock() already formats enrolled courses + recent topics.
-    // We PREPEND the new enriched memory (performance stats + weak topics + long-term)
-    // so the orchestrator gets the full picture.
     const { formatMemoryBlock } = require('../services/userMemory');
     const legacyBlock           = formatMemoryBlock(legacyMemory);
     const enrichedBlock         = enrichedMemory.formatted;
 
-    // Merge both blocks — enriched first (more actionable), legacy second
     const combinedMemoryBlock = [enrichedBlock, legacyBlock]
       .filter(Boolean)
       .join('\n\n');
 
-    // ── 5. Run orchestrator ─────────────────────────────────────────────────
     const orchestratorContext = {
       subject_id,
       subject_name,
@@ -219,12 +185,9 @@ router.post('/chat', protect, subscriptionGuard, async (req, res) => {
       message,
       context:             orchestratorContext,
       conversationHistory,
-      // Pass the formatted combined block as userMemory so the orchestrator's
-      // formatMemoryBlock() call is effectively bypassed by the pre-built string.
       userMemory: { _preformatted: combinedMemoryBlock },
     });
 
-    // ── 6. Persist messages ─────────────────────────────────────────────────
     const assistantContent = result.structured
       ? JSON.stringify(result.structured)
       : result.reply;
@@ -244,7 +207,6 @@ router.post('/chat', protect, subscriptionGuard, async (req, res) => {
       { replacements: { sessionId }, type: QueryTypes.UPDATE }
     );
 
-    // ── 7. Store distilled conversation memory (fire-and-forget) ───────────
     const topicNames = extractTopicNames(message, result, topic_name);
     storeConversation(studentId, sessionId, {
       message,
@@ -256,16 +218,13 @@ router.post('/chat', protect, subscriptionGuard, async (req, res) => {
       console.warn('[AI Chat] storeConversation error:', err.message);
     });
 
-    // ── 8. Derive next_action suggestion ────────────────────────────────────
     const nextAction = deriveNextAction(result.intent, enrichedMemory, subject_name);
 
-    // ── 9. Session cleanup (>30 days, fire-and-forget) ──────────────────────
     sequelize.query(
       `DELETE FROM ai_chat_sessions WHERE updated_at < NOW() - INTERVAL '30 days'`,
       { type: QueryTypes.DELETE }
     ).catch(() => {});
 
-    // ── 10. Return response ─────────────────────────────────────────────────
     return res.json({
       success:          true,
       reply:            result.reply,
@@ -289,17 +248,7 @@ router.post('/chat', protect, subscriptionGuard, async (req, res) => {
 
 // ============================================================================
 // POST /api/ai/chat/stream
-// SSE streaming variant — only active when ENABLE_STREAMING=true in .env.
-// Falls back to the standard POST /chat endpoint if streaming is disabled.
-//
-// Response is a stream of Server-Sent Events:
-//   data: {"chunk": "partial text"}
-//   ...
-//   data: {"done": true, "intent": "...", "session_id": "...", "next_action": "..."}
-//
-// NOTE: Gemini streaming is used here. The orchestrator is NOT called for
-// streaming — the AI is invoked directly for general_chat / explain_topic.
-// For generate_quiz / create_study_plan, falls back to non-streaming.
+// v2: Updated to use @google/genai SDK for streaming.
 // ============================================================================
 router.post('/chat/stream', protect, subscriptionGuard, async (req, res) => {
   if (!STREAMING_ENABLED) {
@@ -324,11 +273,10 @@ router.post('/chat/stream', protect, subscriptionGuard, async (req, res) => {
   const studentId = req.user.id;
   const { subject_id = null } = context;
 
-  // Set SSE headers
-  res.setHeader('Content-Type',  'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection',    'keep-alive');
-  res.setHeader('X-Accel-Buffering', 'no'); // Disable Nginx buffering
+  res.setHeader('Content-Type',      'text/event-stream');
+  res.setHeader('Cache-Control',     'no-cache');
+  res.setHeader('Connection',        'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders();
 
   const sendChunk = (data) => {
@@ -336,7 +284,6 @@ router.post('/chat/stream', protect, subscriptionGuard, async (req, res) => {
   };
 
   try {
-    // Resolve or create session
     let sessionId = session_id || null;
     if (!sessionId) {
       const newSession = await sequelize.query(
@@ -348,35 +295,32 @@ router.post('/chat/stream', protect, subscriptionGuard, async (req, res) => {
       sessionId = newSession[0]?.id;
     }
 
-    // Get memory in background while user sees typing indicator
     const [memoryContext] = await Promise.all([
       getMemoryForPrompt(studentId, { subjectId: subject_id }),
       updateLearningProfile(studentId, { subjectId: subject_id }).catch(() => {}),
     ]);
 
-    // Use Gemini streaming API directly for general chat
-    const { GoogleGenerativeAI } = require('@google/generative-ai');
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    // v2: new @google/genai SDK streaming
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
     const systemContext = memoryContext.formatted
       ? `${memoryContext.formatted}\n\nYou are AISchoolonair, a friendly AI tutor for Nigerian secondary school students.`
       : 'You are AISchoolonair, a friendly AI tutor for Nigerian secondary school students.';
 
-    const streamResult = await model.generateContentStream(
-      `${systemContext}\n\nStudent: ${message}\nAISchoolonair:`
-    );
+    const streamResult = await ai.models.generateContentStream({
+      model:    'gemini-2.0-flash',
+      contents: `${systemContext}\n\nStudent: ${message}\nAISchoolonair:`,
+    });
 
     let fullReply = '';
-    for await (const chunk of streamResult.stream) {
-      const text = chunk.text();
+    for await (const chunk of streamResult) {
+      const text = chunk.text;
       if (text) {
         fullReply += text;
         sendChunk({ chunk: text });
       }
     }
 
-    // Persist messages
     await sequelize.query(
       `INSERT INTO ai_chat_messages (session_id, role, content)
        VALUES (:sessionId, 'user', :content)`,
@@ -392,7 +336,6 @@ router.post('/chat/stream', protect, subscriptionGuard, async (req, res) => {
       { replacements: { sessionId }, type: QueryTypes.UPDATE }
     );
 
-    // Store memory (fire-and-forget)
     storeConversation(studentId, sessionId, {
       message,
       response:   fullReply.slice(0, 500),
@@ -414,39 +357,23 @@ router.post('/chat/stream', protect, subscriptionGuard, async (req, res) => {
 // HELPERS
 // ============================================================================
 
-/**
- * extractTopicNames — pulls topic strings from the message + orchestrator result.
- */
 function extractTopicNames(message, result, contextTopicName) {
   const names = new Set();
-
   if (contextTopicName) names.add(contextTopicName);
-
-  // Pull from structured quiz result
   if (result.structured?.questions) {
     for (const q of result.structured.questions.slice(0, 5)) {
       if (q.topic) names.add(q.topic);
     }
   }
-
-  // Pull topic from quiz title
   if (result.structured?.quiz_title) {
     names.add(result.structured.quiz_title.replace(/^Quiz on\s+/i, '').slice(0, 60));
   }
-
   return [...names].slice(0, 5);
 }
 
-/**
- * deriveNextAction — suggests what the student should do after this turn.
- * This is surfaced to the frontend as a "suggested action" card.
- */
 function deriveNextAction(intent, enrichedMemory, subjectName) {
   if (!enrichedMemory?.weakTopics?.length) return null;
-
   const topWeak = enrichedMemory.weakTopics[0];
-
-  // After an explanation, suggest a quiz on that weak topic
   if (intent === 'explain_topic' && topWeak) {
     return {
       type:    'suggest_quiz',
@@ -456,8 +383,6 @@ function deriveNextAction(intent, enrichedMemory, subjectName) {
       reason:  `You scored ${Math.round(topWeak.accuracy_pct)}% on this topic recently.`,
     };
   }
-
-  // After a quiz, suggest reviewing the weakest topic
   if (intent === 'generate_quiz' && topWeak) {
     return {
       type:    'suggest_review',
@@ -467,10 +392,7 @@ function deriveNextAction(intent, enrichedMemory, subjectName) {
       reason:  `This is your weakest topic (${Math.round(topWeak.accuracy_pct)}% accuracy).`,
     };
   }
-
   return null;
 }
 
 module.exports = router;
-
-
