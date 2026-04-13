@@ -34,29 +34,16 @@
 
 const { QueryTypes } = require('sequelize');
 const sequelize      = require('../config/database');
+// v2: route all AI calls through central hub (services/ai.js)
+const { generate }   = require('./ai');
 
-// ── Gemini lazy-load (mirrors pattern in aiOrchestrator.js) ──────────────────
-let _geminiModel = null;
-function getGeminiModel() {
-  if (_geminiModel) return _geminiModel;
-  if (!process.env.GEMINI_API_KEY) return null;
-  const { GoogleGenerativeAI } = require('@google/generative-ai');
-  const genAI  = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  _geminiModel = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-  return _geminiModel;
-}
-
+// ── callGemini wrapper — now routes through ai.js central hub ────────────────
 async function callGemini(prompt) {
-  const model = getGeminiModel();
-  if (!model) throw Object.assign(
+  if (!process.env.GEMINI_API_KEY) throw Object.assign(
     new Error('GEMINI_API_KEY is not configured. Set it in server/.env'),
     { statusCode: 503 }
   );
-  const result = await model.generateContent({
-    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    generationConfig: { maxOutputTokens: 1024 },
-  });
-  return result.response.text().trim();
+  return generate(prompt, 'remediation');
 }
 
 // ── UUID validator ────────────────────────────────────────────────────────────
@@ -125,7 +112,7 @@ async function enhanceExplanation({ topic_id, subtopic_id, force_refresh = false
         key_points, source_question_count, model_used, created_at, updated_at)
      VALUES
        (:topicId, :subtopicId, :original, :simplified, :keyPoints::jsonb,
-        :qCount, 'gemini-1.5-flash', NOW(), NOW())
+        :qCount, 'gemini-2.5-flash', NOW(), NOW())
      ON CONFLICT (${scope === 'topic' ? 'topic_id' : 'subtopic_id'})
      DO UPDATE SET
        original_explanation    = EXCLUDED.original_explanation,
@@ -404,3 +391,5 @@ function formatResponse({ meta, cached, from_cache }) {
 // EXPORTS
 // =============================================================================
 module.exports = { enhanceExplanation };
+
+
