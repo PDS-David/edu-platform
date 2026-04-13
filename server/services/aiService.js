@@ -10,10 +10,11 @@
 // generateRevisionNotes → routes through ai.js hub ('notes' task)
 // markImage             → direct Gemini multimodal call (architecture rule)
 //
-// This file is retained because aiWorker.js and tool files import from it.
+// v2 — Migrated from deprecated @google/generative-ai to @google/genai SDK.
+//      markImage() updated to use GoogleGenAI client with inline image part.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { GoogleGenAI }        = require('@google/genai');
 const { v4: uuidv4 }         = require('uuid');
 const { QueryTypes }         = require('sequelize');
 const sequelize              = require('../config/database');
@@ -21,10 +22,8 @@ const { generate }           = require('./ai');                      // ← cent
 const { generateAIQuestion: _generateAIQuestion } =
   require('./aiQuestionGenerator');                                   // ← canonical impl
 
-// ── GEMINI_API_KEY is checked lazily inside ai.js — no top-level throw here ──
-
 if (process.env.NODE_ENV !== 'production') {
-  console.log('[aiService] Loaded — routing through ai.js hub (gemini-2.5-flash)');
+  console.log('[aiService] Loaded — routing through ai.js hub (gemini-2.0-flash)');
 }
 
 const FALLBACK_REPLY =
@@ -105,15 +104,6 @@ async function generateAIQuestion(conceptId, studentId) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // generateHint
-// Socratic hint for a multiple-choice question without revealing the answer.
-//
-// @param {object} params
-//   questionText {string}   — the question
-//   options      {array}    — array of { option_text, is_correct }
-//   topic        {string}   — topic/subtopic context
-//   examBoard    {string}   — e.g. 'WAEC'
-//   hintLevel    {number}   — 1 (subtle) | 2 (moderate) | 3 (strong)
-// @returns {Promise<string>}
 // ─────────────────────────────────────────────────────────────────────────────
 async function generateHint({ questionText, options = [], topic, examBoard, hintLevel = 1 }) {
   const hintDescriptions = {
@@ -150,18 +140,6 @@ Rules:
 
 // ─────────────────────────────────────────────────────────────────────────────
 // generateExplanation
-// Post-answer explanation for a multiple-choice question.
-//
-// @param {object} params
-//   questionText        {string}  — the question text
-//   options             {array}   — all options { option_text, is_correct }
-//   correctOptionText   {string}  — text of the correct option
-//   selectedOptionText  {string}  — text the student selected
-//   wasCorrect          {boolean}
-//   existingExplanation {string}  — stored explanation to enhance (optional)
-//   topic               {string}
-//   examBoard           {string}
-// @returns {Promise<string>}
 // ─────────────────────────────────────────────────────────────────────────────
 async function generateExplanation({
   questionText,
@@ -212,13 +190,6 @@ Your task:
 
 // ─────────────────────────────────────────────────────────────────────────────
 // generateRevisionNotes
-// Generates concise revision notes on a topic.
-//
-// @param {object} params
-//   subjectName {string}
-//   topicName   {string}
-//   examBoard   {string}
-// @returns {Promise<string>}
 // ─────────────────────────────────────────────────────────────────────────────
 async function generateRevisionNotes({ subjectName, topicName, examBoard }) {
   const prompt = `
@@ -251,16 +222,7 @@ Keep each section brief. Use plain English. Do not use markdown.
 // markImage
 // Multimodal: marks a photo of handwritten student work.
 // Direct Gemini call — kept here per architecture rule (multimodal stays direct).
-//
-// @param {object} params
-//   imageBase64  {string}  — base64-encoded image data
-//   mimeType     {string}  — e.g. 'image/jpeg'
-//   questionText {string}  — the question being answered
-//   markScheme   {string|null}
-//   subject      {string}
-//   examBoard    {string}
-//   totalMarks   {number}
-// @returns {Promise<object>} { marks_awarded, total_marks, feedback, strengths, improvements }
+// v2: Updated to use @google/genai SDK.
 // ─────────────────────────────────────────────────────────────────────────────
 async function markImage({
   imageBase64,
@@ -278,10 +240,6 @@ async function markImage({
   if (!imageBase64) {
     throw new Error('imageBase64 is required for markImage');
   }
-
-  // Multimodal stays as a direct Gemini call per architecture rules
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
   const markSchemeBlock = markScheme
     ? `\nMark Scheme:\n${markScheme}`
@@ -313,11 +271,20 @@ Respond ONLY with valid JSON in this exact format (no markdown, no extra text):
 `.trim();
 
   try {
-    const result = await model.generateContent([
-      { text: prompt },
-      { inlineData: { mimeType, data: imageBase64 } },
-    ]);
-    const raw     = result.response.text().trim();
+    // v2: new @google/genai SDK for multimodal
+    const ai       = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const response = await ai.models.generateContent({
+      model:    'gemini-2.0-flash',
+      contents: [
+        {
+          parts: [
+            { text: prompt },
+            { inlineData: { mimeType, data: imageBase64 } },
+          ],
+        },
+      ],
+    });
+    const raw     = response.text.trim();
     const cleaned = raw.replace(/```json|```/g, '').trim();
     return JSON.parse(cleaned);
   } catch (err) {
