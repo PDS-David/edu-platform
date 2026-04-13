@@ -173,7 +173,7 @@ router.post('/submit', protect, async (req, res) => {
       {
         replacements: {
           question_text:  question_text.trim(),
-          subtopic_id:    subtopic_id ? parseInt(subtopic_id) : null,
+          subtopic_id:    subtopic_id || null,
           submitted_by:   req.user.id,
           difficulty,
           explanation:    explanation?.trim() || null,

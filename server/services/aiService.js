@@ -272,7 +272,8 @@ async function markImage({
   totalMarks = 10,
 }) {
   if (!process.env.GEMINI_API_KEY) {
-    throw new Error('GEMINI_API_KEY is not configured');
+    console.error('[markImage] GEMINI_API_KEY not configured');
+    return { success: false, error: 'AI service not configured' };
   }
   if (!imageBase64) {
     throw new Error('imageBase64 is required for markImage');
