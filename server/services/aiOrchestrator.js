@@ -6,6 +6,8 @@ const sequelize                                 = require('../config/database');
 const { generateQuizByTopic }                   = require('./quizGenerator');
 const { formatMemoryBlock }                     = require('./userMemory');
 const tools                                     = require('../tools');
+// v2: central AI hub — all Gemini calls routed through generate()
+const { generate }                              = require('./ai');
 
 //  FIXED: removed duplicate prompt builders
 const {
@@ -21,28 +23,11 @@ const {
 const anthropic = new Anthropic();
 const CLAUDE_INTENT_MODEL = 'claude-haiku-4-5-20251001';
 
-let _geminiModel = null;
-function getGeminiModel() {
-  if (_geminiModel) return _geminiModel;
-  if (!process.env.GEMINI_API_KEY) return null;
-
-  const { GoogleGenerativeAI } = require('@google/generative-ai');
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
-  _geminiModel = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-  return _geminiModel;
-}
-
+// v2: callLLM now routes through services/ai.js central hub.
+// Model selection, rate limiting, and token logging are all handled there.
 async function callLLM(prompt, maxTokens) {
-  const model = getGeminiModel();
-  if (!model) throw new Error('GEMINI_API_KEY is not configured');
-
-  const result = await model.generateContent({
-    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    generationConfig: { maxOutputTokens: maxTokens || 1024 },
-  });
-
-  return result.response.text().trim();
+  if (!process.env.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is not configured');
+  return generate(prompt, 'chat');
 }
 
 // =========================================================================
@@ -234,3 +219,4 @@ module.exports = {
   detectIntent,
   orchestrate,
 };
+

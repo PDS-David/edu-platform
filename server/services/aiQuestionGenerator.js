@@ -14,25 +14,16 @@
 //   answer_options   – four answer options linked to the question
 //   question_concepts – links the question back to its concept
 //
-// Requires: GEMINI_API_KEY in .env
-//           @google/generative-ai (already in package.json)
+// v2 — Removed inline Gemini singleton. All AI calls now route through
+//      services/ai.js central hub (generate()) for consistent model
+//      management, rate limiting, and token logging.
 // -------------------------------------------------------------------------
 'use strict';
 
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-const { QueryTypes }         = require('sequelize');
-const sequelize              = require('../config/database');
-
-// ---------------------------------------------------------------------------
-// Gemini singleton (mirrors the pattern in aiService.js)
-// ---------------------------------------------------------------------------
-let _model = null;
-function getModel() {
-  if (_model) return _model;
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  _model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-  return _model;
-}
+const { QueryTypes } = require('sequelize');
+const sequelize      = require('../config/database');
+// v2: central AI hub replaces inline GoogleGenerativeAI call
+const { generate }   = require('./ai');
 
 // ---------------------------------------------------------------------------
 // Difficulty mapper
@@ -112,16 +103,15 @@ Respond ONLY with a valid JSON object in this exact format (no markdown, no extr
 }
 `.trim();
 
-  // ---- Step 3: Call Gemini -----------------------------------------------
+  // ---- Step 3: Call AI via central hub -----------------------------------
   let aiResult;
   try {
-    const model    = getModel();
-    const response = await model.generateContent(prompt);
-    const rawText  = response.response.text().trim();
-    const clean    = rawText.replace(/```json|```/g, '').trim();
-    aiResult       = JSON.parse(clean);
+    // v2: generate() routes through services/ai.js — model managed centrally
+    const rawText = await generate(prompt, 'generate-questions', { userId: studentId });
+    const clean   = rawText.replace(/```json|```/g, '').trim();
+    aiResult      = JSON.parse(clean);
   } catch (err) {
-    console.error('[aiQuestionGenerator] Gemini call / parse error:', err.message);
+    console.error('[aiQuestionGenerator] AI call / parse error:', err.message);
     throw new Error('AI question generation failed. Please try again.');
   }
 
@@ -165,7 +155,7 @@ Respond ONLY with a valid JSON object in this exact format (no markdown, no extr
        :subjectId,
        :examBoardId,
        TRUE,
-       'gemini-1.5-flash',
+       'gemini-2.5-flash',
        :conceptHint,
        'approved',
        'admin_import',
@@ -179,10 +169,10 @@ Respond ONLY with a valid JSON object in this exact format (no markdown, no extr
         difficulty:   difficultyText,
         explanation:  aiResult.explanation || null,
         subtopicId:   concept.subtopic_id,
-        subjectId:    concept.subject_id   || null,
+        subjectId:    concept.subject_id    || null,
         examBoardId:  concept.exam_board_id || null,
         conceptHint:  concept.concept_name,
-        submittedBy:  studentId            || null,
+        submittedBy:  studentId             || null,
       },
       type: QueryTypes.INSERT,
     }
@@ -227,13 +217,12 @@ Respond ONLY with a valid JSON object in this exact format (no markdown, no extr
     `for concept "${concept.concept_name}" (difficulty: ${difficultyText})`
   );
 
-  // Return the full question + options so callers can use it immediately
   return {
     ...newQuestion,
-    concept_id:   conceptId,
-    concept_name: concept.concept_name,
+    concept_id:    conceptId,
+    concept_name:  concept.concept_name,
     subtopic_name: concept.subtopic_name,
-    options: savedOptions,
+    options:       savedOptions,
   };
 }
 
