@@ -61,7 +61,7 @@ router.get('/', protect, authorize('admin'), async (req, res) => {
       sequelize.query(
         `SELECT COUNT(*)::INTEGER AS total
          FROM users u
-         WHERE (:role = '' OR u.role = :role)
+         WHERE (:role = '' OR u.role::text = :role)
            AND (:search = '' OR u.email      ILIKE :searchLike
                              OR u.first_name ILIKE :searchLike
                              OR u.last_name  ILIKE :searchLike)`,
@@ -69,11 +69,11 @@ router.get('/', protect, authorize('admin'), async (req, res) => {
       ),
       sequelize.query(
         `SELECT
-           u.id, u.email, u.first_name, u.last_name, u.role,
-           u.is_active, u.subscription_status, u.created_at,
+           u.id, u.email, u.first_name, u.last_name, u.role::text AS role,
+           u.is_active, u.subscription_status::text AS subscription_status, u.created_at,
            0::INTEGER AS questions_submitted
          FROM users u
-         WHERE (:role = '' OR u.role = :role)
+         WHERE (:role = '' OR u.role::text = :role)
            AND (:search = '' OR u.email      ILIKE :searchLike
                              OR u.first_name ILIKE :searchLike
                              OR u.last_name  ILIKE :searchLike)
@@ -92,7 +92,31 @@ router.get('/', protect, authorize('admin'), async (req, res) => {
     });
   } catch (err) {
     console.error('[GET /users]', err.message);
-    return res.status(500).json({ success: false, error: 'Failed to fetch users' });
+    // Try a minimal query as fallback
+    try {
+      const fallback = await sequelize.query(
+        `SELECT id, email, first_name, last_name, role,
+                is_active, subscription_status::text AS subscription_status, created_at,
+                0::INTEGER AS questions_submitted
+         FROM users
+         ORDER BY created_at DESC
+         LIMIT :limit OFFSET :offset`,
+        { replacements: { limit, offset }, type: QueryTypes.SELECT }
+      );
+      const countFallback = await sequelize.query(
+        `SELECT COUNT(*)::INTEGER AS total FROM users`,
+        { type: QueryTypes.SELECT }
+      );
+      return res.status(200).json({
+        success: true,
+        total:   countFallback[0]?.total || 0,
+        page, limit,
+        data:    fallback,
+      });
+    } catch (fallbackErr) {
+      console.error('[GET /users] fallback also failed:', fallbackErr.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
   }
 });
 
