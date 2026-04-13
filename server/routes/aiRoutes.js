@@ -6,11 +6,12 @@
 //   POST /api/ai/explain       — explain why an answer is right/wrong
 //   POST /api/ai/hint          — get a hint for a question
 //   POST /api/ai/notes/generate — generate AI revision notes for a subtopic
+//   POST /api/ai/mark-image    — multimodal image marking
 //
-// v4 AI COST CONTROL:
-//   Removed inline getGeminiModel() helper.
-//   All 4 generateContent calls now route through services/ai.js generate().
-//   GEMINI_API_KEY guard preserved exactly — only the call site changes.
+// v4 — Removed inline getGeminiModel() helper. All generateContent calls
+//       route through services/ai.js generate().
+// v5 — Migrated mark-image from deprecated @google/generative-ai to
+//       @google/genai SDK.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const express  = require('express');
@@ -18,8 +19,8 @@ const router   = express.Router();
 const { protect }            = require('../middleware/auth');
 const { QueryTypes }         = require('sequelize');
 const sequelize              = require('../config/database');
-// v4: central AI hub replaces inline getGeminiModel() helper
 const { generate }           = require('../services/ai');
+const { GoogleGenAI }        = require('@google/genai');
 
 // ── POST /api/ai/chat ─────────────────────────────────────────────────────────
 router.post('/chat', protect, async (req, res) => {
@@ -35,14 +36,12 @@ router.post('/chat', protect, async (req, res) => {
       const result = await orchestrate({ message, context, conversationHistory: [] });
       reply = result.reply;
     } catch {
-      // Fallback: direct AI call via central hub
       if (!process.env.GEMINI_API_KEY) {
         return res.status(503).json({ success: false, error: 'AI not configured' });
       }
       const system = `You are AISchoolonair, a friendly AI tutor for Nigerian secondary school students.
 Subject: ${context.subject_name || 'General'}. Subtopic: ${context.subtopic_name || ''}.
 Give concise, curriculum-aligned answers suited for WAEC/JAMB/NECO preparation.`;
-      // v4: generate() replaces getGeminiModel() + model.generateContent()
       reply = await generate(`${system}\n\nStudent: ${message}\nAISchoolonair:`, 'chat');
     }
 
@@ -68,7 +67,6 @@ router.post('/explain', protect, async (req, res) => {
               ao.is_correct  AS selected_is_correct,
               q.correct_answer AS correct_text
        FROM questions q
-       -- selected option resolved client-side
        WHERE q.id = :questionId`,
       {
         replacements: {
@@ -119,7 +117,6 @@ Explain in 2-3 sentences why the correct answer is right and briefly why the oth
 Be concise and curriculum-aligned.`;
     }
 
-    // v4: generate() replaces getGeminiModel() + model.generateContent()
     const explanation = await generate(prompt, 'explain');
 
     if (!typed_answer && explanation) {
@@ -176,8 +173,7 @@ Each hint should be a single sentence. Focus on the concept being tested, not th
 Return ONLY the hints as a JSON array of strings, e.g.: ["Hint 1...", "Hint 2..."]
 No preamble, no markdown.`;
 
-    // v4: generate() replaces getGeminiModel() + model.generateContent()
-    const raw = await generate(prompt, 'hint');
+    const raw     = await generate(prompt, 'hint');
     const cleaned = raw.replace(/```json|```/g, '').trim();
 
     let hints;
@@ -247,7 +243,6 @@ Write concise, exam-focused revision notes for this topic. Structure as:
 Keep each bullet point to 1-2 sentences. Use clear, simple English suitable for SS2/SS3 students.
 Total length: under 300 words. Plain text only — no markdown, no headers with #.`;
 
-    // v4: generate() replaces getGeminiModel() + model.generateContent()
     const notes = await generate(prompt, 'notes');
 
     if (subtopic_id && notes) {
@@ -270,6 +265,7 @@ Total length: under 300 words. Plain text only — no markdown, no headers with 
 });
 
 // ── POST /api/ai/mark-image ───────────────────────────────────────────────────
+// v5: Updated to use @google/genai SDK
 router.post('/mark-image', protect, async (req, res) => {
   const { image_base64, question_text, max_marks = 10 } = req.body;
   if (!image_base64) return res.status(400).json({ success: false, error: 'image_base64 is required' });
@@ -279,21 +275,30 @@ router.post('/mark-image', protect, async (req, res) => {
   }
 
   try {
-    const { GoogleGenerativeAI } = require('@google/generative-ai');
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || 'gemini-2.5-flash' });
-
-    const prompt = `You are a Nigerian exam marker. Mark this student's handwritten answer.
+    const ai       = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const prompt   = `You are a Nigerian exam marker. Mark this student's handwritten answer.
 Question: "${question_text || 'Not specified'}"
 Maximum marks: ${max_marks}
 Award marks fairly. Return ONLY valid JSON: {"marks_awarded": N, "feedback": "2-3 sentences", "strengths": "what was good", "improvements": "what to improve"}`;
 
-    const result = await model.generateContent([
-      prompt,
-      { inlineData: { mimeType: 'image/jpeg', data: image_base64.replace(/^data:image\/\w+;base64,/, '') } }
-    ]);
+    const response = await ai.models.generateContent({
+      model:    'gemini-2.0-flash',
+      contents: [
+        {
+          parts: [
+            { text: prompt },
+            {
+              inlineData: {
+                mimeType: 'image/jpeg',
+                data:     image_base64.replace(/^data:image\/\w+;base64,/, ''),
+              },
+            },
+          ],
+        },
+      ],
+    });
 
-    const raw    = result.response.text().replace(/```json|```/g, '').trim();
+    const raw    = response.text.replace(/```json|```/g, '').trim();
     const parsed = JSON.parse(raw);
     return res.json({
       success:       true,
@@ -310,5 +315,3 @@ Award marks fairly. Return ONLY valid JSON: {"marks_awarded": N, "feedback": "2-
 });
 
 module.exports = router;
-
-
