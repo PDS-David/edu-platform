@@ -1,26 +1,33 @@
 'use strict';
+// server/services/aiService.js
+// ─────────────────────────────────────────────────────────────────────────────
+// LEGACY ADAPTER — do not add new features here.
+//
+// generateAIResponse → delegates to services/ai.js generate() hub
+// generateAIQuestion → delegates to services/aiQuestionGenerator.js
+//
+// This file is retained only because aiWorker.js and other callers import it.
+// ─────────────────────────────────────────────────────────────────────────────
 
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-const { v4: uuidv4 } = require('uuid');
-const { QueryTypes } = require('sequelize');
-const sequelize = require('../config/database');
+const { v4: uuidv4 }    = require('uuid');
+const { QueryTypes }    = require('sequelize');
+const sequelize         = require('../config/database');
+const { generate }      = require('./ai');                          // ← central hub
+const { generateAIQuestion: _generateAIQuestion } =
+  require('./aiQuestionGenerator');                                  // ← Step 10 delegation
 
-if (!process.env.GEMINI_API_KEY) {
-  throw new Error('Missing GEMINI_API_KEY in environment variables');
+// ── GEMINI_API_KEY is checked lazily inside ai.js — no top-level throw here ──
+
+if (process.env.NODE_ENV !== 'production') {
+  console.log('[aiService] Loaded — routing through ai.js hub (gemini-2.5-flash)');
 }
-
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
-console.log(` Gemini model loaded: ${GEMINI_MODEL}`);
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({
-  model: GEMINI_MODEL,
-  generationConfig: { temperature: 0.4, maxOutputTokens: 512 },
-});
 
 const FALLBACK_REPLY =
   'AISchoolonair AI is temporarily unavailable. Please try again later. ';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Quota / availability error detector (kept for callers that catch it)
+// ─────────────────────────────────────────────────────────────────────────────
 function isQuotaOrAvailabilityError(err) {
   const msg = err?.message || '';
   return (
@@ -33,26 +40,31 @@ function isQuotaOrAvailabilityError(err) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// safeGenerate — wraps generate() with quota-aware error handling
+// ─────────────────────────────────────────────────────────────────────────────
 async function safeGenerate(prompt) {
   try {
-    const result = await model.generateContent(prompt);
-    const text = result?.response?.text?.();
-    if (!text) throw new Error('Empty response from Gemini');
+    const text = await generate(prompt, 'chat');
+    if (!text) throw new Error('Empty response');
     return text.trim();
   } catch (err) {
-    console.error('[Gemini Error]', err.message || err);
+    console.error('[aiService Error]', err.message);
     if (isQuotaOrAvailabilityError(err)) return null;
     throw new Error('AI provider request failed');
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// generateAIResponse
+// ─────────────────────────────────────────────────────────────────────────────
 async function generateAIResponse({ message, user, context = {} }) {
   const { subject_name = '', subtopic_name = '', weak_topics = [] } = context;
 
   const contextLines = [
-    subject_name && `Subject: ${subject_name}`,
+    subject_name  && `Subject: ${subject_name}`,
     subtopic_name && `Subtopic: ${subtopic_name}`,
-    weak_topics?.length && `Student weak areas: ${weak_topics.join(', ')}`
+    weak_topics?.length && `Student weak areas: ${weak_topics.join(', ')}`,
   ].filter(Boolean);
 
   const systemContext = contextLines.length
@@ -79,74 +91,11 @@ ${message}
   return reply ?? FALLBACK_REPLY;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// generateAIQuestion — delegates to the canonical implementation
+// ─────────────────────────────────────────────────────────────────────────────
 async function generateAIQuestion(conceptId, studentId) {
-  const conceptRows = await sequelize.query(
-    `SELECT c.id, c.name, c.difficulty_level, s.name AS subtopic_name
-     FROM concepts c
-     LEFT JOIN subtopics s ON s.id = c.subtopic_id
-     WHERE c.id = :conceptId`,
-    { replacements: { conceptId }, type: QueryTypes.SELECT }
-  );
-
-  if (!conceptRows.length) throw new Error('Concept not found');
-  const concept = conceptRows[0];
-
-  const prompt = `
-You are an AI question generator for Nigerian secondary school students.
-
-Generate ONE multiple choice question.
-
-Return JSON ONLY.
-
-CONCEPT: ${concept.name}
-SUBTOPIC: ${concept.subtopic_name}
-DIFFICULTY: ${concept.difficulty_level}
-
-FORMAT:
-{
-  "question": "...",
-  "options": [
-    {"text": "...", "is_correct": true},
-    {"text": "...", "is_correct": false},
-    {"text": "...", "is_correct": false},
-    {"text": "...", "is_correct": false}
-  ],
-  "explanation": "..."
-}
-`.trim();
-
-  const rawText = await safeGenerate(prompt);
-  if (!rawText) throw new Error('AI unavailable — cannot generate question now');
-
-  const cleaned = rawText.replace(/```json|```/g, '').trim();
-  let parsed;
-  try { parsed = JSON.parse(cleaned); } catch { throw new Error('Invalid AI JSON response'); }
-
-  if (!parsed.question || !Array.isArray(parsed.options) || parsed.options.length !== 4)
-    throw new Error('Malformed AI output');
-
-  const questionId = uuidv4();
-  await sequelize.query(
-    `INSERT INTO questions (id, question_text, explanation, source, status)
-     VALUES (:id, :question, :explanation, 'ai_generated', 'pending')`,
-    { replacements: { id: questionId, question: parsed.question, explanation: parsed.explanation || null }, type: QueryTypes.INSERT }
-  );
-
-  for (const opt of parsed.options) {
-    await sequelize.query(
-      `INSERT INTO answer_options (id, question_id, option_text, is_correct)
-       VALUES (:id, :questionId, :text, :correct)`,
-      { replacements: { id: uuidv4(), questionId, text: opt.text, correct: opt.is_correct }, type: QueryTypes.INSERT }
-    );
-  }
-
-  await sequelize.query(
-    `INSERT INTO question_concepts (question_id, concept_id)
-     VALUES (:questionId, :conceptId)`,
-    { replacements: { questionId, conceptId }, type: QueryTypes.INSERT }
-  );
-
-  return questionId;
+  return _generateAIQuestion(conceptId, studentId);
 }
 
 module.exports = { generateAIResponse, generateAIQuestion };
