@@ -30,7 +30,9 @@ async function generateQuiz(options) {
   try {
     const cached = await redis.get(cacheKey);
     if (cached) {
-      console.log(`[QuizService] Cache hit — ${cacheKey}`);
+      if (process.env.LOG_LEVEL === 'debug') {
+        console.log(`[QuizService] Cache hit — ${cacheKey}`);
+      }
       return JSON.parse(cached);
     }
   } catch (err) {
