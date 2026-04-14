@@ -253,6 +253,20 @@ router.patch('/preferences', protect, async (req, res) => {
           { replacements: { userId, boardId: row.exam_board_id }, type: QueryTypes.INSERT }
         );
       }
+
+      // Persist individual subject selections into student_subjects
+      for (const sid of subject_ids) {
+        try {
+          await sequelize.query(
+            `INSERT INTO student_subjects (student_id, subject_id, source)
+             VALUES (:userId, :sid, 'self')
+             ON CONFLICT (student_id, subject_id) DO NOTHING`,
+            { replacements: { userId, sid }, type: QueryTypes.INSERT }
+          );
+        } catch (_e) {
+          // If student_subjects table does not exist yet, skip silently
+        }
+      }
     }
 
     // 3. Save daily_goal
