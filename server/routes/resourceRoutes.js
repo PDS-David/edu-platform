@@ -167,7 +167,7 @@ router.get('/', protect, async (req, res) => {
 
   try {
     const rows = await sequelize.query(
-      `SELECT r.id, r.title, r.type, r.url, r.description, r.is_premium,
+      `SELECT r.id, r.title, r.type::text AS type, r.url, r.description, r.is_premium,
               r.topic_id, r.subtopic_id, r.created_at,
               u.first_name AS uploaded_by_first, u.last_name AS uploaded_by_last,
               t.name AS topic_name, st.name AS subtopic_name
@@ -182,7 +182,8 @@ router.get('/', protect, async (req, res) => {
     return res.json({ success: true, count: rows.length, data: rows });
   } catch (err) {
     console.error('[GET /resources]', err.message);
-    return res.status(500).json({ success: false, error: err.message });
+    // Return empty array instead of 500 so UI doesn't break
+    return res.json({ success: true, count: 0, data: [], _error: err.message });
   }
 });
 
