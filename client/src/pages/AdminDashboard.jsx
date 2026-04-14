@@ -6,11 +6,12 @@ import {
   Users, School, BookOpen, Settings, LogOut,
   Plus, Pencil, Trash2, ChevronDown, ChevronRight,
   Loader2, X, Check, AlertTriangle, RefreshCw, GraduationCap,
-  UserCheck, ChevronUp, Sparkles, Zap
+  UserCheck, ChevronUp, Sparkles, Zap, Upload
 } from 'lucide-react';
 import branding from '../config/branding';
 import TopNav from '../components/TopNav';
 import { useCatalog } from '../hooks/useCatalog';
+import AdminBulkUploadPanel from '../components/AdminBulkUploadPanel';
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Cell,
@@ -1630,13 +1631,14 @@ const AdminDashboard = () => {
           <h2 className="text-xl font-bold text-gray-900 mb-4">System Management</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             {[
-              { key: 'analytics', icon: Zap,         color: 'teal',   label: 'Analytics',          desc: 'Platform-wide stats and charts'       },
-              { key: 'users',     icon: Users,        color: 'blue',   label: 'User Management',    desc: 'Manage users and permissions'          },
-              { key: 'schools',   icon: School,       color: 'purple', label: 'School Management',  desc: 'Manage schools and institutions'       },
-              { key: 'content',   icon: BookOpen,     color: 'green',  label: 'Content Management', desc: 'Manage courses and subjects'           },
-              { key: 'catalog',   icon: GraduationCap,color: 'orange', label: 'Catalog Management', desc: 'Manage exam types & subjects'          },
-              { key: 'teachers',  icon: UserCheck,    color: 'purple', label: 'Teacher Assignment', desc: 'Assign subjects to teachers'           },
-              { key: 'aigenerate',icon: Sparkles,     color: 'teal',   label: 'AI Generate',        desc: 'Generate questions with Gemini'        },
+              { key: 'analytics',    icon: Zap,         color: 'teal',   label: 'Analytics',          desc: 'Platform-wide stats and charts'       },
+              { key: 'users',        icon: Users,        color: 'blue',   label: 'User Management',    desc: 'Manage users and permissions'          },
+              { key: 'schools',      icon: School,       color: 'purple', label: 'School Management',  desc: 'Manage schools and institutions'       },
+              { key: 'content',      icon: BookOpen,     color: 'green',  label: 'Content Management', desc: 'Manage courses and subjects'           },
+              { key: 'catalog',      icon: GraduationCap,color: 'orange', label: 'Catalog Management', desc: 'Manage exam types & subjects'          },
+              { key: 'teachers',     icon: UserCheck,    color: 'purple', label: 'Teacher Assignment', desc: 'Assign subjects to teachers'           },
+              { key: 'aigenerate',   icon: Sparkles,     color: 'teal',   label: 'AI Generate',        desc: 'Generate questions with Gemini'        },
+              { key: 'bulkupload',   icon: Upload,       color: 'blue',   label: 'Bulk Upload',        desc: 'Upload files in bulk, assign later'    },
             ].map(({ key, icon: Icon, color, label, desc }) => {
               const active = activePanel === key;
               const borderMap = { teal: 'border-teal-500', blue: 'border-blue-500', purple: 'border-purple-500', green: 'border-green-500', orange: 'border-green-500' };
@@ -1723,6 +1725,12 @@ const AdminDashboard = () => {
         {activePanel === 'aigenerate' && (
           <div className="bg-white rounded-xl shadow p-6">
             <AIGeneratePanel />
+          </div>
+        )}
+
+        {activePanel === 'bulkupload' && (
+          <div className="bg-white rounded-xl shadow p-6">
+            <AdminBulkUploadPanel />
           </div>
         )}
       </main>
