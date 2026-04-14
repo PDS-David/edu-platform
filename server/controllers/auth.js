@@ -116,7 +116,7 @@ exports.register = async (req, res, next) => {
           :verificationToken, :verificationTokenExpires,
           true, false, 'free_trial',
           NOW() + INTERVAL '14 days',
-          :pendingIds,
+          :pendingIds::uuid[],
           NOW(), NOW())
        RETURNING
          id, email, first_name, last_name, role,
@@ -133,7 +133,7 @@ exports.register = async (req, res, next) => {
           role:                     assignedRole,
           verificationToken,
           verificationTokenExpires,
-          pendingIds:               `{${pendingIds.join(',')}}`,
+          pendingIds:               pendingIds.length > 0 ? `{${pendingIds.join(',')}}` : '{}',
         },
         type: QueryTypes.SELECT,
       }
