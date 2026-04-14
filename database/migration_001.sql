@@ -12,16 +12,16 @@
 --   7. Creates test_questions table                       (Prompt 5)
 --   8. Creates test_assignments table                     (Prompt 5)
 --
--- Safe to run multiple times — every statement uses IF NOT EXISTS
+-- Safe to run multiple times  every statement uses IF NOT EXISTS
 -- or checks before altering, so re-running will not break anything.
 -- =============================================================================
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- 
 -- 1. ADD 'free_trial' TO subscription_status ENUM
 --    The register function inserts 'free_trial' but the enum only has:
 --    'free', 'active', 'expired', 'cancelled'
 --    Without this, every new registration throws a 500 error.
--- ─────────────────────────────────────────────────────────────────────────────
+-- 
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -34,18 +34,18 @@ BEGIN
     ALTER TYPE enum_users_subscription_status ADD VALUE 'free_trial';
     RAISE NOTICE 'Added free_trial to enum_users_subscription_status';
   ELSE
-    RAISE NOTICE 'free_trial already exists in enum — skipping';
+    RAISE NOTICE 'free_trial already exists in enum  skipping';
   END IF;
 END
 $$;
 
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- 
 -- 2. ADD MISSING COLUMNS TO topics
 --    Code references: title, created_by
 --    DB currently has: id, subject_id, name, description, order_index,
 --                      is_active, created_at, updated_at
--- ─────────────────────────────────────────────────────────────────────────────
+-- 
 ALTER TABLE topics
   ADD COLUMN IF NOT EXISTS title      VARCHAR(255),
   ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id) ON DELETE SET NULL;
@@ -54,20 +54,20 @@ ALTER TABLE topics
 UPDATE topics SET title = name WHERE title IS NULL;
 
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- 
 -- 3. ADD MISSING COLUMNS TO subtopics
 --    Code references: created_by
 --    DB currently has: id, topic_id, subject_id, name, description, content,
 --                      order_index, is_active, created_at, updated_at
--- ─────────────────────────────────────────────────────────────────────────────
+-- 
 ALTER TABLE subtopics
   ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id) ON DELETE SET NULL;
 
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- 
 -- 4. CREATE classes TABLE
 --    Used by: GET/POST /teacher/classes, POST /teacher/tests (class_id)
--- ─────────────────────────────────────────────────────────────────────────────
+-- 
 CREATE TABLE IF NOT EXISTS classes (
   id          UUID      PRIMARY KEY DEFAULT gen_random_uuid(),
   teacher_id  UUID      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -80,10 +80,10 @@ CREATE TABLE IF NOT EXISTS classes (
 CREATE INDEX IF NOT EXISTS idx_classes_teacher_id ON classes(teacher_id);
 
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- 
 -- 5. CREATE class_memberships TABLE
 --    Used by: GET /teacher/class/:classId/analytics, POST /teacher/tests
--- ─────────────────────────────────────────────────────────────────────────────
+-- 
 CREATE TABLE IF NOT EXISTS class_memberships (
   id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   class_id   UUID        NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
@@ -96,10 +96,10 @@ CREATE INDEX IF NOT EXISTS idx_class_memberships_class_id   ON class_memberships
 CREATE INDEX IF NOT EXISTS idx_class_memberships_student_id ON class_memberships(student_id);
 
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- 
 -- 6. CREATE custom_tests TABLE
 --    Used by: GET/POST /teacher/tests
--- ─────────────────────────────────────────────────────────────────────────────
+-- 
 CREATE TABLE IF NOT EXISTS custom_tests (
   id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   teacher_id       UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -116,10 +116,10 @@ CREATE TABLE IF NOT EXISTS custom_tests (
 CREATE INDEX IF NOT EXISTS idx_custom_tests_teacher_id ON custom_tests(teacher_id);
 
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- 
 -- 7. CREATE test_questions TABLE
 --    Used by: GET /teacher/tests (COUNT), POST /teacher/tests (INSERT)
--- ─────────────────────────────────────────────────────────────────────────────
+-- 
 CREATE TABLE IF NOT EXISTS test_questions (
   id               UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
   test_id          UUID    NOT NULL REFERENCES custom_tests(id) ON DELETE CASCADE,
@@ -132,10 +132,10 @@ CREATE TABLE IF NOT EXISTS test_questions (
 CREATE INDEX IF NOT EXISTS idx_test_questions_test_id ON test_questions(test_id);
 
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- 
 -- 8. CREATE test_assignments TABLE
 --    Used by: GET /teacher/tests (COUNT submissions), POST /teacher/tests
--- ─────────────────────────────────────────────────────────────────────────────
+-- 
 CREATE TABLE IF NOT EXISTS test_assignments (
   id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   test_id     UUID        NOT NULL REFERENCES custom_tests(id) ON DELETE CASCADE,
@@ -149,9 +149,9 @@ CREATE INDEX IF NOT EXISTS idx_test_assignments_test_id    ON test_assignments(t
 CREATE INDEX IF NOT EXISTS idx_test_assignments_student_id ON test_assignments(student_id);
 
 
--- ─────────────────────────────────────────────────────────────────────────────
--- VERIFICATION — run these SELECTs to confirm everything applied correctly
--- ─────────────────────────────────────────────────────────────────────────────
+-- 
+-- VERIFICATION  run these SELECTs to confirm everything applied correctly
+-- 
 SELECT enumlabel AS subscription_status_values
 FROM pg_enum
 WHERE enumtypid = (
@@ -170,3 +170,5 @@ WHERE table_name = 'topics'   AND column_name IN ('title','created_by');
 
 SELECT column_name FROM information_schema.columns
 WHERE table_name = 'subtopics' AND column_name = 'created_by';
+
+

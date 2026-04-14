@@ -1,5 +1,5 @@
 -- ============================================================
--- AISchoolonair — TYPE MISMATCH FIXES (v2)
+-- AISchoolonair  TYPE MISMATCH FIXES (v2)
 -- Fix: drop default before altering pending_exam_board_ids type
 -- ============================================================
 
@@ -26,15 +26,15 @@ CREATE INDEX idx_student_exam_types_board   ON student_exam_types(exam_board_id)
 CREATE INDEX idx_student_exam_types_active  ON student_exam_types(student_id, is_active);
 
 -- ------------------------------------------------------------
--- 2. Fix teacher_subjects.exam_board_id (INTEGER → UUID)
+-- 2. Fix teacher_subjects.exam_board_id (INTEGER  UUID)
 -- ------------------------------------------------------------
 ALTER TABLE teacher_subjects DROP COLUMN exam_board_id;
 ALTER TABLE teacher_subjects ADD COLUMN exam_board_id UUID REFERENCES exam_boards(id) ON DELETE SET NULL;
 CREATE INDEX idx_teacher_subjects_board ON teacher_subjects(exam_board_id);
 
 -- ------------------------------------------------------------
--- 3. Fix users.pending_exam_board_ids (integer[] → uuid[])
---    Must: drop default → change type → re-add default
+-- 3. Fix users.pending_exam_board_ids (integer[]  uuid[])
+--    Must: drop default  change type  re-add default
 -- ------------------------------------------------------------
 ALTER TABLE users ALTER COLUMN pending_exam_board_ids DROP DEFAULT;
 ALTER TABLE users ALTER COLUMN pending_exam_board_ids TYPE uuid[] USING '{}'::uuid[];
@@ -54,3 +54,5 @@ COMMIT;
 -- SELECT column_name, data_type, column_default FROM information_schema.columns
 -- WHERE table_name = 'users' AND column_name = 'pending_exam_board_ids';
 -- ============================================================
+
+
