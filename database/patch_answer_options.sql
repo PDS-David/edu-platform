@@ -1,5 +1,5 @@
 -- ============================================================
--- AISchoolonair — ANSWER OPTIONS PATCH
+-- AISchoolonair  ANSWER OPTIONS PATCH
 -- Fixes 19 questions that had special characters in text
 -- Uses question UUIDs directly to avoid encoding issues
 -- ============================================================
@@ -149,3 +149,5 @@ SELECT
 FROM answer_options;
 
 COMMIT;
+
+

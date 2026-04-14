@@ -35,9 +35,9 @@ BEGIN;
 -- STEP 1: CREATE 16 COURSES
 -- ============================================================
 
--- ────────────────────────────────────────────────────────────
--- DAVID — Sciences — JAMB/UTME (4 courses)
--- ────────────────────────────────────────────────────────────
+-- 
+-- DAVID  Sciences  JAMB/UTME (4 courses)
+-- 
 
 INSERT INTO courses (
   id, subject_id, teacher_id, title, description,
@@ -66,9 +66,9 @@ JOIN (VALUES
    'In-depth JAMB/UTME Biology covering cell biology, genetics, ecology and human physiology.')
 ) AS v(code, title, description) ON s.code = v.code;
 
--- ────────────────────────────────────────────────────────────
--- DAVID — Sciences — WAEC (4 courses)
--- ────────────────────────────────────────────────────────────
+-- 
+-- DAVID  Sciences  WAEC (4 courses)
+-- 
 
 INSERT INTO courses (
   id, subject_id, teacher_id, title, description,
@@ -97,9 +97,9 @@ JOIN (VALUES
    'In-depth WAEC Biology covering cell structure, reproduction, ecology and human biology.')
 ) AS v(code, title, description) ON s.code = v.code;
 
--- ────────────────────────────────────────────────────────────
--- MARY — Humanities — JAMB/UTME (4 courses)
--- ────────────────────────────────────────────────────────────
+-- 
+-- MARY  Humanities  JAMB/UTME (4 courses)
+-- 
 
 INSERT INTO courses (
   id, subject_id, teacher_id, title, description,
@@ -128,9 +128,9 @@ JOIN (VALUES
    'JAMB/UTME Business Studies covering business organisation, marketing, finance and management.')
 ) AS v(code, title, description) ON s.code = v.code;
 
--- ────────────────────────────────────────────────────────────
--- MARY — Humanities — WAEC (4 courses)
--- ────────────────────────────────────────────────────────────
+-- 
+-- MARY  Humanities  WAEC (4 courses)
+-- 
 
 INSERT INTO courses (
   id, subject_id, teacher_id, title, description,
@@ -164,9 +164,9 @@ JOIN (VALUES
 -- STEP 2: CREATE 3 TOPICS PER COURSE (48 topics total)
 -- ============================================================
 
--- ────────────────────────────────────────────────────────────
+-- 
 -- JAMB Mathematics topics
--- ────────────────────────────────────────────────────────────
+-- 
 INSERT INTO topics (id, course_id, title, description, order_index, estimated_hours)
 SELECT gen_random_uuid(), c.id, v.title, v.description, v.order_index, v.hours
 FROM courses c
@@ -271,9 +271,9 @@ WHERE s.code = 'BUS-101'
   AND c.exam_board_id = '5f36f69f-078e-4a4f-951a-200d7f2c6623';
 
 
--- ────────────────────────────────────────────────────────────
+-- 
 -- WAEC Mathematics topics
--- ────────────────────────────────────────────────────────────
+-- 
 INSERT INTO topics (id, course_id, title, description, order_index, estimated_hours)
 SELECT gen_random_uuid(), c.id, v.title, v.description, v.order_index, v.hours
 FROM courses c
@@ -455,3 +455,5 @@ COMMIT;
 --   '10429bfe-bb6b-4b01-99a1-f921bb956687'
 -- )
 -- GROUP BY u.full_name;
+
+

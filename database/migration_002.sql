@@ -10,11 +10,11 @@
 --   5. Cleans up 69 duplicate email unique constraints on users
 --   6. Adds scheduled trial-expiry UPDATE (run manually or via cron)
 --
--- Safe to run multiple times — uses IF NOT EXISTS and DO $$ checks throughout.
+-- Safe to run multiple times  uses IF NOT EXISTS and DO $$ checks throughout.
 -- =============================================================================
 
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- 
 -- 1. ADD MISSING COLUMNS TO questions
 --
 --    DB currently has:
@@ -26,7 +26,7 @@
 --      status, difficulty, question_type, question_sub_type,
 --      topic, year, source, subject_id_uuid,
 --      is_ai_generated, ai_generation_source, concept_hint, hints
--- ─────────────────────────────────────────────────────────────────────────────
+-- 
 ALTER TABLE questions
   ADD COLUMN IF NOT EXISTS status               VARCHAR(20)  NOT NULL DEFAULT 'pending',
   ADD COLUMN IF NOT EXISTS difficulty           VARCHAR(10)  DEFAULT 'medium',
@@ -51,11 +51,11 @@ CREATE INDEX IF NOT EXISTS idx_questions_sub_type       ON questions(question_su
 UPDATE questions SET status = 'approved' WHERE status = 'pending';
 
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- 
 -- 2. CREATE subscription_plans TABLE + SEED
 --    Used by: GET /payments/plans, POST /payments/initialize,
 --             GET /payments/verify, POST /payments/webhook
--- ─────────────────────────────────────────────────────────────────────────────
+-- 
 CREATE TABLE IF NOT EXISTS subscription_plans (
   id                UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
   plan_code         VARCHAR(50)  NOT NULL UNIQUE,
@@ -76,20 +76,20 @@ INSERT INTO subscription_plans
   (plan_code, plan_name, price_monthly, price_yearly, currency,
    has_analytics, has_video_access, has_test_builder, is_active)
 VALUES
-  -- Free trial — no payment, activated automatically on registration
+  -- Free trial  no payment, activated automatically on registration
   ('FREE_TRIAL',      'Free Trial',       NULL,   NULL,    'NGN', true,  true,  false, true),
-  -- ₦2,000/month (200,000 kobo)
+  -- 2,000/month (200,000 kobo)
   ('STUDENT_MONTHLY', 'Student Monthly',  200000, NULL,    'NGN', true,  true,  true,  true),
-  -- ₦6,000/year (600,000 kobo) — ₦500/month equivalent
+  -- 6,000/year (600,000 kobo)  500/month equivalent
   ('STUDENT_YEARLY',  'Student Annual',   NULL,   600000,  'NGN', true,  true,  true,  true)
 ON CONFLICT (plan_code) DO NOTHING;
 
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- 
 -- 3. CREATE payment_transactions TABLE
 --    Used by: POST /payments/initialize, GET /payments/verify,
 --             POST /payments/webhook
--- ─────────────────────────────────────────────────────────────────────────────
+-- 
 CREATE TABLE IF NOT EXISTS payment_transactions (
   id                      UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id                 UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -109,11 +109,11 @@ CREATE INDEX IF NOT EXISTS idx_payment_transactions_reference ON payment_transac
 CREATE INDEX IF NOT EXISTS idx_payment_transactions_status    ON payment_transactions(status);
 
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- 
 -- 4. CREATE user_subscriptions TABLE
 --    Used by: GET /payments/verify, POST /payments/webhook,
 --             GET /payments/subscription
--- ─────────────────────────────────────────────────────────────────────────────
+-- 
 CREATE TABLE IF NOT EXISTS user_subscriptions (
   id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id           UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -131,13 +131,13 @@ CREATE INDEX IF NOT EXISTS idx_user_subscriptions_user_id ON user_subscriptions(
 CREATE INDEX IF NOT EXISTS idx_user_subscriptions_status  ON user_subscriptions(status);
 
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- 
 -- 5. CLEAN UP DUPLICATE EMAIL UNIQUE CONSTRAINTS ON users
 --    The users table has 70 identical unique constraints on email
 --    (users_email_key through users_email_key69). Keep only the original
 --    users_email_key and drop the 69 duplicates.
---    This is safe — the column stays unique, we just remove redundant indexes.
--- ─────────────────────────────────────────────────────────────────────────────
+--    This is safe  the column stays unique, we just remove redundant indexes.
+-- 
 DO $$
 DECLARE
   i INTEGER;
@@ -154,12 +154,12 @@ END
 $$;
 
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- 
 -- 6. EXPIRE FREE TRIALS THAT HAVE PASSED THEIR END DATE
 --    This is the one-time backfill. For ongoing expiry, add this to
 --    scheduledJobs.js (see note below).
---    Changes free_trial → expired where subscription_expires_at has passed.
--- ─────────────────────────────────────────────────────────────────────────────
+--    Changes free_trial  expired where subscription_expires_at has passed.
+-- 
 UPDATE users
 SET    subscription_status = 'expired',
        updated_at          = NOW()
@@ -170,9 +170,9 @@ WHERE  subscription_status   = 'free_trial'
 RAISE NOTICE 'Expired free trials updated to expired status';
 
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- 
 -- VERIFICATION
--- ─────────────────────────────────────────────────────────────────────────────
+-- 
 
 -- 1. questions new columns
 SELECT column_name, data_type, column_default
@@ -208,3 +208,5 @@ FROM information_schema.table_constraints
 WHERE table_name       = 'users'
   AND constraint_type  = 'UNIQUE'
   AND constraint_name  LIKE 'users_email%';
+
+

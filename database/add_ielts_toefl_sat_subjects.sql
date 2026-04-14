@@ -1,9 +1,9 @@
--- ═══════════════════════════════════════════════════════════════
+-- 
 -- Add subjects for IELTS, TOEFL, and SAT exam boards
 -- Run this in psql while connected to edu_platform
--- ═══════════════════════════════════════════════════════════════
+-- 
 
--- ── IELTS Subjects (4 sections) ──────────────────────────────
+--  IELTS Subjects (4 sections) 
 INSERT INTO subjects (id, name, code, subject_code, description, icon_emoji, color, category, level, question_count, video_count, notes_count, past_papers_count, is_active, exam_board_id)
 VALUES
   (gen_random_uuid(), 'Listening', 'IELTS-LISTEN', 'IELTS-01',
@@ -31,7 +31,7 @@ VALUES
    (SELECT id FROM exam_boards WHERE code = 'IELTS'));
 
 
--- ── TOEFL Subjects (4 sections) ──────────────────────────────
+--  TOEFL Subjects (4 sections) 
 INSERT INTO subjects (id, name, code, subject_code, description, icon_emoji, color, category, level, question_count, video_count, notes_count, past_papers_count, is_active, exam_board_id)
 VALUES
   (gen_random_uuid(), 'Reading', 'TOEFL-READ', 'TOEFL-01',
@@ -59,7 +59,7 @@ VALUES
    (SELECT id FROM exam_boards WHERE code = 'TOEFL'));
 
 
--- ── SAT Subjects (2 sections) ────────────────────────────────
+--  SAT Subjects (2 sections) 
 INSERT INTO subjects (id, name, code, subject_code, description, icon_emoji, color, category, level, question_count, video_count, notes_count, past_papers_count, is_active, exam_board_id)
 VALUES
   (gen_random_uuid(), 'Reading & Writing', 'SAT-RW', 'SAT-01',
@@ -75,9 +75,11 @@ VALUES
    (SELECT id FROM exam_boards WHERE code = 'SAT'));
 
 
--- ── Verify ───────────────────────────────────────────────────
+--  Verify 
 SELECT eb.code, COUNT(s.id) as subject_count
 FROM exam_boards eb
 LEFT JOIN subjects s ON eb.id = s.exam_board_id
 GROUP BY eb.code
 ORDER BY eb.display_order;
+
+

@@ -1,10 +1,10 @@
 -- ============================================================
--- AISchoolonair — NOTIFICATIONS + HEALTH CHECK
+-- AISchoolonair  NOTIFICATIONS + HEALTH CHECK
 -- ============================================================
 
 BEGIN;
 
--- ── 1. WELCOME NOTIFICATIONS ─────────────────────────────────
+--  1. WELCOME NOTIFICATIONS 
 
 -- John Doe notifications
 INSERT INTO notifications (id, user_id, title, message, type, is_read, action_url, created_at)
@@ -17,7 +17,7 @@ VALUES
 
   (gen_random_uuid(),
    'cd818b5c-24c2-46a4-ae0c-5635d7f671b0',
-   'Subscription Confirmed — Student Yearly',
+   'Subscription Confirmed  Student Yearly',
    'Your Student Yearly plan is active until March 2027. You have full access to all features.',
    'subscription', false, '/subscription', NOW()),
 
@@ -38,7 +38,7 @@ VALUES
 
   (gen_random_uuid(),
    '10429bfe-bb6b-4b01-99a1-f921bb956687',
-   'Free Trial Started — 14 Days Remaining',
+   'Free Trial Started  14 Days Remaining',
    'Your free trial gives you access to 1 exam board and 3 subjects. Upgrade anytime for full access.',
    'subscription', false, '/subscription', NOW()),
 
@@ -54,7 +54,7 @@ COMMIT;
 -- 2. PLATFORM HEALTH CHECK
 -- ============================================================
 
--- ── Row counts for all major tables ─────────────────────────
+--  Row counts for all major tables 
 SELECT
   'users'              AS table_name, COUNT(*) AS row_count FROM users
 UNION ALL SELECT 'exam_boards',        COUNT(*) FROM exam_boards
@@ -70,7 +70,7 @@ UNION ALL SELECT 'teacher_subjects',   COUNT(*) FROM teacher_subjects
 UNION ALL SELECT 'notifications',      COUNT(*) FROM notifications
 ORDER BY table_name;
 
--- ── Questions: answer options coverage ──────────────────────
+--  Questions: answer options coverage 
 SELECT
   'Questions WITH answer options'    AS check_name,
   COUNT(DISTINCT q.id)               AS count
@@ -104,7 +104,7 @@ SELECT
     HAVING COUNT(*) = 1
   ) x;
 
--- ── Questions: explanation coverage ─────────────────────────
+--  Questions: explanation coverage 
 SELECT
   'Questions WITH explanation'  AS check_name, COUNT(*) AS count
 FROM questions WHERE explanation IS NOT NULL
@@ -113,7 +113,7 @@ SELECT
   'Questions WITHOUT explanation', COUNT(*)
 FROM questions WHERE explanation IS NULL;
 
--- ── Students: subscription status ───────────────────────────
+--  Students: subscription status 
 SELECT
   u.first_name || ' ' || u.last_name AS student,
   sp.plan_name,
@@ -128,7 +128,7 @@ WHERE u.role = 'student'
 GROUP BY u.id, u.first_name, u.last_name, sp.plan_name, us.status, us.end_date
 ORDER BY u.first_name;
 
--- ── Quizzes: question count check ───────────────────────────
+--  Quizzes: question count check 
 SELECT
   'Quizzes with exactly 5 questions' AS check_name,
   COUNT(*) AS count
@@ -159,7 +159,7 @@ WHERE NOT EXISTS (
   SELECT 1 FROM questions q WHERE q.quiz_id = qz.id
 );
 
--- ── Teachers: subject assignments ───────────────────────────
+--  Teachers: subject assignments 
 SELECT
   u.first_name || ' ' || u.last_name AS teacher,
   COUNT(ts.id) AS subjects_assigned
@@ -169,7 +169,7 @@ WHERE u.role = 'teacher'
 GROUP BY u.id, u.first_name, u.last_name
 ORDER BY u.first_name;
 
--- ── Orphan check: questions without subjects ─────────────────
+--  Orphan check: questions without subjects 
 SELECT
   'Questions with no valid subject' AS check_name,
   COUNT(*) AS count
@@ -200,7 +200,7 @@ SELECT
 FROM student_exam_types
 WHERE subscription_id IS NULL;
 
--- ── Overall platform readiness summary ──────────────────────
+--  Overall platform readiness summary 
 SELECT
   CASE
     WHEN
@@ -210,5 +210,7 @@ SELECT
       AND (SELECT COUNT(*) FROM user_subscriptions WHERE status = 'active') = 2
       AND (SELECT COUNT(*) FROM student_exam_types WHERE is_active = true) = 4
     THEN 'PLATFORM READY FOR TESTING'
-    ELSE 'ISSUES FOUND — CHECK ABOVE'
+    ELSE 'ISSUES FOUND  CHECK ABOVE'
   END AS platform_status;
+
+
