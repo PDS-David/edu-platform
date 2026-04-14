@@ -81,27 +81,59 @@ router.post(
     const fileUrl      = `/uploads/resources/${req.file.filename}`;
 
     try {
-      const result = await sequelize.query(
-        `INSERT INTO resources
-           (topic_id, subtopic_id, uploaded_by, title, type, url,
-            description, is_premium, is_active, created_at, updated_at)
-         VALUES
-           (:topicId, :subtopicId, :uploadedBy, :title, :type, :url,
-            :description, false, true, NOW(), NOW())
-         RETURNING id`,
-        {
-          replacements: {
-            topicId:     topic_id    || null,   // FIX: was parseInt(topic_id)
-            subtopicId:  subtopic_id || null,   // FIX: was parseInt(subtopic_id)
-            uploadedBy:  req.user.id,
-            title:       title.trim(),
-            type:        resourceType,
-            url:         fileUrl,
-            description: description || null,
-          },
-          type: QueryTypes.SELECT,
+      let result;
+      try {
+        // Primary: insert with uploaded_by (UUID — correct schema after migrations)
+        result = await sequelize.query(
+          `INSERT INTO resources
+             (topic_id, subtopic_id, uploaded_by, title, type, url,
+              description, is_premium, is_active, created_at, updated_at)
+           VALUES
+             (:topicId, :subtopicId, :uploadedBy, :title, :type, :url,
+              :description, false, true, NOW(), NOW())
+           RETURNING id`,
+          {
+            replacements: {
+              topicId:     topic_id    || null,
+              subtopicId:  subtopic_id || null,
+              uploadedBy:  req.user.id,
+              title:       title.trim(),
+              type:        resourceType,
+              url:         fileUrl,
+              description: description || null,
+            },
+            type: QueryTypes.SELECT,
+          }
+        );
+      } catch (innerErr) {
+        // Fallback: if uploaded_by column is still INTEGER in DB (pre-migration),
+        // insert without it so the upload still succeeds.
+        if (innerErr.message.includes('invalid input syntax for type integer')) {
+          console.warn('[resources/upload] uploaded_by column is INTEGER in DB — inserting without it. Run patch_001_fix_types.sql to fix permanently.');
+          result = await sequelize.query(
+            `INSERT INTO resources
+               (topic_id, subtopic_id, title, type, url,
+                description, is_premium, is_active, created_at, updated_at)
+             VALUES
+               (:topicId, :subtopicId, :title, :type, :url,
+                :description, false, true, NOW(), NOW())
+             RETURNING id`,
+            {
+              replacements: {
+                topicId:     topic_id    || null,
+                subtopicId:  subtopic_id || null,
+                title:       title.trim(),
+                type:        resourceType,
+                url:         fileUrl,
+                description: description || null,
+              },
+              type: QueryTypes.SELECT,
+            }
+          );
+        } else {
+          throw innerErr;
         }
-      );
+      }
 
       return res.status(201).json({
         success: true,
