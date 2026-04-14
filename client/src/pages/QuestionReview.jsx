@@ -47,10 +47,7 @@ export default function QuestionReview() {
     setLoading(true);
     setError(null);
     try {
-      const { data } = await axios.get(
-        `${API}/questions/pending?limit=${PAGE_SIZE}&offset=${off}`,
-        { headers: authHeader() }
-      );
+      const data = await api.get(`/admin/questions/pending?limit=${PAGE_SIZE}&offset=${off}`);
       setQuestions(data.data || []);
       setTotal(data.total || 0);
       setOffset(off);
@@ -69,10 +66,9 @@ export default function QuestionReview() {
     if (!reviewing || !action) return;
     setSubmitting(true);
     try {
-      const { data } = await axios.put(
-        `${API}/questions/${reviewing.id}/review`,
-        { action, feedback: feedback.trim() || undefined },
-        { headers: authHeader() }
+      const data = await api.put(
+        `/admin/questions/${reviewing.id}/review`,
+        { action, feedback: feedback.trim() || undefined }
       );
       if (data.success) {
         setReviewing(null);
