@@ -394,7 +394,15 @@ router.get('/platform-stats', protect, adminOnly, async (req, res) => {
         [{}]
       ),
       safeQuery(
-        `SELECT COUNT(*)::INTEGER AS total_approved FROM questions WHERE is_active = true`,
+        `SELECT
+           COUNT(*)::INTEGER AS total_approved,
+           COUNT(*) FILTER (WHERE status = 'pending' OR status IS NULL)::INTEGER AS total_pending,
+           COUNT(*) FILTER (WHERE is_ai_generated = true)::INTEGER AS total_ai_generated,
+           (SELECT COUNT(*)::INTEGER FROM practice_attempts
+            WHERE attempted_at > NOW() - INTERVAL '24 hours') AS answered_today,
+           (SELECT COUNT(*)::INTEGER FROM practice_attempts
+            WHERE attempted_at > NOW() - INTERVAL '7 days') AS answered_this_week
+         FROM questions WHERE is_active = true`,
         [{}]
       ),
       safeQuery(
