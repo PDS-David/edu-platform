@@ -1,131 +1,144 @@
 // client/src/pages/TeacherResourcesPage.jsx
-// URL: /teacher/resources  (also /teacher/upload-video, /teacher/add-questions)
-// Props: defaultTab — "upload" | "resources" | "questions"
-//
-// Tab 1 — Upload: file picker → POST /api/resources/upload (multipart)
-// Tab 2 — My Resources: list + delete → GET/DELETE /api/resources
-// Tab 3 — Add Questions: MCQ submission → POST /api/teacher/questions
+// URL: /teacher/resources
+// Tab 1 — Upload Resource → POST /api/resources/upload (multipart)
+// Tab 2 — My Resources   → GET/DELETE /api/resources
+// Tab 3 — Add Question   → POST /api/teacher/questions
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
 import TopNav from '../components/TopNav';
 import {
   Upload, FileText, Video, Music, Trash2, Loader2,
   CheckCircle, AlertTriangle, X, Plus, BookOpen,
-  ChevronDown, File,
+  File,
 } from 'lucide-react';
 
-// ── Toast ────────────────────────────────────────────────────────────────────
+// ── Toast ─────────────────────────────────────────────────────────────────────
 function Toast({ msg, type, onClose }) {
-  useEffect(() => { const t = setTimeout(onClose, 4000); return () => clearTimeout(t); }, [onClose]);
+  useEffect(() => {
+    const t = setTimeout(onClose, 5000);
+    return () => clearTimeout(t);
+  }, [onClose]);
   return (
     <div className={`fixed bottom-6 right-4 z-50 flex items-center gap-2.5 px-5 py-3
-      rounded-2xl shadow-xl text-sm font-semibold text-white
+      rounded-2xl shadow-xl text-sm font-semibold text-white max-w-sm
       ${type === 'success' ? 'bg-gray-900' : 'bg-red-600'}`}>
       {type === 'success'
         ? <CheckCircle size={14} className="text-teal-400 shrink-0" />
         : <AlertTriangle size={14} className="shrink-0" />}
-      <span>{msg}</span>
+      <span className="flex-1">{msg}</span>
       <button onClick={onClose}><X size={13} className="opacity-60" /></button>
     </div>
   );
 }
 
-// ── File type icon ────────────────────────────────────────────────────────────
+// ── File type icon ─────────────────────────────────────────────────────────────
 function FileTypeIcon({ type, size = 20 }) {
-  if (type === 'video')    return <Video    size={size} className="text-blue-500" />;
-  if (type === 'audio')    return <Music    size={size} className="text-purple-500" />;
-  if (type === 'document') return <FileText size={size} className="text-amber-500" />;
+  if (type === 'video')  return <Video    size={size} className="text-blue-500" />;
+  if (type === 'audio')  return <Music    size={size} className="text-purple-500" />;
+  if (type === 'pdf')    return <FileText size={size} className="text-red-500" />;
+  if (type === 'other')  return <FileText size={size} className="text-amber-500" />;
   return <File size={size} className="text-gray-400" />;
 }
 
-// ── Format file size ─────────────────────────────────────────────────────────
+// ── Format file size ──────────────────────────────────────────────────────────
 function fmtSize(bytes) {
   if (!bytes) return '';
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+// ── Safe list extractor — handles { success, data: [...] } or plain array ─────
+function extractList(r) {
+  if (Array.isArray(r))        return r;
+  if (Array.isArray(r?.data))  return r.data;
+  return [];
+}
+
+// ── Subject label with exam board ─────────────────────────────────────────────
+function subjectLabel(s) {
+  const board = s.exam_board_code || s.exam_board_name || '';
+  return board ? `${s.name} (${board})` : s.name;
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // TAB 1 — Upload Resource
 // ══════════════════════════════════════════════════════════════════════════════
 function UploadTab({ showToast }) {
-  const [subjects,    setSubjects]    = useState([]);
-  const [topics,      setTopics]      = useState([]);
-  const [subtopics,   setSubtopics]   = useState([]);
-  const [form,        setForm]        = useState({
+  const [subjects,  setSubjects]  = useState([]);
+  const [topics,    setTopics]    = useState([]);
+  const [subtopics, setSubtopics] = useState([]);
+  const [form,      setForm]      = useState({
     subject_id: '', topic_id: '', subtopic_id: '', title: '',
   });
-  const [file,        setFile]        = useState(null);
-  const [uploading,   setUploading]   = useState(false);
-  const [progress,    setProgress]    = useState(0);
-  const [dragOver,    setDragOver]    = useState(false);
+  const [file,      setFile]      = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [progress,  setProgress]  = useState(0);
+  const [dragOver,  setDragOver]  = useState(false);
   const fileRef = useRef(null);
 
-  // Load teacher's assigned subjects
+  // ── Load teacher's assigned subjects ────────────────────────────────────────
   useEffect(() => {
     api.get('/teacher/my-subjects')
-      .then(r => {
-        const list = Array.isArray(r) ? r : (r.data ?? []);
-        setSubjects(list);
-      })
+      .then(r => setSubjects(extractList(r)))
       .catch(() => {});
   }, []);
 
-  // Load topics when subject changes
+  // ── Load topics when subject changes ────────────────────────────────────────
   useEffect(() => {
-    setTopics([]); setSubtopics([]);
+    setTopics([]);
+    setSubtopics([]);
     setForm(f => ({ ...f, topic_id: '', subtopic_id: '' }));
     if (!form.subject_id) return;
-    api.get('/teacher/topics', { params: { subject_id: form.subject_id } })
-      .then(r => setTopics(Array.isArray(r) ? r : (r.data ?? [])))
-      .catch(() => {});
-  }, [form.subject_id]);
 
-  // Load subtopics when topic changes
+    api.get('/teacher/topics', { params: { subject_id: String(form.subject_id) } })
+      .then(r => setTopics(extractList(r)))
+      .catch(() => setTopics([]));
+  }, [form.subject_id]); // eslint-disable-line
+
+  // ── Load subtopics when topic changes ───────────────────────────────────────
   useEffect(() => {
     setSubtopics([]);
     setForm(f => ({ ...f, subtopic_id: '' }));
     if (!form.topic_id) return;
-    api.get('/teacher/subtopics', { params: { topic_id: form.topic_id } })
-      .then(r => setSubtopics(Array.isArray(r) ? r : (r.data ?? [])))
-      .catch(() => {});
-  }, [form.topic_id]);
+
+    api.get('/teacher/subtopics', { params: { topic_id: String(form.topic_id) } })
+      .then(r => setSubtopics(extractList(r)))
+      .catch(() => setSubtopics([]));
+  }, [form.topic_id]); // eslint-disable-line
 
   const handleFile = (f) => {
     if (!f) return;
     setFile(f);
-    if (!form.title) setForm(prev => ({ ...prev, title: f.name.replace(/\.[^/.]+$/, '') }));
+    if (!form.title) setForm(p => ({ ...p, title: f.name.replace(/\.[^/.]+$/, '') }));
   };
 
   const handleDrop = (e) => {
     e.preventDefault(); setDragOver(false);
-    const f = e.dataTransfer.files[0];
-    if (f) handleFile(f);
+    handleFile(e.dataTransfer.files[0]);
   };
 
   const handleUpload = async () => {
-    if (!file || !form.title.trim()) {
-      showToast('Please select a file and enter a title.', 'error');
-      return;
-    }
+    if (!file)             { showToast('Please select a file.', 'error'); return; }
+    if (!form.title.trim()){ showToast('Please enter a title.', 'error'); return; }
+
     setUploading(true);
     setProgress(0);
 
     const fd = new FormData();
     fd.append('file',  file);
     fd.append('title', form.title.trim());
-    if (form.topic_id)    fd.append('topic_id',    form.topic_id);
-    if (form.subtopic_id) fd.append('subtopic_id', form.subtopic_id);
-    if (form.description) fd.append('description', form.description);
+    // NOTE: uploaded_by is set server-side from req.user.id — do NOT send it from frontend
+    if (form.topic_id)    fd.append('topic_id',    String(form.topic_id));
+    if (form.subtopic_id) fd.append('subtopic_id', String(form.subtopic_id));
 
     try {
-      // Use raw fetch for upload progress (axios doesn't stream progress well here)
       const rawBase = import.meta.env.VITE_API_URL || '';
-      const apiBase = rawBase.endsWith('/api') ? rawBase : (rawBase ? `${rawBase}/api` : '/api');
-      const token   = localStorage.getItem('token') || sessionStorage.getItem('token') ||
-                      document.cookie.match(/token=([^;]+)/)?.[1] || '';
+      const apiBase = rawBase.endsWith('/api')
+        ? rawBase
+        : (rawBase ? `${rawBase}/api` : '/api');
+      const token = localStorage.getItem('token') || '';
 
       await new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
@@ -135,11 +148,15 @@ function UploadTab({ showToast }) {
           if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 100));
         };
         xhr.onload = () => {
-          const res = JSON.parse(xhr.responseText);
-          if (xhr.status >= 200 && xhr.status < 300 && res.success) resolve(res);
-          else reject(new Error(res.error || 'Upload failed'));
+          try {
+            const res = JSON.parse(xhr.responseText);
+            if (xhr.status >= 200 && xhr.status < 300 && res.success) resolve(res);
+            else reject(new Error(res.error || `Upload failed (${xhr.status})`));
+          } catch {
+            reject(new Error(`Server error (${xhr.status})`));
+          }
         };
-        xhr.onerror = () => reject(new Error('Network error'));
+        xhr.onerror = () => reject(new Error('Network error — check your connection.'));
         xhr.send(fd);
       });
 
@@ -155,7 +172,7 @@ function UploadTab({ showToast }) {
     }
   };
 
-  const sel = 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-300';
+  const sel = 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-300 disabled:bg-gray-50 disabled:text-gray-400';
   const lbl = 'block text-xs font-semibold text-gray-600 mb-1.5';
 
   return (
@@ -179,13 +196,22 @@ function UploadTab({ showToast }) {
         />
         {file ? (
           <div className="flex items-center justify-center gap-3">
-            <FileTypeIcon type={file.type.split('/')[0] === 'video' ? 'video' : file.type.startsWith('audio') ? 'audio' : 'document'} size={24} />
+            <FileTypeIcon
+              type={
+                file.type.startsWith('video/') ? 'video' :
+                file.type.startsWith('audio/') ? 'audio' :
+                file.type === 'application/pdf' ? 'pdf' : 'other'
+              }
+              size={24}
+            />
             <div className="text-left">
               <p className="text-sm font-semibold text-gray-800 truncate max-w-xs">{file.name}</p>
               <p className="text-xs text-gray-400">{fmtSize(file.size)}</p>
             </div>
-            <button onClick={e => { e.stopPropagation(); setFile(null); if (fileRef.current) fileRef.current.value = ''; }}
-              className="ml-2 text-gray-400 hover:text-red-500">
+            <button
+              onClick={e => { e.stopPropagation(); setFile(null); if (fileRef.current) fileRef.current.value = ''; }}
+              className="ml-2 text-gray-400 hover:text-red-500"
+            >
               <X size={16} />
             </button>
           </div>
@@ -209,34 +235,68 @@ function UploadTab({ showToast }) {
         />
       </div>
 
-      {/* Subject */}
+      {/* Subject — shows full label with exam board */}
       <div>
-        <label className={lbl}>Subject * <span className="text-gray-400 font-normal">(your assigned subjects only)</span></label>
-        <select value={form.subject_id} onChange={e => setForm(f => ({ ...f, subject_id: e.target.value }))} className={sel}>
+        <label className={lbl}>
+          Subject * <span className="text-gray-400 font-normal">(your assigned subjects only)</span>
+        </label>
+        <select
+          value={form.subject_id}
+          onChange={e => setForm(f => ({ ...f, subject_id: e.target.value }))}
+          className={sel}
+        >
           <option value="">Select subject…</option>
           {subjects.map(s => (
-            <option key={s.id} value={s.id}>{s.icon_emoji || ''} {s.name} {s.exam_board_code ? `(${s.exam_board_code})` : ''}</option>
+            <option key={s.id} value={s.id}>
+              {subjectLabel(s)}
+            </option>
           ))}
         </select>
+        {subjects.length === 0 && (
+          <p className="text-xs text-amber-600 mt-1">
+            No subjects assigned yet. Ask your admin to assign subjects to your account.
+          </p>
+        )}
       </div>
 
-      {/* Topic (optional) */}
+      {/* Topic */}
       <div>
-        <label className={lbl}>Topic <span className="text-gray-400 font-normal">(optional)</span></label>
-        <select value={form.topic_id} onChange={e => setForm(f => ({ ...f, topic_id: e.target.value }))}
-          disabled={!form.subject_id || topics.length === 0} className={sel}>
+        <label className={lbl}>
+          Topic <span className="text-gray-400 font-normal">(optional)</span>
+        </label>
+        <select
+          value={form.topic_id}
+          onChange={e => setForm(f => ({ ...f, topic_id: e.target.value }))}
+          disabled={!form.subject_id}
+          className={sel}
+        >
           <option value="">All topics / General</option>
-          {topics.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+          {topics.map(t => (
+            <option key={t.id} value={t.id}>{t.name}</option>
+          ))}
         </select>
+        {form.subject_id && topics.length === 0 && (
+          <p className="text-xs text-gray-400 mt-1">
+            No topics created for this subject yet. Create topics in the Content section.
+          </p>
+        )}
       </div>
 
-      {/* Subtopic (optional) */}
+      {/* Subtopic */}
       <div>
-        <label className={lbl}>Subtopic <span className="text-gray-400 font-normal">(optional)</span></label>
-        <select value={form.subtopic_id} onChange={e => setForm(f => ({ ...f, subtopic_id: e.target.value }))}
-          disabled={!form.topic_id || subtopics.length === 0} className={sel}>
+        <label className={lbl}>
+          Subtopic <span className="text-gray-400 font-normal">(optional)</span>
+        </label>
+        <select
+          value={form.subtopic_id}
+          onChange={e => setForm(f => ({ ...f, subtopic_id: e.target.value }))}
+          disabled={!form.topic_id}
+          className={sel}
+        >
           <option value="">All subtopics / General</option>
-          {subtopics.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          {subtopics.map(s => (
+            <option key={s.id} value={s.id}>{s.name}</option>
+          ))}
         </select>
       </div>
 
@@ -247,8 +307,10 @@ function UploadTab({ showToast }) {
             <span>Uploading…</span><span>{progress}%</span>
           </div>
           <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-            <div className="h-full bg-teal-500 rounded-full transition-all duration-300"
-              style={{ width: `${progress}%` }} />
+            <div
+              className="h-full bg-teal-500 rounded-full transition-all duration-300"
+              style={{ width: `${progress}%` }}
+            />
           </div>
         </div>
       )}
@@ -275,14 +337,15 @@ function ResourcesTab({ showToast }) {
   const [loading,   setLoading]   = useState(true);
   const [deleting,  setDeleting]  = useState(null);
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     api.get('/resources')
-      .then(r => setResources(Array.isArray(r) ? r : (r.data ?? [])))
+      .then(r => setResources(extractList(r)))
       .catch(() => setResources([]))
       .finally(() => setLoading(false));
-  };
-  useEffect(load, []);
+  }, []);
+
+  useEffect(load, [load]);
 
   const handleDelete = async (id, title) => {
     if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
@@ -298,7 +361,11 @@ function ResourcesTab({ showToast }) {
     }
   };
 
-  if (loading) return <div className="flex justify-center py-16"><Loader2 size={24} className="animate-spin text-teal-400" /></div>;
+  if (loading) return (
+    <div className="flex justify-center py-16">
+      <Loader2 size={24} className="animate-spin text-teal-400" />
+    </div>
+  );
 
   if (resources.length === 0) return (
     <div className="text-center py-16 text-gray-400">
@@ -312,22 +379,32 @@ function ResourcesTab({ showToast }) {
     <div className="space-y-3 max-w-3xl">
       {resources.map(r => (
         <div key={r.id} className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center gap-4">
-          <FileTypeIcon type={r.resource_type} size={22} />
+          <FileTypeIcon type={r.type || r.resource_type || 'other'} size={22} />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-gray-800 truncate">{r.title}</p>
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-              <span className="text-xs text-gray-400 capitalize">{r.resource_type}</span>
-              {r.file_size_bytes && <span className="text-xs text-gray-300">·</span>}
-              {r.file_size_bytes && <span className="text-xs text-gray-400">{fmtSize(r.file_size_bytes)}</span>}
-              {r.subject_name && <span className="text-xs text-gray-300">·</span>}
-              {r.subject_name && <span className="text-xs text-teal-600">{r.subject_name}</span>}
-              {r.subtopic_name && <span className="text-xs text-gray-300">·</span>}
-              {r.subtopic_name && <span className="text-xs text-gray-400">{r.subtopic_name}</span>}
+              <span className="text-xs text-gray-400 capitalize">{r.type || r.resource_type || 'file'}</span>
+              {(r.file_size_bytes || r.file_size) && (
+                <><span className="text-xs text-gray-300">·</span>
+                <span className="text-xs text-gray-400">{fmtSize(r.file_size_bytes || r.file_size)}</span></>
+              )}
+              {r.subject_name && (
+                <><span className="text-xs text-gray-300">·</span>
+                <span className="text-xs text-teal-600">{r.subject_name}</span></>
+              )}
+              {r.subtopic_name && (
+                <><span className="text-xs text-gray-300">·</span>
+                <span className="text-xs text-gray-400">{r.subtopic_name}</span></>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <a href={r.file_url} target="_blank" rel="noreferrer"
-              className="text-xs text-teal-600 hover:text-teal-800 font-medium px-3 py-1.5 border border-teal-200 rounded-lg transition-colors">
+            <a
+              href={r.url || r.file_url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs text-teal-600 hover:text-teal-800 font-medium px-3 py-1.5 border border-teal-200 rounded-lg transition-colors"
+            >
               View
             </a>
             <button
@@ -335,7 +412,9 @@ function ResourcesTab({ showToast }) {
               disabled={deleting === r.id}
               className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
             >
-              {deleting === r.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+              {deleting === r.id
+                ? <Loader2 size={14} className="animate-spin" />
+                : <Trash2 size={14} />}
             </button>
           </div>
         </div>
@@ -348,17 +427,18 @@ function ResourcesTab({ showToast }) {
 // TAB 3 — Add Question
 // ══════════════════════════════════════════════════════════════════════════════
 function QuestionsTab({ showToast }) {
-  const [subjects,   setSubjects]   = useState([]);
-  const [subtopics,  setSubtopics]  = useState([]);
-  const [saving,     setSaving]     = useState(false);
-  const EMPTY_OPT = { text: '', is_correct: false };
+  const [subjects,  setSubjects]  = useState([]);
+  const [topics,    setTopics]    = useState([]);
+  const [subtopics, setSubtopics] = useState([]);
+  const [saving,    setSaving]    = useState(false);
   const [form, setForm] = useState({
     question_text: '',
     subject_id:    '',
+    topic_id:      '',
     subtopic_id:   '',
     difficulty:    'medium',
     explanation:   '',
-    options:       [
+    options: [
       { text: '', is_correct: true  },
       { text: '', is_correct: false },
       { text: '', is_correct: false },
@@ -366,69 +446,67 @@ function QuestionsTab({ showToast }) {
     ],
   });
 
+  // Load assigned subjects
   useEffect(() => {
     api.get('/teacher/my-subjects')
-      .then(r => setSubjects(Array.isArray(r) ? r : (r.data ?? [])))
+      .then(r => setSubjects(extractList(r)))
       .catch(() => {});
   }, []);
 
+  // Load topics when subject changes
+  useEffect(() => {
+    setTopics([]); setSubtopics([]);
+    setForm(f => ({ ...f, topic_id: '', subtopic_id: '' }));
+    if (!form.subject_id) return;
+    api.get('/teacher/topics', { params: { subject_id: String(form.subject_id) } })
+      .then(r => setTopics(extractList(r)))
+      .catch(() => {});
+  }, [form.subject_id]); // eslint-disable-line
+
+  // Load subtopics when topic changes
   useEffect(() => {
     setSubtopics([]);
     setForm(f => ({ ...f, subtopic_id: '' }));
-    if (!form.subject_id) return;
-    // Fetch all subtopics for the subject by fetching topics first
-    api.get('/teacher/topics', { params: { subject_id: form.subject_id } })
-      .then(async r => {
-        const topicList = Array.isArray(r) ? r : (r.data ?? []);
-        const allSubs = [];
-        await Promise.all(topicList.map(t =>
-          api.get('/teacher/subtopics', { params: { topic_id: t.id } })
-            .then(sr => {
-              const subs = Array.isArray(sr) ? sr : (sr.data ?? []);
-              allSubs.push(...subs);
-            })
-            .catch(() => {})
-        ));
-        setSubtopics(allSubs);
-      })
+    if (!form.topic_id) return;
+    api.get('/teacher/subtopics', { params: { topic_id: String(form.topic_id) } })
+      .then(r => setSubtopics(extractList(r)))
       .catch(() => {});
-  }, [form.subject_id]);
+  }, [form.topic_id]); // eslint-disable-line
 
   const setOption = (idx, field, val) => {
     setForm(f => {
-      const opts = [...f.options];
-      if (field === 'is_correct') {
-        // Only one option can be correct
-        opts.forEach((o, i) => { opts[i] = { ...o, is_correct: i === idx }; });
-      } else {
-        opts[idx] = { ...opts[idx], [field]: val };
-      }
+      const opts = f.options.map((o, i) =>
+        field === 'is_correct'
+          ? { ...o, is_correct: i === idx }
+          : i === idx ? { ...o, [field]: val } : o
+      );
       return { ...f, options: opts };
     });
   };
 
   const handleSubmit = async () => {
     const { question_text, subject_id, options, difficulty } = form;
-    if (!question_text.trim()) { showToast('Question text is required.', 'error'); return; }
-    if (!subject_id)           { showToast('Please select a subject.', 'error'); return; }
+    if (!question_text.trim())          { showToast('Question text is required.', 'error'); return; }
+    if (!subject_id)                    { showToast('Please select a subject.', 'error'); return; }
     if (options.some(o => !o.text.trim())) { showToast('All 4 options must be filled.', 'error'); return; }
     if (!options.some(o => o.is_correct))  { showToast('Mark one option as correct.', 'error'); return; }
 
     setSaving(true);
     try {
       await api.post('/teacher/questions', {
-        question_text:    question_text.trim(),
+        question_text: question_text.trim(),
         subject_id,
-        subtopic_id:      form.subtopic_id || null,
+        subtopic_id:   form.subtopic_id || null,
         difficulty,
-        explanation:      form.explanation.trim() || null,
-        options:          options.map(o => ({ option_text: o.text.trim(), is_correct: o.is_correct })),
+        explanation:   form.explanation.trim() || null,
+        options:       options.map(o => ({ option_text: o.text.trim(), is_correct: o.is_correct })),
       });
       showToast('Question submitted and approved!');
       setForm(f => ({
         ...f,
         question_text: '',
         explanation:   '',
+        topic_id:      '',
         subtopic_id:   '',
         options: [
           { text: '', is_correct: true  },
@@ -438,20 +516,20 @@ function QuestionsTab({ showToast }) {
         ],
       }));
     } catch (err) {
-      showToast(err?.error || 'Failed to submit question.', 'error');
+      showToast(err?.error || err?.message || 'Failed to submit question.', 'error');
     } finally {
       setSaving(false);
     }
   };
 
-  const inp = 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-300';
+  const inp = 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-300 disabled:bg-gray-50 disabled:text-gray-400';
   const lbl = 'block text-xs font-semibold text-gray-600 mb-1.5';
   const LABELS = ['A', 'B', 'C', 'D'];
 
   return (
     <div className="max-w-2xl space-y-5">
       <div className="bg-teal-50 border border-teal-100 rounded-2xl px-4 py-3 text-xs text-teal-700">
-         Questions you submit here are <strong>automatically approved</strong> and will immediately appear in quizzes for your assigned subjects.
+        Questions you submit here are <strong>automatically approved</strong> and will immediately appear in quizzes for your assigned subjects.
       </div>
 
       {/* Question text */}
@@ -470,14 +548,26 @@ function QuestionsTab({ showToast }) {
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className={lbl}>Subject *</label>
-          <select value={form.subject_id} onChange={e => setForm(f => ({ ...f, subject_id: e.target.value }))} className={inp}>
+          <select
+            value={form.subject_id}
+            onChange={e => setForm(f => ({ ...f, subject_id: e.target.value }))}
+            className={inp}
+          >
             <option value="">Select…</option>
-            {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            {subjects.map(s => (
+              <option key={s.id} value={s.id}>
+                {subjectLabel(s)}
+              </option>
+            ))}
           </select>
         </div>
         <div>
           <label className={lbl}>Difficulty</label>
-          <select value={form.difficulty} onChange={e => setForm(f => ({ ...f, difficulty: e.target.value }))} className={inp}>
+          <select
+            value={form.difficulty}
+            onChange={e => setForm(f => ({ ...f, difficulty: e.target.value }))}
+            className={inp}
+          >
             <option value="easy">Easy</option>
             <option value="medium">Medium</option>
             <option value="hard">Hard</option>
@@ -485,25 +575,60 @@ function QuestionsTab({ showToast }) {
         </div>
       </div>
 
-      {/* Subtopic (optional) */}
-      <div>
-        <label className={lbl}>Subtopic <span className="text-gray-400 font-normal">(optional — links question to specific content)</span></label>
-        <select value={form.subtopic_id} onChange={e => setForm(f => ({ ...f, subtopic_id: e.target.value }))}
-          disabled={subtopics.length === 0} className={inp}>
-          <option value="">No specific subtopic</option>
-          {subtopics.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-        </select>
-      </div>
+      {/* Topic — shown when subject selected */}
+      {form.subject_id && (
+        <div>
+          <label className={lbl}>
+            Topic <span className="text-gray-400 font-normal">(optional)</span>
+          </label>
+          <select
+            value={form.topic_id}
+            onChange={e => setForm(f => ({ ...f, topic_id: e.target.value }))}
+            className={inp}
+          >
+            <option value="">No specific topic</option>
+            {topics.map(t => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* Subtopic — shown when topic selected */}
+      {form.topic_id && (
+        <div>
+          <label className={lbl}>
+            Subtopic <span className="text-gray-400 font-normal">(optional — links question to specific content)</span>
+          </label>
+          <select
+            value={form.subtopic_id}
+            onChange={e => setForm(f => ({ ...f, subtopic_id: e.target.value }))}
+            className={inp}
+          >
+            <option value="">No specific subtopic</option>
+            {subtopics.map(s => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Options */}
       <div>
-        <label className={lbl}>Answer Options * <span className="text-gray-400 font-normal">(click the circle to mark correct answer)</span></label>
+        <label className={lbl}>
+          Answer Options * <span className="text-gray-400 font-normal">(click the circle to mark correct answer)</span>
+        </label>
         <div className="space-y-2">
           {form.options.map((opt, i) => (
-            <div key={i} className={`flex items-center gap-3 border-2 rounded-xl px-3 py-2.5 transition-colors ${opt.is_correct ? 'border-teal-400 bg-teal-50' : 'border-gray-200'}`}>
+            <div
+              key={i}
+              className={`flex items-center gap-3 border-2 rounded-xl px-3 py-2.5 transition-colors
+                ${opt.is_correct ? 'border-teal-400 bg-teal-50' : 'border-gray-200'}`}
+            >
               <button
                 onClick={() => setOption(i, 'is_correct', true)}
-                className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${opt.is_correct ? 'border-teal-500 bg-teal-500' : 'border-gray-300 hover:border-teal-300'}`}
+                className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors
+                  ${opt.is_correct ? 'border-teal-500 bg-teal-500' : 'border-gray-300 hover:border-teal-300'}`}
               >
                 {opt.is_correct && <div className="w-2.5 h-2.5 rounded-full bg-white" />}
               </button>
@@ -521,7 +646,9 @@ function QuestionsTab({ showToast }) {
 
       {/* Explanation */}
       <div>
-        <label className={lbl}>Explanation <span className="text-gray-400 font-normal">(optional — shown after student answers)</span></label>
+        <label className={lbl}>
+          Explanation <span className="text-gray-400 font-normal">(optional — shown after student answers)</span>
+        </label>
         <textarea
           value={form.explanation}
           onChange={e => setForm(f => ({ ...f, explanation: e.target.value }))}
@@ -537,7 +664,9 @@ function QuestionsTab({ showToast }) {
         className="w-full bg-teal-500 hover:bg-teal-600 disabled:opacity-50 text-white font-semibold
           py-3 rounded-xl text-sm transition-colors flex items-center justify-center gap-2"
       >
-        {saving ? <><Loader2 size={15} className="animate-spin" /> Submitting…</> : <><Plus size={15} /> Submit Question</>}
+        {saving
+          ? <><Loader2 size={15} className="animate-spin" /> Submitting…</>
+          : <><Plus size={15} /> Submit Question</>}
       </button>
     </div>
   );
@@ -550,7 +679,7 @@ export default function TeacherResourcesPage({ defaultTab = 'upload' }) {
   const [activeTab, setActiveTab] = useState(defaultTab);
   const [toast,     setToast]     = useState(null);
 
-  const showToast = (msg, type = 'success') => setToast({ msg, type });
+  const showToast = useCallback((msg, type = 'success') => setToast({ msg, type }), []);
 
   const tabs = [
     { id: 'upload',    label: 'Upload Resource', icon: Upload   },
@@ -567,11 +696,13 @@ export default function TeacherResourcesPage({ defaultTab = 'upload' }) {
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
           <div>
             <p className="text-white/50 text-xs mb-1">Teacher</p>
-            <h1 className="text-white text-xl font-bold">Resources & Content</h1>
+            <h1 className="text-white text-xl font-bold">Resources &amp; Content</h1>
             <p className="text-white/60 text-sm mt-0.5">Upload files and add questions for your students</p>
           </div>
-          <Link to="/teacher/dashboard"
-            className="text-white/70 hover:text-white text-sm transition-colors shrink-0">
+          <Link
+            to="/teacher/dashboard"
+            className="text-white/70 hover:text-white text-sm transition-colors shrink-0"
+          >
             ← Dashboard
           </Link>
         </div>
