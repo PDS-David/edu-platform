@@ -12,14 +12,14 @@ const requestId = require('./middleware/requestId');
 const requestLogger = require('./middleware/requestLogger');
 
 // ─────────────────────────────────────────────────────────────
-// ENV LOADING (LOCAL ONLY)
+// ENV (LOCAL ONLY)
 // ─────────────────────────────────────────────────────────────
 if (process.env.NODE_ENV !== 'production') {
   require('dotenv').config({ path: path.join(__dirname, '.env') });
 }
 
 // ─────────────────────────────────────────────────────────────
-// LOG DIRECTORY (PROD SAFETY)
+// LOG DIR (PROD SAFE)
 // ─────────────────────────────────────────────────────────────
 if (process.env.NODE_ENV === 'production') {
   const logsDir = path.join(__dirname, 'logs');
@@ -53,7 +53,7 @@ const app = express();
 app.set('trust proxy', 1);
 
 // ─────────────────────────────────────────────────────────────
-// STATIC FRONTEND (OPTIONAL)
+// STATIC FRONTEND
 // ─────────────────────────────────────────────────────────────
 const clientDist = path.join(__dirname, '..', 'client', 'dist');
 
@@ -85,8 +85,10 @@ app.use(cors({
     if (!origin) return cb(null, true);
     if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
 
-    logger.warn('CORS blocked', { origin });
-    return cb(null, true); // do NOT crash production
+    logger.warn('CORS blocked origin', { origin });
+
+    // DO NOT crash production
+    return cb(null, true);
   },
   credentials: true,
 }));
@@ -101,7 +103,7 @@ app.use(requestLogger);
 const db = require('./config/database');
 
 // ─────────────────────────────────────────────────────────────
-// MODEL BOOTSTRAP (SAFE)
+// MODEL BOOTSTRAP
 // ─────────────────────────────────────────────────────────────
 const modelPaths = [
   './models/User',
@@ -131,13 +133,10 @@ const modelPaths = [
 for (const m of modelPaths) {
   try {
     const model = require(m);
-
-    // supports sequelize.define OR init(db)
     if (typeof model === 'function') {
       if (model.length === 1) model(db);
       else model();
     }
-
   } catch (e) {
     logger.warn(`Model skipped: ${m} — ${e.message}`);
   }
@@ -150,7 +149,7 @@ try {
 }
 
 // ─────────────────────────────────────────────────────────────
-// DB CONNECTION
+// DB CONNECT
 // ─────────────────────────────────────────────────────────────
 async function initDB() {
   try {
@@ -176,16 +175,20 @@ try {
 }
 
 // ─────────────────────────────────────────────────────────────
-// ROUTE LOADING (SAFE PATTERN)
+// SAFE ROUTER LOADER
 // ─────────────────────────────────────────────────────────────
 function safeRequire(routePath) {
   try {
     return require(routePath);
   } catch (e) {
-    logger.error(`Route missing: ${routePath} — ${e.message}`);
+    logger.warn(`Route missing: ${routePath} — ${e.message}`);
     return null;
   }
 }
+
+// ─────────────────────────────────────────────────────────────
+// ROUTES
+// ─────────────────────────────────────────────────────────────
 
 // PUBLIC
 const authRoutes = safeRequire('./routes/authRoutes');
@@ -194,13 +197,18 @@ const curriculumRoutes = safeRequire('./routes/curriculumRoutes');
 
 // CORE
 const aiRoutes = safeRequire('./routes/aiRoutes');
+const aiChatRoute = safeRequire('./routes/aiChatRoute');
 const adminRoutes = safeRequire('./routes/adminRoutes');
 const teacherRoutes = safeRequire('./routes/teacherRoutes');
 const userRoutes = safeRequire('./routes/users');
 
+// IMPORTANT FIX:
+// You had mismatch here before: ./routes/subjects vs ./routes/subjectsRoutes
 const subjectRoutes = safeRequire('./routes/subjectsRoutes');
+
 const topicsRoutes = safeRequire('./routes/topicsRoutes');
 const subtopicRoutes = safeRequire('./routes/subtopicRoutes');
+const subtopicProgressRoutes = safeRequire('./routes/subtopicProgressRoutes');
 
 // LEARNING
 const resourceRoutes = safeRequire('./routes/resourceRoutes');
@@ -218,16 +226,13 @@ const notificationsRoutes = safeRequire('./routes/notificationsRoutes');
 const studentRoutes = safeRequire('./routes/studentRoutes');
 const conceptRoutes = safeRequire('./routes/conceptRoutes');
 
-// OPTIONAL
-let aiChatRoute = safeRequire('./routes/aiChatRoute');
-
 // ─────────────────────────────────────────────────────────────
-// STATIC
+// STATIC FILES
 // ─────────────────────────────────────────────────────────────
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ─────────────────────────────────────────────────────────────
-// ROUTES (ONLY MOUNT IF EXISTS)
+// ROUTE MOUNTING
 // ─────────────────────────────────────────────────────────────
 if (authRoutes) app.use('/api/auth', authRoutes);
 if (examBoardsRoutes) app.use('/api/exam-boards', examBoardsRoutes);
@@ -243,6 +248,10 @@ if (userRoutes) app.use('/api/users', protect, userRoutes);
 if (subjectRoutes) app.use('/api/subjects', protect, subjectRoutes);
 if (topicsRoutes) app.use('/api/topics', protect, topicsRoutes);
 if (subtopicRoutes) app.use('/api/subtopics', protect, subtopicRoutes);
+
+// ✅ PROGRESS ENGINE WIRED HERE
+if (subtopicProgressRoutes)
+  app.use('/api/subtopic-progress', protect, subtopicProgressRoutes);
 
 if (resourceRoutes) app.use('/api/resources', protect, resourceRoutes);
 if (coursesRoutes) app.use('/api/courses', protect, coursesRoutes);
@@ -261,7 +270,7 @@ if (studentRoutes) app.use('/api/students', protect, studentRoutes);
 if (conceptRoutes) app.use('/api/concepts', protect, conceptRoutes);
 
 // ─────────────────────────────────────────────────────────────
-// HEALTH CHECK
+// HEALTH
 // ─────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {
   res.json({ success: true });
@@ -276,7 +285,7 @@ app.use((err, _req, res, _next) => {
 });
 
 // ─────────────────────────────────────────────────────────────
-// START SERVER
+// START
 // ─────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 
