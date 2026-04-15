@@ -9,10 +9,51 @@ export default function StudentDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  const firstName = user?.firstName || 'Student';
+
+/* ===============================
+   SUBJECTS
+=============================== */
+
+  const [subjects, setSubjects] = useState([]);
+  const [loadingSubjects, setLoadingSubjects] = useState(true);
+
+/* ===============================
+   RESOURCES
+=============================== */
+
   const [resources, setResources] = useState([]);
   const [loadingResources, setLoadingResources] = useState(true);
 
-  const firstName = user?.firstName || 'Student';
+/* ===============================
+   LOAD SUBJECTS
+=============================== */
+
+  useEffect(() => {
+
+    const loadSubjects = async () => {
+
+      try {
+
+        const res = await api.get('/students/my-subjects');
+
+        setSubjects(res.data || []);
+
+      } catch (err) {
+
+        console.error('Subjects load failed:', err);
+
+      } finally {
+
+        setLoadingSubjects(false);
+
+      }
+
+    };
+
+    loadSubjects();
+
+  }, []);
 
 /* ===============================
    LOAD RESOURCES
@@ -45,7 +86,7 @@ export default function StudentDashboard() {
   }, []);
 
 /* ===============================
-   GROUP BY SUBJECT
+   GROUP RESOURCES
 =============================== */
 
   const grouped = {};
@@ -79,7 +120,55 @@ export default function StudentDashboard() {
         </h1>
 
 {/* ===============================
-   MY FILES SECTION
+   MY SUBJECTS
+=============================== */}
+
+        <div className="bg-white p-4 rounded-xl mb-4">
+
+          <h2 className="font-semibold mb-3">
+            My Subjects
+          </h2>
+
+          {loadingSubjects ? (
+
+            <p className="text-sm text-gray-400">
+              Loading subjects...
+            </p>
+
+          ) : subjects.length === 0 ? (
+
+            <p className="text-sm text-gray-400">
+              No subjects available.
+            </p>
+
+          ) : (
+
+            <div className="grid grid-cols-2 gap-3">
+
+              {subjects.map(subject => (
+
+                <button
+                  key={subject.id}
+                  onClick={() => navigate(`/student/subject/${subject.id}`)}
+                  className="border p-3 rounded-xl text-left hover:bg-gray-50"
+                >
+
+                  <p className="font-semibold text-sm">
+                    {subject.name}
+                  </p>
+
+                </button>
+
+              ))}
+
+            </div>
+
+          )}
+
+        </div>
+
+{/* ===============================
+   MY FILES
 =============================== */}
 
         <div className="bg-white p-4 rounded-xl">
