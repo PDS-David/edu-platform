@@ -285,3 +285,179 @@ router.post('/test/:testId/submit', protect, async (req, res) => {
 });
 
 module.exports = router;
+
+// =============================================================================
+// STUDENT SUBJECT MANAGEMENT
+// Tracks which subjects a student has individually selected/enrolled in.
+// Separate from student_exam_types (which tracks exam board access).
+// =============================================================================
+
+// ── GET /api/students/my-boards ───────────────────────────────────────────────
+// Returns the exam boards the student selected during registration/onboarding.
+// Used by StudentDashboard to show only relevant boards in the dropdown.
+router.get('/my-boards', protect, async (req, res) => {
+  try {
+    // First try student_exam_types (set during onboarding/payment)
+    let boards = await sequelize.query(
+      `SELECT eb.id, eb.code, eb.name, eb.icon_emoji
+       FROM student_exam_types set2
+       JOIN exam_boards eb ON eb.id = set2.exam_board_id
+       WHERE set2.student_id = :studentId AND set2.is_active = true
+       ORDER BY eb.name`,
+      { replacements: { studentId: req.user.id }, type: QueryTypes.SELECT }
+    );
+
+    // Fallback: use pending_exam_board_ids if student hasn't completed onboarding yet
+    if (boards.length === 0) {
+      boards = await sequelize.query(
+        `SELECT eb.id, eb.code, eb.name, eb.icon_emoji
+         FROM users u
+         JOIN exam_boards eb ON eb.id = ANY(u.pending_exam_board_ids)
+         WHERE u.id = :studentId`,
+        { replacements: { studentId: req.user.id }, type: QueryTypes.SELECT }
+      ).catch(() => []);
+    }
+
+    return res.status(200).json({ success: true, data: boards });
+  } catch (err) {
+    console.error('[GET /students/my-boards]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── GET /api/students/my-subjects ─────────────────────────────────────────────
+// Returns all subjects the student has selected (own selections + class-assigned).
+router.get('/my-subjects', protect, async (req, res) => {
+  const studentId = req.user.id;
+  try {
+    // 1. Student's own selected subjects
+    let ownSubjects = [];
+    try {
+      ownSubjects = await sequelize.query(
+        `SELECT DISTINCT
+           s.id, s.name, s.code, s.level, s.icon_emoji, s.is_active,
+           eb.code  AS exam_board_code,
+           eb.name  AS exam_board_name,
+           eb.id    AS exam_board_id,
+           'own'    AS source
+         FROM student_subjects ss
+         JOIN subjects  s  ON s.id  = ss.subject_id
+         JOIN exam_boards eb ON eb.id = s.exam_board_id
+         WHERE ss.student_id = :studentId AND ss.is_active = true AND s.is_active = true
+         ORDER BY s.name`,
+        { replacements: { studentId }, type: QueryTypes.SELECT }
+      );
+    } catch (e) {
+      // student_subjects table may not exist yet — handled by migration below
+      ownSubjects = [];
+    }
+
+    // 2. Subjects assigned to the student's class(es)
+    let classSubjects = [];
+    try {
+      classSubjects = await sequelize.query(
+        `SELECT DISTINCT
+           s.id, s.name, s.code, s.level, s.icon_emoji, s.is_active,
+           eb.code    AS exam_board_code,
+           eb.name    AS exam_board_name,
+           eb.id      AS exam_board_id,
+           'class'    AS source,
+           c.name     AS class_name
+         FROM class_memberships cm
+         JOIN classes          c   ON c.id   = cm.class_id
+         JOIN class_subjects   cs  ON cs.class_id = c.id
+         JOIN subjects         s   ON s.id   = cs.subject_id
+         JOIN exam_boards      eb  ON eb.id  = s.exam_board_id
+         WHERE cm.student_id = :studentId AND s.is_active = true
+         ORDER BY s.name`,
+        { replacements: { studentId }, type: QueryTypes.SELECT }
+      );
+    } catch (e) {
+      // class_subjects table may not exist — graceful fallback
+      classSubjects = [];
+    }
+
+    // Merge, deduplicating by subject ID (own selection wins over class)
+    const merged = new Map();
+    [...ownSubjects, ...classSubjects].forEach(s => {
+      if (!merged.has(s.id)) merged.set(s.id, s);
+    });
+
+    return res.status(200).json({ success: true, data: [...merged.values()] });
+  } catch (err) {
+    console.error('[GET /students/my-subjects]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── POST /api/students/subjects ───────────────────────────────────────────────
+// Add a subject to the student's selected subjects.
+// Body: { subject_id: <integer> }
+router.post('/subjects', protect, async (req, res) => {
+  const studentId = req.user.id;
+  const { subject_id } = req.body;
+  if (!subject_id) {
+    return res.status(400).json({ success: false, error: 'subject_id is required' });
+  }
+  try {
+    // Ensure student_subjects table exists
+    await sequelize.query(
+      `CREATE TABLE IF NOT EXISTS student_subjects (
+         id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+         student_id UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+         subject_id INTEGER     NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+         is_active  BOOLEAN     NOT NULL DEFAULT true,
+         added_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+         UNIQUE(student_id, subject_id)
+       )`,
+      { type: QueryTypes.RAW }
+    );
+
+    await sequelize.query(
+      `INSERT INTO student_subjects (student_id, subject_id, is_active)
+       VALUES (:studentId, :subjectId, true)
+       ON CONFLICT (student_id, subject_id) DO UPDATE SET is_active = true`,
+      { replacements: { studentId, subjectId: parseInt(subject_id) }, type: QueryTypes.INSERT }
+    );
+
+    // Also ensure the board is in student_exam_types
+    const boardRows = await sequelize.query(
+      `SELECT exam_board_id FROM subjects WHERE id = :subjectId AND is_active = true`,
+      { replacements: { subjectId: parseInt(subject_id) }, type: QueryTypes.SELECT }
+    );
+    if (boardRows[0]?.exam_board_id) {
+      await sequelize.query(
+        `INSERT INTO student_exam_types (student_id, exam_board_id, is_active)
+         VALUES (:studentId, :boardId, true)
+         ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active = true`,
+        { replacements: { studentId, boardId: boardRows[0].exam_board_id }, type: QueryTypes.INSERT }
+      );
+    }
+
+    return res.status(200).json({ success: true, message: 'Subject added' });
+  } catch (err) {
+    console.error('[POST /students/subjects]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── DELETE /api/students/subjects/:subjectId ──────────────────────────────────
+// Remove a subject from the student's selected subjects.
+router.delete('/subjects/:subjectId', protect, async (req, res) => {
+  const studentId = req.user.id;
+  const subjectId = parseInt(req.params.subjectId);
+  if (!subjectId) {
+    return res.status(400).json({ success: false, error: 'Invalid subject ID' });
+  }
+  try {
+    await sequelize.query(
+      `UPDATE student_subjects SET is_active = false
+       WHERE student_id = :studentId AND subject_id = :subjectId`,
+      { replacements: { studentId, subjectId }, type: QueryTypes.UPDATE }
+    );
+    return res.status(200).json({ success: true, message: 'Subject removed' });
+  } catch (err) {
+    console.error('[DELETE /students/subjects/:subjectId]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});

@@ -153,18 +153,22 @@ function ResourcesTab({ subtopicId, subtopic, subtopicName, onComplete }) {
                 Listen
               </button>
             )}
-            {(res.resource_type === 'document' || res.resource_type === 'pdf') && (
-              <div className="flex gap-2">
-                <a href={res.file_url} target="_blank" rel="noreferrer" onClick={() => handleOpen(res)}
-                  className="border border-gray-200 text-gray-600 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">
-                  View
-                </a>
-                <a href={res.file_url} download
-                  className="bg-gray-100 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-gray-200 transition-colors">
-                  ↓
-                </a>
-              </div>
-            )}
+            {(res.resource_type === 'document' || res.resource_type === 'pdf') && (() => {
+                const base = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/api$/, '');
+                const fullUrl = res.file_url?.startsWith('http') ? res.file_url : `${base}${res.file_url}`;
+                return (
+                  <div className="flex gap-2">
+                    <a href={fullUrl} target="_blank" rel="noreferrer" onClick={() => handleOpen(res)}
+                      className="border border-gray-200 text-gray-600 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">
+                      View
+                    </a>
+                    <a href={fullUrl} download
+                      className="bg-gray-100 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-gray-200 transition-colors">
+                      ↓
+                    </a>
+                  </div>
+                );
+              })()}
           </div>
           {activeRes?.id === res.id && res.resource_type === 'video' && (
             <div className="mt-2 rounded-xl overflow-hidden">

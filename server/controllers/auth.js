@@ -61,6 +61,8 @@ exports.register = async (req, res, next) => {
     // Accept both camelCase (frontend) and snake_case (API clients)
     const first_name = (req.body.first_name || req.body.firstName || '').trim();
     const last_name  = (req.body.last_name  || req.body.lastName  || first_name).trim();
+    // Exam board IDs selected during registration (stored as pending until onboarding)
+    const pendingExamBoards = req.body.pendingExamBoards || req.body.pending_exam_boards || [];
 
     // ── Validation ────────────────────────────────────────────────────────────
     if (!email || !password) {
@@ -95,23 +97,32 @@ exports.register = async (req, res, next) => {
     const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 h
 
     // ── Insert user ───────────────────────────────────────────────────────────
+    // pendingExamBoards contains exam_board IDs (UUIDs) chosen during registration.
+    // Stored as pending_exam_board_ids so OnboardingPage can filter subjects by board.
+    const pendingIds = Array.isArray(pendingExamBoards) && pendingExamBoards.length > 0
+      ? pendingExamBoards
+      : [];
+
     const rows = await db.query(
       `INSERT INTO users
          (email, password, first_name, last_name, role,
           verification_token, verification_token_expires,
           is_active, is_verified, subscription_status,
           subscription_expires_at,
+          pending_exam_board_ids,
           created_at, updated_at)
        VALUES
          (:email, :password, :first_name, :last_name, :role,
           :verificationToken, :verificationTokenExpires,
           true, false, 'free_trial',
           NOW() + INTERVAL '14 days',
+          :pendingIds::uuid[],
           NOW(), NOW())
        RETURNING
          id, email, first_name, last_name, role,
          is_active, is_verified, subscription_status,
          onboarding_complete, xp_points, study_streak_days,
+         pending_exam_board_ids,
          created_at`,
       {
         replacements: {
@@ -122,6 +133,7 @@ exports.register = async (req, res, next) => {
           role:                     assignedRole,
           verificationToken,
           verificationTokenExpires,
+          pendingIds:               pendingIds.length > 0 ? `{${pendingIds.join(',')}}` : '{}',
         },
         type: QueryTypes.SELECT,
       }
@@ -231,6 +243,7 @@ exports.getMe = async (req, res, next) => {
          onboarding_complete, xp_points, study_streak_days, last_login,
          avatar_url, phone, country, daily_goal,
          preferred_study_days, preferred_study_time,
+         pending_exam_board_ids,
          created_at, updated_at
        FROM users
        WHERE id = :id
