@@ -307,13 +307,12 @@ router.get('/my-boards', protect, async (req, res) => {
       { replacements: { studentId: req.user.id }, type: QueryTypes.SELECT }
     );
 
-    // Fallback: use pending_exam_board_ids if onboarding not yet complete
+    // Fallback: use pending_exam_board_ids if student hasn't completed onboarding yet
     if (boards.length === 0) {
       boards = await sequelize.query(
         `SELECT eb.id, eb.code, eb.name, eb.icon_emoji
-         FROM unnest(u.pending_exam_board_ids) AS pid
-         JOIN exam_boards eb ON eb.id = pid::uuid
          FROM users u
+         JOIN exam_boards eb ON eb.id = ANY(u.pending_exam_board_ids)
          WHERE u.id = :studentId`,
         { replacements: { studentId: req.user.id }, type: QueryTypes.SELECT }
       ).catch(() => []);
