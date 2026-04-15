@@ -19,7 +19,7 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // ─────────────────────────────────────────────────────────────
-// LOG DIRECTORY (PROD SAFE)
+// LOG DIRECTORY (PROD SAFETY)
 // ─────────────────────────────────────────────────────────────
 if (process.env.NODE_ENV === 'production') {
   const logsDir = path.join(__dirname, 'logs');
@@ -59,9 +59,9 @@ const clientDist = path.join(__dirname, '..', 'client', 'dist');
 
 if (fs.existsSync(clientDist)) {
   app.use(express.static(clientDist));
-  console.log('Serving React frontend');
+  console.log('Serving React frontend from client/dist');
 } else {
-  console.log('No client build detected (Render Static Site mode)');
+  console.log('No client build detected (Render Static Site expected)');
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -71,12 +71,13 @@ app.use(requestId);
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(globalLimiter);
 
-// CORS
 const ALLOWED_ORIGINS = [
   'http://localhost:5173',
   'http://localhost:3000',
+  'https://aischoolonair.onrender.com',
   process.env.CLIENT_URL,
   process.env.PROD_CLIENT_URL,
+  process.env.NGROK_URL,
 ].filter(Boolean);
 
 app.use(cors({
@@ -85,7 +86,7 @@ app.use(cors({
     if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
 
     logger.warn('CORS blocked', { origin });
-    return cb(null, true); // never crash prod
+    return cb(null, true);
   },
   credentials: true,
 }));
@@ -100,7 +101,7 @@ app.use(requestLogger);
 const db = require('./config/database');
 
 // ─────────────────────────────────────────────────────────────
-// MODEL BOOTSTRAP (SAFE)
+// MODEL BOOTSTRAP
 // ─────────────────────────────────────────────────────────────
 const modelPaths = [
   './models/User',
@@ -108,14 +109,32 @@ const modelPaths = [
   './models/Subject',
   './models/Topic',
   './models/Subtopic',
-  './models/SubtopicProgress',
+  './models/Resource',
+  './models/Course',
+  './models/Enrollment',
+  './models/Quiz',
   './models/Question',
+  './models/Note',
+  './models/Video',
+  './models/PastPaper',
+  './models/Payment',
+  './models/Notification',
+  './models/Concept',
+  './models/StudentExamType',
+  './models/SubtopicProgress',
+  './models/PracticeAttempt',
+  './models/AiChatSession',
+  './models/AiChatMessage',
+  './models/TeacherSubject',
 ];
 
 for (const m of modelPaths) {
   try {
     const model = require(m);
-    if (typeof model === 'function') model(db);
+    if (typeof model === 'function') {
+      if (model.length === 1) model(db);
+      else model();
+    }
   } catch (e) {
     logger.warn(`Model skipped: ${m} — ${e.message}`);
   }
@@ -154,20 +173,16 @@ try {
 }
 
 // ─────────────────────────────────────────────────────────────
-// SAFE REQUIRE
+// ROUTES
 // ─────────────────────────────────────────────────────────────
 function safeRequire(routePath) {
   try {
     return require(routePath);
   } catch (e) {
-    logger.error(`Route missing: ${routePath}`);
+    logger.error(`Route missing: ${routePath} — ${e.message}`);
     return null;
   }
 }
-
-// ─────────────────────────────────────────────────────────────
-// ROUTES
-// ─────────────────────────────────────────────────────────────
 
 // PUBLIC
 const authRoutes = safeRequire('./routes/authRoutes');
@@ -181,77 +196,79 @@ const teacherRoutes = safeRequire('./routes/teacherRoutes');
 const userRoutes = safeRequire('./routes/users');
 
 const subjectRoutes = safeRequire('./routes/subjectsRoutes');
-const topicRoutes = safeRequire('./routes/topicsRoutes');
+const topicsRoutes = safeRequire('./routes/topicsRoutes');
 const subtopicRoutes = safeRequire('./routes/subtopicRoutes');
+
+// 🔥 A1 PROGRESS ENGINE ROUTE (NEW)
+const subtopicProgressRoutes = safeRequire('./routes/subtopicProgressRoutes');
 
 // LEARNING
 const resourceRoutes = safeRequire('./routes/resourceRoutes');
-const quizRoutes = safeRequire('./routes/quizzes');
-const questionRoutes = safeRequire('./routes/questionsRoutes');
+const coursesRoutes = safeRequire('./routes/courses');
+const enrollmentsRoutes = safeRequire('./routes/enrollments');
+const quizzesRoutes = safeRequire('./routes/quizzes');
+const questionsRoutes = safeRequire('./routes/questionsRoutes');
+const analyticsRoutes = safeRequire('./routes/analyticsRoutes');
+const notesRoutes = safeRequire('./routes/notesRoutes');
+const videosRoutes = safeRequire('./routes/videosRoutes');
+const pastPaperRoutes = safeRequire('./routes/pastPaperRoutes');
+const paymentRoutes = safeRequire('./routes/paymentRoutes');
+const catalogRoutes = safeRequire('./routes/catalogRoutes');
+const notificationsRoutes = safeRequire('./routes/notificationsRoutes');
+const studentRoutes = safeRequire('./routes/studentRoutes');
+const conceptRoutes = safeRequire('./routes/conceptRoutes');
+
+// OPTIONAL
+let aiChatRoute = safeRequire('./routes/aiChatRoute');
 
 // ─────────────────────────────────────────────────────────────
-// 🧠 2.8 EXAM INTELLIGENCE ENGINE
+// STATIC
 // ─────────────────────────────────────────────────────────────
-const examAnalyticsRoutes = safeRequire('./routes/examAnalyticsRoutes');
-
-// ─────────────────────────────────────────────────────────────
-// 🤖 2.9 AI QUESTION GENERATION ENGINE
-// ─────────────────────────────────────────────────────────────
-const aiQuestionGenRoutes = safeRequire('./routes/aiQuestionGenerationRoutes');
-
-// ─────────────────────────────────────────────────────────────
-// 🧪 2.10 ENGINE INTEGRATION VALIDATION LAYER
-// ─────────────────────────────────────────────────────────────
-const engineValidationRoutes = safeRequire('./routes/engineValidationRoutes');
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ─────────────────────────────────────────────────────────────
 // ROUTE MOUNTING
 // ─────────────────────────────────────────────────────────────
 
-// public
+// PUBLIC
 if (authRoutes) app.use('/api/auth', authRoutes);
 if (examBoardsRoutes) app.use('/api/exam-boards', examBoardsRoutes);
 if (curriculumRoutes) app.use('/api/curriculum', curriculumRoutes);
 
-// core
-if (aiRoutes)
-  app.use('/api/ai', protect, subscriptionGuard, aiLimiter, aiRoutes);
+// AI
+if (aiRoutes) app.use('/api/ai', protect, subscriptionGuard, aiLimiter, aiRoutes);
+if (aiChatRoute) app.use('/api/ai', protect, subscriptionGuard, aiLimiter, aiChatRoute);
 
+// CORE
 if (adminRoutes) app.use('/api/admin', protect, adminRoutes);
 if (teacherRoutes) app.use('/api/teacher', protect, teacherRoutes);
 if (userRoutes) app.use('/api/users', protect, userRoutes);
 
 if (subjectRoutes) app.use('/api/subjects', protect, subjectRoutes);
-if (topicRoutes) app.use('/api/topics', protect, topicRoutes);
+if (topicsRoutes) app.use('/api/topics', protect, topicsRoutes);
 if (subtopicRoutes) app.use('/api/subtopics', protect, subtopicRoutes);
 
-// learning
+// 🔥 A1 PROGRESS ENGINE MOUNT (NEW)
+if (subtopicProgressRoutes) {
+  app.use('/api/subtopic-progress', protect, subtopicProgressRoutes);
+}
+
+// LEARNING
 if (resourceRoutes) app.use('/api/resources', protect, resourceRoutes);
-if (quizRoutes) app.use('/api/quizzes', protect, quizRoutes);
-if (questionRoutes) app.use('/api/questions', protect, questionRoutes);
+if (coursesRoutes) app.use('/api/courses', protect, coursesRoutes);
+if (enrollmentsRoutes) app.use('/api/enrollments', protect, enrollmentsRoutes);
+if (quizzesRoutes) app.use('/api/quizzes', protect, quizzesRoutes);
+if (questionsRoutes) app.use('/api/questions', protect, questionsRoutes);
 
-// ─────────────────────────────────────────────────────────────
-// ENGINE 2.8 — EXAM INTELLIGENCE
-// ─────────────────────────────────────────────────────────────
-if (examAnalyticsRoutes)
-  app.use('/api/exam-analytics', protect, examAnalyticsRoutes);
-
-// ─────────────────────────────────────────────────────────────
-// ENGINE 2.9 — AI QUESTION GENERATION
-// ─────────────────────────────────────────────────────────────
-if (aiQuestionGenRoutes)
-  app.use('/api/ai-questions', protect, subscriptionGuard, aiQuestionGenRoutes);
-
-// ─────────────────────────────────────────────────────────────
-// ENGINE 2.10 — VALIDATION LAYER
-// ─────────────────────────────────────────────────────────────
-if (engineValidationRoutes)
-  app.use('/api/engine', protect, engineValidationRoutes);
-
-// ─────────────────────────────────────────────────────────────
-// STATIC FILES
-// ─────────────────────────────────────────────────────────────
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+if (analyticsRoutes) app.use('/api/analytics', protect, analyticsRoutes);
+if (notesRoutes) app.use('/api/notes', protect, notesRoutes);
+if (videosRoutes) app.use('/api/videos', protect, videosRoutes);
+if (pastPaperRoutes) app.use('/api/past-papers', protect, pastPaperRoutes);
+if (paymentRoutes) app.use('/api/payments', protect, paymentRoutes);
+if (catalogRoutes) app.use('/api/catalog', protect, catalogRoutes);
+if (notificationsRoutes) app.use('/api/notifications', protect, notificationsRoutes);
+if (studentRoutes) app.use('/api/students', protect, studentRoutes);
+if (conceptRoutes) app.use('/api/concepts', protect, conceptRoutes);
 
 // ─────────────────────────────────────────────────────────────
 // HEALTH CHECK
