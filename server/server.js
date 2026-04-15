@@ -12,20 +12,18 @@ const requestId = require('./middleware/requestId');
 const requestLogger = require('./middleware/requestLogger');
 
 // ─────────────────────────────────────────────────────────────
-// ENV LOAD (LOCAL ONLY)
+// ENV
 // ─────────────────────────────────────────────────────────────
 if (process.env.NODE_ENV !== 'production') {
   require('dotenv').config({ path: path.join(__dirname, '.env') });
 }
 
 // ─────────────────────────────────────────────────────────────
-// LOG DIRECTORY SAFETY (PROD)
+// LOGGING DIR
 // ─────────────────────────────────────────────────────────────
 if (process.env.NODE_ENV === 'production') {
   const logsDir = path.join(__dirname, 'logs');
-  if (!fs.existsSync(logsDir)) {
-    fs.mkdirSync(logsDir, { recursive: true });
-  }
+  if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -39,7 +37,6 @@ if (process.env.NODE_ENV === 'production') {
   }
 
   const missing = required.filter(k => !process.env[k]);
-
   if (missing.length) {
     console.error('Missing environment variables:', missing.join(', '));
     process.exit(1);
@@ -53,15 +50,15 @@ const app = express();
 app.set('trust proxy', 1);
 
 // ─────────────────────────────────────────────────────────────
-// STATIC CLIENT (OPTIONAL)
+// STATIC CLIENT
 // ─────────────────────────────────────────────────────────────
 const clientDist = path.join(__dirname, '..', 'client', 'dist');
 
 if (fs.existsSync(clientDist)) {
   app.use(express.static(clientDist));
-  console.log('Serving React frontend from client/dist');
+  console.log('Serving React frontend');
 } else {
-  console.log('No client build detected (Render API mode)');
+  console.log('No client build detected');
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -74,10 +71,8 @@ app.use(globalLimiter);
 const ALLOWED_ORIGINS = [
   'http://localhost:5173',
   'http://localhost:3000',
-  'https://aischoolonair.onrender.com',
   process.env.CLIENT_URL,
   process.env.PROD_CLIENT_URL,
-  process.env.NGROK_URL,
 ].filter(Boolean);
 
 app.use(cors({
@@ -86,8 +81,6 @@ app.use(cors({
     if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
 
     logger.warn('CORS blocked', { origin });
-
-    // IMPORTANT: do NOT crash production
     return cb(null, true);
   },
   credentials: true,
@@ -103,7 +96,7 @@ app.use(requestLogger);
 const db = require('./config/database');
 
 // ─────────────────────────────────────────────────────────────
-// MODEL BOOTSTRAP (SAFE FACTORY)
+// MODEL BOOTSTRAP
 // ─────────────────────────────────────────────────────────────
 const modelPaths = [
   './models/User',
@@ -112,21 +105,7 @@ const modelPaths = [
   './models/Topic',
   './models/Subtopic',
   './models/SubtopicProgress',
-  './models/Resource',
-  './models/Course',
-  './models/Enrollment',
-  './models/Quiz',
   './models/Question',
-  './models/Note',
-  './models/Video',
-  './models/PastPaper',
-  './models/Payment',
-  './models/Notification',
-  './models/Concept',
-  './models/PracticeAttempt',
-  './models/AiChatSession',
-  './models/AiChatMessage',
-  './models/TeacherSubject',
 ];
 
 for (const m of modelPaths) {
@@ -140,9 +119,7 @@ for (const m of modelPaths) {
 
 try {
   require('./models/associations');
-} catch (e) {
-  logger.warn('Associations not loaded');
-}
+} catch {}
 
 // ─────────────────────────────────────────────────────────────
 // DB CONNECT
@@ -169,13 +146,13 @@ try {
 } catch {}
 
 // ─────────────────────────────────────────────────────────────
-// SAFE ROUTE LOADER
+// SAFE REQUIRE
 // ─────────────────────────────────────────────────────────────
-function safeRequire(routePath) {
+function safeRequire(path) {
   try {
-    return require(routePath);
+    return require(path);
   } catch (e) {
-    logger.error(`Route missing: ${routePath} — ${e.message}`);
+    logger.error(`Route missing: ${path}`);
     return null;
   }
 }
@@ -196,86 +173,60 @@ const teacherRoutes = safeRequire('./routes/teacherRoutes');
 const userRoutes = safeRequire('./routes/users');
 
 const subjectRoutes = safeRequire('./routes/subjectsRoutes');
-const topicsRoutes = safeRequire('./routes/topicsRoutes');
+const topicRoutes = safeRequire('./routes/topicsRoutes');
 const subtopicRoutes = safeRequire('./routes/subtopicRoutes');
-
-// PROGRESS ENGINE (IMPORTANT)
-const subtopicProgressRoutes = safeRequire('./routes/subtopicProgressRoutes');
 
 // LEARNING
 const resourceRoutes = safeRequire('./routes/resourceRoutes');
-const coursesRoutes = safeRequire('./routes/courses');
-const enrollmentsRoutes = safeRequire('./routes/enrollments');
-const quizzesRoutes = safeRequire('./routes/quizzes');
-const questionsRoutes = safeRequire('./routes/questionsRoutes');
-const analyticsRoutes = safeRequire('./routes/analyticsRoutes');
-const notesRoutes = safeRequire('./routes/notesRoutes');
-const videosRoutes = safeRequire('./routes/videosRoutes');
-const pastPaperRoutes = safeRequire('./routes/pastPaperRoutes');
-const paymentRoutes = safeRequire('./routes/paymentRoutes');
-const catalogRoutes = safeRequire('./routes/catalogRoutes');
-const notificationsRoutes = safeRequire('./routes/notificationsRoutes');
-const studentRoutes = safeRequire('./routes/studentRoutes');
-const conceptRoutes = safeRequire('./routes/conceptRoutes');
-
-// OPTIONAL
-let aiChatRoute = safeRequire('./routes/aiChatRoute');
+const quizRoutes = safeRequire('./routes/quizzes');
+const questionRoutes = safeRequire('./routes/questionsRoutes');
 
 // ─────────────────────────────────────────────────────────────
-// STATIC FILES
+// 🧠 2.8 EXAM INTELLIGENCE ENGINE
 // ─────────────────────────────────────────────────────────────
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+const examAnalyticsRoutes = safeRequire('./routes/examAnalyticsRoutes');
+
+// ─────────────────────────────────────────────────────────────
+// 🤖 2.9 AI QUESTION GENERATION ENGINE
+// ─────────────────────────────────────────────────────────────
+const aiQuestionGenRoutes = safeRequire('./routes/aiQuestionGenerationRoutes');
 
 // ─────────────────────────────────────────────────────────────
 // ROUTE MOUNTING
 // ─────────────────────────────────────────────────────────────
 
-// PUBLIC
+// public
 if (authRoutes) app.use('/api/auth', authRoutes);
 if (examBoardsRoutes) app.use('/api/exam-boards', examBoardsRoutes);
 if (curriculumRoutes) app.use('/api/curriculum', curriculumRoutes);
 
-// AI
+// core
 if (aiRoutes) app.use('/api/ai', protect, subscriptionGuard, aiLimiter, aiRoutes);
-if (aiChatRoute) app.use('/api/ai', protect, subscriptionGuard, aiLimiter, aiChatRoute);
-
-// CORE
 if (adminRoutes) app.use('/api/admin', protect, adminRoutes);
 if (teacherRoutes) app.use('/api/teacher', protect, teacherRoutes);
 if (userRoutes) app.use('/api/users', protect, userRoutes);
 
-// LEARNING CORE
 if (subjectRoutes) app.use('/api/subjects', protect, subjectRoutes);
-if (topicsRoutes) app.use('/api/topics', protect, topicsRoutes);
+if (topicRoutes) app.use('/api/topics', protect, topicRoutes);
 if (subtopicRoutes) app.use('/api/subtopics', protect, subtopicRoutes);
 
-// 🔥 PROGRESS ENGINE MOUNT (NEW)
-if (subtopicProgressRoutes) {
-  app.use('/api/subtopic-progress', protect, subtopicProgressRoutes);
-}
-
-// CONTENT
+// learning
 if (resourceRoutes) app.use('/api/resources', protect, resourceRoutes);
-if (coursesRoutes) app.use('/api/courses', protect, coursesRoutes);
-if (enrollmentsRoutes) app.use('/api/enrollments', protect, enrollmentsRoutes);
-if (quizzesRoutes) app.use('/api/quizzes', protect, quizzesRoutes);
-if (questionsRoutes) app.use('/api/questions', protect, questionsRoutes);
-if (analyticsRoutes) app.use('/api/analytics', protect, analyticsRoutes);
-if (notesRoutes) app.use('/api/notes', protect, notesRoutes);
-if (videosRoutes) app.use('/api/videos', protect, videosRoutes);
-if (pastPaperRoutes) app.use('/api/past-papers', protect, pastPaperRoutes);
-if (paymentRoutes) app.use('/api/payments', protect, paymentRoutes);
-if (catalogRoutes) app.use('/api/catalog', protect, catalogRoutes);
-if (notificationsRoutes) app.use('/api/notifications', protect, notificationsRoutes);
-if (studentRoutes) app.use('/api/students', protect, studentRoutes);
-if (conceptRoutes) app.use('/api/concepts', protect, conceptRoutes);
+if (quizRoutes) app.use('/api/quizzes', protect, quizRoutes);
+if (questionRoutes) app.use('/api/questions', protect, questionRoutes);
+
+// ENGINE 2.8
+if (examAnalyticsRoutes)
+  app.use('/api/exam-analytics', protect, examAnalyticsRoutes);
+
+// ENGINE 2.9
+if (aiQuestionGenRoutes)
+  app.use('/api/ai-questions', protect, subscriptionGuard, aiQuestionGenRoutes);
 
 // ─────────────────────────────────────────────────────────────
-// HEALTH CHECK
+// HEALTH
 // ─────────────────────────────────────────────────────────────
-app.get('/health', (_req, res) => {
-  res.json({ success: true });
-});
+app.get('/health', (_req, res) => res.json({ success: true }));
 
 // ─────────────────────────────────────────────────────────────
 // ERROR HANDLER
@@ -289,7 +240,6 @@ app.use((err, _req, res, _next) => {
 // START
 // ─────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
-
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`Server running on ${PORT}`);
 });
