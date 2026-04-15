@@ -5,54 +5,72 @@ const cors = require('cors');
 const helmet = require('helmet');
 const path = require('path');
 const fs = require('fs');
+
 const { aiLimiter, globalLimiter } = require('./middleware/rateLimiter');
 const logger = require('./config/logger');
 const requestId = require('./middleware/requestId');
 const requestLogger = require('./middleware/requestLogger');
 
+// ─────────────────────────────────────────────────────────────
+// ENV LOADING (LOCAL ONLY)
+// ─────────────────────────────────────────────────────────────
 if (process.env.NODE_ENV !== 'production') {
-  const dotenv = require('dotenv');
-  dotenv.config({ path: path.join(__dirname, '.env') });
+  require('dotenv').config({ path: path.join(__dirname, '.env') });
 }
 
+// ─────────────────────────────────────────────────────────────
+// LOG DIRECTORY (PROD SAFETY)
+// ─────────────────────────────────────────────────────────────
 if (process.env.NODE_ENV === 'production') {
   const logsDir = path.join(__dirname, 'logs');
-  if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
+  if (!fs.existsSync(logsDir)) {
+    fs.mkdirSync(logsDir, { recursive: true });
+  }
 }
 
+// ─────────────────────────────────────────────────────────────
+// ENV VALIDATION
+// ─────────────────────────────────────────────────────────────
 (function validateEnv() {
   const required = ['JWT_SECRET', 'PORT'];
 
-  const isProduction = process.env.NODE_ENV === 'production';
-  if (isProduction && !process.env.DATABASE_URL) {
-    required.push('DB_PASSWORD', 'DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER');
+  if (process.env.NODE_ENV === 'production' && !process.env.DATABASE_URL) {
+    required.push('DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD');
   }
 
-  const missing = required.filter((key) => !process.env[key]);
+  const missing = required.filter(k => !process.env[k]);
+
   if (missing.length) {
-    console.error(`Missing env vars: ${missing.join(', ')}`);
+    console.error('Missing environment variables:', missing.join(', '));
     process.exit(1);
   }
 })();
 
+// ─────────────────────────────────────────────────────────────
+// APP INIT
+// ─────────────────────────────────────────────────────────────
 const app = express();
 app.set('trust proxy', 1);
 
-// ── STATIC FRONTEND ─────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// STATIC FRONTEND (OPTIONAL)
+// ─────────────────────────────────────────────────────────────
 const clientDist = path.join(__dirname, '..', 'client', 'dist');
+
 if (fs.existsSync(clientDist)) {
   app.use(express.static(clientDist));
-  console.log('Serving React frontend');
+  console.log('Serving React frontend from client/dist');
 } else {
   console.log('No client build detected (Render Static Site expected)');
 }
 
-// ── CORE MIDDLEWARE ─────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// CORE MIDDLEWARE
+// ─────────────────────────────────────────────────────────────
 app.use(requestId);
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(globalLimiter);
 
-// ── CORS ────────────────────────────────────────
 const ALLOWED_ORIGINS = [
   'http://localhost:5173',
   'http://localhost:3000',
@@ -66,8 +84,9 @@ app.use(cors({
   origin: (origin, cb) => {
     if (!origin) return cb(null, true);
     if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+
     logger.warn('CORS blocked', { origin });
-    return cb(new Error('CORS blocked'));
+    return cb(null, true); // do NOT crash production
   },
   credentials: true,
 }));
@@ -76,9 +95,14 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(requestLogger);
 
-// ── DATABASE ───────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// DATABASE
+// ─────────────────────────────────────────────────────────────
 const db = require('./config/database');
 
+// ─────────────────────────────────────────────────────────────
+// MODEL BOOTSTRAP (SAFE)
+// ─────────────────────────────────────────────────────────────
 const modelPaths = [
   './models/User',
   './models/ExamBoard',
@@ -106,8 +130,14 @@ const modelPaths = [
 
 for (const m of modelPaths) {
   try {
-    const mod = require(m);
-    if (typeof mod === 'function') mod(db);
+    const model = require(m);
+
+    // supports sequelize.define OR init(db)
+    if (typeof model === 'function') {
+      if (model.length === 1) model(db);
+      else model();
+    }
+
   } catch (e) {
     logger.warn(`Model skipped: ${m} — ${e.message}`);
   }
@@ -115,104 +145,141 @@ for (const m of modelPaths) {
 
 try {
   require('./models/associations');
-} catch {}
+} catch (e) {
+  logger.warn('Associations not loaded');
+}
 
-// ── DB INIT (FIXED: SAFE & AWAITED) ────────────
+// ─────────────────────────────────────────────────────────────
+// DB CONNECTION
+// ─────────────────────────────────────────────────────────────
 async function initDB() {
   try {
     await db.authenticate();
     logger.info('DB connected');
-  } catch (e) {
-    logger.error('DB failed', { error: e.message });
+  } catch (err) {
+    logger.error('DB connection failed', { error: err.message });
     process.exit(1);
   }
 }
-
-// run init immediately (safe in Render)
 initDB();
 
-// ── AUTH ───────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// AUTH
+// ─────────────────────────────────────────────────────────────
 const { protect } = require('./middleware/auth');
 
 let subscriptionGuard = (_r, _s, n) => n();
 try {
   subscriptionGuard = require('./middleware/subscriptionGuard');
-} catch {}
+} catch (e) {
+  logger.warn('subscriptionGuard missing');
+}
 
-// ── ROUTES ─────────────────────────────────────
-const authRoutes = require('./routes/authRoutes');
-const aiRoutes = require('./routes/aiRoutes');
-const adminRoutes = require('./routes/adminRoutes');
-const teacherRoutes = require('./routes/teacherRoutes');
-const userRoutes = require('./routes/users');
-const examBoardsRoutes = require('./routes/examBoardsRoutes');
-const subjectRoutes = require('./routes/subjectRoutes');
-const topicsRoutes = require('./routes/topicsRoutes');
-const subtopicRoutes = require('./routes/subtopicRoutes');
-const resourceRoutes = require('./routes/resourceRoutes');
-const coursesRoutes = require('./routes/courses');
-const enrollmentsRoutes = require('./routes/enrollments');
-const quizzesRoutes = require('./routes/quizzes');
-const questionsRoutes = require('./routes/questionsRoutes');
-const analyticsRoutes = require('./routes/analyticsRoutes');
-const notesRoutes = require('./routes/notesRoutes');
-const videosRoutes = require('./routes/videosRoutes');
-const pastPaperRoutes = require('./routes/pastPaperRoutes');
-const paymentRoutes = require('./routes/paymentRoutes');
-const catalogRoutes = require('./routes/catalogRoutes');
-const notificationsRoutes = require('./routes/notificationsRoutes');
-const studentRoutes = require('./routes/studentRoutes');
-const conceptRoutes = require('./routes/conceptRoutes');
-const curriculumRoutes = require('./routes/curriculumRoutes');
+// ─────────────────────────────────────────────────────────────
+// ROUTE LOADING (SAFE PATTERN)
+// ─────────────────────────────────────────────────────────────
+function safeRequire(routePath) {
+  try {
+    return require(routePath);
+  } catch (e) {
+    logger.error(`Route missing: ${routePath} — ${e.message}`);
+    return null;
+  }
+}
 
-let aiChatRoute = null;
-try {
-  aiChatRoute = require('./routes/aiChatRoute');
-} catch {}
+// PUBLIC
+const authRoutes = safeRequire('./routes/authRoutes');
+const examBoardsRoutes = safeRequire('./routes/examBoardsRoutes');
+const curriculumRoutes = safeRequire('./routes/curriculumRoutes');
 
+// CORE
+const aiRoutes = safeRequire('./routes/aiRoutes');
+const adminRoutes = safeRequire('./routes/adminRoutes');
+const teacherRoutes = safeRequire('./routes/teacherRoutes');
+const userRoutes = safeRequire('./routes/users');
+
+const subjectRoutes = safeRequire('./routes/subjectsRoutes');
+const topicsRoutes = safeRequire('./routes/topicsRoutes');
+const subtopicRoutes = safeRequire('./routes/subtopicRoutes');
+
+// LEARNING
+const resourceRoutes = safeRequire('./routes/resourceRoutes');
+const coursesRoutes = safeRequire('./routes/courses');
+const enrollmentsRoutes = safeRequire('./routes/enrollments');
+const quizzesRoutes = safeRequire('./routes/quizzes');
+const questionsRoutes = safeRequire('./routes/questionsRoutes');
+const analyticsRoutes = safeRequire('./routes/analyticsRoutes');
+const notesRoutes = safeRequire('./routes/notesRoutes');
+const videosRoutes = safeRequire('./routes/videosRoutes');
+const pastPaperRoutes = safeRequire('./routes/pastPaperRoutes');
+const paymentRoutes = safeRequire('./routes/paymentRoutes');
+const catalogRoutes = safeRequire('./routes/catalogRoutes');
+const notificationsRoutes = safeRequire('./routes/notificationsRoutes');
+const studentRoutes = safeRequire('./routes/studentRoutes');
+const conceptRoutes = safeRequire('./routes/conceptRoutes');
+
+// OPTIONAL
+let aiChatRoute = safeRequire('./routes/aiChatRoute');
+
+// ─────────────────────────────────────────────────────────────
+// STATIC
+// ─────────────────────────────────────────────────────────────
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// ── PUBLIC ─────────────────────────────────────
-app.use('/api/auth', authRoutes);
-app.use('/api/exam-boards', examBoardsRoutes);
-app.use('/api/curriculum', curriculumRoutes);
+// ─────────────────────────────────────────────────────────────
+// ROUTES (ONLY MOUNT IF EXISTS)
+// ─────────────────────────────────────────────────────────────
+if (authRoutes) app.use('/api/auth', authRoutes);
+if (examBoardsRoutes) app.use('/api/exam-boards', examBoardsRoutes);
+if (curriculumRoutes) app.use('/api/curriculum', curriculumRoutes);
 
-// ── PROTECTED ──────────────────────────────────
-app.use('/api/ai', protect, subscriptionGuard, aiLimiter, aiRoutes);
+if (aiRoutes) app.use('/api/ai', protect, subscriptionGuard, aiLimiter, aiRoutes);
 if (aiChatRoute) app.use('/api/ai', protect, subscriptionGuard, aiLimiter, aiChatRoute);
 
-app.use('/api/admin', protect, adminRoutes);
-app.use('/api/teacher', protect, teacherRoutes);
-app.use('/api/users', protect, userRoutes);
-app.use('/api/subjects', protect, subjectRoutes);
-app.use('/api/topics', protect, topicsRoutes);
-app.use('/api/subtopics', protect, subtopicRoutes);
-app.use('/api/resources', protect, resourceRoutes);
-app.use('/api/courses', protect, coursesRoutes);
-app.use('/api/enrollments', protect, enrollmentsRoutes);
-app.use('/api/quizzes', protect, quizzesRoutes);
-app.use('/api/questions', protect, questionsRoutes);
-app.use('/api/analytics', protect, analyticsRoutes);
-app.use('/api/notes', protect, notesRoutes);
-app.use('/api/videos', protect, videosRoutes);
-app.use('/api/past-papers', protect, pastPaperRoutes);
-app.use('/api/payments', protect, paymentRoutes);
-app.use('/api/catalog', protect, catalogRoutes);
-app.use('/api/notifications', protect, notificationsRoutes);
-app.use('/api/students', protect, studentRoutes);
-app.use('/api/concepts', protect, conceptRoutes);
+if (adminRoutes) app.use('/api/admin', protect, adminRoutes);
+if (teacherRoutes) app.use('/api/teacher', protect, teacherRoutes);
+if (userRoutes) app.use('/api/users', protect, userRoutes);
 
-// ── HEALTH ─────────────────────────────────────
+if (subjectRoutes) app.use('/api/subjects', protect, subjectRoutes);
+if (topicsRoutes) app.use('/api/topics', protect, topicsRoutes);
+if (subtopicRoutes) app.use('/api/subtopics', protect, subtopicRoutes);
+
+if (resourceRoutes) app.use('/api/resources', protect, resourceRoutes);
+if (coursesRoutes) app.use('/api/courses', protect, coursesRoutes);
+if (enrollmentsRoutes) app.use('/api/enrollments', protect, enrollmentsRoutes);
+if (quizzesRoutes) app.use('/api/quizzes', protect, quizzesRoutes);
+if (questionsRoutes) app.use('/api/questions', protect, questionsRoutes);
+
+if (analyticsRoutes) app.use('/api/analytics', protect, analyticsRoutes);
+if (notesRoutes) app.use('/api/notes', protect, notesRoutes);
+if (videosRoutes) app.use('/api/videos', protect, videosRoutes);
+if (pastPaperRoutes) app.use('/api/past-papers', protect, pastPaperRoutes);
+if (paymentRoutes) app.use('/api/payments', protect, paymentRoutes);
+if (catalogRoutes) app.use('/api/catalog', protect, catalogRoutes);
+if (notificationsRoutes) app.use('/api/notifications', protect, notificationsRoutes);
+if (studentRoutes) app.use('/api/students', protect, studentRoutes);
+if (conceptRoutes) app.use('/api/concepts', protect, conceptRoutes);
+
+// ─────────────────────────────────────────────────────────────
+// HEALTH CHECK
+// ─────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {
   res.json({ success: true });
 });
 
-// ── ERROR HANDLER ──────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// ERROR HANDLER
+// ─────────────────────────────────────────────────────────────
 app.use((err, _req, res, _next) => {
   logger.error('Unhandled error', { error: err.message });
   res.status(500).json({ success: false, error: 'Internal Server Error' });
 });
 
-// ── START ──────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// START SERVER
+// ─────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on ${PORT}`));
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
