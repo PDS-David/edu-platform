@@ -1,6 +1,6 @@
 ================================================================================
   AI-OPTIMIZED PROJECT DUMP
-  Generated : 2026-04-14 18:36:59
+  Generated : 2026-04-15 02:27:13
   Root      : C:\Users\MASHAALLAH\Desktop\edu-platform
 ================================================================================
 
@@ -28,7 +28,7 @@ SECTION: CONFIG
 ================================================================================
 
 ================================================================================
-FILE (1/178): package.json
+FILE (1/180): package.json
 SIZE: 57 bytes
 ================================================================================
 {
@@ -44,7 +44,7 @@ SECTION: BACKEND
 ================================================================================
 
 ================================================================================
-FILE (2/178): server\config\database.js
+FILE (2/180): server\config\database.js
 SIZE: 2706 bytes
 ================================================================================
 'use strict';
@@ -124,7 +124,7 @@ module.exports = sequelize;
 
 
 ================================================================================
-FILE (3/178): server\config\logger.js
+FILE (3/180): server\config\logger.js
 SIZE: 4174 bytes
 ================================================================================
 // server/config/logger.js
@@ -229,7 +229,7 @@ module.exports = logger;
 
 
 ================================================================================
-FILE (4/178): server\controllers\auth.js
+FILE (4/180): server\controllers\auth.js
 SIZE: 17109 bytes
 ================================================================================
 'use strict';
@@ -671,7 +671,7 @@ exports.verifyEmail = async (req, res, next) => {
 
 
 ================================================================================
-FILE (5/178): server\controllers\quizController.js
+FILE (5/180): server\controllers\quizController.js
 SIZE: 7936 bytes
 ================================================================================
 'use strict';
@@ -920,7 +920,7 @@ module.exports = { generateQuiz, submitQuiz };
 
 
 ================================================================================
-FILE (6/178): server\controllers\subjects.js
+FILE (6/180): server\controllers\subjects.js
 SIZE: 5269 bytes
 ================================================================================
 // server/controllers/subjects.js
@@ -1131,7 +1131,7 @@ module.exports = {
 
 
 ================================================================================
-FILE (7/178): server\debug-jwt.js
+FILE (7/180): server\debug-jwt.js
 SIZE: 1995 bytes
 ================================================================================
 // server/debug-jwt.js
@@ -1182,7 +1182,7 @@ try {
 
 
 ================================================================================
-FILE (8/178): server\jobs\scheduledJobs.js
+FILE (8/180): server\jobs\scheduledJobs.js
 SIZE: 8982 bytes
 ================================================================================
 // server/jobs/scheduledJobs.js
@@ -1380,7 +1380,7 @@ module.exports = {
 
 
 ================================================================================
-FILE (9/178): server\middleware\auth.js
+FILE (9/180): server\middleware\auth.js
 SIZE: 3301 bytes
 ================================================================================
 // server/middleware/auth.js
@@ -1454,7 +1454,7 @@ module.exports = { protect, authorize };
 
 
 ================================================================================
-FILE (10/178): server\middleware\ipWhitelist.js
+FILE (10/180): server\middleware\ipWhitelist.js
 SIZE: 1817 bytes
 ================================================================================
 // server/middleware/ipWhitelist.js
@@ -1512,7 +1512,7 @@ module.exports = function ipWhitelist(req, res, next) {
 
 
 ================================================================================
-FILE (11/178): server\middleware\rateLimiter.js
+FILE (11/180): server\middleware\rateLimiter.js
 SIZE: 776 bytes
 ================================================================================
 // server/middleware/rateLimiter.js
@@ -1546,7 +1546,7 @@ const aiLimiter = rateLimit({
 module.exports = { analyticsLimiter, globalLimiter, aiLimiter };
 
 ================================================================================
-FILE (12/178): server\middleware\requestId.js
+FILE (12/180): server\middleware\requestId.js
 SIZE: 1297 bytes
 ================================================================================
 // server/middleware/requestId.js
@@ -1580,7 +1580,7 @@ module.exports = function requestId(req, res, next) {
 
 
 ================================================================================
-FILE (13/178): server\middleware\requestLogger.js
+FILE (13/180): server\middleware\requestLogger.js
 SIZE: 1637 bytes
 ================================================================================
 // server/middleware/requestLogger.js
@@ -1627,7 +1627,7 @@ module.exports = function requestLogger(req, res, next) {
 
 
 ================================================================================
-FILE (14/178): server\middleware\roleMiddleware.js
+FILE (14/180): server\middleware\roleMiddleware.js
 SIZE: 9593 bytes
 ================================================================================
 // server/middleware/roleMiddleware.js
@@ -1863,7 +1863,7 @@ module.exports = {
 
 
 ================================================================================
-FILE (15/178): server\middleware\subscriptionGuard.js
+FILE (15/180): server\middleware\subscriptionGuard.js
 SIZE: 3172 bytes
 ================================================================================
 // server/middleware/subscriptionGuard.js
@@ -1964,7 +1964,7 @@ module.exports = async (req, res, next) => {
 
 
 ================================================================================
-FILE (16/178): server\middleware\xpMiddleware.js
+FILE (16/180): server\middleware\xpMiddleware.js
 SIZE: 7700 bytes
 ================================================================================
 // Called AFTER a successful answer or quiz submission.
@@ -2153,7 +2153,7 @@ module.exports = { awardXP, xpMiddleware };
 
 
 ================================================================================
-FILE (17/178): server\models\AiChatMessage.js
+FILE (17/180): server\models\AiChatMessage.js
 SIZE: 799 bytes
 ================================================================================
 'use strict';
@@ -2191,7 +2191,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (18/178): server\models\AiChatSession.js
+FILE (18/180): server\models\AiChatSession.js
 SIZE: 815 bytes
 ================================================================================
 const { DataTypes } = require('sequelize');
@@ -2219,7 +2219,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (19/178): server\models\Concept.js
+FILE (19/180): server\models\Concept.js
 SIZE: 1071 bytes
 ================================================================================
 const { DataTypes } = require('sequelize');
@@ -2252,7 +2252,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (20/178): server\models\Course.js
+FILE (20/180): server\models\Course.js
 SIZE: 1453 bytes
 ================================================================================
 const { DataTypes } = require('sequelize');
@@ -2290,7 +2290,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (21/178): server\models\Enrollment.js
+FILE (21/180): server\models\Enrollment.js
 SIZE: 1233 bytes
 ================================================================================
 const { DataTypes } = require('sequelize');
@@ -2321,7 +2321,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (22/178): server\models\ExamBoard.js
+FILE (22/180): server\models\ExamBoard.js
 SIZE: 994 bytes
 ================================================================================
 const { DataTypes } = require('sequelize');
@@ -2350,7 +2350,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (23/178): server\models\Note.js
+FILE (23/180): server\models\Note.js
 SIZE: 865 bytes
 ================================================================================
 const { DataTypes } = require('sequelize');
@@ -2380,7 +2380,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (24/178): server\models\Notification.js
+FILE (24/180): server\models\Notification.js
 SIZE: 1036 bytes
 ================================================================================
 const { DataTypes } = require('sequelize');
@@ -2412,7 +2412,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (25/178): server\models\PastPaper.js
+FILE (25/180): server\models\PastPaper.js
 SIZE: 1222 bytes
 ================================================================================
 const { DataTypes } = require('sequelize');
@@ -2446,7 +2446,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (26/178): server\models\Payment.js
+FILE (26/180): server\models\Payment.js
 SIZE: 1230 bytes
 ================================================================================
 const { DataTypes } = require('sequelize');
@@ -2480,7 +2480,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (27/178): server\models\PracticeAttempt.js
+FILE (27/180): server\models\PracticeAttempt.js
 SIZE: 1056 bytes
 ================================================================================
 const { DataTypes } = require('sequelize');
@@ -2510,7 +2510,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (28/178): server\models\Question.js
+FILE (28/180): server\models\Question.js
 SIZE: 1902 bytes
 ================================================================================
 const { DataTypes } = require('sequelize');
@@ -2553,7 +2553,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (29/178): server\models\Quiz.js
+FILE (29/180): server\models\Quiz.js
 SIZE: 1129 bytes
 ================================================================================
 const { DataTypes } = require('sequelize');
@@ -2586,7 +2586,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (30/178): server\models\Resource.js
+FILE (30/180): server\models\Resource.js
 SIZE: 1337 bytes
 ================================================================================
 const { DataTypes } = require('sequelize');
@@ -2622,7 +2622,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (31/178): server\models\StudentExamType.js
+FILE (31/180): server\models\StudentExamType.js
 SIZE: 1002 bytes
 ================================================================================
 const { DataTypes } = require('sequelize');
@@ -2655,7 +2655,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (32/178): server\models\Subject.js
+FILE (32/180): server\models\Subject.js
 SIZE: 1084 bytes
 ================================================================================
 const { DataTypes } = require('sequelize');
@@ -2688,7 +2688,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (33/178): server\models\Subtopic.js
+FILE (33/180): server\models\Subtopic.js
 SIZE: 997 bytes
 ================================================================================
 const { DataTypes } = require('sequelize');
@@ -2719,7 +2719,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (34/178): server\models\SubtopicProgress.js
+FILE (34/180): server\models\SubtopicProgress.js
 SIZE: 1118 bytes
 ================================================================================
 const { DataTypes } = require('sequelize');
@@ -2749,7 +2749,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (35/178): server\models\TeacherSubject.js
+FILE (35/180): server\models\TeacherSubject.js
 SIZE: 1615 bytes
 ================================================================================
 'use strict';
@@ -2811,7 +2811,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (36/178): server\models\Topic.js
+FILE (36/180): server\models\Topic.js
 SIZE: 971 bytes
 ================================================================================
 const { DataTypes } = require('sequelize');
@@ -2842,7 +2842,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (37/178): server\models\User.js
+FILE (37/180): server\models\User.js
 SIZE: 12124 bytes
 ================================================================================
 'use strict';
@@ -3068,7 +3068,7 @@ module.exports = User;
 
 
 ================================================================================
-FILE (38/178): server\models\Video.js
+FILE (38/180): server\models\Video.js
 SIZE: 1441 bytes
 ================================================================================
 const { DataTypes } = require('sequelize');
@@ -3106,7 +3106,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (39/178): server\package.json
+FILE (39/180): server\package.json
 SIZE: 1265 bytes
 ================================================================================
 {
@@ -3166,7 +3166,7 @@ SIZE: 1265 bytes
 
 
 ================================================================================
-FILE (40/178): server\queues\aiQueue.js
+FILE (40/180): server\queues\aiQueue.js
 SIZE: 633 bytes
 ================================================================================
 'use strict';
@@ -3200,7 +3200,7 @@ module.exports = { getAiQueue };
 
 
 ================================================================================
-FILE (41/178): server\routes\adminRoutes.js
+FILE (41/180): server\routes\adminRoutes.js
 SIZE: 37445 bytes
 ================================================================================
 // server/routes/adminRoutes.js
@@ -3696,7 +3696,7 @@ router.get('/questions/pending', protect, adminOnly, async (req, res) => {
 ...TRUNCATED...
 
 ================================================================================
-FILE (42/178): server\routes\aiChatRoute.js
+FILE (42/180): server\routes\aiChatRoute.js
 SIZE: 13873 bytes
 ================================================================================
 'use strict';
@@ -4100,7 +4100,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (43/178): server\routes\aiRoutes.js
+FILE (43/180): server\routes\aiRoutes.js
 SIZE: 13099 bytes
 ================================================================================
 'use strict';
@@ -4423,7 +4423,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (44/178): server\routes\analytics.js
+FILE (44/180): server\routes\analytics.js
 SIZE: 17019 bytes
 ================================================================================
 'use strict';
@@ -4829,7 +4829,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (45/178): server\routes\analyticsRoutes.js
+FILE (45/180): server\routes\analyticsRoutes.js
 SIZE: 17019 bytes
 ================================================================================
 'use strict';
@@ -5235,7 +5235,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (46/178): server\routes\authRoutes.js
+FILE (46/180): server\routes\authRoutes.js
 SIZE: 4931 bytes
 ================================================================================
 // server/routes/authRoutes.js
@@ -5373,7 +5373,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (47/178): server\routes\catalogRoutes.js
+FILE (47/180): server\routes\catalogRoutes.js
 SIZE: 19196 bytes
 ================================================================================
 'use strict';
@@ -5786,7 +5786,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (48/178): server\routes\conceptRoutes.js
+FILE (48/180): server\routes\conceptRoutes.js
 SIZE: 28945 bytes
 ================================================================================
 // server/routes/conceptRoutes.js
@@ -6284,7 +6284,7 @@ router.get('/:id/mastery', protect, async (req, res) => {
 ...TRUNCATED...
 
 ================================================================================
-FILE (49/178): server\routes\courses.js
+FILE (49/180): server\routes\courses.js
 SIZE: 431 bytes
 ================================================================================
 const express = require('express');
@@ -6303,7 +6303,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (50/178): server\routes\curriculumRoutes.js
+FILE (50/180): server\routes\curriculumRoutes.js
 SIZE: 2909 bytes
 ================================================================================
 'use strict';
@@ -6423,7 +6423,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (51/178): server\routes\enrollments.js
+FILE (51/180): server\routes\enrollments.js
 SIZE: 271 bytes
 ================================================================================
 const express = require('express');
@@ -6438,7 +6438,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (52/178): server\routes\examBoardRoutes.js
+FILE (52/180): server\routes\examBoardRoutes.js
 SIZE: 3015 bytes
 ================================================================================
 // server/routes/examBoardRoutes.js
@@ -6514,7 +6514,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (53/178): server\routes\examBoardsRoutes.js
+FILE (53/180): server\routes\examBoardsRoutes.js
 SIZE: 7635 bytes
 ================================================================================
 // server/routes/examBoardsRoutes.js
@@ -6731,7 +6731,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (54/178): server\routes\examTypeActivation.js
+FILE (54/180): server\routes\examTypeActivation.js
 SIZE: 4036 bytes
 ================================================================================
 // server/routes/examTypeActivation.js
@@ -6834,7 +6834,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (55/178): server\routes\explanationRoute.js
+FILE (55/180): server\routes\explanationRoute.js
 SIZE: 7489 bytes
 ================================================================================
 // server/routes/explanationRoute.js
@@ -7030,7 +7030,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (56/178): server\routes\notesRoutes.js
+FILE (56/180): server\routes\notesRoutes.js
 SIZE: 3735 bytes
 ================================================================================
 // server/routes/notesRoutes.js
@@ -7128,7 +7128,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (57/178): server\routes\notificationsRoutes.js
+FILE (57/180): server\routes\notificationsRoutes.js
 SIZE: 2520 bytes
 ================================================================================
 const express = require('express');
@@ -7206,7 +7206,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (58/178): server\routes\pastPaperRoutes.js
+FILE (58/180): server\routes\pastPaperRoutes.js
 SIZE: 6247 bytes
 ================================================================================
 // server/routes/pastPaperRoutes.js
@@ -7357,7 +7357,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (59/178): server\routes\paymentRoutes.js
+FILE (59/180): server\routes\paymentRoutes.js
 SIZE: 27147 bytes
 ================================================================================
 // server/routes/paymentRoutes.js
@@ -7922,7 +7922,7 @@ router.get('/subscription', protect, async (req, res) => {
 ...TRUNCATED...
 
 ================================================================================
-FILE (60/178): server\routes\questionsRoutes.js
+FILE (60/180): server\routes\questionsRoutes.js
 SIZE: 8341 bytes
 ================================================================================
 'use strict';
@@ -8121,7 +8121,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (61/178): server\routes\quizGeneratorRoute.js
+FILE (61/180): server\routes\quizGeneratorRoute.js
 SIZE: 1286 bytes
 ================================================================================
 'use strict';
@@ -8159,7 +8159,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (62/178): server\routes\quizzes.js
+FILE (62/180): server\routes\quizzes.js
 SIZE: 9002 bytes
 ================================================================================
 'use strict';
@@ -8364,18 +8364,21 @@ module.exports = router;
 
 
 ================================================================================
-FILE (63/178): server\routes\resourceRoutes.js
-SIZE: 10560 bytes
+FILE (63/180): server\routes\resourceRoutes.js
+SIZE: 21968 bytes
 ================================================================================
 'use strict';
-// server/routes/resourceRoutes.js
-// Matches actual Resource model:
-//   id (INTEGER), topic_id, subtopic_id, uploaded_by, title,
-//   type (ENUM video/pdf/link/note/image/other), url, content,
-//   description, is_premium, order_index, is_active, created_at, updated_at
+// server/routes/resourceRoutes.js  v3
 //
-// v2 UUID FIX: removed parseInt() from topic_id and subtopic_id query/body params
-//   (these are UUID foreign keys). parseInt(req.params.id) is kept — resources.id is INTEGER.
+// Routes:
+//   POST   /upload              — single upload (teacher/admin), topic optional
+//   POST   /bulk-upload         — admin bulk upload up to 20 files, no metadata needed
+//   PUT    /:id/assign-meta     — admin assigns exam_type, subject, topic, subtopic to a staged file
+//   PUT    /:id/assign-users    — admin assigns a resource to specific students or all students
+//   GET    /staged              — admin: list unassigned/staged resources
+//   GET    /                    — teacher sees own; student sees accessible; admin sees all
+//   GET    /:id                 — single resource
+//   DELETE /:id                 — teacher (own) or admin
 
 const express    = require('express');
 const router     = express.Router();
@@ -8386,10 +8389,10 @@ const { QueryTypes } = require('sequelize');
 const sequelize  = require('../config/database');
 const { protect, authorize } = require('../middleware/auth');
 
-// ── File type map ─────────────────────────────────────────────────────────────
+// ── MIME → type ───────────────────────────────────────────────────────────────
 const MIME_TO_TYPE = {
-  'video/mp4':       'video', 'video/webm': 'video', 'video/quicktime': 'video',
-  'audio/mpeg':      'other', 'audio/wav':  'other', 'audio/mp4': 'other',
+  'video/mp4': 'video', 'video/webm': 'video', 'video/quicktime': 'video',
+  'audio/mpeg': 'other', 'audio/wav': 'other', 'audio/mp4': 'other',
   'application/pdf': 'pdf',
   'application/msword': 'other',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'other',
@@ -8398,6 +8401,7 @@ const MIME_TO_TYPE = {
   'image/jpeg': 'image', 'image/png': 'image', 'image/gif': 'image', 'image/webp': 'image',
 };
 
+// ── Multer ────────────────────────────────────────────────────────────────────
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const dir = path.join(__dirname, '..', 'uploads', 'resources');
@@ -8405,168 +8409,340 @@ const storage = multer.diskStorage({
     cb(null, dir);
   },
   filename: (req, file, cb) => {
-    const ts   = Date.now();
-    const ext  = path.extname(file.originalname).toLowerCase();
-    cb(null, `${ts}${ext}`);
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `${Date.now()}_${Math.random().toString(36).slice(2, 7)}${ext}`);
   },
 });
+const fileFilter = (_req, file, cb) => {
+  if (MIME_TO_TYPE[file.mimetype]) cb(null, true);
+  else cb(new Error(`File type not allowed: ${file.mimetype}`));
+};
+const uploadSingle = multer({ storage, limits: { fileSize: 500 * 1024 * 1024 }, fileFilter });
+const uploadBulk   = multer({ storage, limits: { fileSize: 500 * 1024 * 1024, files: 20 }, fileFilter });
 
-const upload = multer({
-  storage,
-  limits: { fileSize: 500 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    if (MIME_TO_TYPE[file.mimetype]) {
-      cb(null, true);
-    } else {
-      cb(new Error(`File type not allowed: ${file.mimetype}`));
+// ── Middleware helpers ─────────────────────────────────────────────────────────
+const adminOnly = (req, res, next) => {
+  if (req.user?.role !== 'admin') return res.status(403).json({ success: false, error: 'Admin access required' });
+  next();
+};
+
+// ── Safe insert (handles pre-migration INTEGER uploaded_by column) ─────────────
+async function safeInsert(replacements) {
+  const withOwner = `
+    INSERT INTO resources (topic_id, subtopic_id, uploaded_by, title, type, url,
+      description, is_premium, is_active, is_staged, file_size_bytes, original_filename, created_at, updated_at)
+    VALUES (:topicId, :subtopicId, :uploadedBy, :title, :type, :url,
+      :description, false, true, :isStaged, :fileSize, :originalFilename, NOW(), NOW())
+    RETURNING id`;
+  const withoutOwner = `
+    INSERT INTO resources (topic_id, subtopic_id, title, type, url,
+      description, is_premium, is_active, is_staged, file_size_bytes, original_filename, created_at, updated_at)
+    VALUES (:topicId, :subtopicId, :title, :type, :url,
+      :description, false, true, :isStaged, :fileSize, :originalFilename, NOW(), NOW())
+    RETURNING id`;
+  try {
+    const r = await sequelize.query(withOwner, { replacements, type: QueryTypes.SELECT });
+    return r[0];
+  } catch (e) {
+    if (e.message.includes('invalid input syntax for type integer') ||
+        e.message.includes('column "is_staged" of relation') ||
+        e.message.includes('column "file_size_bytes" of relation') ||
+        e.message.includes('column "original_filename" of relation')) {
+      // Fallback for older schema — insert with minimal columns
+      const minimal = `
+        INSERT INTO resources (topic_id, subtopic_id, title, type, url,
+          description, is_premium, is_active, created_at, updated_at)
+        VALUES (:topicId, :subtopicId, :title, :type, :url,
+          :description, false, true, NOW(), NOW())
+        RETURNING id`;
+      const r = await sequelize.query(minimal, { replacements, type: QueryTypes.SELECT });
+      return r[0];
     }
-  },
+    throw e;
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// POST /api/resources/upload  — single upload (teacher/admin)
+// ═════════════════════════════════════════════════════════════════════════════
+router.post('/upload', protect, authorize('teacher', 'admin'), uploadSingle.single('file'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ success: false, error: 'No file uploaded.' });
+  const { title, topic_id, subtopic_id, description } = req.body;
+  if (!title?.trim()) { fs.unlink(req.file.path, () => {}); return res.status(400).json({ success: false, error: 'title is required' }); }
+
+  const type    = MIME_TO_TYPE[req.file.mimetype] || 'other';
+  const fileUrl = `/uploads/resources/${req.file.filename}`;
+  try {
+    const row = await safeInsert({
+      topicId: topic_id || null, subtopicId: subtopic_id || null,
+      uploadedBy: req.user.id, title: title.trim(), type, url: fileUrl,
+      description: description || null, isStaged: false,
+      fileSize: req.file.size, originalFilename: req.file.originalname,
+    });
+    return res.status(201).json({ success: true, message: 'Resource uploaded.', data: { id: row.id, title: title.trim(), type, url: fileUrl } });
+  } catch (err) {
+    fs.unlink(req.file.path, () => {});
+    return res.status(500).json({ success: false, error: 'Failed to save: ' + err.message });
+  }
 });
 
-// ── POST /api/resources/upload ────────────────────────────────────────────────
-// Form fields: title (required), topic_id (optional), subtopic_id (optional), description
-// File field:  file
-// subject_id is NOT stored in the Resource model — we look it up via subtopic_id or topic_id
-router.post(
-  '/upload',
-  protect,
-  authorize('teacher', 'admin'),
-  upload.single('file'),
-  async (req, res) => {
-    if (!req.file) {
-      return res.status(400).json({ success: false, error: 'No file uploaded. Use field name "file".' });
-    }
+// ═════════════════════════════════════════════════════════════════════════════
+// POST /api/resources/bulk-upload  — admin uploads up to 20 files at once
+// Files are saved immediately; metadata (exam type, subject, topic) is
+// assigned later via PUT /api/resources/:id/assign-meta
+// ═════════════════════════════════════════════════════════════════════════════
+router.post('/bulk-upload', protect, adminOnly, uploadBulk.array('files', 20), async (req, res) => {
+  if (!req.files || req.files.length === 0) {
+    return res.status(400).json({ success: false, error: 'No files uploaded. Use field name "files".' });
+  }
 
-    const { title, topic_id, subtopic_id, description } = req.body;
+  const results  = [];
+  const failures = [];
 
-    if (!title?.trim()) {
-      fs.unlink(req.file.path, () => {});
-      return res.status(400).json({ success: false, error: 'title is required' });
-    }
-
-    // topic_id or subtopic_id should be provided for proper organisation
-    // but we won't block upload if neither is given
-    const resourceType = MIME_TO_TYPE[req.file.mimetype] || 'other';
-    const fileUrl      = `/uploads/resources/${req.file.filename}`;
+  for (const file of req.files) {
+    const type        = MIME_TO_TYPE[file.mimetype] || 'other';
+    const fileUrl     = `/uploads/resources/${file.filename}`;
+    const title       = file.originalname.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
 
     try {
-      let result;
-      try {
-        // Primary: insert with uploaded_by (UUID — correct schema after migrations)
-        result = await sequelize.query(
-          `INSERT INTO resources
-             (topic_id, subtopic_id, uploaded_by, title, type, url,
-              description, is_premium, is_active, created_at, updated_at)
-           VALUES
-             (:topicId, :subtopicId, :uploadedBy, :title, :type, :url,
-              :description, false, true, NOW(), NOW())
-           RETURNING id`,
-          {
-            replacements: {
-              topicId:     topic_id    || null,
-              subtopicId:  subtopic_id || null,
-              uploadedBy:  req.user.id,
-              title:       title.trim(),
-              type:        resourceType,
-              url:         fileUrl,
-              description: description || null,
-            },
-            type: QueryTypes.SELECT,
-          }
-        );
-      } catch (innerErr) {
-        // Fallback: if uploaded_by column is still INTEGER in DB (pre-migration),
-        // insert without it so the upload still succeeds.
-        if (innerErr.message.includes('invalid input syntax for type integer')) {
-          console.warn('[resources/upload] uploaded_by column is INTEGER in DB — inserting without it. Run patch_001_fix_types.sql to fix permanently.');
-          result = await sequelize.query(
-            `INSERT INTO resources
-               (topic_id, subtopic_id, title, type, url,
-                description, is_premium, is_active, created_at, updated_at)
-             VALUES
-               (:topicId, :subtopicId, :title, :type, :url,
-                :description, false, true, NOW(), NOW())
-             RETURNING id`,
-            {
-              replacements: {
-                topicId:     topic_id    || null,
-                subtopicId:  subtopic_id || null,
-                title:       title.trim(),
-                type:        resourceType,
-                url:         fileUrl,
-                description: description || null,
-              },
-              type: QueryTypes.SELECT,
-            }
-          );
-        } else {
-          throw innerErr;
-        }
-      }
-
-      return res.status(201).json({
-        success: true,
-        message: 'Resource uploaded successfully',
-        data: {
-          id:          result[0].id,
-          title:       title.trim(),
-          type:        resourceType,
-          url:         fileUrl,
-          topic_id:    topic_id    || null,
-          subtopic_id: subtopic_id || null,
-        },
+      const row = await safeInsert({
+        topicId: null, subtopicId: null,
+        uploadedBy: req.user.id, title, type, url: fileUrl,
+        description: null, isStaged: true,
+        fileSize: file.size, originalFilename: file.originalname,
+      });
+      results.push({
+        id:                row.id,
+        title,
+        type,
+        url:               fileUrl,
+        original_filename: file.originalname,
+        file_size:         file.size,
+        is_staged:         true,
       });
     } catch (err) {
-      fs.unlink(req.file.path, () => {});
-      console.error('[POST /resources/upload]', err.message);
-      return res.status(500).json({ success: false, error: 'Failed to save resource: ' + err.message });
+      fs.unlink(file.path, () => {});
+      failures.push({ filename: file.originalname, error: err.message });
     }
   }
-);
 
-// ── GET /api/resources ────────────────────────────────────────────────────────
+  return res.status(201).json({
+    success:  true,
+    uploaded: results.length,
+    failed:   failures.length,
+    message:  `${results.length} file(s) uploaded. ${failures.length > 0 ? failures.length + ' failed.' : ''} Assign metadata to make them visible to students.`,
+    files:    results,
+    failures,
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// PUT /api/resources/:id/assign-meta  — admin assigns exam type / subject / topic / subtopic
+// Also clears the is_staged flag so the resource becomes visible to students
+// ═════════════════════════════════════════════════════════════════════════════
+router.put('/:id/assign-meta', protect, adminOnly, async (req, res) => {
+  const id = parseInt(req.params.id);
+  const { title, topic_id, subtopic_id, description, exam_type_id, subject_id } = req.body;
+
+  if (!topic_id && !subject_id) {
+    return res.status(400).json({ success: false, error: 'At least a subject or topic must be assigned.' });
+  }
+
+  try {
+    // Resolve topic_id from subject_id if topic_id not given
+    // (store subject_id on the resource via a topic in that subject)
+    let resolvedTopicId = topic_id || null;
+
+    await sequelize.query(
+      `UPDATE resources SET
+         title       = COALESCE(NULLIF(:title, ''), title),
+         topic_id    = :topic_id,
+         subtopic_id = :subtopic_id,
+         description = COALESCE(:description, description),
+         is_staged   = false,
+         updated_at  = NOW()
+       WHERE id = :id`,
+      {
+        replacements: {
+          id,
+          title:       title || '',
+          topic_id:    resolvedTopicId,
+          subtopic_id: subtopic_id || null,
+          description: description || null,
+        },
+        type: QueryTypes.UPDATE,
+      }
+    ).catch(async () => {
+      // Fallback if is_staged column doesn't exist yet
+      await sequelize.query(
+        `UPDATE resources SET
+           title       = COALESCE(NULLIF(:title, ''), title),
+           topic_id    = :topic_id,
+           subtopic_id = :subtopic_id,
+           updated_at  = NOW()
+         WHERE id = :id`,
+        { replacements: { id, title: title || '', topic_id: resolvedTopicId, subtopic_id: subtopic_id || null }, type: QueryTypes.UPDATE }
+      );
+    });
+
+    return res.json({ success: true, message: 'Metadata assigned. Resource is now visible to students.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// PUT /api/resources/:id/assign-users  — admin assigns resource to specific students
+// Body: { user_ids: ['uuid1','uuid2'] }  OR  { assign_all: true }
+// ═════════════════════════════════════════════════════════════════════════════
+router.put('/:id/assign-users', protect, adminOnly, async (req, res) => {
+  const resourceId = parseInt(req.params.id);
+  const { user_ids, assign_all } = req.body;
+
+  try {
+    // Ensure assignment table exists
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS resource_user_assignments (
+        id          SERIAL      PRIMARY KEY,
+        resource_id INTEGER     NOT NULL REFERENCES resources(id) ON DELETE CASCADE,
+        user_id     UUID        NOT NULL REFERENCES users(id)     ON DELETE CASCADE,
+        assigned_by UUID        REFERENCES users(id) ON DELETE SET NULL,
+        assigned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE (resource_id, user_id)
+      )
+    `, { type: QueryTypes.RAW });
+
+    if (assign_all) {
+      // Assign to every active student
+      await sequelize.query(`
+        INSERT INTO resource_user_assignments (resource_id, user_id, assigned_by, assigned_at)
+        SELECT :resourceId, u.id, :assignedBy, NOW()
+        FROM users u
+        WHERE u.role = 'student' AND u.is_active = true
+        ON CONFLICT (resource_id, user_id) DO NOTHING
+      `, { replacements: { resourceId, assignedBy: req.user.id }, type: QueryTypes.INSERT });
+      return res.json({ success: true, message: 'Resource assigned to all active students.' });
+    }
+
+    if (!Array.isArray(user_ids) || user_ids.length === 0) {
+      return res.status(400).json({ success: false, error: 'user_ids array or assign_all:true is required.' });
+    }
+
+    // Assign to specific students
+    for (const userId of user_ids) {
+      await sequelize.query(`
+        INSERT INTO resource_user_assignments (resource_id, user_id, assigned_by, assigned_at)
+        VALUES (:resourceId, :userId, :assignedBy, NOW())
+        ON CONFLICT (resource_id, user_id) DO NOTHING
+      `, { replacements: { resourceId, userId, assignedBy: req.user.id }, type: QueryTypes.INSERT });
+    }
+    return res.json({ success: true, message: `Resource assigned to ${user_ids.length} student(s).` });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// GET /api/resources/staged  — admin: list files awaiting metadata assignment
+// ═════════════════════════════════════════════════════════════════════════════
+router.get('/staged', protect, adminOnly, async (req, res) => {
+  try {
+    const rows = await sequelize.query(
+      `SELECT r.id, r.title, r.type::text AS type, r.url, r.original_filename,
+              r.file_size_bytes, r.created_at,
+              u.first_name AS uploaded_by_first, u.last_name AS uploaded_by_last
+       FROM resources r
+       LEFT JOIN users u ON r.uploaded_by = u.id
+       WHERE r.is_active = true
+         AND (r.is_staged = true OR r.topic_id IS NULL)
+       ORDER BY r.created_at DESC`,
+      { type: QueryTypes.SELECT }
+    );
+    return res.json({ success: true, count: rows.length, data: rows });
+  } catch (err) {
+    // is_staged column may not exist — return all unassigned
+    try {
+      const rows = await sequelize.query(
+        `SELECT r.id, r.title, r.type::text AS type, r.url, r.created_at
+         FROM resources r
+         WHERE r.is_active = true AND r.topic_id IS NULL
+         ORDER BY r.created_at DESC`,
+        { type: QueryTypes.SELECT }
+      );
+      return res.json({ success: true, count: rows.length, data: rows });
+    } catch {
+      return res.json({ success: true, count: 0, data: [] });
+    }
+  }
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// GET /api/resources  — list
+// Teacher sees own; admin sees all; student sees what's assigned to them
+// ═════════════════════════════════════════════════════════════════════════════
 router.get('/', protect, async (req, res) => {
-  const { topic_id, subtopic_id, type } = req.query;
+  const { topic_id, subtopic_id, type, staged } = req.query;
   const filters      = ['r.is_active = true'];
   const replacements = {};
-  // FIX: was parseInt(topic_id) / parseInt(subtopic_id) — both are UUID foreign keys
+
   if (topic_id)    { filters.push('r.topic_id    = :topic_id');    replacements.topic_id    = topic_id;    }
   if (subtopic_id) { filters.push('r.subtopic_id = :subtopic_id'); replacements.subtopic_id = subtopic_id; }
-  if (type)        { filters.push('r.type        = :type');         replacements.type        = type;        }
+  if (type)        { filters.push("r.type::text  = :type");        replacements.type        = type;        }
+
+  if (req.user.role === 'teacher') {
+    filters.push('r.uploaded_by = :uid');
+    replacements.uid = req.user.id;
+  } else if (req.user.role === 'student') {
+    // Students see resources assigned to them + non-staged public resources
+    filters.push(`(
+      EXISTS (SELECT 1 FROM resource_user_assignments rua WHERE rua.resource_id = r.id AND rua.user_id = :uid)
+      OR (r.is_staged = false AND r.topic_id IS NOT NULL)
+    )`);
+    replacements.uid = req.user.id;
+  }
+  // admin sees all — no extra filter
 
   try {
     const rows = await sequelize.query(
-      `SELECT r.id, r.title, r.type::text AS type, r.url, r.description, r.is_premium,
-              r.topic_id, r.subtopic_id, r.created_at,
+      `SELECT r.id, r.title, r.type::text AS type, r.url, r.description,
+              r.topic_id, r.subtopic_id, r.file_size_bytes, r.original_filename,
+              r.created_at,
+              COALESCE(r.is_staged, r.topic_id IS NULL) AS is_staged,
               u.first_name AS uploaded_by_first, u.last_name AS uploaded_by_last,
-              t.name AS topic_name, st.name AS subtopic_name
+              t.name  AS topic_name,
+              s.name  AS subject_name,
+              st.name AS subtopic_name
        FROM resources r
-       LEFT JOIN users     u  ON r.uploaded_by  = u.id
-       LEFT JOIN topics    t  ON r.topic_id     = t.id
-       LEFT JOIN subtopics st ON r.subtopic_id  = st.id
+       LEFT JOIN users     u  ON r.uploaded_by = u.id
+       LEFT JOIN topics    t  ON r.topic_id    = t.id
+       LEFT JOIN subtopics st ON r.subtopic_id = st.id
+       LEFT JOIN subjects  s  ON s.id = t.subject_id
        WHERE ${filters.join(' AND ')}
        ORDER BY r.created_at DESC`,
       { replacements, type: QueryTypes.SELECT }
     );
     return res.json({ success: true, count: rows.length, data: rows });
   } catch (err) {
-    console.error('[GET /resources]', err.message);
-    // Return empty array instead of 500 so UI doesn't break
     return res.json({ success: true, count: 0, data: [], _error: err.message });
   }
 });
 
-// ── GET /api/resources/:id ────────────────────────────────────────────────────
-// resources.id is INTEGER — parseInt(req.params.id) is correct here
+// ═════════════════════════════════════════════════════════════════════════════
+// GET /api/resources/:id
+// ═════════════════════════════════════════════════════════════════════════════
 router.get('/:id', protect, async (req, res) => {
   try {
     const rows = await sequelize.query(
-      `SELECT r.*, u.first_name AS uploaded_by_first, u.last_name AS uploaded_by_last,
-              t.name AS topic_name, st.name AS subtopic_name
+      `SELECT r.*, r.type::text AS type,
+              u.first_name AS uploaded_by_first, u.last_name AS uploaded_by_last,
+              t.name  AS topic_name,
+              s.name  AS subject_name,
+              st.name AS subtopic_name
        FROM resources r
        LEFT JOIN users     u  ON r.uploaded_by = u.id
        LEFT JOIN topics    t  ON r.topic_id    = t.id
        LEFT JOIN subtopics st ON r.subtopic_id = st.id
+       LEFT JOIN subjects  s  ON s.id = t.subject_id
        WHERE r.id = :id AND r.is_active = true`,
       { replacements: { id: parseInt(req.params.id) }, type: QueryTypes.SELECT }
     );
@@ -8577,8 +8753,9 @@ router.get('/:id', protect, async (req, res) => {
   }
 });
 
-// ── DELETE /api/resources/:id ─────────────────────────────────────────────────
-// resources.id is INTEGER — parseInt(req.params.id) is correct here
+// ═════════════════════════════════════════════════════════════════════════════
+// DELETE /api/resources/:id
+// ═════════════════════════════════════════════════════════════════════════════
 router.delete('/:id', protect, authorize('teacher', 'admin'), async (req, res) => {
   try {
     const rows = await sequelize.query(
@@ -8587,8 +8764,8 @@ router.delete('/:id', protect, authorize('teacher', 'admin'), async (req, res) =
     );
     if (!rows.length) return res.status(404).json({ success: false, error: 'Resource not found' });
     const resource = rows[0];
-    if (req.user.role === 'teacher' && resource.uploaded_by !== req.user.id) {
-      return res.status(403).json({ success: false, error: 'You can only delete your own resources' });
+    if (req.user.role === 'teacher' && String(resource.uploaded_by) !== String(req.user.id)) {
+      return res.status(403).json({ success: false, error: 'You can only delete your own resources.' });
     }
     await sequelize.query(
       `UPDATE resources SET is_active = false WHERE id = :id`,
@@ -8596,7 +8773,7 @@ router.delete('/:id', protect, authorize('teacher', 'admin'), async (req, res) =
     );
     const filePath = path.join(__dirname, '..', (resource.url || '').replace(/^\//, ''));
     fs.unlink(filePath, () => {});
-    return res.json({ success: true, message: 'Resource deleted' });
+    return res.json({ success: true, message: 'Resource deleted.' });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
@@ -8606,7 +8783,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (64/178): server\routes\studentRoutes.js
+FILE (64/180): server\routes\studentRoutes.js
 SIZE: 13036 bytes
 ================================================================================
 'use strict';
@@ -8899,7 +9076,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (65/178): server\routes\studyPlannerRoute.js
+FILE (65/180): server\routes\studyPlannerRoute.js
 SIZE: 14772 bytes
 ================================================================================
 // server/routes/studyPlannerRoute.js
@@ -9297,7 +9474,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (66/178): server\routes\subjects.js
+FILE (66/180): server\routes\subjects.js
 SIZE: 390 bytes
 ================================================================================
 const express = require('express');
@@ -9313,7 +9490,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (67/178): server\routes\subtopicRoutes.js
+FILE (67/180): server\routes\subtopicRoutes.js
 SIZE: 22456 bytes
 ================================================================================
 // server/routes/subtopicRoutes.js
@@ -9792,7 +9969,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (68/178): server\routes\teacherRoutes.js
+FILE (68/180): server\routes\teacherRoutes.js
 SIZE: 19048 bytes
 ================================================================================
 'use strict';
@@ -10138,7 +10315,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (69/178): server\routes\testRoutes.js
+FILE (69/180): server\routes\testRoutes.js
 SIZE: 1533 bytes
 ================================================================================
 // server/routes/testRoutes.js
@@ -10167,7 +10344,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (70/178): server\routes\topicsRoutes.js
+FILE (70/180): server\routes\topicsRoutes.js
 SIZE: 5185 bytes
 ================================================================================
 // server/routes/topicsRoutes.js
@@ -10284,7 +10461,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (71/178): server\routes\users.js
+FILE (71/180): server\routes\users.js
 SIZE: 16656 bytes
 ================================================================================
 // server/routes/users.js
@@ -10638,7 +10815,7 @@ router.delete('/:id', protect, authorize('admin'), async (req, res) => {
 module.exports = router;
 
 ================================================================================
-FILE (72/178): server\routes\videosRoutes.js
+FILE (72/180): server\routes\videosRoutes.js
 SIZE: 23802 bytes
 ================================================================================
 // server/routes/videosRoutes.js
@@ -11170,7 +11347,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (73/178): server\server.js
+FILE (73/180): server\server.js
 SIZE: 13001 bytes
 ================================================================================
 'use strict';
@@ -11457,7 +11634,7 @@ try {
 
 
 ================================================================================
-FILE (74/178): server\services\ai.js
+FILE (74/180): server\services\ai.js
 SIZE: 10779 bytes
 ================================================================================
 'use strict';
@@ -11709,7 +11886,7 @@ module.exports = { generate };
 
 
 ================================================================================
-FILE (75/178): server\services\aiOrchestrator.js
+FILE (75/180): server\services\aiOrchestrator.js
 SIZE: 6278 bytes
 ================================================================================
 'use strict';
@@ -11937,7 +12114,7 @@ module.exports = {
 
 
 ================================================================================
-FILE (76/178): server\services\aiQuestionGenerator.js
+FILE (76/180): server\services\aiQuestionGenerator.js
 SIZE: 8256 bytes
 ================================================================================
 // server/services/aiQuestionGenerator.js
@@ -12172,7 +12349,7 @@ module.exports = { generateAIQuestion };
 
 
 ================================================================================
-FILE (77/178): server\services\aiService.js
+FILE (77/180): server\services\aiService.js
 SIZE: 14338 bytes
 ================================================================================
 'use strict';
@@ -12484,7 +12661,7 @@ module.exports = {
 
 
 ================================================================================
-FILE (78/178): server\services\difficultyService.js
+FILE (78/180): server\services\difficultyService.js
 SIZE: 593 bytes
 ================================================================================
 const db = require('../config/db');
@@ -12509,7 +12686,7 @@ async function getStudentDifficultyLevel(studentId, subtopicId) {
 module.exports = { getStudentDifficultyLevel };
 
 ================================================================================
-FILE (79/178): server\services\eacbuddyPersonality.js
+FILE (79/180): server\services\eacbuddyPersonality.js
 SIZE: 15054 bytes
 ================================================================================
 // server/services/AISchoolonairPersonality.js
@@ -12929,7 +13106,7 @@ module.exports = {
 
 
 ================================================================================
-FILE (80/178): server\services\emailService.js
+FILE (80/180): server\services\emailService.js
 SIZE: 12920 bytes
 ================================================================================
 // server/services/emailService.js
@@ -13213,7 +13390,7 @@ module.exports = {
 
 
 ================================================================================
-FILE (81/178): server\services\explanationEnhancer.js
+FILE (81/180): server\services\explanationEnhancer.js
 SIZE: 16205 bytes
 ================================================================================
 // server/services/explanationEnhancer.js
@@ -13614,7 +13791,7 @@ module.exports = { enhanceExplanation };
 
 
 ================================================================================
-FILE (82/178): server\services\memoryService.js
+FILE (82/180): server\services\memoryService.js
 SIZE: 21582 bytes
 ================================================================================
 // server/services/memoryService.js
@@ -14141,7 +14318,7 @@ function formatMemoryContext({ profile, weakTopics, memories }) {
 ...TRUNCATED...
 
 ================================================================================
-FILE (83/178): server\services\questionService.js
+FILE (83/180): server\services\questionService.js
 SIZE: 1603 bytes
 ================================================================================
 const db = require('../config/database');
@@ -14209,7 +14386,7 @@ module.exports = {
 };
 
 ================================================================================
-FILE (84/178): server\services\quizGenerator.js
+FILE (84/180): server\services\quizGenerator.js
 SIZE: 18414 bytes
 ================================================================================
 // server/services/quizGenerator.js
@@ -14658,7 +14835,7 @@ module.exports = { generateQuizByTopic, buildQuizPayload };
 
 
 ================================================================================
-FILE (85/178): server\services\quizService.js
+FILE (85/180): server\services\quizService.js
 SIZE: 2426 bytes
 ================================================================================
 'use strict';
@@ -14760,7 +14937,7 @@ module.exports = {
 
 
 ================================================================================
-FILE (86/178): server\services\remediationService.js
+FILE (86/180): server\services\remediationService.js
 SIZE: 8095 bytes
 ================================================================================
 'use strict';
@@ -14997,7 +15174,7 @@ module.exports = {
 
 
 ================================================================================
-FILE (87/178): server\services\userMemory.js
+FILE (87/180): server\services\userMemory.js
 SIZE: 10175 bytes
 ================================================================================
 // server/services/userMemory.js
@@ -15245,7 +15422,7 @@ module.exports = { fetchUserMemory, formatMemoryBlock };
 
 
 ================================================================================
-FILE (88/178): server\services\weakConceptService.js
+FILE (88/180): server\services\weakConceptService.js
 SIZE: 2671 bytes
 ================================================================================
 // server/services/weakConceptService.js
@@ -15337,7 +15514,7 @@ module.exports = {
 
 
 ================================================================================
-FILE (89/178): server\services\weaknessService.js
+FILE (89/180): server\services\weaknessService.js
 SIZE: 3590 bytes
 ================================================================================
 'use strict';
@@ -15470,7 +15647,7 @@ module.exports = {
 };
 
 ================================================================================
-FILE (90/178): server\tests\pipeline.test.js
+FILE (90/180): server\tests\pipeline.test.js
 SIZE: 28497 bytes
 ================================================================================
 // tests/pipeline.test.js
@@ -16030,7 +16207,7 @@ describe('Test 6: Update mastery', () => {
 ...TRUNCATED...
 
 ================================================================================
-FILE (91/178): server\tools\_toolHelpers.js
+FILE (91/180): server\tools\_toolHelpers.js
 SIZE: 1988 bytes
 ================================================================================
 // server/tools/_toolHelpers.js
@@ -16094,7 +16271,7 @@ global.toolError = function toolError(toolName, message, originalError = null, s
 
 
 ================================================================================
-FILE (92/178): server\tools\analyticsTools.js
+FILE (92/180): server\tools\analyticsTools.js
 SIZE: 10794 bytes
 ================================================================================
 // server/tools/analyticsTools.js
@@ -16361,7 +16538,7 @@ module.exports = { getPerformance, predictGrade, getLeaderboard };
 
 
 ================================================================================
-FILE (93/178): server\tools\courseTools.js
+FILE (93/180): server\tools\courseTools.js
 SIZE: 4529 bytes
 ================================================================================
 // server/tools/courseTools.js
@@ -16484,7 +16661,7 @@ module.exports = { getCourses, getEnrollmentProgress };
 
 
 ================================================================================
-FILE (94/178): server\tools\explanationTools.js
+FILE (94/180): server\tools\explanationTools.js
 SIZE: 7892 bytes
 ================================================================================
 // server/tools/explanationTools.js
@@ -16716,7 +16893,7 @@ module.exports = { explainConcept, getHint };
 
 
 ================================================================================
-FILE (95/178): server\tools\importConcepts.js
+FILE (95/180): server\tools\importConcepts.js
 SIZE: 14798 bytes
 ================================================================================
 #!/usr/bin/env node
@@ -17078,7 +17255,7 @@ module.exports = { importConcepts }; // export for programmatic use / tests
 
 
 ================================================================================
-FILE (96/178): server\tools\index.js
+FILE (96/180): server\tools\index.js
 SIZE: 2650 bytes
 ================================================================================
 // server/tools/index.js
@@ -17139,7 +17316,7 @@ module.exports = TOOLS;
 
 
 ================================================================================
-FILE (97/178): server\tools\quizTools.js
+FILE (97/180): server\tools\quizTools.js
 SIZE: 5042 bytes
 ================================================================================
 // server/tools/quizTools.js
@@ -17284,7 +17461,7 @@ module.exports = { startQuiz, getQuizHistory };
 
 
 ================================================================================
-FILE (98/178): server\tools\testTools.js
+FILE (98/180): server\tools\testTools.js
 SIZE: 9845 bytes
 ================================================================================
 // server/tools/testTools.js
@@ -17571,7 +17748,7 @@ module.exports = { generateTest, getStudentTests, getTestDetails };
 
 
 ================================================================================
-FILE (99/178): server\tools\weaknessTools.js
+FILE (99/180): server\tools\weaknessTools.js
 SIZE: 2116 bytes
 ================================================================================
 'use strict';
@@ -17642,7 +17819,7 @@ module.exports = { getWeaknessProfile };
 
 
 ================================================================================
-FILE (100/178): server\utils\jwt.js
+FILE (100/180): server\utils\jwt.js
 SIZE: 876 bytes
 ================================================================================
 'use strict';
@@ -17682,7 +17859,7 @@ module.exports = { generateToken, verifyToken, extractToken };
 
 
 ================================================================================
-FILE (101/178): server\utils\questionImporter.js
+FILE (101/180): server\utils\questionImporter.js
 SIZE: 14368 bytes
 ================================================================================
 // server/utils/questionImporter.js
@@ -18044,7 +18221,7 @@ module.exports = { parseJSON, parseCSV, batchInsert, validateQuestion };
 
 
 ================================================================================
-FILE (102/178): server\utils\videoEncryption.js
+FILE (102/180): server\utils\videoEncryption.js
 SIZE: 10724 bytes
 ================================================================================
 // server/utils/videoEncryption.js
@@ -18248,7 +18425,7 @@ module.exports = {
 
 
 ================================================================================
-FILE (103/178): server\validators\aiQuestionSchema.js
+FILE (103/180): server\validators\aiQuestionSchema.js
 SIZE: 790 bytes
 ================================================================================
 const Ajv = require('ajv');
@@ -18290,7 +18467,7 @@ module.exports = (data) => {
 };
 
 ================================================================================
-FILE (104/178): server\workers\aiWorker.js
+FILE (104/180): server\workers\aiWorker.js
 SIZE: 7138 bytes
 ================================================================================
 'use strict';
@@ -18490,7 +18667,7 @@ SECTION: FRONTEND
 ================================================================================
 
 ================================================================================
-FILE (105/178): client\index.html
+FILE (105/180): client\index.html
 SIZE: 642 bytes
 ================================================================================
 <!doctype html>
@@ -18512,7 +18689,7 @@ SIZE: 642 bytes
 
 
 ================================================================================
-FILE (106/178): client\package.json
+FILE (106/180): client\package.json
 SIZE: 682 bytes
 ================================================================================
 {
@@ -18547,7 +18724,7 @@ SIZE: 682 bytes
 
 
 ================================================================================
-FILE (107/178): client\postcss.config.js
+FILE (107/180): client\postcss.config.js
 SIZE: 86 bytes
 ================================================================================
 export default {
@@ -18559,7 +18736,7 @@ export default {
 
 
 ================================================================================
-FILE (108/178): client\src\App.jsx
+FILE (108/180): client\src\App.jsx
 SIZE: 10941 bytes
 ================================================================================
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
@@ -18733,7 +18910,464 @@ export default App;
 
 
 ================================================================================
-FILE (109/178): client\src\components\AIChatWidget.jsx
+FILE (109/180): client\src\components\AdminBulkUploadPanel.jsx
+SIZE: 28249 bytes
+================================================================================
+// client/src/components/AdminBulkUploadPanel.jsx
+// Admin-only bulk file uploader.
+//
+// WORKFLOW:
+//   Stage 1 — DROP / SELECT up to 20 files  →  upload all at once
+//   Stage 2 — Staged files list              →  assign Exam Type → Subject → Topic → Subtopic per file
+//   Stage 3 — (optional) assign to students  →  specific students OR all students
+//
+// API calls:
+//   POST /api/resources/bulk-upload
+//   GET  /api/resources/staged
+//   PUT  /api/resources/:id/assign-meta
+//   PUT  /api/resources/:id/assign-users
+//   GET  /api/catalog/types
+//   GET  /api/catalog/types/:id/subjects
+//   GET  /api/teacher/topics?subject_id=
+//   GET  /api/teacher/subtopics?topic_id=
+//   GET  /api/users?role=student
+
+import { useState, useEffect, useRef, useCallback } from 'react';
+import api from '../services/api';
+import {
+  Upload, FileText, Video, Music, Image, File,
+  CheckCircle, AlertTriangle, X, Loader2,
+  ChevronDown, Users, Tag, RefreshCw, Inbox,
+} from 'lucide-react';
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const extract = (r) => (Array.isArray(r) ? r : Array.isArray(r?.data) ? r.data : []);
+const fmtSize = (b) => (!b ? '' : b < 1048576 ? `${Math.round(b / 1024)} KB` : `${(b / 1048576).toFixed(1)} MB`);
+
+function FileIcon({ type, size = 16 }) {
+  if (type === 'video') return <Video   size={size} className="text-blue-500"   />;
+  if (type === 'pdf')   return <FileText size={size} className="text-red-500"    />;
+  if (type === 'image') return <Image   size={size} className="text-green-500"  />;
+  if (type === 'audio') return <Music   size={size} className="text-purple-500" />;
+  return <File size={size} className="text-amber-500" />;
+}
+
+function StatusBadge({ staged }) {
+  return staged
+    ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Unassigned</span>
+    : <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">Assigned</span>;
+}
+
+// ── Cascade dropdowns hook ────────────────────────────────────────────────────
+function useMeta() {
+  const [examTypes,  setExamTypes]  = useState([]);
+  const [subjects,   setSubjects]   = useState([]);
+  const [topics,     setTopics]     = useState([]);
+  const [subtopics,  setSubtopics]  = useState([]);
+
+  useEffect(() => {
+    api.get('/catalog/types').then(r => setExamTypes(extract(r))).catch(() => {});
+  }, []);
+
+  const loadSubjects = useCallback((typeId) => {
+    setSubjects([]); setTopics([]); setSubtopics([]);
+    if (!typeId) return;
+    api.get(`/catalog/types/${typeId}/subjects`).then(r => setSubjects(extract(r))).catch(() => {});
+  }, []);
+
+  const loadTopics = useCallback((subjectId) => {
+    setTopics([]); setSubtopics([]);
+    if (!subjectId) return;
+    api.get('/teacher/topics', { params: { subject_id: String(subjectId) } })
+      .then(r => setTopics(extract(r))).catch(() => {});
+  }, []);
+
+  const loadSubtopics = useCallback((topicId) => {
+    setSubtopics([]);
+    if (!topicId) return;
+    api.get('/teacher/subtopics', { params: { topic_id: String(topicId) } })
+      .then(r => setSubtopics(extract(r))).catch(() => {});
+  }, []);
+
+  return { examTypes, subjects, topics, subtopics, loadSubjects, loadTopics, loadSubtopics };
+}
+
+// ── Per-file metadata form ────────────────────────────────────────────────────
+function MetaForm({ file, onSave, onDismiss }) {
+  const [form, setForm] = useState({
+    title:      file.title || '',
+    examTypeId: '',
+    subjectId:  '',
+    topicId:    '',
+    subtopicId: '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [msg,    setMsg]    = useState('');
+  const { examTypes, subjects, topics, subtopics, loadSubjects, loadTopics, loadSubtopics } = useMeta();
+
+  const set = (field, val) => {
+    setForm(f => {
+      const next = { ...f, [field]: val };
+      if (field === 'examTypeId') { next.subjectId = ''; next.topicId = ''; next.subtopicId = ''; loadSubjects(val); }
+      if (field === 'subjectId')  { next.topicId = ''; next.subtopicId = ''; loadTopics(val); }
+      if (field === 'topicId')    { next.subtopicId = ''; loadSubtopics(val); }
+      return next;
+    });
+  };
+
+  const handleSave = async () => {
+    if (!form.subjectId && !form.topicId) { setMsg('Please select at least a subject or topic.'); return; }
+    setSaving(true); setMsg('');
+    try {
+      await api.put(`/resources/${file.id}/assign-meta`, {
+        title:      form.title.trim() || file.title,
+        topic_id:   form.topicId   || null,
+        subtopic_id:form.subtopicId || null,
+        subject_id: form.subjectId  || null,
+      });
+      onSave(file.id);
+    } catch (err) {
+      setMsg(err?.error || 'Save failed.');
+      setSaving(false);
+    }
+  };
+
+  const sel = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-teal-300 disabled:bg-gray-50 disabled:text-gray-400';
+
+  return (
+    <div className="border-t border-gray-100 bg-gray-50 px-4 py-4 space-y-3">
+      <p className="text-xs font-semibold text-gray-600">Assign metadata to this file</p>
+
+      {/* Title */}
+      <input value={form.title} onChange={e => set('title', e.target.value)}
+        placeholder="Title (leave blank to keep filename)"
+        className={sel} />
+
+      {/* Exam Type */}
+      <select value={form.examTypeId} onChange={e => set('examTypeId', e.target.value)} className={sel}>
+        <option value="">Select Exam Type (optional)…</option>
+        {examTypes.map(t => <option key={t.id} value={t.id}>{t.name || t.code}</option>)}
+      </select>
+
+      {/* Subject */}
+      <select value={form.subjectId} onChange={e => set('subjectId', e.target.value)}
+        disabled={!form.examTypeId} className={sel}>
+        <option value="">Select Subject…</option>
+        {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+      </select>
+
+      {/* Topic */}
+      <select value={form.topicId} onChange={e => set('topicId', e.target.value)}
+        disabled={!form.subjectId || topics.length === 0} className={sel}>
+        <option value="">Select Topic (optional)…</option>
+        {topics.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+      </select>
+
+      {/* Subtopic */}
+      <select value={form.subtopicId} onChange={e => set('subtopicId', e.target.value)}
+        disabled={!form.topicId || subtopics.length === 0} className={sel}>
+        <option value="">Select Subtopic (optional)…</option>
+        {subtopics.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+      </select>
+
+      {msg && <p className="text-xs text-red-600">{msg}</p>}
+
+      <div className="flex gap-2">
+        <button onClick={handleSave} disabled={saving}
+          className="flex-1 bg-teal-500 hover:bg-teal-600 disabled:opacity-50 text-white text-xs font-semibold py-2 rounded-lg flex items-center justify-center gap-1.5">
+          {saving ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />}
+          Save & Publish
+        </button>
+        <button onClick={onDismiss} disabled={saving}
+          className="px-3 py-2 border border-gray-200 text-gray-500 text-xs rounded-lg hover:bg-gray-100">
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Per-file assign-users form ────────────────────────────────────────────────
+function AssignUsersForm({ file, onDone, onDismiss }) {
+  const [students,   setStudents]   = useState([]);
+  const [selected,   setSelected]   = useState([]);
+  const [assignAll,  setAssignAll]  = useState(false);
+  const [search,     setSearch]     = useState('');
+  const [saving,     setSaving]     = useState(false);
+  const [msg,        setMsg]        = useState('');
+
+  useEffect(() => {
+    api.get('/users', { params: { role: 'student' } })
+      .then(r => setStudents(extract(r)))
+      .catch(() => {});
+  }, []);
+
+  const filtered = students.filter(s =>
+    `${s.first_name} ${s.last_name} ${s.email}`.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const toggle = (id) => setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+
+  const handleAssign = async () => {
+    if (!assignAll && selected.length === 0) { setMsg('Select at least one student or choose "All students".'); return; }
+    setSaving(true); setMsg('');
+    try {
+      await api.put(`/resources/${file.id}/assign-users`,
+        assignAll ? { assign_all: true } : { user_ids: selected }
+      );
+      onDone(file.id);
+    } catch (err) {
+      setMsg(err?.error || 'Assignment failed.');
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="border-t border-gray-100 bg-blue-50 px-4 py-4 space-y-3">
+      <p className="text-xs font-semibold text-gray-700">Assign to students</p>
+
+      {/* All students toggle */}
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input type="checkbox" checked={assignAll} onChange={e => setAssignAll(e.target.checked)}
+          className="rounded text-teal-500" />
+        <span className="text-xs text-gray-700 font-medium">All active students ({students.length})</span>
+      </label>
+
+      {!assignAll && (
+        <>
+          <input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Search student by name or email…"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-300" />
+          <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg bg-white">
+            {filtered.length === 0
+              ? <p className="text-xs text-gray-400 text-center py-4">No students found.</p>
+              : filtered.map(s => (
+                <label key={s.id} className="flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0">
+                  <input type="checkbox" checked={selected.includes(s.id)} onChange={() => toggle(s.id)}
+                    className="rounded text-blue-500" />
+                  <span className="text-xs text-gray-800">{s.first_name} {s.last_name}</span>
+                  <span className="text-xs text-gray-400 ml-auto truncate max-w-[120px]">{s.email}</span>
+                </label>
+              ))}
+          </div>
+          {selected.length > 0 && (
+            <p className="text-xs text-blue-600 font-medium">{selected.length} student(s) selected</p>
+          )}
+        </>
+      )}
+
+      {msg && <p className="text-xs text-red-600">{msg}</p>}
+
+      <div className="flex gap-2">
+        <button onClick={handleAssign} disabled={saving}
+          className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-semibold py-2 rounded-lg flex items-center justify-center gap-1.5">
+          {saving ? <Loader2 size={12} className="animate-spin" /> : <Users size={12} />}
+          Assign to Students
+        </button>
+        <button onClick={onDismiss} className="px-3 py-2 border border-gray-200 text-gray-500 text-xs rounded-lg hover:bg-gray-100">
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MAIN PANEL
+// ══════════════════════════════════════════════════════════════════════════════
+export default function AdminBulkUploadPanel() {
+  // ── Dropzone state ───────────────────────────────────────────────────────────
+  const [pendingFiles, setPendingFiles] = useState([]);   // FileList objects not yet uploaded
+  const [dragOver,     setDragOver]     = useState(false);
+  const [uploading,    setUploading]    = useState(false);
+  const [uploadProg,   setUploadProg]   = useState(0);    // overall %
+  const fileInputRef = useRef(null);
+
+  // ── Staged files (uploaded, awaiting metadata) ───────────────────────────────
+  const [staged,       setStaged]       = useState([]);
+  const [loadingStaged,setLoadingStaged]= useState(true);
+
+  // ── Active actions per file ──────────────────────────────────────────────────
+  const [assigningMeta,  setAssigningMeta]  = useState(null); // file id
+  const [assigningUsers, setAssigningUsers] = useState(null); // file id
+
+  // ── Upload result ────────────────────────────────────────────────────────────
+  const [result, setResult] = useState(null); // { uploaded, failed, message, failures }
+
+  // ── Load staged files on mount ───────────────────────────────────────────────
+  const loadStaged = useCallback(() => {
+    setLoadingStaged(true);
+    api.get('/resources/staged')
+      .then(r => setStaged(extract(r)))
+      .catch(() => setStaged([]))
+      .finally(() => setLoadingStaged(false));
+  }, []);
+  useEffect(loadStaged, [loadStaged]);
+
+  // ── File selection ────────────────────────────────────────────────────────────
+  const handleFiles = (files) => {
+    if (!files || files.length === 0) return;
+    const arr = Array.from(files).slice(0, 20);
+    setPendingFiles(arr);
+    setResult(null);
+  };
+
+  const removePending = (idx) => setPendingFiles(prev => prev.filter((_, i) => i !== idx));
+
+  // ── Upload ────────────────────────────────────────────────────────────────────
+  const handleUpload = async () => {
+    if (pendingFiles.length === 0) return;
+    setUploading(true); setUploadProg(0); setResult(null);
+
+    const fd = new FormData();
+    pendingFiles.forEach(f => fd.append('files', f));
+
+    try {
+      const rawBase = import.meta.env.VITE_API_URL || '';
+      const apiBase = rawBase.endsWith('/api') ? rawBase : (rawBase ? `${rawBase}/api` : '/api');
+      const token   = localStorage.getItem('token') || '';
+
+      const res = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${apiBase}/resources/bulk-upload`);
+        if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        xhr.upload.onprogress = e => { if (e.lengthComputable) setUploadProg(Math.round(e.loaded / e.total * 100)); };
+        xhr.onload = () => {
+          try {
+            const r = JSON.parse(xhr.responseText);
+            if (xhr.status >= 200 && xhr.status < 300) resolve(r);
+            else reject(new Error(r.error || `Server error ${xhr.status}`));
+          } catch { reject(new Error(`Server error ${xhr.status}`)); }
+        };
+        xhr.onerror = () => reject(new Error('Network error.'));
+        xhr.send(fd);
+      });
+
+      setResult(res);
+      setPendingFiles([]);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      loadStaged(); // refresh staged list
+    } catch (err) {
+      setResult({ success: false, message: err.message, uploaded: 0, failed: pendingFiles.length });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // ── After metadata saved ──────────────────────────────────────────────────────
+  const handleMetaSaved = (fileId) => {
+    setAssigningMeta(null);
+    setStaged(prev => prev.filter(f => f.id !== fileId));
+    // Optionally move to "assigned" list — for now just remove from staged
+  };
+
+  // ── After users assigned ──────────────────────────────────────────────────────
+  const handleUsersDone = (fileId) => {
+    setAssigningUsers(null);
+    // File is still staged until metadata is also set — just close the form
+  };
+
+  // ── MIME guesser from filename extension ─────────────────────────────────────
+  const guessType = (file) => {
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (['mp4','webm','mov'].includes(ext)) return 'video';
+    if (['mp3','wav','m4a'].includes(ext)) return 'audio';
+    if (ext === 'pdf') return 'pdf';
+    if (['jpg','jpeg','png','gif','webp'].includes(ext)) return 'image';
+    return 'other';
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  return (
+    <div className="space-y-6">
+
+      {/* ── Section header ── */}
+      <div>
+        <h2 className="text-xl font-bold text-gray-900">Bulk File Upload</h2>
+        <p className="text-sm text-gray-500 mt-1">
+          Upload up to 20 files at once. Files are saved immediately and held in a staging area.
+          Assign each file an Exam Type, Subject and Topic to make it visible to students.
+        </p>
+      </div>
+
+      {/* ══ STAGE 1: Drop Zone ══════════════════════════════════════════════════ */}
+      <div
+        onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={e => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
+        onClick={() => !pendingFiles.length && fileInputRef.current?.click()}
+        className={`border-2 border-dashed rounded-2xl p-10 text-center transition-colors
+          ${dragOver ? 'border-teal-400 bg-teal-50' : 'border-gray-200 hover:border-teal-300 hover:bg-gray-50'}
+          ${pendingFiles.length ? 'cursor-default' : 'cursor-pointer'}`}
+      >
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          accept=".mp4,.webm,.mov,.mp3,.wav,.m4a,.pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.webp"
+          onChange={e => handleFiles(e.target.files)}
+        />
+        {pendingFiles.length === 0 ? (
+          <>
+            <Upload size={32} className="mx-auto mb-3 text-gray-300" />
+            <p className="text-sm font-semibold text-gray-600">Drop up to 20 files here, or click to browse</p>
+            <p className="text-xs text-gray-400 mt-1">PDF, DOCX, PPTX, MP4, MP3, Images · 500 MB max per file</p>
+          </>
+        ) : (
+          <div className="space-y-2 text-left">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-semibold text-gray-700">{pendingFiles.length} file(s) ready to upload</p>
+              <button onClick={e => { e.stopPropagation(); fileInputRef.current?.click(); }}
+                className="text-xs text-teal-600 hover:text-teal-800 font-medium">+ Add more</button>
+            </div>
+            {pendingFiles.map((f, i) => (
+              <div key={i} className="flex items-center gap-3 bg-white border border-gray-100 rounded-xl px-3 py-2">
+                <FileIcon type={guessType(f)} size={16} />
+                <span className="text-xs text-gray-700 flex-1 truncate">{f.name}</span>
+                <span className="text-xs text-gray-400 shrink-0">{fmtSize(f.size)}</span>
+                <button onClick={e => { e.stopPropagation(); removePending(i); }}
+                  className="text-gray-300 hover:text-red-500 shrink-0"><X size={13} /></button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Upload progress */}
+      {uploading && (
+        <div>
+          <div className="flex justify-between text-xs text-gray-500 mb-1">
+            <span>Uploading {pendingFiles.length} file(s)…</span>
+            <span>{uploadProg}%</span>
+          </div>
+          <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+            <div className="h-full bg-teal-500 rounded-full transition-all duration-200" style={{ width: `${uploadProg}%` }} />
+          </div>
+        </div>
+      )}
+
+      {/* Upload button */}
+      {pendingFiles.length > 0 && (
+        <button onClick={handleUpload} disabled={uploading}
+          className="w-full bg-teal-500 hover:bg-teal-600 disabled:opacity-50 text-white font-semibold
+            py-3 rounded-xl text-sm flex items-center justify-center gap-2 transition-colors">
+          {uploading
+            ? <><Loader2 size={15} className="animate-spin" /> Uploading {uploadProg}%…</>
+            : <><Upload size={15} /> Upload {pendingFiles.length} File{pendingFiles.length > 1 ? 's' : ''}</>}
+        </button>
+      )}
+
+      {/* Upload result banner */}
+      {result && (
+        <div className={`flex items-start gap-3 px-4 py-3 rounded-xl text-sm
+          ${result.uploaded > 0 ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+          {result.uploaded > 0
+            ? <CheckCircle size={16} className="tex
+...TRUNCATED...
+
+================================================================================
+FILE (110/180): client\src\components\AIChatWidget.jsx
 SIZE: 9925 bytes
 ================================================================================
 // client/src/components/AIChatWidget.jsx
@@ -18976,7 +19610,7 @@ export default function AIChatWidget({
 
 
 ================================================================================
-FILE (110/178): client\src\components\ConceptList.jsx
+FILE (111/180): client\src\components\ConceptList.jsx
 SIZE: 11844 bytes
 ================================================================================
 // client/src/components/ConceptList.jsx
@@ -19249,7 +19883,7 @@ export default function ConceptList({ subtopic, showToast }) {
 
 
 ================================================================================
-FILE (111/178): client\src\components\ExamBoardSelector.jsx
+FILE (112/180): client\src\components\ExamBoardSelector.jsx
 SIZE: 3341 bytes
 ================================================================================
 /**
@@ -19349,7 +19983,7 @@ export default ExamBoardSelector;
 
 
 ================================================================================
-FILE (112/178): client\src\components\ExamTypeSelector.jsx
+FILE (113/180): client\src\components\ExamTypeSelector.jsx
 SIZE: 4453 bytes
 ================================================================================
 // client/src/components/ExamTypeSelector.jsx
@@ -19471,7 +20105,7 @@ export default ExamTypeSelector;
 
 
 ================================================================================
-FILE (113/178): client\src\components\GamificationBar.jsx
+FILE (114/180): client\src\components\GamificationBar.jsx
 SIZE: 3992 bytes
 ================================================================================
 // Drop this anywhere in StudentDashboard.jsx:
@@ -19578,7 +20212,7 @@ export default function GamificationBar() {
 
 
 ================================================================================
-FILE (114/178): client\src\components\PrivateRoute.jsx
+FILE (115/180): client\src\components\PrivateRoute.jsx
 SIZE: 917 bytes
 ================================================================================
 import { Navigate } from 'react-router-dom';
@@ -19616,7 +20250,7 @@ export default PrivateRoute;
 
 
 ================================================================================
-FILE (115/178): client\src\components\PublicNav.jsx
+FILE (116/180): client\src\components\PublicNav.jsx
 SIZE: 1970 bytes
 ================================================================================
 // client/src/components/PublicNav.jsx
@@ -19689,7 +20323,7 @@ export default function PublicNav({
 
 
 ================================================================================
-FILE (116/178): client\src\components\QuizTab.jsx
+FILE (117/180): client\src\components\QuizTab.jsx
 SIZE: 38876 bytes
 ================================================================================
 // client/src/components/QuizTab.jsx
@@ -20197,7 +20831,7 @@ function InProgressScreen({ subtopicId, subtopic, selectedPaper, onFinish, navig
 ...TRUNCATED...
 
 ================================================================================
-FILE (117/178): client\src\components\SubjectCard.jsx
+FILE (118/180): client\src\components\SubjectCard.jsx
 SIZE: 6190 bytes
 ================================================================================
 import React from 'react';
@@ -20373,7 +21007,7 @@ export default SubjectCard;
 
 
 ================================================================================
-FILE (118/178): client\src\components\TopicsModal.jsx
+FILE (119/180): client\src\components\TopicsModal.jsx
 SIZE: 5322 bytes
 ================================================================================
 // client/src/components/TopicsModal.jsx
@@ -20496,7 +21130,7 @@ export default function TopicsModal({ subjectId, mode, onClose }) {
 
 
 ================================================================================
-FILE (119/178): client\src\components\TopNav.jsx
+FILE (120/180): client\src\components\TopNav.jsx
 SIZE: 8268 bytes
 ================================================================================
 // client/src/components/TopNav.jsx
@@ -20698,7 +21332,7 @@ export default function TopNav() {
 
 
 ================================================================================
-FILE (120/178): client\src\components\VideoPlayer.jsx
+FILE (121/180): client\src\components\VideoPlayer.jsx
 SIZE: 21061 bytes
 ================================================================================
 // client/src/components/VideoPlayer.jsx
@@ -21248,7 +21882,7 @@ export default function VideoPlayer({ videoId, onComplete }) {
 
 
 ================================================================================
-FILE (121/178): client\src\components\WhatsAppButton.jsx
+FILE (122/180): client\src\components\WhatsAppButton.jsx
 SIZE: 2665 bytes
 ================================================================================
 // WhatsAppButton.jsx
@@ -21309,7 +21943,7 @@ export default WhatsAppButton;
 
 
 ================================================================================
-FILE (122/178): client\src\config\branding.js
+FILE (123/180): client\src\config\branding.js
 SIZE: 1199 bytes
 ================================================================================
 // EAC Platform Branding Configuration
@@ -21366,7 +22000,7 @@ export default branding;
 
 
 ================================================================================
-FILE (123/178): client\src\context\AuthContext.jsx
+FILE (124/180): client\src\context\AuthContext.jsx
 SIZE: 7488 bytes
 ================================================================================
 // client/src/context/AuthContext.jsx
@@ -21568,7 +22202,7 @@ export default AuthContext;
 
 
 ================================================================================
-FILE (124/178): client\src\hooks\useCatalog.js
+FILE (125/180): client\src\hooks\useCatalog.js
 SIZE: 6153 bytes
 ================================================================================
 /**
@@ -21723,7 +22357,7 @@ export function useCatalog() {
 
 
 ================================================================================
-FILE (125/178): client\src\index.css
+FILE (126/180): client\src\index.css
 SIZE: 1923 bytes
 ================================================================================
 @tailwind base;
@@ -21827,7 +22461,7 @@ SIZE: 1923 bytes
 
 
 ================================================================================
-FILE (126/178): client\src\main.jsx
+FILE (127/180): client\src\main.jsx
 SIZE: 245 bytes
 ================================================================================
 import React from 'react'
@@ -21843,8 +22477,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 
 
 ================================================================================
-FILE (127/178): client\src\pages\AdminDashboard.jsx
-SIZE: 80718 bytes
+FILE (128/180): client\src\pages\AdminDashboard.jsx
+SIZE: 81146 bytes
 ================================================================================
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -21854,11 +22488,12 @@ import {
   Users, School, BookOpen, Settings, LogOut,
   Plus, Pencil, Trash2, ChevronDown, ChevronRight,
   Loader2, X, Check, AlertTriangle, RefreshCw, GraduationCap,
-  UserCheck, ChevronUp, Sparkles, Zap
+  UserCheck, ChevronUp, Sparkles, Zap, Upload
 } from 'lucide-react';
 import branding from '../config/branding';
 import TopNav from '../components/TopNav';
 import { useCatalog } from '../hooks/useCatalog';
+import AdminBulkUploadPanel from '../components/AdminBulkUploadPanel';
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Cell,
@@ -22313,13 +22948,11 @@ const CatalogPanel = () => {
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Display Order</label>
-                <input
-                  type="number"
-                  value={typeForm.display_ord
+                <inpu
 ...TRUNCATED...
 
 ================================================================================
-FILE (128/178): client\src\pages\ContributeQuestion.jsx
+FILE (129/180): client\src\pages\ContributeQuestion.jsx
 SIZE: 23607 bytes
 ================================================================================
 // client/src/pages/ContributeQuestion.jsx
@@ -22754,7 +23387,7 @@ export default function ContributeQuestion() {
 ...TRUNCATED...
 
 ================================================================================
-FILE (129/178): client\src\pages\ForgotPassword.jsx
+FILE (130/180): client\src\pages\ForgotPassword.jsx
 SIZE: 7930 bytes
 ================================================================================
 import { useState } from 'react';
@@ -22918,7 +23551,7 @@ export default ForgotPassword;
 
 
 ================================================================================
-FILE (130/178): client\src\pages\ImageMarkingPage.jsx
+FILE (131/180): client\src\pages\ImageMarkingPage.jsx
 SIZE: 24895 bytes
 ================================================================================
 // client/src/pages/ImageMarkingPage.jsx
@@ -23407,7 +24040,7 @@ export default function ImageMarkingPage() {
 ...TRUNCATED...
 
 ================================================================================
-FILE (131/178): client\src\pages\LandingPage.jsx
+FILE (132/180): client\src\pages\LandingPage.jsx
 SIZE: 35207 bytes
 ================================================================================
 // client/src/pages/LandingPage.jsx
@@ -23758,7 +24391,7 @@ export default function LandingPage() {
 ...TRUNCATED...
 
 ================================================================================
-FILE (132/178): client\src\pages\LoginPage.jsx
+FILE (133/180): client\src\pages\LoginPage.jsx
 SIZE: 10756 bytes
 ================================================================================
 import { useState } from 'react';
@@ -23991,7 +24624,7 @@ export default LoginPage;
 
 
 ================================================================================
-FILE (133/178): client\src\pages\MockExamPage.jsx
+FILE (134/180): client\src\pages\MockExamPage.jsx
 SIZE: 12423 bytes
 ================================================================================
 // client/src/pages/MockExamPage.jsx
@@ -24280,7 +24913,7 @@ export { predictGrade };
 
 
 ================================================================================
-FILE (134/178): client\src\pages\NotFound.jsx
+FILE (135/180): client\src\pages\NotFound.jsx
 SIZE: 1103 bytes
 ================================================================================
 import { Link } from 'react-router-dom';
@@ -24312,7 +24945,7 @@ export default NotFound;
 
 
 ================================================================================
-FILE (135/178): client\src\pages\OnboardingPage.jsx
+FILE (136/180): client\src\pages\OnboardingPage.jsx
 SIZE: 14574 bytes
 ================================================================================
 // client/src/pages/OnboardingPage.jsx
@@ -24657,7 +25290,7 @@ export default function OnboardingPage() {
 
 
 ================================================================================
-FILE (136/178): client\src\pages\PastPapersPage.jsx
+FILE (137/180): client\src\pages\PastPapersPage.jsx
 SIZE: 9016 bytes
 ================================================================================
 // client/src/pages/PastPapersPage.jsx
@@ -24863,7 +25496,7 @@ export default function PastPapersPage() {
 
 
 ================================================================================
-FILE (137/178): client\src\pages\PaymentVerify.jsx
+FILE (138/180): client\src\pages\PaymentVerify.jsx
 SIZE: 5732 bytes
 ================================================================================
 // client/src/pages/PaymentVerify.jsx
@@ -25003,7 +25636,7 @@ export default function PaymentVerify() {
 
 
 ================================================================================
-FILE (138/178): client\src\pages\PracticeMode.jsx
+FILE (139/180): client\src\pages\PracticeMode.jsx
 SIZE: 24748 bytes
 ================================================================================
 // client/src/pages/PracticeMode.jsx
@@ -25482,7 +26115,7 @@ export default function PracticeMode() {
 ...TRUNCATED...
 
 ================================================================================
-FILE (139/178): client\src\pages\PricingPage.jsx
+FILE (140/180): client\src\pages\PricingPage.jsx
 SIZE: 18544 bytes
 ================================================================================
 // client/src/pages/PricingPage.jsx
@@ -25892,7 +26525,7 @@ export function UpgradeWall({ score, max, time, accuracy, onRevise }) {
 
 
 ================================================================================
-FILE (140/178): client\src\pages\PrivacyPolicy.jsx
+FILE (141/180): client\src\pages\PrivacyPolicy.jsx
 SIZE: 8815 bytes
 ================================================================================
 import { Link } from 'react-router-dom';
@@ -26055,7 +26688,7 @@ export default PrivacyPolicy;
 
 
 ================================================================================
-FILE (141/178): client\src\pages\question_template.json
+FILE (142/180): client\src\pages\question_template.json
 SIZE: 8365 bytes
 ================================================================================
 {
@@ -26285,7 +26918,7 @@ SIZE: 8365 bytes
 
 
 ================================================================================
-FILE (142/178): client\src\pages\QuestionReview.jsx
+FILE (143/180): client\src\pages\QuestionReview.jsx
 SIZE: 16367 bytes
 ================================================================================
 // client/src/pages/QuestionReview.jsx
@@ -26621,7 +27254,7 @@ export default function QuestionReview() {
 
 
 ================================================================================
-FILE (143/178): client\src\pages\QuizHistoryPage.jsx
+FILE (144/180): client\src\pages\QuizHistoryPage.jsx
 SIZE: 6591 bytes
 ================================================================================
 // client/src/pages/QuizHistoryPage.jsx
@@ -26773,7 +27406,7 @@ export default function QuizHistoryPage() {
 
 
 ================================================================================
-FILE (144/178): client\src\pages\QuizPage.jsx
+FILE (145/180): client\src\pages\QuizPage.jsx
 SIZE: 14343 bytes
 ================================================================================
 // client/src/pages/QuizPage.jsx
@@ -27119,7 +27752,7 @@ export default function QuizPage() {
 
 
 ================================================================================
-FILE (145/178): client\src\pages\QuizResultsPage.jsx
+FILE (146/180): client\src\pages\QuizResultsPage.jsx
 SIZE: 15472 bytes
 ================================================================================
 // client/src/pages/QuizResultsPage.jsx
@@ -27470,7 +28103,7 @@ export default function QuizResultsPage() {
 
 
 ================================================================================
-FILE (146/178): client\src\pages\RegisterPage.jsx
+FILE (147/180): client\src\pages\RegisterPage.jsx
 SIZE: 33792 bytes
 ================================================================================
 import { useState, useEffect, useRef } from 'react';
@@ -27892,7 +28525,7 @@ const RegisterPage = () => {
 ...TRUNCATED...
 
 ================================================================================
-FILE (147/178): client\src\pages\ResetPassword.jsx
+FILE (148/180): client\src\pages\ResetPassword.jsx
 SIZE: 11032 bytes
 ================================================================================
 import { useState, useEffect } from 'react';
@@ -28117,7 +28750,7 @@ export default ResetPassword;
 
 
 ================================================================================
-FILE (148/178): client\src\pages\SettingsPage.jsx
+FILE (149/180): client\src\pages\SettingsPage.jsx
 SIZE: 20142 bytes
 ================================================================================
 // client/src/pages/SettingsPage.jsx
@@ -28491,7 +29124,7 @@ export default function SettingsPage() {
 
 
 ================================================================================
-FILE (149/178): client\src\pages\StudentAnalyticsDashboard.jsx
+FILE (150/180): client\src\pages\StudentAnalyticsDashboard.jsx
 SIZE: 20393 bytes
 ================================================================================
 // client/src/pages/StudentAnalyticsDashboard.jsx
@@ -28916,7 +29549,7 @@ export default function StudentAnalyticsDashboard() {
 
 
 ================================================================================
-FILE (150/178): client\src\pages\StudentDashboard.jsx
+FILE (151/180): client\src\pages\StudentDashboard.jsx
 SIZE: 33274 bytes
 ================================================================================
 // client/src/pages/StudentDashboard.jsx
@@ -29365,7 +29998,7 @@ export default function StudentDashboard() {
 ...TRUNCATED...
 
 ================================================================================
-FILE (151/178): client\src\pages\StudentTestPage.jsx
+FILE (152/180): client\src\pages\StudentTestPage.jsx
 SIZE: 9077 bytes
 ================================================================================
 // Route: /student/test/:testId
@@ -29557,7 +30190,7 @@ export default function StudentTestPage() {
 
 
 ================================================================================
-FILE (152/178): client\src\pages\SubjectCatalog.jsx
+FILE (153/180): client\src\pages\SubjectCatalog.jsx
 SIZE: 11870 bytes
 ================================================================================
 import { useState, useEffect } from 'react';
@@ -29834,7 +30467,7 @@ export default SubjectCatalog;
 
 
 ================================================================================
-FILE (153/178): client\src\pages\SubjectPage.jsx
+FILE (154/180): client\src\pages\SubjectPage.jsx
 SIZE: 17678 bytes
 ================================================================================
 // client/src/pages/SubjectPage.jsx
@@ -30199,7 +30832,7 @@ export default function SubjectPage() {
 
 
 ================================================================================
-FILE (154/178): client\src\pages\SubtopicPage.jsx
+FILE (155/180): client\src\pages\SubtopicPage.jsx
 SIZE: 35562 bytes
 ================================================================================
 // client/src/pages/SubtopicPage.jsx
@@ -30646,7 +31279,7 @@ function OpenAnswerQuestion({ question, questionNumber, totalQuestions, dismisse
 ...TRUNCATED...
 
 ================================================================================
-FILE (155/178): client\src\pages\TeacherAssignmentPage.jsx
+FILE (156/180): client\src\pages\TeacherAssignmentPage.jsx
 SIZE: 19686 bytes
 ================================================================================
 // client/src/pages/admin/TeacherAssignmentPage.jsx
@@ -31083,7 +31716,7 @@ export default function TeacherAssignmentPage() {
 
 
 ================================================================================
-FILE (156/178): client\src\pages\TeacherContentPage.jsx
+FILE (157/180): client\src\pages\TeacherContentPage.jsx
 SIZE: 23493 bytes
 ================================================================================
 // client/src/pages/TeacherContentPage.jsx
@@ -31600,7 +32233,7 @@ export default function TeacherContentPage() {
 ...TRUNCATED...
 
 ================================================================================
-FILE (157/178): client\src\pages\TeacherDashboard.jsx
+FILE (158/180): client\src\pages\TeacherDashboard.jsx
 SIZE: 28328 bytes
 ================================================================================
 // client/src/pages/TeacherDashboard.jsx
@@ -32041,7 +32674,7 @@ function TestBuilderTab() {
 ...TRUNCATED...
 
 ================================================================================
-FILE (158/178): client\src\pages\TeacherPendingQuestions.jsx
+FILE (159/180): client\src\pages\TeacherPendingQuestions.jsx
 SIZE: 4394 bytes
 ================================================================================
 // client/src/pages/TeacherPendingQuestions.jsx
@@ -32141,7 +32774,7 @@ export default function TeacherPendingQuestions() {
 
 
 ================================================================================
-FILE (159/178): client\src\pages\TeacherResourcesPage.jsx
+FILE (160/180): client\src\pages\TeacherResourcesPage.jsx
 SIZE: 30584 bytes
 ================================================================================
 // client/src/pages/TeacherResourcesPage.jsx
@@ -32679,7 +33312,7 @@ function QuestionsTab({ showToast }) {
 ...TRUNCATED...
 
 ================================================================================
-FILE (160/178): client\src\pages\TermsOfService.jsx
+FILE (161/180): client\src\pages\TermsOfService.jsx
 SIZE: 7765 bytes
 ================================================================================
 import { Link } from 'react-router-dom';
@@ -32831,7 +33464,7 @@ export default TermsOfService;
 
 
 ================================================================================
-FILE (161/178): client\src\pages\VerifyEmailPage.jsx
+FILE (162/180): client\src\pages\VerifyEmailPage.jsx
 SIZE: 3874 bytes
 ================================================================================
 // client/src/pages/VerifyEmailPage.jsx
@@ -32944,7 +33577,7 @@ export default function VerifyEmailPage() {
 
 
 ================================================================================
-FILE (162/178): client\src\services\api.js
+FILE (163/180): client\src\services\api.js
 SIZE: 11851 bytes
 ================================================================================
 import axios from 'axios';
@@ -33148,7 +33781,7 @@ export default api;
 
 
 ================================================================================
-FILE (163/178): client\tailwind.config.js
+FILE (164/180): client\tailwind.config.js
 SIZE: 611 bytes
 ================================================================================
 /** @type {import('tailwindcss').Config} */
@@ -33183,7 +33816,7 @@ export default {
 
 
 ================================================================================
-FILE (164/178): client\vite.config.js
+FILE (165/180): client\vite.config.js
 SIZE: 292 bytes
 ================================================================================
 import { defineConfig } from 'vite'
@@ -33204,7 +33837,7 @@ export default defineConfig({
 
 
 ================================================================================
-FILE (165/178): server\config\redisClient.js
+FILE (166/180): server\config\redisClient.js
 SIZE: 616 bytes
 ================================================================================
 'use strict';
@@ -33243,7 +33876,7 @@ SECTION: OTHER
 ================================================================================
 
 ================================================================================
-FILE (166/178): .gitignore
+FILE (167/180): .gitignore
 SIZE: 2446 bytes
 ================================================================================
 # ── Dependencies ─────────────────────────────────────────────────────────────
@@ -33313,7 +33946,7 @@ coverage/
 !ai-ready-dump.txt
 
 ================================================================================
-FILE (167/178): database\add_ielts_toefl_sat_subjects.sql
+FILE (168/180): database\add_ielts_toefl_sat_subjects.sql
 SIZE: 4580 bytes
 ================================================================================
 -- 
@@ -33404,7 +34037,7 @@ ORDER BY eb.display_order;
 
 
 ================================================================================
-FILE (168/178): database\eac_courses_topics_enrollments.sql
+FILE (169/180): database\eac_courses_topics_enrollments.sql
 SIZE: 20557 bytes
 ================================================================================
 -- ============================================================
@@ -33864,7 +34497,7 @@ COMMIT;
 ...TRUNCATED...
 
 ================================================================================
-FILE (169/178): database\eac_explanations.sql
+FILE (170/180): database\eac_explanations.sql
 SIZE: 47336 bytes
 ================================================================================
 -- ============================================================
@@ -34191,7 +34824,7 @@ FROM subjects s, exam_boards eb, (VALUES
 ...TRUNCATED...
 
 ================================================================================
-FILE (170/178): database\fix_type_mismatches_v2.sql
+FILE (171/180): database\fix_type_mismatches_v2.sql
 SIZE: 2808 bytes
 ================================================================================
 -- ============================================================
@@ -34255,7 +34888,7 @@ COMMIT;
 
 
 ================================================================================
-FILE (171/178): database\migrate_roles_and_curricula.sql
+FILE (172/180): database\migrate_roles_and_curricula.sql
 SIZE: 3931 bytes
 ================================================================================
 -- ============================================================
@@ -34441,7 +35074,7 @@ SELECT 'Migration complete.' AS status;
 
 
 ================================================================================
-FILE (172/178): database\migration_001.sql
+FILE (173/180): database\migration_001.sql
 SIZE: 6601 bytes
 ================================================================================
 -- =============================================================================
@@ -34621,7 +35254,7 @@ WHERE table_name = 'subtopics' AND column_name = 'created_by';
 
 
 ================================================================================
-FILE (173/178): database\migration_002.sql
+FILE (174/180): database\migration_002.sql
 SIZE: 8872 bytes
 ================================================================================
 -- =============================================================================
@@ -34839,7 +35472,7 @@ WHERE table_name       = 'users'
 
 
 ================================================================================
-FILE (174/178): database\migration_003.sql
+FILE (175/180): database\migration_003.sql
 SIZE: 24552 bytes
 ================================================================================
 -- =============================================================================
@@ -35332,7 +35965,7 @@ CREATE TABLE IF NOT EXISTS video_progress (
 ...TRUNCATED...
 
 ================================================================================
-FILE (175/178): database\notifications_and_healthcheck.sql
+FILE (176/180): database\notifications_and_healthcheck.sql
 SIZE: 6831 bytes
 ================================================================================
 -- ============================================================
@@ -35554,7 +36187,7 @@ SELECT
 
 
 ================================================================================
-FILE (176/178): database\patch_answer_options.sql
+FILE (177/180): database\patch_answer_options.sql
 SIZE: 10352 bytes
 ================================================================================
 -- ============================================================
@@ -35713,7 +36346,864 @@ COMMIT;
 
 
 ================================================================================
-FILE (177/178): venv\.gitignore
+FILE (178/180): schema.sql
+SIZE: 82729 bytes
+================================================================================
+--
+-- PostgreSQL database dump
+--
+
+\restrict cRV3Y8AnyFXfe4oNeyNQnjg70lqOM9ksfB99xbUIdEfQ9gwZAElQTar4wmuV1Ha
+
+-- Dumped from database version 18.3 (Debian 18.3-1.pgdg12+1)
+-- Dumped by pg_dump version 18.1
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET transaction_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- Name: public; Type: SCHEMA; Schema: -; Owner: -
+--
+
+-- *not* creating schema, since initdb creates it
+
+
+--
+-- Name: pgcrypto; Type: EXTENSION; Schema: -; Owner: -
+--
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
+
+
+--
+-- Name: EXTENSION pgcrypto; Type: COMMENT; Schema: -; Owner: -
+--
+
+COMMENT ON EXTENSION pgcrypto IS 'cryptographic functions';
+
+
+--
+-- Name: enum_ai_chat_messages_role; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.enum_ai_chat_messages_role AS ENUM (
+    'user',
+    'assistant'
+);
+
+
+--
+-- Name: enum_enrollments_status; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.enum_enrollments_status AS ENUM (
+    'active',
+    'completed',
+    'cancelled',
+    'pending'
+);
+
+
+--
+-- Name: enum_payments_status; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.enum_payments_status AS ENUM (
+    'pending',
+    'completed',
+    'failed',
+    'refunded'
+);
+
+
+--
+-- Name: enum_questions_type; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.enum_questions_type AS ENUM (
+    'mcq',
+    'true_false',
+    'short_answer',
+    'essay'
+);
+
+
+--
+-- Name: enum_resources_type; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.enum_resources_type AS ENUM (
+    'video',
+    'pdf',
+    'link',
+    'note',
+    'image',
+    'other'
+);
+
+
+--
+-- Name: enum_users_role; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.enum_users_role AS ENUM (
+    'student',
+    'teacher',
+    'admin'
+);
+
+
+--
+-- Name: enum_users_subscription_status; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.enum_users_subscription_status AS ENUM (
+    'free',
+    'active',
+    'expired',
+    'cancelled',
+    'free_trial'
+);
+
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- Name: ai_chat_messages; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ai_chat_messages (
+    id integer NOT NULL,
+    session_id integer NOT NULL,
+    role public.enum_ai_chat_messages_role NOT NULL,
+    content text NOT NULL,
+    created_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone NOT NULL
+);
+
+
+--
+-- Name: ai_chat_messages_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ai_chat_messages_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ai_chat_messages_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ai_chat_messages_id_seq OWNED BY public.ai_chat_messages.id;
+
+
+--
+-- Name: ai_chat_sessions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ai_chat_sessions (
+    id integer NOT NULL,
+    student_id uuid NOT NULL,
+    title character varying(255),
+    is_active boolean DEFAULT true,
+    metadata jsonb,
+    created_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone NOT NULL,
+    subject_id integer,
+    subtopic_id integer
+);
+
+
+--
+-- Name: ai_chat_sessions_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ai_chat_sessions_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ai_chat_sessions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ai_chat_sessions_id_seq OWNED BY public.ai_chat_sessions.id;
+
+
+--
+-- Name: ai_explanation_cache; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ai_explanation_cache (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    topic_id integer,
+    subtopic_id integer,
+    original_explanation text,
+    simplified_explanation text,
+    key_points jsonb,
+    source_question_count integer DEFAULT 0 NOT NULL,
+    model_used character varying(100),
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: ai_question_logs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ai_question_logs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    question_id integer,
+    generated_by uuid,
+    model_used character varying(100),
+    prompt_used text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: answer_options; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.answer_options (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    question_id integer NOT NULL,
+    option_text text NOT NULL,
+    is_correct boolean DEFAULT false NOT NULL,
+    order_index integer DEFAULT 0 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: class_memberships; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.class_memberships (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    class_id uuid NOT NULL,
+    student_id uuid NOT NULL,
+    joined_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: classes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.classes (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    teacher_id uuid NOT NULL,
+    name character varying(255) NOT NULL,
+    join_code character varying(20) NOT NULL,
+    subject_ids jsonb DEFAULT '[]'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: concept_dependencies; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.concept_dependencies (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    parent_concept_id integer NOT NULL,
+    child_concept_id integer NOT NULL,
+    dependency_type character varying(50) DEFAULT 'prerequisite'::character varying NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: concepts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.concepts (
+    id integer NOT NULL,
+    subtopic_id integer,
+    title character varying(255) NOT NULL,
+    definition text,
+    explanation text,
+    examples text,
+    image_url character varying(255),
+    order_index integer DEFAULT 0,
+    is_active boolean DEFAULT true,
+    created_by integer,
+    created_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone NOT NULL,
+    name character varying(255),
+    description text,
+    difficulty_level integer DEFAULT 1 NOT NULL,
+    estimated_minutes integer DEFAULT 10 NOT NULL
+);
+
+
+--
+-- Name: concepts_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.concepts_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: concepts_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.concepts_id_seq OWNED BY public.concepts.id;
+
+
+--
+-- Name: courses; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.courses (
+    id integer NOT NULL,
+    subject_id integer,
+    title character varying(255) NOT NULL,
+    description text,
+    price numeric(10,2) DEFAULT 0,
+    currency character varying(10) DEFAULT 'GBP'::character varying,
+    is_free boolean DEFAULT false,
+    is_premium boolean DEFAULT false,
+    thumbnail_url character varying(255),
+    level character varying(255),
+    duration_hours numeric(5,1),
+    is_active boolean DEFAULT true,
+    created_by integer,
+    created_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone NOT NULL
+);
+
+
+--
+-- Name: courses_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.courses_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: courses_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.courses_id_seq OWNED BY public.courses.id;
+
+
+--
+-- Name: custom_tests; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.custom_tests (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    teacher_id uuid NOT NULL,
+    subject_id integer,
+    title character varying(255) NOT NULL,
+    duration_minutes integer DEFAULT 30 NOT NULL,
+    total_marks integer DEFAULT 10 NOT NULL,
+    passing_marks integer DEFAULT 5 NOT NULL,
+    is_published boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: enrollments; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.enrollments (
+    id integer NOT NULL,
+    student_id integer NOT NULL,
+    course_id integer NOT NULL,
+    status public.enum_enrollments_status DEFAULT 'active'::public.enum_enrollments_status,
+    enrollment_date timestamp with time zone,
+    completed_at timestamp with time zone,
+    progress_percentage integer DEFAULT 0,
+    payment_id integer,
+    created_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone NOT NULL
+);
+
+
+--
+-- Name: enrollments_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.enrollments_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: enrollments_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.enrollments_id_seq OWNED BY public.enrollments.id;
+
+
+--
+-- Name: exam_boards; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.exam_boards (
+    id integer NOT NULL,
+    name character varying(255) NOT NULL,
+    code character varying(255),
+    country character varying(255),
+    description text,
+    logo_url character varying(255),
+    is_active boolean DEFAULT true,
+    created_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone NOT NULL,
+    full_name character varying(255),
+    icon_emoji character varying(10),
+    display_order integer DEFAULT 0
+);
+
+
+--
+-- Name: exam_boards_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.exam_boards_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: exam_boards_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.exam_boards_id_seq OWNED BY public.exam_boards.id;
+
+
+--
+-- Name: notes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.notes (
+    id integer NOT NULL,
+    user_id uuid NOT NULL,
+    subtopic_id integer,
+    title character varying(255),
+    content text NOT NULL,
+    is_public boolean DEFAULT false,
+    tags character varying(255)[],
+    created_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone NOT NULL
+);
+
+
+--
+-- Name: notes_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.notes_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: notes_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.notes_id_seq OWNED BY public.notes.id;
+
+
+--
+-- Name: notifications; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.notifications (
+    id integer NOT NULL,
+    user_id uuid NOT NULL,
+    title character varying(255) NOT NULL,
+    message text NOT NULL,
+    type character varying(255),
+    is_read boolean DEFAULT false,
+    read_at timestamp with time zone,
+    link character varying(255),
+    metadata jsonb,
+    created_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone NOT NULL,
+    action_url character varying(255)
+);
+
+
+--
+-- Name: notifications_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.notifications_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: notifications_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.notifications_id_seq OWNED BY public.notifications.id;
+
+
+--
+-- Name: past_papers; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.past_papers (
+    id integer NOT NULL,
+    subject_id integer NOT NULL,
+    title character varying(255) NOT NULL,
+    year integer,
+    session character varying(255),
+    paper_number character varying(255),
+    file_url text,
+    markscheme_url text,
+    is_premium boolean DEFAULT false,
+    is_active boolean DEFAULT true,
+    uploaded_by integer,
+    created_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone NOT NULL,
+    exam_board character varying(50),
+    paper_type character varying(50),
+    file_size_bytes integer,
+    created_by uuid
+);
+
+
+--
+-- Name: past_papers_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.past_papers_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: past_papers_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.past_papers_id_seq OWNED BY public.past_papers.id;
+
+
+--
+-- Name: payment_transactions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.payment_transactions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_id uuid NOT NULL,
+    transaction_reference character varying(100) NOT NULL,
+    paystack_reference character varying(100),
+    payment_gateway character varying(50) DEFAULT 'paystack'::character varying NOT NULL,
+    amount integer NOT NULL,
+    currency character varying(10) DEFAULT 'NGN'::character varying NOT NULL,
+    status character varying(20) DEFAULT 'pending'::character varying NOT NULL,
+    metadata jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: payments; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.payments (
+    id integer NOT NULL,
+    user_id integer NOT NULL,
+    course_id integer,
+    amount numeric(10,2) NOT NULL,
+    currency character varying(10) DEFAULT 'GBP'::character varying,
+    status public.enum_payments_status DEFAULT 'pending'::public.enum_payments_status,
+    provider character varying(255),
+    provider_ref character varying(255),
+    metadata jsonb,
+    paid_at timestamp with time zone,
+    created_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone NOT NULL
+);
+
+
+--
+-- Name: payments_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.payments_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: payments_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.payments_id_seq OWNED BY public.payments.id;
+
+
+--
+-- Name: practice_attempts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.practice_attempts (
+    id integer NOT NULL,
+    student_id integer NOT NULL,
+    question_id integer NOT NULL,
+    attempted_at timestamp with time zone,
+    is_correct boolean,
+    answer_given text,
+    time_taken_seconds integer,
+    created_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone NOT NULL
+);
+
+
+--
+-- Name: practice_attempts_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.practice_attempts_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: practice_attempts_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.practice_attempts_id_seq OWNED BY public.practice_attempts.id;
+
+
+--
+-- Name: question_concepts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.question_concepts (
+    id integer NOT NULL,
+    question_id integer NOT NULL,
+    concept_id integer NOT NULL,
+    weight integer DEFAULT 1 NOT NULL,
+    created_at timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: question_concepts_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.question_concepts_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: question_concepts_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.question_concepts_id_seq OWNED BY public.question_concepts.id;
+
+
+--
+-- Name: questions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.questions (
+    id integer NOT NULL,
+    subtopic_id integer,
+    submitted_by uuid,
+    question_text text NOT NULL,
+    type public.enum_questions_type DEFAULT 'mcq'::public.enum_questions_type,
+    options jsonb,
+    correct_answer text,
+    explanation text,
+    marks integer DEFAULT 1,
+    order_index integer DEFAULT 0,
+    image_url character varying(255),
+    is_active boolean DEFAULT true,
+    created_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone NOT NULL,
+    status character varying(20) DEFAULT 'pending'::character varying NOT NULL,
+    difficulty character varying(10) DEFAULT 'medium'::character varying,
+    question_type character varying(50) DEFAULT 'mcq'::character varying,
+    question_sub_type character varying(50) DEFAULT 'mcq'::character varying,
+    topic character varying(255),
+    year integer,
+    source character varying(100),
+    subject_id_uuid integer,
+    is_ai_generated boolean DEFAULT false NOT NULL,
+    ai_generation_source character varying(100),
+    concept_hint text,
+    hints jsonb
+);
+
+
+--
+-- Name: questions_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.questions_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: questions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.questions_id_seq OWNED BY public.questions.id;
+
+
+--
+-- Name: quiz_attempts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.quiz_attempts (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    quiz_id uuid,
+    student_id uuid NOT NULL,
+    score integer,
+    total_marks integer,
+    percentage numeric(5,2),
+    start_time timestamp with time zone DEFAULT now() NOT NULL,
+    end_time timestamp with time zone,
+    status character varying(20) DEFAULT 'completed'::character varying NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: quizzes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.quizzes (
+    id integer NOT NULL,
+    topic_id integer,
+    title character varying(255) NOT NULL,
+    description text,
+    time_limit_minutes integer,
+    passing_score integer DEFAULT 70,
+    is_premium boolean DEFAULT false,
+    is_active boolean DEFAULT true,
+    created_by integer,
+    created_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone NOT NULL
+);
+
+
+--
+-- Name: quizzes_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.quizzes_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: quizzes_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.quizzes_id_seq OWNED BY public.quizzes.id;
+
+
+--
+-- Name: resource_user_assignments; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.resource_user_assignments (
+    id integer NOT NULL,
+    resource_id integer NOT NULL,
+    user_id uuid NOT NULL,
+    assigned_by uuid,
+    assigned_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: resource_user_assignments_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.resource_user_assignments_id_seq
+    AS integer
+    STAR
+...TRUNCATED...
+
+================================================================================
+FILE (179/180): venv\.gitignore
 SIZE: 71 bytes
 ================================================================================
 # Created by venv; see https://docs.python.org/3/library/venv.html
@@ -35721,7 +37211,7 @@ SIZE: 71 bytes
 
 
 ================================================================================
-FILE (178/178): venv\Lib\site-packages\pip-25.2.dist-info\licenses\src\pip\_vendor\idna\LICENSE.md
+FILE (180/180): venv\Lib\site-packages\pip-25.2.dist-info\licenses\src\pip\_vendor\idna\LICENSE.md
 SIZE: 1541 bytes
 ================================================================================
 BSD 3-Clause License
@@ -35758,5 +37248,5 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 ================================================================================
-END OF DUMP | 178 files
+END OF DUMP | 180 files
 ================================================================================
