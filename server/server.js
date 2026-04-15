@@ -10,7 +10,6 @@ const logger = require('./config/logger');
 const requestId = require('./middleware/requestId');
 const requestLogger = require('./middleware/requestLogger');
 
-
 // ── DOTENV FOR LOCAL DEV ONLY ────────────────────────────────────────────────
 if (process.env.NODE_ENV !== 'production') {
   const dotenv = require('dotenv');
@@ -93,7 +92,7 @@ app.use(requestLogger);
 // ── DATABASE ──────────────────────────────────────────────────────────────────
 const db = require('./config/database');
 
-// Import all models so Sequelize registers them.
+// Load models
 const modelPaths = [
   './models/User',
   './models/ExamBoard',
@@ -126,7 +125,7 @@ for (const modelPath of modelPaths) {
       modelExport(db);
     }
   } catch (e) {
-    logger.warn(`Model not found or failed to load, skipping: ${modelPath} — ${e.message}`);
+    logger.warn(`Model not found or failed to load: ${modelPath} — ${e.message}`);
   }
 }
 
@@ -150,65 +149,64 @@ initDatabase();
 
 // ── AUTH ─────────────────────────────────────────────────────────────────────
 const { protect } = require('./middleware/auth');
+
 let subscriptionGuard = (_req, _res, next) => next();
 try {
   subscriptionGuard = require('./middleware/subscriptionGuard');
 } catch {}
 
 // ── ROUTES ───────────────────────────────────────────────────────────────────
-const authRoutes          = require('./routes/authRoutes');
-const aiRoutes            = require('./routes/aiRoutes');
-const adminRoutes         = require('./routes/adminRoutes');
-const teacherRoutes       = require('./routes/teacherRoutes');
-const userRoutes          = require('./routes/users');
-const examBoardsRoutes    = require('./routes/examBoardsRoutes');
-const subjectRoutes       = require('./routes/subjects');
-const topicsRoutes        = require('./routes/topicsRoutes');
-const subtopicRoutes      = require('./routes/subtopicRoutes');
-const resourceRoutes      = require('./routes/resourceRoutes');
-const coursesRoutes       = require('./routes/courses');
-const enrollmentsRoutes   = require('./routes/enrollments');
-const quizzesRoutes       = require('./routes/quizzes');
-const questionsRoutes     = require('./routes/questionsRoutes');
-const analyticsRoutes     = require('./routes/analyticsRoutes');
-const notesRoutes         = require('./routes/notesRoutes');
-const videosRoutes        = require('./routes/videosRoutes');
-const pastPaperRoutes     = require('./routes/pastPaperRoutes');
-const paymentRoutes       = require('./routes/paymentRoutes');
-const catalogRoutes       = require('./routes/catalogRoutes');
+const authRoutes        = require('./routes/authRoutes');
+const aiRoutes          = require('./routes/aiRoutes');
+const adminRoutes       = require('./routes/adminRoutes');
+const teacherRoutes     = require('./routes/teacherRoutes');
+const userRoutes        = require('./routes/users');
+const examBoardsRoutes  = require('./routes/examBoardsRoutes');
+const subjectRoutes     = require('./routes/subjects');
+const topicsRoutes      = require('./routes/topicsRoutes');
+const subtopicRoutes    = require('./routes/subtopicRoutes');
+const resourceRoutes    = require('./routes/resourceRoutes');
+const coursesRoutes     = require('./routes/courses');
+const enrollmentsRoutes = require('./routes/enrollments');
+const quizzesRoutes     = require('./routes/quizzes');
+const questionsRoutes   = require('./routes/questionsRoutes');
+const analyticsRoutes   = require('./routes/analyticsRoutes');
+const notesRoutes       = require('./routes/notesRoutes');
+const videosRoutes      = require('./routes/videosRoutes');
+const pastPaperRoutes   = require('./routes/pastPaperRoutes');
+const paymentRoutes     = require('./routes/paymentRoutes');
+const catalogRoutes     = require('./routes/catalogRoutes');
 const notificationsRoutes = require('./routes/notificationsRoutes');
-const studentRoutes       = require('./routes/studentRoutes');
-const conceptRoutes       = require('./routes/conceptRoutes');
-const curriculumRoutes    = require('./routes/curriculumRoutes');
+const studentRoutes     = require('./routes/studentRoutes');
+const conceptRoutes     = require('./routes/conceptRoutes');
+const curriculumRoutes  = require('./routes/curriculumRoutes');
 
-// ✅ ADD THIS LINE
-const subtopicProgressRoutes = require('./routes/subtopicProgressRoutes');
-
-// ── OPTIONAL ROUTES ──────────────────────────────────────────────────────────
 let aiChatRoute = null;
-try { aiChatRoute = require('./routes/aiChatRoute'); } catch {}
+try {
+  aiChatRoute = require('./routes/aiChatRoute');
+} catch {}
 
-// ── STATIC ───────────────────────────────────────────────────────────────────
+// ── STATIC FILES ──────────────────────────────────────────────────────────────
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// ── PUBLIC ───────────────────────────────────────────────────────────────────
+// ── PUBLIC ROUTES ────────────────────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
 app.use('/api/exam-boards', examBoardsRoutes);
 app.use('/api/curriculum', curriculumRoutes);
 
-// ── PROTECTED ────────────────────────────────────────────────────────────────
+// ── PROTECTED ROUTES ─────────────────────────────────────────────────────────
 app.use('/api/ai', protect, subscriptionGuard, aiLimiter, aiRoutes);
 if (aiChatRoute) app.use('/api/ai', protect, subscriptionGuard, aiLimiter, aiChatRoute);
-
-// ✅ ADD THIS LINE (CRITICAL)
-app.use('/api/subtopics/progress-summary', protect, subtopicProgressRoutes);
 
 app.use('/api/admin', protect, adminRoutes);
 app.use('/api/teacher', protect, teacherRoutes);
 app.use('/api/users', protect, userRoutes);
 app.use('/api/subjects', protect, subjectRoutes);
 app.use('/api/topics', protect, topicsRoutes);
+
+// ✅ SINGLE SOURCE OF TRUTH FOR SUBTOPICS
 app.use('/api/subtopics', protect, subtopicRoutes);
+
 app.use('/api/resources', protect, resourceRoutes);
 app.use('/api/courses', protect, coursesRoutes);
 app.use('/api/enrollments', protect, enrollmentsRoutes);
@@ -224,18 +222,18 @@ app.use('/api/notifications', protect, notificationsRoutes);
 app.use('/api/students', protect, studentRoutes);
 app.use('/api/concepts', protect, conceptRoutes);
 
-// ── HEALTH ───────────────────────────────────────────────────────────────────
+// ── HEALTH CHECK ─────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {
   res.json({ success: true });
 });
 
-// ── ERROR ────────────────────────────────────────────────────────────────────
+// ── ERROR HANDLING ───────────────────────────────────────────────────────────
 app.use((err, _req, res, _next) => {
   logger.error('Unhandled error', { error: err.message });
   res.status(500).json({ success: false, error: 'Internal Server Error' });
 });
 
-// ── START ────────────────────────────────────────────────────────────────────
+// ── START SERVER ─────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(` Server running on port ${PORT}`);
