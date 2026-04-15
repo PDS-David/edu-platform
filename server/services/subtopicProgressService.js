@@ -1,127 +1,148 @@
 'use strict';
 
-const sequelize = require('../config/database');
-const { QueryTypes } = require('sequelize');
-const CacheService = require('./cacheService');
-
 /**
- * SUBTOPIC PROGRESS SERVICE
- * -----------------------------------------
- * Source of truth for:
- * - student subtopic progress
- * - mastery computation
- * - cached learning state
+ * subtopicProgressService.js
+ *
+ * CORE PROGRESS ENGINE (A1.6)
+ * - Orchestrates progress updates
+ * - Delegates evaluation logic
+ * - Ensures DB consistency
  */
 
-class SubtopicProgressService {
+const sequelize = require('../config/database');
+const { QueryTypes } = require('sequelize');
 
-  // ─────────────────────────────────────────────
-  // CACHE KEY
-  // ─────────────────────────────────────────────
-  static cacheKey(studentId) {
-    return `progress:${studentId}`;
-  }
+const evaluateCompletion = require('./evaluateCompletion');
+const syncProgressState = require('./progressSyncService');
 
-  // ─────────────────────────────────────────────
-  // 1. GET PROGRESS (CACHED + DB FALLBACK)
-  // ─────────────────────────────────────────────
-  static async getStudentProgress(studentId) {
-    const key = this.cacheKey(studentId);
-
-    // 1. Try cache first
-    let cached = await CacheService.get(key);
-    if (cached) {
-      return {
-        source: 'cache',
-        data: cached
-      };
+/**
+ * Fetch current progress row (if exists)
+ */
+async function getProgress(studentId, subtopicId) {
+  const rows = await sequelize.query(
+    `
+    SELECT *
+    FROM subtopic_progress
+    WHERE student_id = :studentId
+      AND subtopic_id = :subtopicId
+    LIMIT 1
+    `,
+    {
+      replacements: { studentId, subtopicId },
+      type: QueryTypes.SELECT,
     }
+  );
 
-    // 2. Fallback to DB
-    const rows = await sequelize.query(
-      `
-      SELECT
-        st.id AS subtopic_id,
-        st.name,
-        COALESCE(sp.resources_completed, false) AS resources_completed,
-        COALESCE(sp.practice_completed, false) AS practice_completed,
-        COALESCE(sp.quiz_completed, false) AS quiz_completed,
-        COALESCE(sp.notes_viewed, false) AS notes_viewed,
-        COALESCE(sp.video_watched, false) AS video_watched,
-        CASE
-          WHEN (sp.resources_completed AND sp.practice_completed AND sp.quiz_completed)
-          THEN true ELSE false
-        END AS is_mastered
-      FROM subtopics st
-      LEFT JOIN subtopic_progress sp
-        ON sp.subtopic_id = st.id
-        AND sp.student_id = :studentId
-      ORDER BY st.id ASC
-      `,
-      {
-        replacements: { studentId },
-        type: QueryTypes.SELECT
-      }
-    );
-
-    // 3. Store in cache
-    await CacheService.set(key, rows, 300);
-
-    return {
-      source: 'db',
-      data: rows
-    };
-  }
-
-  // ─────────────────────────────────────────────
-  // 2. MASTERy CALCULATION
-  // ─────────────────────────────────────────────
-  static computeMastery(progressRow) {
-    const base =
-      progressRow.resources_completed &&
-      progressRow.practice_completed &&
-      progressRow.quiz_completed;
-
-    const bonus =
-      (progressRow.notes_viewed ? 0.1 : 0) +
-      (progressRow.video_watched ? 0.1 : 0);
-
-    return Math.min(base ? 1 : 0 + bonus, 1);
-  }
-
-  // ─────────────────────────────────────────────
-  // 3. INVALIDATE CACHE
-  // ─────────────────────────────────────────────
-  static async invalidate(studentId) {
-    const key = this.cacheKey(studentId);
-    await CacheService.del(key);
-
-    // Also invalidate dependent systems
-    await CacheService.del(`analytics:${studentId}`);
-  }
-
-  // ─────────────────────────────────────────────
-  // 4. UPDATE PROGRESS HOOK
-  // ─────────────────────────────────────────────
-  static async onProgressUpdate(studentId) {
-    await this.invalidate(studentId);
-  }
-
-  // ─────────────────────────────────────────────
-  // 5. GET MASTERED COUNT
-  // ─────────────────────────────────────────────
-  static async getMasterySummary(studentId) {
-    const progress = await this.getStudentProgress(studentId);
-
-    const total = progress.data.length;
-    const mastered = progress.data.filter(p => p.is_mastered).length;
-
-    return {
-      total_subtopics: total,
-      mastered_subtopics: mastered,
-      mastery_rate: total ? mastered / total : 0
-    };
-  }
+  return rows[0] || null;
 }
 
-module.exports = SubtopicProgressService;
+/**
+ * UPSERT progress row safely
+ */
+async function upsertProgress(studentId, subtopicId, updates) {
+  const existing = await getProgress(studentId, subtopicId);
+
+  if (!existing) {
+    return sequelize.query(
+      `
+      INSERT INTO subtopic_progress (
+        student_id,
+        subtopic_id,
+        resources_completed,
+        practice_completed,
+        quiz_completed,
+        notes_viewed,
+        video_watched,
+        created_at,
+        updated_at
+      )
+      VALUES (
+        :studentId,
+        :subtopicId,
+        :resources_completed,
+        :practice_completed,
+        :quiz_completed,
+        :notes_viewed,
+        :video_watched,
+        NOW(),
+        NOW()
+      )
+      RETURNING *
+      `,
+      {
+        replacements: {
+          studentId,
+          subtopicId,
+          resources_completed: updates.resources_completed || false,
+          practice_completed: updates.practice_completed || false,
+          quiz_completed: updates.quiz_completed || false,
+          notes_viewed: updates.notes_viewed || false,
+          video_watched: updates.video_watched || false,
+        },
+        type: QueryTypes.INSERT,
+      }
+    );
+  }
+
+  return sequelize.query(
+    `
+    UPDATE subtopic_progress
+    SET
+      resources_completed = COALESCE(:resources_completed, resources_completed),
+      practice_completed  = COALESCE(:practice_completed, practice_completed),
+      quiz_completed      = COALESCE(:quiz_completed, quiz_completed),
+      notes_viewed        = COALESCE(:notes_viewed, notes_viewed),
+      video_watched       = COALESCE(:video_watched, video_watched),
+      updated_at          = NOW()
+    WHERE student_id = :studentId
+      AND subtopic_id = :subtopicId
+    RETURNING *
+    `,
+    {
+      replacements: {
+        studentId,
+        subtopicId,
+        ...updates,
+      },
+      type: QueryTypes.UPDATE,
+    }
+  );
+}
+
+/**
+ * MAIN ENTRY POINT
+ * Called from routes when user interacts with learning content
+ */
+async function updateProgress(studentId, subtopicId, input = {}) {
+  // 1. sync raw input state
+  const normalizedInput = syncProgressState(input);
+
+  // 2. write/update DB
+  await upsertProgress(studentId, subtopicId, normalizedInput);
+
+  // 3. re-fetch latest state
+  const latest = await getProgress(studentId, subtopicId);
+
+  // 4. evaluate completion state (A1.7)
+  const evaluation = await evaluateCompletion(latest);
+
+  // 5. persist evaluated state if needed
+  if (evaluation.changed) {
+    await upsertProgress(studentId, subtopicId, evaluation.flags);
+  }
+
+  // 6. final fetch
+  const finalState = await getProgress(studentId, subtopicId);
+
+  return {
+    success: true,
+    data: finalState,
+    meta: evaluation.meta,
+  };
+}
+
+module.exports = {
+  updateProgress,
+  getProgress,
+  upsertProgress,
+};
