@@ -1,68 +1,115 @@
 'use strict';
 
+const sequelize = require('../config/database');
+const { QueryTypes } = require('sequelize');
+
 /**
- * Progress Engine
- * ----------------
- * Single source of truth for computing subtopic completion state.
- *
- * This replaces SQL CASE logic and ensures:
- * - deterministic completion rules
- * - future extensibility (XP, mastery, weighting)
- * - consistent API + analytics outputs
+ * Ensures a progress row exists (idempotent)
  */
+async function ensureRow(studentId, subtopicId) {
+  await sequelize.query(
+    `
+    INSERT INTO subtopic_progress (student_id, subtopic_id)
+    VALUES (:studentId, :subtopicId)
+    ON CONFLICT (student_id, subtopic_id)
+    DO NOTHING
+    `,
+    {
+      replacements: { studentId, subtopicId },
+      type: QueryTypes.INSERT,
+    }
+  );
+}
 
-function computeSubtopicCompletion(progress) {
-  if (!progress) {
-    return {
-      resources_completed: false,
-      practice_completed: false,
-      quiz_completed: false,
-      notes_viewed: false,
-      video_watched: false,
-      completed: false,
-      completion_score: 0,
-    };
-  }
+/**
+ * Fetch current progress state
+ */
+async function getProgress(studentId, subtopicId) {
+  const rows = await sequelize.query(
+    `
+    SELECT *
+    FROM subtopic_progress
+    WHERE student_id = :studentId
+      AND subtopic_id = :subtopicId
+    `,
+    {
+      replacements: { studentId, subtopicId },
+      type: QueryTypes.SELECT,
+    }
+  );
 
-  const {
-    resources_completed = false,
-    practice_completed = false,
-    quiz_completed = false,
-    notes_viewed = false,
-    video_watched = false,
-  } = progress;
+  return rows[0] || null;
+}
 
-  // Core completion rules (STRICT)
-  const coreCompleted =
-    resources_completed &&
-    practice_completed &&
-    quiz_completed;
+/**
+ * Recompute completion state (single source of truth)
+ */
+function computeCompletion(row) {
+  const resources = !!row.resources_completed;
+  const practice = !!row.practice_completed;
+  const quiz = !!row.quiz_completed;
+  const notes = !!row.notes_viewed;
+  const video = !!row.video_watched;
 
-  // Lightweight engagement score (future AI + analytics use)
-  let score = 0;
+  return resources && practice && quiz && notes && video;
+}
 
-  if (resources_completed) score += 35;
-  if (practice_completed) score += 35;
-  if (quiz_completed) score += 30;
+/**
+ * Persist recomputed completion
+ */
+async function updateCompletion(studentId, subtopicId) {
+  const row = await getProgress(studentId, subtopicId);
+  if (!row) return null;
 
-  // Engagement bonuses (non-blocking)
-  if (notes_viewed) score += 5;
-  if (video_watched) score += 5;
+  const completed = computeCompletion(row);
 
-  if (score > 100) score = 100;
+  await sequelize.query(
+    `
+    UPDATE subtopic_progress
+    SET completed_at = CASE
+        WHEN :completed = true AND completed_at IS NULL
+        THEN NOW()
+        ELSE completed_at
+    END
+    WHERE student_id = :studentId
+      AND subtopic_id = :subtopicId
+    `,
+    {
+      replacements: { studentId, subtopicId, completed },
+      type: QueryTypes.UPDATE,
+    }
+  );
 
-  return {
-    resources_completed,
-    practice_completed,
-    quiz_completed,
-    notes_viewed,
-    video_watched,
+  return { completed };
+}
 
-    completed: coreCompleted,
-    completion_score: score,
-  };
+/**
+ * Generic field updater (safe + extensible)
+ */
+async function markField(studentId, subtopicId, field, value = true) {
+  await ensureRow(studentId, subtopicId);
+
+  await sequelize.query(
+    `
+    UPDATE subtopic_progress
+    SET ${field} = :value,
+        updated_at = NOW()
+    WHERE student_id = :studentId
+      AND subtopic_id = :subtopicId
+    `,
+    {
+      replacements: { studentId, subtopicId, value },
+      type: QueryTypes.UPDATE,
+    }
+  );
+
+  return updateCompletion(studentId, subtopicId);
 }
 
 module.exports = {
-  computeSubtopicCompletion,
+  ensureRow,
+  getProgress,
+  computeCompletion,
+  updateCompletion,
+  markField,
 };
