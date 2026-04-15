@@ -65,30 +65,17 @@ export default function OnboardingPage() {
     const loadSubjects = async () => {
       setLoadingS(true);
       try {
-        // Try to match the user's curriculum to an exam board code
-        const curriculum = user?.curriculum || user?.exam_board || '';
-        let boardCodes   = [];
-
-        if (curriculum) {
-          // Fetch all boards and find one whose name or code fuzzy-matches
-          const boardsRes = await api.get('/exam-boards').catch(() => ({ data: [] }));
-          const allBoards = extractList(boardsRes);
-          const matched   = allBoards.find(b =>
-            b.code?.toLowerCase()  === curriculum.toLowerCase() ||
-            b.name?.toLowerCase().includes(curriculum.toLowerCase()) ||
-            curriculum.toLowerCase().includes(b.code?.toLowerCase())
-          );
-          if (matched) boardCodes = [matched.code];
-        }
-
-        setDetectedBoards(boardCodes);
-
-        // Fetch subjects — filtered by board if we matched one, otherwise all
         let subs = [];
-        if (boardCodes.length > 0) {
+
+        // Priority 1: use pending_exam_board_ids stored during registration.
+        // These are the exam board IDs the student explicitly chose on sign-up.
+        const pendingIds = user?.pending_exam_board_ids || [];
+
+        if (pendingIds.length > 0) {
+          setDetectedBoards(pendingIds);
           const results = await Promise.all(
-            boardCodes.map(code =>
-              api.get('/subjects', { params: { exam_board_code: code } })
+            pendingIds.map(id =>
+              api.get('/subjects', { params: { exam_board_id: id } })
                 .then(r => extractList(r))
                 .catch(() => [])
             )
@@ -96,15 +83,37 @@ export default function OnboardingPage() {
           subs = results.flat();
         }
 
-        // If board-filtered fetch returned nothing, fall back to all subjects
+        // Priority 2: fuzzy-match curriculum string (legacy / fallback)
+        if (subs.length === 0) {
+          const curriculum = user?.curriculum || user?.exam_board || '';
+          if (curriculum) {
+            const boardsRes = await api.get('/exam-boards').catch(() => ({ data: [] }));
+            const allBoards = extractList(boardsRes);
+            const matched   = allBoards.find(b =>
+              b.code?.toLowerCase()  === curriculum.toLowerCase() ||
+              b.name?.toLowerCase().includes(curriculum.toLowerCase()) ||
+              curriculum.toLowerCase().includes(b.code?.toLowerCase())
+            );
+            if (matched) {
+              setDetectedBoards([matched.id]);
+              const r = await api.get('/subjects', { params: { exam_board_id: matched.id } })
+                .catch(() => ({ data: [] }));
+              subs = extractList(r);
+            }
+          }
+        }
+
+        // Priority 3: fall back to all subjects
         if (subs.length === 0) {
           const allRes = await api.get('/subjects').catch(() => ({ data: [] }));
           subs = extractList(allRes);
         }
 
-        // Deduplicate
-        const unique = [...new Map(subs.map(s => [s.id, s])).values()];
-        setAllSubs(unique);
+        // Deduplicate by subject NAME so the same subject that exists across
+        // multiple exam boards only shows once in the picker.
+        const byName = new Map();
+        subs.forEach(s => { if (!byName.has(s.name)) byName.set(s.name, s); });
+        setAllSubs([...byName.values()]);
       } catch {
         setAllSubs([]);
       } finally {

@@ -212,12 +212,38 @@ router.patch('/preferences', protect, async (req, res) => {
       }
     }
 
-    // 2. Save subject_ids — look up their exam_board_ids and upsert into student_exam_types
+    // 2. Save subject_ids — upsert into student_subjects AND student_exam_types
     if (Array.isArray(subject_ids) && subject_ids.length > 0) {
+      // Ensure student_subjects table exists (idempotent)
+      await sequelize.query(
+        `CREATE TABLE IF NOT EXISTS student_subjects (
+           id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+           student_id UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+           subject_id INTEGER     NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+           is_active  BOOLEAN     NOT NULL DEFAULT true,
+           added_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+           UNIQUE(student_id, subject_id)
+         )`,
+        { type: QueryTypes.RAW }
+      );
+
+      // Save each selected subject
+      for (const sid of subject_ids) {
+        const safeId = parseInt(sid);
+        if (!safeId) continue;
+        await sequelize.query(
+          `INSERT INTO student_subjects (student_id, subject_id, is_active)
+           VALUES (:userId, :subjectId, true)
+           ON CONFLICT (student_id, subject_id) DO UPDATE SET is_active = true`,
+          { replacements: { userId, subjectId: safeId }, type: QueryTypes.INSERT }
+        );
+      }
+
+      // Also save the boards those subjects belong to in student_exam_types
       const boardRows = await sequelize.query(
         `SELECT DISTINCT exam_board_id FROM subjects
          WHERE id = ANY(:subjectIds) AND is_active = true AND exam_board_id IS NOT NULL`,
-        { replacements: { subjectIds: subject_ids }, type: QueryTypes.SELECT }
+        { replacements: { subjectIds: subject_ids.map(Number).filter(Boolean) }, type: QueryTypes.SELECT }
       );
       for (const row of boardRows) {
         await sequelize.query(
