@@ -10,19 +10,16 @@ const logger = require('./config/logger');
 const requestId = require('./middleware/requestId');
 const requestLogger = require('./middleware/requestLogger');
 
-// ── DOTENV FOR LOCAL DEV ONLY ────────────────────────────────────────────────
 if (process.env.NODE_ENV !== 'production') {
   const dotenv = require('dotenv');
   dotenv.config({ path: path.join(__dirname, '.env') });
 }
 
-// ── CREATE LOGS DIR IF PRODUCTION ─────────────────────────────────────────────
 if (process.env.NODE_ENV === 'production') {
   const logsDir = path.join(__dirname, 'logs');
   if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
 }
 
-// ── ENV VALIDATION ────────────────────────────────────────────────────────────
 (function validateEnv() {
   const required = ['JWT_SECRET', 'PORT'];
 
@@ -32,67 +29,53 @@ if (process.env.NODE_ENV === 'production') {
   }
 
   const missing = required.filter((key) => !process.env[key]);
-  if (missing.length > 0) {
-    console.error(` Missing required environment variables: ${missing.join(', ')}`);
+  if (missing.length) {
+    console.error(`Missing env vars: ${missing.join(', ')}`);
     process.exit(1);
   }
 })();
 
-// ── EXPRESS APP ───────────────────────────────────────────────────────────────
 const app = express();
 app.set('trust proxy', 1);
 
-// ── SERVE REACT STATIC FILES (LOCAL/NGROK ONLY) ─────────────────────────────
 const clientDist = path.join(__dirname, '..', 'client', 'dist');
 if (fs.existsSync(clientDist)) {
   app.use(express.static(clientDist));
-  console.log(' Serving React frontend from client/dist');
+  console.log('Serving React frontend');
 } else {
-  console.log('ℹ  client/dist not found — expecting separate frontend service (Render Static Site)');
+  console.log('No client build detected (expected on Render Static Site)');
 }
 
-// ── CORE MIDDLEWARE ───────────────────────────────────────────────────────────
 app.use(requestId);
-
-app.use(
-  helmet({
-    contentSecurityPolicy: false,
-  })
-);
-
+app.use(helmet({ contentSecurityPolicy: false }));
 app.use(globalLimiter);
 
-// ── CORS ──────────────────────────────────────────────────────────────────────
 const ALLOWED_ORIGINS = [
   'http://localhost:5173',
   'http://localhost:3000',
-  'http://localhost:5000',
   'https://aischoolonair.onrender.com',
   process.env.CLIENT_URL,
   process.env.PROD_CLIENT_URL,
   process.env.NGROK_URL,
 ].filter(Boolean);
 
-app.use(
-  cors({
-    origin: (origin, cb) => {
-      if (!origin) return cb(null, true);
-      if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
-      logger.warn('CORS rejected origin', { origin });
-      cb(new Error('CORS blocked'));
-    },
-    credentials: true,
-  })
-);
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true);
+    if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+    logger.warn('CORS blocked', { origin });
+    cb(new Error('CORS blocked'));
+  },
+  credentials: true,
+}));
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(requestLogger);
 
-// ── DATABASE ──────────────────────────────────────────────────────────────────
+// DB
 const db = require('./config/database');
 
-// Load models
 const modelPaths = [
   './models/User',
   './models/ExamBoard',
@@ -118,83 +101,75 @@ const modelPaths = [
   './models/TeacherSubject',
 ];
 
-for (const modelPath of modelPaths) {
+for (const m of modelPaths) {
   try {
-    const modelExport = require(modelPath);
-    if (typeof modelExport === 'function' && modelExport.length === 1) {
-      modelExport(db);
-    }
+    const mod = require(m);
+    if (typeof mod === 'function') mod(db);
   } catch (e) {
-    logger.warn(`Model not found or failed to load: ${modelPath} — ${e.message}`);
+    logger.warn(`Model skipped: ${m} — ${e.message}`);
   }
 }
 
 try {
   require('./models/associations');
-} catch (e) {}
+} catch {}
 
-// ── DB INIT ──────────────────────────────────────────────────────────────────
-async function initDatabase() {
+async function initDB() {
   try {
     await db.authenticate();
-    logger.info(' DB connected');
-    logger.info(' DB ready (schema managed via migrations)');
-  } catch (err) {
-    logger.error(' DB connection failed', { error: err.message });
+    logger.info('DB connected');
+  } catch (e) {
+    logger.error('DB failed', { error: e.message });
     process.exit(1);
   }
 }
+initDB();
 
-initDatabase();
-
-// ── AUTH ─────────────────────────────────────────────────────────────────────
 const { protect } = require('./middleware/auth');
 
-let subscriptionGuard = (_req, _res, next) => next();
+let subscriptionGuard = (_r, _s, n) => n();
 try {
   subscriptionGuard = require('./middleware/subscriptionGuard');
 } catch {}
 
-// ── ROUTES ───────────────────────────────────────────────────────────────────
-const authRoutes        = require('./routes/authRoutes');
-const aiRoutes          = require('./routes/aiRoutes');
-const adminRoutes       = require('./routes/adminRoutes');
-const teacherRoutes     = require('./routes/teacherRoutes');
-const userRoutes        = require('./routes/users');
-const examBoardsRoutes  = require('./routes/examBoardsRoutes');
-const subjectRoutes     = require('./routes/subjects');
-const topicsRoutes      = require('./routes/topicsRoutes');
-const subtopicRoutes    = require('./routes/subtopicRoutes');
-const resourceRoutes    = require('./routes/resourceRoutes');
-const coursesRoutes     = require('./routes/courses');
+const authRoutes = require('./routes/authRoutes');
+const aiRoutes = require('./routes/aiRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+const teacherRoutes = require('./routes/teacherRoutes');
+const userRoutes = require('./routes/users');
+const examBoardsRoutes = require('./routes/examBoardsRoutes');
+const subjectRoutes = require('./routes/subjects');
+const topicsRoutes = require('./routes/topicsRoutes');
+const subtopicRoutes = require('./routes/subtopicRoutes');
+const resourceRoutes = require('./routes/resourceRoutes');
+const coursesRoutes = require('./routes/courses');
 const enrollmentsRoutes = require('./routes/enrollments');
-const quizzesRoutes     = require('./routes/quizzes');
-const questionsRoutes   = require('./routes/questionsRoutes');
-const analyticsRoutes   = require('./routes/analyticsRoutes');
-const notesRoutes       = require('./routes/notesRoutes');
-const videosRoutes      = require('./routes/videosRoutes');
-const pastPaperRoutes   = require('./routes/pastPaperRoutes');
-const paymentRoutes     = require('./routes/paymentRoutes');
-const catalogRoutes     = require('./routes/catalogRoutes');
+const quizzesRoutes = require('./routes/quizzes');
+const questionsRoutes = require('./routes/questionsRoutes');
+const analyticsRoutes = require('./routes/analyticsRoutes');
+const notesRoutes = require('./routes/notesRoutes');
+const videosRoutes = require('./routes/videosRoutes');
+const pastPaperRoutes = require('./routes/pastPaperRoutes');
+const paymentRoutes = require('./routes/paymentRoutes');
+const catalogRoutes = require('./routes/catalogRoutes');
 const notificationsRoutes = require('./routes/notificationsRoutes');
-const studentRoutes     = require('./routes/studentRoutes');
-const conceptRoutes     = require('./routes/conceptRoutes');
-const curriculumRoutes  = require('./routes/curriculumRoutes');
+const studentRoutes = require('./routes/studentRoutes');
+const conceptRoutes = require('./routes/conceptRoutes');
+const curriculumRoutes = require('./routes/curriculumRoutes');
 
 let aiChatRoute = null;
 try {
   aiChatRoute = require('./routes/aiChatRoute');
 } catch {}
 
-// ── STATIC FILES ──────────────────────────────────────────────────────────────
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// ── PUBLIC ROUTES ────────────────────────────────────────────────────────────
+// PUBLIC
 app.use('/api/auth', authRoutes);
 app.use('/api/exam-boards', examBoardsRoutes);
 app.use('/api/curriculum', curriculumRoutes);
 
-// ── PROTECTED ROUTES ─────────────────────────────────────────────────────────
+// PROTECTED
 app.use('/api/ai', protect, subscriptionGuard, aiLimiter, aiRoutes);
 if (aiChatRoute) app.use('/api/ai', protect, subscriptionGuard, aiLimiter, aiChatRoute);
 
@@ -203,10 +178,7 @@ app.use('/api/teacher', protect, teacherRoutes);
 app.use('/api/users', protect, userRoutes);
 app.use('/api/subjects', protect, subjectRoutes);
 app.use('/api/topics', protect, topicsRoutes);
-
-// ✅ SINGLE SOURCE OF TRUTH FOR SUBTOPICS
 app.use('/api/subtopics', protect, subtopicRoutes);
-
 app.use('/api/resources', protect, resourceRoutes);
 app.use('/api/courses', protect, coursesRoutes);
 app.use('/api/enrollments', protect, enrollmentsRoutes);
@@ -222,19 +194,12 @@ app.use('/api/notifications', protect, notificationsRoutes);
 app.use('/api/students', protect, studentRoutes);
 app.use('/api/concepts', protect, conceptRoutes);
 
-// ── HEALTH CHECK ─────────────────────────────────────────────────────────────
-app.get('/health', (_req, res) => {
-  res.json({ success: true });
-});
+app.get('/health', (_req, res) => res.json({ success: true }));
 
-// ── ERROR HANDLING ───────────────────────────────────────────────────────────
 app.use((err, _req, res, _next) => {
   logger.error('Unhandled error', { error: err.message });
   res.status(500).json({ success: false, error: 'Internal Server Error' });
 });
 
-// ── START SERVER ─────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(` Server running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Server running on ${PORT}`));
