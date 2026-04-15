@@ -4,28 +4,24 @@ const sequelize = require('../config/database');
 const { QueryTypes } = require('sequelize');
 
 /**
- * SUBTOPIC PROGRESS SERVICE (SMART ENGINE CORE)
- * ---------------------------------------------
- * Single source of truth for:
- * - progress tracking
- * - weighted completion
- * - XP system
- * - streak system
- * - completion evaluation
+ * Subtopic Progress Service
+ * -------------------------
+ * Central logic for:
+ * - updating learning activities
+ * - computing completion state
+ * - syncing derived completion field
  */
 
 class SubtopicProgressService {
 
   // ─────────────────────────────────────────────
-  // GET OR CREATE PROGRESS ROW
+  // Ensure row exists
   // ─────────────────────────────────────────────
-  static async getOrCreate(studentId, subtopicId) {
+  static async ensureProgress(studentId, subtopicId) {
     const existing = await sequelize.query(
       `
-      SELECT *
-      FROM subtopic_progress
-      WHERE student_id = :studentId
-      AND subtopic_id = :subtopicId
+      SELECT id FROM subtopic_progress
+      WHERE student_id = :studentId AND subtopic_id = :subtopicId
       `,
       {
         replacements: { studentId, subtopicId },
@@ -33,32 +29,13 @@ class SubtopicProgressService {
       }
     );
 
-    if (existing.length) return existing[0];
+    if (existing.length) return existing[0].id;
 
-    await sequelize.query(
+    const result = await sequelize.query(
       `
       INSERT INTO subtopic_progress (student_id, subtopic_id)
       VALUES (:studentId, :subtopicId)
-      `,
-      {
-        replacements: { studentId, subtopicId },
-        type: QueryTypes.INSERT
-      }
-    );
-
-    return this.getProgress(studentId, subtopicId);
-  }
-
-  // ─────────────────────────────────────────────
-  // GET PROGRESS
-  // ─────────────────────────────────────────────
-  static async getProgress(studentId, subtopicId) {
-    const rows = await sequelize.query(
-      `
-      SELECT *
-      FROM subtopic_progress
-      WHERE student_id = :studentId
-      AND subtopic_id = :subtopicId
+      RETURNING id
       `,
       {
         replacements: { studentId, subtopicId },
@@ -66,22 +43,45 @@ class SubtopicProgressService {
       }
     );
 
-    return rows[0] || null;
+    return result[0].id;
   }
 
   // ─────────────────────────────────────────────
-  // UPDATE FIELD (IDEMPOTENT)
+  // Update a single progress flag
   // ─────────────────────────────────────────────
-  static async updateField(studentId, subtopicId, field, value) {
-    await this.getOrCreate(studentId, subtopicId);
+  static async updateProgress(studentId, subtopicId, field, value = true) {
+
+    const allowedFields = [
+      'resources_completed',
+      'practice_completed',
+      'quiz_completed',
+      'notes_viewed',
+      'video_watched'
+    ];
+
+    if (!allowedFields.includes(field)) {
+      throw new Error(`Invalid progress field: ${field}`);
+    }
+
+    await this.ensureProgress(studentId, subtopicId);
 
     await sequelize.query(
       `
       UPDATE subtopic_progress
       SET ${field} = :value,
-          updated_at = NOW()
-      WHERE student_id = :studentId
-      AND subtopic_id = :subtopicId
+          updated_at = NOW(),
+          completed_at = CASE
+            WHEN (
+              resources_completed = true AND
+              practice_completed = true AND
+              quiz_completed = true AND
+              notes_viewed = true AND
+              video_watched = true
+            )
+            THEN NOW()
+            ELSE completed_at
+          END
+      WHERE student_id = :studentId AND subtopic_id = :subtopicId
       `,
       {
         replacements: { studentId, subtopicId, value },
@@ -93,106 +93,75 @@ class SubtopicProgressService {
   }
 
   // ─────────────────────────────────────────────
-  // WEIGHTED SCORE CALCULATION
+  // Get progress state
   // ─────────────────────────────────────────────
-  static calculateScore(progress) {
-    const score =
-      (progress.resources_completed ? 0.3 : 0) +
-      (progress.practice_completed ? 0.3 : 0) +
-      (progress.quiz_completed ? 0.4 : 0);
-
-    return Math.round(score * 100);
-  }
-
-  static isCompleted(progress) {
-    return this.calculateScore(progress) >= 100;
-  }
-
-  // ─────────────────────────────────────────────
-  // XP CALCULATION (SMART REWARD SYSTEM)
-  // ─────────────────────────────────────────────
-  static calculateXP(progress) {
-    const score = this.calculateScore(progress);
-
-    let xp = 10;
-
-    if (score >= 40) xp += 2;
-    if (score >= 70) xp += 3;
-    if (score >= 100) xp += 5;
-
-    return xp;
-  }
-
-  // ─────────────────────────────────────────────
-  // STREAK SYSTEM
-  // ─────────────────────────────────────────────
-  static async updateStreak(studentId) {
-    const today = new Date().toISOString().slice(0, 10);
-
+  static async getProgress(studentId, subtopicId) {
     const rows = await sequelize.query(
       `
-      SELECT last_login
-      FROM users
-      WHERE id = :studentId
+      SELECT *
+      FROM subtopic_progress
+      WHERE student_id = :studentId AND subtopic_id = :subtopicId
       `,
       {
-        replacements: { studentId },
+        replacements: { studentId, subtopicId },
         type: QueryTypes.SELECT
       }
     );
 
-    const user = rows[0];
-    if (!user) return;
+    return rows[0] || null;
+  }
 
-    const lastLogin = user.last_login
-      ? new Date(user.last_login).toISOString().slice(0, 10)
-      : null;
+  // ─────────────────────────────────────────────
+  // Compute completion status (SMART ENGINE)
+  // ─────────────────────────────────────────────
+  static isCompleted(progress) {
+    if (!progress) return false;
 
-    if (lastLogin === today) return;
-
-    await sequelize.query(
-      `
-      UPDATE users
-      SET study_streak_days = study_streak_days + 1,
-          last_login = NOW()
-      WHERE id = :studentId
-      `,
-      {
-        replacements: { studentId },
-        type: QueryTypes.UPDATE
-      }
+    return (
+      progress.resources_completed &&
+      progress.practice_completed &&
+      progress.quiz_completed &&
+      progress.notes_viewed &&
+      progress.video_watched
     );
   }
 
   // ─────────────────────────────────────────────
-  // MAIN EVALUATION ENGINE
+  // Get completion percentage
   // ─────────────────────────────────────────────
-  static async evaluateCompletion(studentId, subtopicId) {
-    const progress = await this.getProgress(studentId, subtopicId);
-    if (!progress) return null;
+  static getCompletionPercentage(progress) {
+    if (!progress) return 0;
 
-    const score = this.calculateScore(progress);
-    const completed = this.isCompleted(progress);
+    const fields = [
+      progress.resources_completed,
+      progress.practice_completed,
+      progress.quiz_completed,
+      progress.notes_viewed,
+      progress.video_watched
+    ];
 
-    await this.updateStreak(studentId);
+    const done = fields.filter(Boolean).length;
 
-    // already completed → prevent XP duplication
-    if (progress.completed_at) {
-      return { ...progress, score, completed: true };
-    }
+    return Math.round((done / fields.length) * 100);
+  }
 
-    // not completed yet
-    if (!completed) {
-      return { ...progress, score, completed: false };
-    }
+  // ─────────────────────────────────────────────
+  // Mark full completion manually
+  // ─────────────────────────────────────────────
+  static async markCompleted(studentId, subtopicId) {
+    await this.ensureProgress(studentId, subtopicId);
 
-    // mark completion
     await sequelize.query(
       `
       UPDATE subtopic_progress
-      SET completed_at = NOW()
-      WHERE student_id = :studentId
-      AND subtopic_id = :subtopicId
+      SET resources_completed = true,
+          practice_completed = true,
+          quiz_completed = true,
+          notes_viewed = true,
+          video_watched = true,
+          completed_at = NOW(),
+          updated_at = NOW()
+      WHERE student_id = :studentId AND subtopic_id = :subtopicId
       `,
       {
         replacements: { studentId, subtopicId },
@@ -200,33 +169,7 @@ class SubtopicProgressService {
       }
     );
 
-    // award XP
-    const xp = this.calculateXP(progress);
-    await this.awardXP(studentId, xp);
-
-    return {
-      ...progress,
-      score,
-      completed: true,
-      xpAwarded: xp
-    };
-  }
-
-  // ─────────────────────────────────────────────
-  // XP AWARD
-  // ─────────────────────────────────────────────
-  static async awardXP(studentId, points) {
-    await sequelize.query(
-      `
-      UPDATE users
-      SET xp_points = xp_points + :points
-      WHERE id = :studentId
-      `,
-      {
-        replacements: { studentId, points },
-        type: QueryTypes.UPDATE
-      }
-    );
+    return this.getProgress(studentId, subtopicId);
   }
 }
 
