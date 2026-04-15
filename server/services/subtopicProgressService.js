@@ -1,38 +1,35 @@
 'use strict';
 
 /**
- * A1 + A3 INTEGRATED PROGRESS SERVICE
+ * A1 + A4 FINAL PROGRESS SERVICE
  *
- * Responsibilities:
- * - Update subtopic progress safely (idempotent writes)
- * - Maintain consistency across progress flags
- * - Trigger analytics events (A3 Analytics Engine)
- * - Compute completion state centrally
+ * CHANGES FROM A3 → A4:
+ * - Removed analyticsEngine dependency
+ * - Replaced with eventEngine (hard event bus)
+ * - Progress now emits events only (no direct analytics coupling)
+ *
+ * RESULT:
+ * - Fully decoupled architecture
+ * - Event-driven analytics pipeline
  */
 
 const sequelize = require('../config/database');
 const { QueryTypes } = require('sequelize');
 const logger = require('../config/logger');
 
-// A3 Analytics Engine integration
+// A4 Event Engine (replaces A3 analytics coupling)
 const {
-  emitProgressUpdate,
-} = require('./analyticsEngine');
+  emitProgressEvent,
+} = require('./eventEngine');
 
 /* ─────────────────────────────────────────────────────────────
    HELPERS
 ───────────────────────────────────────────────────────────── */
 
-/**
- * Normalize boolean inputs safely
- */
 function toBool(v) {
   return v === true || v === 'true' || v === 1 || v === '1';
 }
 
-/**
- * Determine completion state
- */
 function computeCompletion(flags) {
   return (
     flags.resources_completed &&
@@ -44,12 +41,9 @@ function computeCompletion(flags) {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   CORE UPSERT LOGIC
+   UPSERT PROGRESS CORE
 ───────────────────────────────────────────────────────────── */
 
-/**
- * Create or update subtopic progress row (UPSERT logic)
- */
 async function upsertProgress({
   studentId,
   subtopicId,
@@ -60,7 +54,7 @@ async function upsertProgress({
   video_watched,
 }) {
   try {
-    // 1. Check existing record
+    // Check existing record
     const existing = await sequelize.query(
       `
       SELECT *
@@ -77,7 +71,7 @@ async function upsertProgress({
 
     const record = existing[0];
 
-    const payload = {
+    const incoming = {
       resources_completed: toBool(resources_completed),
       practice_completed: toBool(practice_completed),
       quiz_completed: toBool(quiz_completed),
@@ -85,10 +79,10 @@ async function upsertProgress({
       video_watched: toBool(video_watched),
     };
 
-    const isCompleted = computeCompletion(payload);
     const now = new Date();
 
-    // 2. INSERT
+    /* ───────────────────────── INSERT ───────────────────────── */
+
     if (!record) {
       const result = await sequelize.query(
         `
@@ -122,8 +116,8 @@ async function upsertProgress({
           replacements: {
             studentId,
             subtopicId,
-            ...payload,
-            completedAt: isCompleted ? now : null,
+            ...incoming,
+            completedAt: computeCompletion(incoming) ? now : null,
           },
           type: QueryTypes.INSERT,
         }
@@ -131,22 +125,29 @@ async function upsertProgress({
 
       const created = result?.[0]?.[0];
 
-      emitProgressUpdate({
+      // A4 EVENT EMISSION
+      emitProgressEvent({
         studentId,
         subtopicId,
-        ...payload,
+        ...incoming,
       });
 
       return created;
     }
 
-    // 3. UPDATE (merge existing + new values)
+    /* ───────────────────────── UPDATE ───────────────────────── */
+
     const merged = {
-      resources_completed: payload.resources_completed ?? record.resources_completed,
-      practice_completed: payload.practice_completed ?? record.practice_completed,
-      quiz_completed: payload.quiz_completed ?? record.quiz_completed,
-      notes_viewed: payload.notes_viewed ?? record.notes_viewed,
-      video_watched: payload.video_watched ?? record.video_watched,
+      resources_completed:
+        incoming.resources_completed ?? record.resources_completed,
+      practice_completed:
+        incoming.practice_completed ?? record.practice_completed,
+      quiz_completed:
+        incoming.quiz_completed ?? record.quiz_completed,
+      notes_viewed:
+        incoming.notes_viewed ?? record.notes_viewed,
+      video_watched:
+        incoming.video_watched ?? record.video_watched,
     };
 
     const completed = computeCompletion(merged);
@@ -182,7 +183,8 @@ async function upsertProgress({
 
     const updatedRow = updated?.[0]?.[0];
 
-    emitProgressUpdate({
+    // A4 EVENT EMISSION
+    emitProgressEvent({
       studentId,
       subtopicId,
       ...merged,
@@ -190,7 +192,7 @@ async function upsertProgress({
 
     return updatedRow;
   } catch (err) {
-    logger.error('[subtopicProgressService] upsert failed', {
+    logger.error('[subtopicProgressService] error', {
       error: err.message,
     });
     throw err;
@@ -198,7 +200,7 @@ async function upsertProgress({
 }
 
 /* ─────────────────────────────────────────────────────────────
-   FETCH USER PROGRESS (FOR UI)
+   FETCH USER PROGRESS
 ───────────────────────────────────────────────────────────── */
 
 async function getUserProgress(studentId) {
