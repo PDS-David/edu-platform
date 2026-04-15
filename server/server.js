@@ -132,17 +132,13 @@ for (const modelPath of modelPaths) {
 
 try {
   require('./models/associations');
-} catch (e) {
-  // No associations file — fine
-}
+} catch (e) {}
 
+// ── DB INIT ──────────────────────────────────────────────────────────────────
 async function initDatabase() {
   try {
     await db.authenticate();
     logger.info(' DB connected');
-    // Schema is managed entirely via manual migration files (migration_001–004).
-    // db.sync is intentionally disabled — it conflicts with UUID columns
-    // and causes crash loops on Render.
     logger.info(' DB ready (schema managed via migrations)');
   } catch (err) {
     logger.error(' DB connection failed', { error: err.message });
@@ -152,7 +148,7 @@ async function initDatabase() {
 
 initDatabase();
 
-// ── AUTH & SUBSCRIPTION MIDDLEWARE ───────────────────────────────────────────
+// ── AUTH ─────────────────────────────────────────────────────────────────────
 const { protect } = require('./middleware/auth');
 let subscriptionGuard = (_req, _res, next) => next();
 try {
@@ -185,97 +181,62 @@ const studentRoutes       = require('./routes/studentRoutes');
 const conceptRoutes       = require('./routes/conceptRoutes');
 const curriculumRoutes    = require('./routes/curriculumRoutes');
 
-// Optional routes — skip if file missing
-let aiChatRoute        = null;
-let quizGeneratorRoute = null;
-let studyPlannerRoute  = null;
-let explanationRoute   = null;
-let examTypeActivation = null;
-let analyticsLegacy    = null;
+// ✅ ADD THIS LINE
+const subtopicProgressRoutes = require('./routes/subtopicProgressRoutes');
 
-try { aiChatRoute        = require('./routes/aiChatRoute');        } catch {}
-try { quizGeneratorRoute = require('./routes/quizGeneratorRoute'); } catch {}
-try { studyPlannerRoute  = require('./routes/studyPlannerRoute');  } catch {}
-try { explanationRoute   = require('./routes/explanationRoute');   } catch {}
-try { examTypeActivation = require('./routes/examTypeActivation'); } catch {}
-try { analyticsLegacy    = require('./routes/analytics');          } catch {}
+// ── OPTIONAL ROUTES ──────────────────────────────────────────────────────────
+let aiChatRoute = null;
+try { aiChatRoute = require('./routes/aiChatRoute'); } catch {}
 
-// ── Serve uploaded files ──────────────────────────────────────────────────────
+// ── STATIC ───────────────────────────────────────────────────────────────────
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// ── Public routes ─────────────────────────────────────────────────────────────
-app.use('/api/auth',        authRoutes);
+// ── PUBLIC ───────────────────────────────────────────────────────────────────
+app.use('/api/auth', authRoutes);
 app.use('/api/exam-boards', examBoardsRoutes);
-app.use('/api/curriculum',  curriculumRoutes);
+app.use('/api/curriculum', curriculumRoutes);
 
-// ── Protected routes ──────────────────────────────────────────────────────────
+// ── PROTECTED ────────────────────────────────────────────────────────────────
 app.use('/api/ai', protect, subscriptionGuard, aiLimiter, aiRoutes);
-if (aiChatRoute)        app.use('/api/ai',            protect, subscriptionGuard, aiLimiter, aiChatRoute);
-if (quizGeneratorRoute) app.use('/api/quiz-generator', protect, quizGeneratorRoute);
-if (studyPlannerRoute)  app.use('/api/study-planner',  protect, studyPlannerRoute);
-if (explanationRoute)   app.use('/api/explanations',   protect, explanationRoute);
-if (examTypeActivation) app.use('/api/exam-types',     protect, examTypeActivation);
-if (analyticsLegacy)    app.use('/api/analytics',      protect, analyticsLegacy);
+if (aiChatRoute) app.use('/api/ai', protect, subscriptionGuard, aiLimiter, aiChatRoute);
 
-app.use('/api/admin',         protect, adminRoutes);
-app.use('/api/teacher',       protect, teacherRoutes);
-app.use('/api/users',         protect, userRoutes);
-app.use('/api/subjects',      protect, subjectRoutes);
-app.use('/api/topics',        protect, topicsRoutes);
-app.use('/api/subtopics',     protect, subtopicRoutes);
-app.use('/api/resources',     protect, resourceRoutes);
-app.use('/api/courses',       protect, coursesRoutes);
-app.use('/api/enrollments',   protect, enrollmentsRoutes);
-app.use('/api/quizzes',       protect, quizzesRoutes);
-app.use('/api/questions',     protect, questionsRoutes);
-app.use('/api/analytics',     protect, analyticsRoutes);
-app.use('/api/notes',         protect, notesRoutes);
-app.use('/api/videos',        protect, videosRoutes);
-app.use('/api/past-papers',   protect, pastPaperRoutes);
-app.use('/api/payments',      protect, paymentRoutes);
-app.use('/api/catalog',       protect, catalogRoutes);
+// ✅ ADD THIS LINE (CRITICAL)
+app.use('/api/subtopics/progress-summary', protect, subtopicProgressRoutes);
+
+app.use('/api/admin', protect, adminRoutes);
+app.use('/api/teacher', protect, teacherRoutes);
+app.use('/api/users', protect, userRoutes);
+app.use('/api/subjects', protect, subjectRoutes);
+app.use('/api/topics', protect, topicsRoutes);
+app.use('/api/subtopics', protect, subtopicRoutes);
+app.use('/api/resources', protect, resourceRoutes);
+app.use('/api/courses', protect, coursesRoutes);
+app.use('/api/enrollments', protect, enrollmentsRoutes);
+app.use('/api/quizzes', protect, quizzesRoutes);
+app.use('/api/questions', protect, questionsRoutes);
+app.use('/api/analytics', protect, analyticsRoutes);
+app.use('/api/notes', protect, notesRoutes);
+app.use('/api/videos', protect, videosRoutes);
+app.use('/api/past-papers', protect, pastPaperRoutes);
+app.use('/api/payments', protect, paymentRoutes);
+app.use('/api/catalog', protect, catalogRoutes);
 app.use('/api/notifications', protect, notificationsRoutes);
-app.use('/api/students',      protect, studentRoutes);
-app.use('/api/concepts',      protect, conceptRoutes);
+app.use('/api/students', protect, studentRoutes);
+app.use('/api/concepts', protect, conceptRoutes);
 
-// ── HEALTH CHECK ──────────────────────────────────────────────────────────────
+// ── HEALTH ───────────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {
-  res.json({ success: true, message: 'Server running' });
+  res.json({ success: true });
 });
 
-// ── SPA CATCH-ALL (local/ngrok only) ─────────────────────────────────────────
-if (fs.existsSync(clientDist)) {
-  app.get('*', (_req, res) => {
-    res.setHeader('ngrok-skip-browser-warning', 'true');
-    res.sendFile(path.join(clientDist, 'index.html'));
-  });
-}
-
-// ── ERROR HANDLER ─────────────────────────────────────────────────────────────
+// ── ERROR ────────────────────────────────────────────────────────────────────
 app.use((err, _req, res, _next) => {
-  logger.error('Unhandled error', {
-    error: err.message,
-    stack: err.stack,
-  });
+  logger.error('Unhandled error', { error: err.message });
   res.status(500).json({ success: false, error: 'Internal Server Error' });
 });
 
-// ── START SERVER ──────────────────────────────────────────────────────────────
+// ── START ────────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(` Server running on port ${PORT}`);
-  console.log(` Local:  http://localhost:${PORT}`);
 });
-
-// ── SCHEDULED JOBS ────────────────────────────────────────────────────────────
-try {
-  const scheduledJobs = require('./jobs/scheduledJobs');
-  if (typeof scheduledJobs.start === 'function') {
-    scheduledJobs.start();
-    console.log('[server] Scheduled jobs started.');
-  } else {
-    console.log('[server] Scheduled jobs loaded.');
-  }
-} catch (e) {
-  console.warn('[server] Scheduled jobs not loaded:', e.message);
-}
