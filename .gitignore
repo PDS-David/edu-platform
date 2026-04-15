@@ -61,3 +61,5 @@ coverage/
 *.tmp
 *.bak
 *.swp
+
+!ai-ready-dump.txt
