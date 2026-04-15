@@ -22,9 +22,8 @@ const LoginPage = () => {
     try {
       const user = await login(email, password, rememberMe);
       // Support both snake_case (API) and camelCase versions of the flag
-      const onboardingDone = user.onboarding_complete ?? user.onboardingComplete ?? false;
       if (user.role === 'student') {
-        navigate(onboardingDone ? '/student/dashboard' : '/onboarding');
+        navigate('/student/dashboard');
       } else {
         const redirectMap = {
           teacher: '/teacher/dashboard',

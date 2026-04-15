@@ -357,7 +357,7 @@ const RegisterPage = () => {
         terms_accepted:    true,
       });
 
-      if (user.role === 'student')      navigate('/onboarding');
+      if (user.role === 'student')      navigate('/student/dashboard');
       else if (user.role === 'teacher') navigate('/teacher/dashboard');
       else                              navigate('/admin/dashboard');
     } catch (err) {
