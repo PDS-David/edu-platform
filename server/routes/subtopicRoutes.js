@@ -46,10 +46,33 @@ router.get('/', protect, async (req, res) => {
         COALESCE(sp.resources_completed, false) AS resources_completed,
         COALESCE(sp.practice_completed, false) AS practice_completed,
         COALESCE(sp.quiz_completed, false) AS quiz_completed,
-        CASE
-          WHEN (sp.resources_completed AND sp.practice_completed AND sp.quiz_completed)
-          THEN true ELSE false
-        END AS completed
+        const subtopics = await sequelize.query(
+  `
+  SELECT
+    st.id,
+    st.name,
+    st.description,
+    st.order_index,
+    st.topic_id,
+    st.subject_id,
+
+    COALESCE(sp.resources_completed, false) AS resources_completed,
+    COALESCE(sp.practice_completed, false) AS practice_completed,
+    COALESCE(sp.quiz_completed, false) AS quiz_completed,
+    COALESCE(sp.notes_viewed, false) AS notes_viewed,
+    COALESCE(sp.video_watched, false) AS video_watched
+
+  FROM subtopics st
+  JOIN topics t ON st.topic_id = t.id
+  JOIN subjects s ON st.subject_id = s.id
+  LEFT JOIN subtopic_progress sp
+    ON sp.subtopic_id = st.id AND sp.student_id = :studentId
+
+  ${where}
+  ORDER BY t.order_index ASC, st.order_index ASC
+  `,
+  { replacements, type: QueryTypes.SELECT }
+);
       FROM subtopics st
       JOIN topics t ON st.topic_id = t.id
       JOIN subjects s ON st.subject_id = s.id
