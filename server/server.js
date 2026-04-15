@@ -38,18 +38,21 @@ if (process.env.NODE_ENV === 'production') {
 const app = express();
 app.set('trust proxy', 1);
 
+// ── STATIC FRONTEND ─────────────────────────────
 const clientDist = path.join(__dirname, '..', 'client', 'dist');
 if (fs.existsSync(clientDist)) {
   app.use(express.static(clientDist));
   console.log('Serving React frontend');
 } else {
-  console.log('No client build detected (expected on Render Static Site)');
+  console.log('No client build detected (Render Static Site expected)');
 }
 
+// ── CORE MIDDLEWARE ─────────────────────────────
 app.use(requestId);
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(globalLimiter);
 
+// ── CORS ────────────────────────────────────────
 const ALLOWED_ORIGINS = [
   'http://localhost:5173',
   'http://localhost:3000',
@@ -64,7 +67,7 @@ app.use(cors({
     if (!origin) return cb(null, true);
     if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
     logger.warn('CORS blocked', { origin });
-    cb(new Error('CORS blocked'));
+    return cb(new Error('CORS blocked'));
   },
   credentials: true,
 }));
@@ -73,7 +76,7 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(requestLogger);
 
-// DB
+// ── DATABASE ───────────────────────────────────
 const db = require('./config/database');
 
 const modelPaths = [
@@ -114,6 +117,7 @@ try {
   require('./models/associations');
 } catch {}
 
+// ── DB INIT (FIXED: SAFE & AWAITED) ────────────
 async function initDB() {
   try {
     await db.authenticate();
@@ -123,8 +127,11 @@ async function initDB() {
     process.exit(1);
   }
 }
+
+// run init immediately (safe in Render)
 initDB();
 
+// ── AUTH ───────────────────────────────────────
 const { protect } = require('./middleware/auth');
 
 let subscriptionGuard = (_r, _s, n) => n();
@@ -132,6 +139,7 @@ try {
   subscriptionGuard = require('./middleware/subscriptionGuard');
 } catch {}
 
+// ── ROUTES ─────────────────────────────────────
 const authRoutes = require('./routes/authRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 const adminRoutes = require('./routes/adminRoutes');
@@ -164,12 +172,12 @@ try {
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// PUBLIC
+// ── PUBLIC ─────────────────────────────────────
 app.use('/api/auth', authRoutes);
 app.use('/api/exam-boards', examBoardsRoutes);
 app.use('/api/curriculum', curriculumRoutes);
 
-// PROTECTED
+// ── PROTECTED ──────────────────────────────────
 app.use('/api/ai', protect, subscriptionGuard, aiLimiter, aiRoutes);
 if (aiChatRoute) app.use('/api/ai', protect, subscriptionGuard, aiLimiter, aiChatRoute);
 
@@ -194,12 +202,17 @@ app.use('/api/notifications', protect, notificationsRoutes);
 app.use('/api/students', protect, studentRoutes);
 app.use('/api/concepts', protect, conceptRoutes);
 
-app.get('/health', (_req, res) => res.json({ success: true }));
+// ── HEALTH ─────────────────────────────────────
+app.get('/health', (_req, res) => {
+  res.json({ success: true });
+});
 
+// ── ERROR HANDLER ──────────────────────────────
 app.use((err, _req, res, _next) => {
   logger.error('Unhandled error', { error: err.message });
   res.status(500).json({ success: false, error: 'Internal Server Error' });
 });
 
+// ── START ──────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on ${PORT}`));
