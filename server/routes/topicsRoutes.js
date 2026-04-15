@@ -6,18 +6,14 @@ const { QueryTypes } = require('sequelize');
 const sequelize = require('../config/database');
 const { protect } = require('../middleware/auth');
 
-// ─────────────────────────────────────────────────────────────
-// GET /api/topics?subject_id=123&include_subtopics=true
-// ─────────────────────────────────────────────────────────────
-
 router.get('/', protect, async (req, res) => {
-  const subjectId = parseInt(req.query.subject_id, 10);
+  const subjectId = Number(req.query.subject_id);
   const includeSubtopics = req.query.include_subtopics !== 'false';
 
-  if (!subjectId) {
+  if (!subjectId || Number.isNaN(subjectId)) {
     return res.status(400).json({
       success: false,
-      error: 'subject_id (integer) is required',
+      error: 'subject_id must be a valid integer',
     });
   }
 
@@ -29,19 +25,18 @@ router.get('/', protect, async (req, res) => {
         COALESCE(t.name, t.title, 'Untitled Topic') AS name,
         t.description,
         COALESCE(t.order_index, 0) AS order_index,
-        t.subject_id,
-        COUNT(st.id)::INTEGER AS subtopic_count
+        COUNT(st.id)::int AS subtopic_count
       FROM topics t
       LEFT JOIN subtopics st ON st.topic_id = t.id
       WHERE t.subject_id = :subjectId
-      GROUP BY t.id, t.name, t.title, t.description, t.order_index, t.subject_id
-      ORDER BY COALESCE(t.order_index, 0), name ASC
+      GROUP BY t.id
+      ORDER BY order_index ASC, name ASC
       `,
       { replacements: { subjectId }, type: QueryTypes.SELECT }
     );
 
     if (!topics.length) {
-      return res.status(200).json({ success: true, count: 0, topics: [] });
+      return res.json({ success: true, count: 0, topics: [] });
     }
 
     let subtopicsByTopic = {};
@@ -51,12 +46,7 @@ router.get('/', protect, async (req, res) => {
 
       const subtopics = await sequelize.query(
         `
-        SELECT
-          id,
-          topic_id,
-          name,
-          description,
-          COALESCE(order_index, 0) AS order_index
+        SELECT id, topic_id, name, description, order_index
         FROM subtopics
         WHERE topic_id IN (:topicIds)
         ORDER BY order_index ASC, name ASC
@@ -86,17 +76,16 @@ router.get('/', protect, async (req, res) => {
       order_index: t.order_index,
       subtopic_count: t.subtopic_count,
       subtopics: subtopicsByTopic[t.id] || [],
-      completion_percentage: 0,
     }));
 
-    return res.status(200).json({
+    return res.json({
       success: true,
       count: result.length,
       topics: result,
     });
 
   } catch (err) {
-    console.error('[GET /topics] Error:', err.message);
+    console.error('[topics] error:', err.message);
     return res.status(500).json({
       success: false,
       error: 'Failed to fetch topics',
