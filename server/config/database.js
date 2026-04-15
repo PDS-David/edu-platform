@@ -3,10 +3,6 @@
 // config/database.js
 
 const { Sequelize } = require('sequelize');
-const { defaults } = require('pg');
-
-// UTF-8 safety (Windows + Render)
-defaults.client_encoding = 'UTF8';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
