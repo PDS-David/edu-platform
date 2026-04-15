@@ -12,18 +12,20 @@ const requestId = require('./middleware/requestId');
 const requestLogger = require('./middleware/requestLogger');
 
 // ─────────────────────────────────────────────────────────────
-// ENV
+// ENV LOADING (LOCAL ONLY)
 // ─────────────────────────────────────────────────────────────
 if (process.env.NODE_ENV !== 'production') {
   require('dotenv').config({ path: path.join(__dirname, '.env') });
 }
 
 // ─────────────────────────────────────────────────────────────
-// LOGGING DIR
+// LOG DIRECTORY (PROD SAFE)
 // ─────────────────────────────────────────────────────────────
 if (process.env.NODE_ENV === 'production') {
   const logsDir = path.join(__dirname, 'logs');
-  if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
+  if (!fs.existsSync(logsDir)) {
+    fs.mkdirSync(logsDir, { recursive: true });
+  }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -37,6 +39,7 @@ if (process.env.NODE_ENV === 'production') {
   }
 
   const missing = required.filter(k => !process.env[k]);
+
   if (missing.length) {
     console.error('Missing environment variables:', missing.join(', '));
     process.exit(1);
@@ -50,7 +53,7 @@ const app = express();
 app.set('trust proxy', 1);
 
 // ─────────────────────────────────────────────────────────────
-// STATIC CLIENT
+// STATIC FRONTEND (OPTIONAL)
 // ─────────────────────────────────────────────────────────────
 const clientDist = path.join(__dirname, '..', 'client', 'dist');
 
@@ -58,7 +61,7 @@ if (fs.existsSync(clientDist)) {
   app.use(express.static(clientDist));
   console.log('Serving React frontend');
 } else {
-  console.log('No client build detected');
+  console.log('No client build detected (Render Static Site mode)');
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -68,6 +71,7 @@ app.use(requestId);
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(globalLimiter);
 
+// CORS
 const ALLOWED_ORIGINS = [
   'http://localhost:5173',
   'http://localhost:3000',
@@ -81,7 +85,7 @@ app.use(cors({
     if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
 
     logger.warn('CORS blocked', { origin });
-    return cb(null, true);
+    return cb(null, true); // never crash prod
   },
   credentials: true,
 }));
@@ -96,7 +100,7 @@ app.use(requestLogger);
 const db = require('./config/database');
 
 // ─────────────────────────────────────────────────────────────
-// MODEL BOOTSTRAP
+// MODEL BOOTSTRAP (SAFE)
 // ─────────────────────────────────────────────────────────────
 const modelPaths = [
   './models/User',
@@ -119,10 +123,12 @@ for (const m of modelPaths) {
 
 try {
   require('./models/associations');
-} catch {}
+} catch (e) {
+  logger.warn('Associations not loaded');
+}
 
 // ─────────────────────────────────────────────────────────────
-// DB CONNECT
+// DB CONNECTION
 // ─────────────────────────────────────────────────────────────
 async function initDB() {
   try {
@@ -143,16 +149,18 @@ const { protect } = require('./middleware/auth');
 let subscriptionGuard = (_r, _s, n) => n();
 try {
   subscriptionGuard = require('./middleware/subscriptionGuard');
-} catch {}
+} catch (e) {
+  logger.warn('subscriptionGuard missing');
+}
 
 // ─────────────────────────────────────────────────────────────
 // SAFE REQUIRE
 // ─────────────────────────────────────────────────────────────
-function safeRequire(path) {
+function safeRequire(routePath) {
   try {
-    return require(path);
+    return require(routePath);
   } catch (e) {
-    logger.error(`Route missing: ${path}`);
+    logger.error(`Route missing: ${routePath}`);
     return null;
   }
 }
@@ -192,6 +200,11 @@ const examAnalyticsRoutes = safeRequire('./routes/examAnalyticsRoutes');
 const aiQuestionGenRoutes = safeRequire('./routes/aiQuestionGenerationRoutes');
 
 // ─────────────────────────────────────────────────────────────
+// 🧪 2.10 ENGINE INTEGRATION VALIDATION LAYER
+// ─────────────────────────────────────────────────────────────
+const engineValidationRoutes = safeRequire('./routes/engineValidationRoutes');
+
+// ─────────────────────────────────────────────────────────────
 // ROUTE MOUNTING
 // ─────────────────────────────────────────────────────────────
 
@@ -201,7 +214,9 @@ if (examBoardsRoutes) app.use('/api/exam-boards', examBoardsRoutes);
 if (curriculumRoutes) app.use('/api/curriculum', curriculumRoutes);
 
 // core
-if (aiRoutes) app.use('/api/ai', protect, subscriptionGuard, aiLimiter, aiRoutes);
+if (aiRoutes)
+  app.use('/api/ai', protect, subscriptionGuard, aiLimiter, aiRoutes);
+
 if (adminRoutes) app.use('/api/admin', protect, adminRoutes);
 if (teacherRoutes) app.use('/api/teacher', protect, teacherRoutes);
 if (userRoutes) app.use('/api/users', protect, userRoutes);
@@ -215,18 +230,35 @@ if (resourceRoutes) app.use('/api/resources', protect, resourceRoutes);
 if (quizRoutes) app.use('/api/quizzes', protect, quizRoutes);
 if (questionRoutes) app.use('/api/questions', protect, questionRoutes);
 
-// ENGINE 2.8
+// ─────────────────────────────────────────────────────────────
+// ENGINE 2.8 — EXAM INTELLIGENCE
+// ─────────────────────────────────────────────────────────────
 if (examAnalyticsRoutes)
   app.use('/api/exam-analytics', protect, examAnalyticsRoutes);
 
-// ENGINE 2.9
+// ─────────────────────────────────────────────────────────────
+// ENGINE 2.9 — AI QUESTION GENERATION
+// ─────────────────────────────────────────────────────────────
 if (aiQuestionGenRoutes)
   app.use('/api/ai-questions', protect, subscriptionGuard, aiQuestionGenRoutes);
 
 // ─────────────────────────────────────────────────────────────
-// HEALTH
+// ENGINE 2.10 — VALIDATION LAYER
 // ─────────────────────────────────────────────────────────────
-app.get('/health', (_req, res) => res.json({ success: true }));
+if (engineValidationRoutes)
+  app.use('/api/engine', protect, engineValidationRoutes);
+
+// ─────────────────────────────────────────────────────────────
+// STATIC FILES
+// ─────────────────────────────────────────────────────────────
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// ─────────────────────────────────────────────────────────────
+// HEALTH CHECK
+// ─────────────────────────────────────────────────────────────
+app.get('/health', (_req, res) => {
+  res.json({ success: true });
+});
 
 // ─────────────────────────────────────────────────────────────
 // ERROR HANDLER
@@ -237,9 +269,10 @@ app.use((err, _req, res, _next) => {
 });
 
 // ─────────────────────────────────────────────────────────────
-// START
+// START SERVER
 // ─────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
+
 app.listen(PORT, () => {
-  console.log(`Server running on ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
