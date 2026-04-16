@@ -219,9 +219,17 @@ async function startServer() {
       });
 
     } else {
-      app.listen(PORT, () => {
-        console.log(`🚀 Server running on port ${PORT}`);
-      });
+      const http = require('http');
+const realtimeEngine = require('./services/realtimeEngine');
+
+const server = http.createServer(app);
+
+// INIT REALTIME
+realtimeEngine.init(server);
+
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
     }
 
   } catch (err) {
