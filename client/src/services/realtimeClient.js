@@ -8,14 +8,19 @@ export function initRealtime() {
   socket = io(import.meta.env.VITE_API_URL, {
     withCredentials: true,
     transports: ["websocket"],
+    autoConnect: true,
   });
 
   socket.on("connect", () => {
-    console.log("Realtime connected:", socket.id);
+    console.log("[realtime] connected:", socket.id);
   });
 
-  socket.on("disconnect", () => {
-    console.log("Realtime disconnected");
+  socket.on("disconnect", (reason) => {
+    console.log("[realtime] disconnected:", reason);
+  });
+
+  socket.on("connect_error", (err) => {
+    console.warn("[realtime] connection error:", err.message);
   });
 
   return socket;
