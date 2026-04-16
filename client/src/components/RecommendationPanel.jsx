@@ -1,24 +1,17 @@
-import React from 'react';
-import { useRecommendations } from '../hooks/useRecommendations';
-
-export default function RecommendationPanel() {
-  const { data, isLoading } = useRecommendations();
-
-  if (isLoading) {
-    return <div>Loading recommendations...</div>;
+export default function RecommendationPanel({ items }) {
+  if (!items || items.length === 0) {
+    return <div className="p-4">No recommendations available</div>;
   }
 
   return (
-    <div className="p-4 rounded-xl border">
-      <h2 className="text-lg font-semibold">Recommendations</h2>
+    <div className="p-4 border rounded">
+      <h2>Recommendations</h2>
 
-      <ul className="mt-3 space-y-2">
-        {data?.map((rec, idx) => (
-          <li key={idx} className="p-2 border rounded">
-            {rec.message || rec.recommendation}
-          </li>
-        ))}
-      </ul>
+      {items.map((r, i) => (
+        <div key={i}>
+          {r.title ?? r.message ?? "Recommendation"}
+        </div>
+      ))}
     </div>
   );
 }
