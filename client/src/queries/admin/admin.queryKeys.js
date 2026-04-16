@@ -1,39 +1,20 @@
-// client/src/queries/admin/admin.queryKeys.js
-// ─────────────────────────────────────────────────────────────
-// CENTRALIZED QUERY KEYS (GLOBAL ADMIN CACHE CONTROL)
-// ─────────────────────────────────────────────────────────────
+/**
+ * FILE: client/src/queries/admin/admin.queryKeys.js
+ * Centralized query key factory for all admin React Query hooks.
+ */
 
-export const adminQueryKeys = {
-  // ─────────────────────────────
-  // USERS
-  // ─────────────────────────────
-  users: {
-    all: ['admin-users'],
-    list: (params) => ['admin-users', 'list', params],
-    stats: () => ['admin-user-stats'],
-  },
+export const adminKeys = {
+  all: ['admin'],
 
-  // ─────────────────────────────
-  // ASSIGNMENTS (teacher-subjects)
-  // ─────────────────────────────
-  assignments: {
-    all: ['admin-assignments'],
-    list: () => ['admin-assignments', 'list'],
-  },
+  // ── USERS ─────────────────────────────────────────
+  users: (params = {}) => ['admin', 'users', params],
+  userStats: () => ['admin', 'user-stats'],
 
-  // ─────────────────────────────
-  // QUESTIONS
-  // ─────────────────────────────
-  questions: {
-    all: ['admin-questions'],
-    pending: (params) => ['admin-questions', 'pending', params],
-    pendingCount: () => ['admin-questions', 'pending-count'],
-  },
+  // ── ASSIGNMENTS ───────────────────────────────────
+  assignments: () => ['admin', 'assignments'],
+  subjects: () => ['admin', 'subjects'],
 
-  // ─────────────────────────────
-  // PLATFORM STATS
-  // ─────────────────────────────
-  stats: {
-    all: ['admin-platform-stats'],
-  },
+  // ── QUESTIONS (future-safe) ───────────────────────
+  questions: (params = {}) => ['admin', 'questions', params],
+  pendingQuestions: (params = {}) => ['admin', 'questions', 'pending', params],
 };
