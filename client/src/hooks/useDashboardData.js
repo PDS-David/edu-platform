@@ -1,25 +1,37 @@
 import { useQuery } from "@tanstack/react-query";
-import { dashboardService } from "../services/dashboardService";
+import api from "../api/axios";
 
 export default function useDashboardData() {
   const summary = useQuery({
     queryKey: ["dashboard", "summary"],
-    queryFn: dashboardService.getProgressSummary,
+    queryFn: async () => {
+      const res = await api.get("/dashboard/summary");
+      return res?.data || null;
+    },
   });
 
   const weakTopics = useQuery({
     queryKey: ["dashboard", "weakTopics"],
-    queryFn: dashboardService.getWeakTopics,
+    queryFn: async () => {
+      const res = await api.get("/dashboard/weak-topics");
+      return res?.data || [];
+    },
   });
 
   const recommendations = useQuery({
     queryKey: ["dashboard", "recommendations"],
-    queryFn: dashboardService.getRecommendations,
+    queryFn: async () => {
+      const res = await api.get("/dashboard/recommendations");
+      return res?.data || [];
+    },
   });
 
   const sessions = useQuery({
     queryKey: ["dashboard", "sessions"],
-    queryFn: dashboardService.getSessions,
+    queryFn: async () => {
+      const res = await api.get("/dashboard/sessions");
+      return res?.data || [];
+    },
   });
 
   return {
