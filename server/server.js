@@ -5,6 +5,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const path = require('path');
 const fs = require('fs');
+const http = require('http');
 
 const { aiLimiter, globalLimiter } = require('./middleware/rateLimiter');
 const logger = require('./config/logger');
@@ -12,14 +13,14 @@ const requestId = require('./middleware/requestId');
 const requestLogger = require('./middleware/requestLogger');
 
 // ─────────────────────────────────────────────
-// ENV
+// ENV LOADING (LOCAL ONLY)
 // ─────────────────────────────────────────────
 if (process.env.NODE_ENV !== 'production') {
   require('dotenv').config({ path: path.join(__dirname, '.env') });
 }
 
 // ─────────────────────────────────────────────
-// LOG DIRECTORY (PROD SAFE)
+// LOG DIRECTORY (PROD SAFETY)
 // ─────────────────────────────────────────────
 if (process.env.NODE_ENV === 'production') {
   const logsDir = path.join(__dirname, 'logs');
@@ -41,7 +42,7 @@ if (process.env.NODE_ENV === 'production') {
   const missing = required.filter(k => !process.env[k]);
 
   if (missing.length) {
-    console.error('❌ Missing env vars:', missing.join(', '));
+    console.error('Missing environment variables:', missing.join(', '));
     process.exit(1);
   }
 })();
@@ -59,9 +60,7 @@ const clientDist = path.join(__dirname, '..', 'client', 'dist');
 
 if (fs.existsSync(clientDist)) {
   app.use(express.static(clientDist));
-  console.log('✔ Serving frontend from client/dist');
-} else {
-  console.log('ℹ No frontend build detected');
+  console.log('Serving frontend from client/dist');
 }
 
 // ─────────────────────────────────────────────
@@ -74,7 +73,6 @@ app.use(globalLimiter);
 const ALLOWED_ORIGINS = [
   'http://localhost:5173',
   'http://localhost:3000',
-  'https://aischoolonair.onrender.com',
   process.env.CLIENT_URL,
   process.env.PROD_CLIENT_URL,
 ].filter(Boolean);
@@ -98,59 +96,6 @@ app.use(requestLogger);
 // DATABASE
 // ─────────────────────────────────────────────
 const db = require('./config/database');
-
-// ─────────────────────────────────────────────
-// MODEL BOOTSTRAP (CRITICAL FIXED SET)
-// ─────────────────────────────────────────────
-const modelPaths = [
-  './models/User',
-  './models/Subject',
-  './models/Topic',
-  './models/Subtopic',
-  './models/SubtopicProgress',
-  './models/PracticeAttempt',
-];
-
-for (const m of modelPaths) {
-  try {
-    const model = require(m);
-    if (typeof model === 'function') model(db);
-  } catch (e) {
-    logger.warn(`Model skipped: ${m} — ${e.message}`);
-  }
-}
-
-try {
-  require('./models/associations');
-} catch (e) {
-  logger.warn('Associations not loaded');
-}
-
-// ─────────────────────────────────────────────
-// ENGINE BOOTSTRAP (CRITICAL ORDER FIX)
-// ─────────────────────────────────────────────
-
-// 1. EVENT BUS FIRST
-const eventBus = require('./services/eventBus');
-
-// 2. WRITE SIDE ENGINE (event listeners)
-require('./services/analyticsEventEngine');
-
-// 3. READ SIDE ENGINE (analytics queries)
-require('./services/analyticsEngine');
-
-// ─────────────────────────────────────────────
-// DB CONNECTION
-// ─────────────────────────────────────────────
-(async () => {
-  try {
-    await db.authenticate();
-    logger.info('✔ Database connected successfully');
-  } catch (err) {
-    logger.error('❌ DB connection failed', { error: err.message });
-    process.exit(1);
-  }
-})();
 
 // ─────────────────────────────────────────────
 // AUTH
@@ -177,70 +122,112 @@ const subjectRoutes = safeRequire('./routes/subjectsRoutes');
 const topicsRoutes = safeRequire('./routes/topicsRoutes');
 const subtopicRoutes = safeRequire('./routes/subtopicRoutes');
 
-const analyticsRoutes = safeRequire('./routes/analyticsRoutes');
 const weakTopicRoutes = safeRequire('./routes/weakTopicRoutes');
 const recommendationRoutes = safeRequire('./routes/recommendationRoutes');
 const sessionRoutes = safeRequire('./routes/sessionRoutes');
+const analyticsRoutes = safeRequire('./routes/analyticsRoutes');
+
 const replayRoutes = safeRequire('./routes/eventReplayRoutes');
 
 // ─────────────────────────────────────────────
-// STATIC FILES
+// ENGINE WRAPPER
 // ─────────────────────────────────────────────
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// ─────────────────────────────────────────────
-// ROUTE MOUNTING (CLEAN LAYERED SYSTEM)
-// ─────────────────────────────────────────────
-if (authRoutes) app.use('/api/auth', authRoutes);
-
-if (subjectRoutes) app.use('/api/subjects', protect, subjectRoutes);
-if (topicsRoutes) app.use('/api/topics', protect, topicsRoutes);
-if (subtopicRoutes) app.use('/api/subtopics', protect, subtopicRoutes);
-
-// ANALYTICS CORE
-if (analyticsRoutes) app.use('/api/analytics', protect, analyticsRoutes);
-
-// INTELLIGENCE LAYER
-if (weakTopicRoutes) app.use('/api/weak-topics', protect, weakTopicRoutes);
-if (recommendationRoutes) app.use('/api/recommendations', protect, recommendationRoutes);
-
-// SESSION LAYER
-if (sessionRoutes) app.use('/api/sessions', protect, sessionRoutes);
-
-// EVENT DEBUG / REPLAY
-if (replayRoutes) app.use('/api/replay', protect, replayRoutes);
+function safeInit(name, fn) {
+  try {
+    fn();
+    console.log(`✅ Engine loaded: ${name}`);
+  } catch (err) {
+    console.error(`❌ Engine failed: ${name}`, err.message);
+  }
+}
 
 // ─────────────────────────────────────────────
-// HEALTH CHECK
+// STARTUP SEQUENCE (CRITICAL)
 // ─────────────────────────────────────────────
-app.get('/health', (_req, res) => {
-  res.json({ success: true, status: 'ok' });
-});
+async function startServer() {
+  try {
+    // 1. DB CONNECT
+    await db.authenticate();
+    logger.info('DB connected');
 
-// ─────────────────────────────────────────────
-// ERROR HANDLER
-// ─────────────────────────────────────────────
-app.use((err, _req, res, _next) => {
-  logger.error('Unhandled server error', { error: err.message });
-  res.status(500).json({
-    success: false,
-    error: 'Internal Server Error',
-  });
-});
+    // 2. MODELS LOAD (AFTER DB)
+    const modelPaths = [
+      './models/User',
+      './models/SubtopicProgress',
+    ];
 
-// ─────────────────────────────────────────────
-// START SERVER
-// ─────────────────────────────────────────────
-const http = require('http');
-const server = http.createServer(app);
+    for (const m of modelPaths) {
+      try {
+        const model = require(m);
+        if (typeof model === 'function') model(db);
+      } catch (e) {
+        logger.warn(`Model skipped: ${m}`);
+      }
+    }
 
-// attach realtime engine
-const RealtimeEngine = require('./services/realtimeEngine');
-new RealtimeEngine(server);
+    try {
+      require('./models/associations');
+    } catch {}
 
-// START
-const PORT = process.env.PORT || 5000;
+    // 3. ENGINE BOOTSTRAP
+    safeInit('eventBus', () => require('./services/eventBus'));
+    safeInit('analyticsEngine', () => require('./services/analyticsEngine'));
+    safeInit('eventEngine', () => require('./services/eventEngine'));
+    safeInit('analyticsEventEngine', () => require('./services/analyticsEventEngine'));
 
-server.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-});
+    // 4. STATIC FILES
+    app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+    // 5. ROUTES
+    if (authRoutes) app.use('/api/auth', authRoutes);
+
+    if (subjectRoutes) app.use('/api/subjects', protect, subjectRoutes);
+    if (topicsRoutes) app.use('/api/topics', protect, topicsRoutes);
+    if (subtopicRoutes) app.use('/api/subtopics', protect, subtopicRoutes);
+
+    if (analyticsRoutes) app.use('/api/analytics', protect, analyticsRoutes);
+    if (weakTopicRoutes) app.use('/api/weak-topics', protect, weakTopicRoutes);
+    if (recommendationRoutes) app.use('/api/recommendations', protect, recommendationRoutes);
+    if (sessionRoutes) app.use('/api/sessions', protect, sessionRoutes);
+
+    if (replayRoutes) app.use('/api/replay', protect, replayRoutes);
+
+    // 6. HEALTH CHECK
+    app.get('/health', (_req, res) => {
+      res.json({ success: true });
+    });
+
+    // 7. ERROR HANDLER
+    app.use((err, _req, res, _next) => {
+      logger.error('Unhandled error', { error: err.message });
+      res.status(500).json({ success: false });
+    });
+
+    // 8. SERVER START
+    const PORT = process.env.PORT || 5000;
+
+    if (process.env.ENABLE_WS === 'true') {
+      const server = http.createServer(app);
+
+      safeInit('realtimeEngine', () => {
+        const RealtimeEngine = require('./services/realtimeEngine');
+        new RealtimeEngine(server);
+      });
+
+      server.listen(PORT, () => {
+        console.log(`🚀 Server running with WS on port ${PORT}`);
+      });
+
+    } else {
+      app.listen(PORT, () => {
+        console.log(`🚀 Server running on port ${PORT}`);
+      });
+    }
+
+  } catch (err) {
+    logger.error('FATAL SERVER BOOT ERROR', err.message);
+    process.exit(1);
+  }
+}
+
+startServer();
