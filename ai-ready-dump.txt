@@ -1,6 +1,6 @@
 ================================================================================
   AI-OPTIMIZED PROJECT DUMP
-  Generated : 2026-04-16 05:04:34
+  Generated : 2026-04-16 09:29:20
   Root      : C:\Users\MASHAALLAH\Desktop\edu-platform
 ================================================================================
 
@@ -28,12 +28,13 @@ SECTION: CONFIG
 ================================================================================
 
 ================================================================================
-FILE (1/246): package.json
-SIZE: 57 bytes
+FILE (1/255): package.json
+SIZE: 92 bytes
 ================================================================================
 {
   "dependencies": {
-    "dotenv": "^17.4.1"
+    "dotenv": "^17.4.1",
+    "socket.io-client": "^4.8.3"
   }
 }
 
@@ -44,7 +45,7 @@ SECTION: BACKEND
 ================================================================================
 
 ================================================================================
-FILE (2/246): server\config\database.js
+FILE (2/255): server\config\database.js
 SIZE: 2595 bytes
 ================================================================================
 'use strict';
@@ -120,7 +121,7 @@ module.exports = sequelize;
 
 
 ================================================================================
-FILE (3/246): server\config\loadRoutes.js
+FILE (3/255): server\config\loadRoutes.js
 SIZE: 823 bytes
 ================================================================================
 'use strict';
@@ -160,7 +161,7 @@ module.exports = loadRoutes;
 
 
 ================================================================================
-FILE (4/246): server\config\logger.js
+FILE (4/255): server\config\logger.js
 SIZE: 4174 bytes
 ================================================================================
 // server/config/logger.js
@@ -265,7 +266,7 @@ module.exports = logger;
 
 
 ================================================================================
-FILE (5/246): server\config\redis.js
+FILE (5/255): server\config\redis.js
 SIZE: 476 bytes
 ================================================================================
 'use strict';
@@ -298,7 +299,7 @@ module.exports = {
 
 
 ================================================================================
-FILE (6/246): server\config\routeRegistry.js
+FILE (6/255): server\config\routeRegistry.js
 SIZE: 1671 bytes
 ================================================================================
 'use strict';
@@ -347,7 +348,7 @@ module.exports = [
 
 
 ================================================================================
-FILE (7/246): server\controllers\auth.js
+FILE (7/255): server\controllers\auth.js
 SIZE: 17833 bytes
 ================================================================================
 'use strict';
@@ -802,7 +803,7 @@ exports.verifyEmail = async (req, res, next) => {
 
 
 ================================================================================
-FILE (8/246): server\controllers\quizController.js
+FILE (8/255): server\controllers\quizController.js
 SIZE: 7936 bytes
 ================================================================================
 'use strict';
@@ -1051,7 +1052,7 @@ module.exports = { generateQuiz, submitQuiz };
 
 
 ================================================================================
-FILE (9/246): server\controllers\subjects.js
+FILE (9/255): server\controllers\subjects.js
 SIZE: 5269 bytes
 ================================================================================
 // server/controllers/subjects.js
@@ -1262,7 +1263,7 @@ module.exports = {
 
 
 ================================================================================
-FILE (10/246): server\controllers\subtopicProgressController.js
+FILE (10/255): server\controllers\subtopicProgressController.js
 SIZE: 2755 bytes
 ================================================================================
 'use strict';
@@ -1361,7 +1362,7 @@ exports.completeQuiz = async (req, res) => {
 
 
 ================================================================================
-FILE (11/246): server\debug-jwt.js
+FILE (11/255): server\debug-jwt.js
 SIZE: 1995 bytes
 ================================================================================
 // server/debug-jwt.js
@@ -1412,7 +1413,7 @@ try {
 
 
 ================================================================================
-FILE (12/246): server\jobs\scheduledJobs.js
+FILE (12/255): server\jobs\scheduledJobs.js
 SIZE: 8982 bytes
 ================================================================================
 // server/jobs/scheduledJobs.js
@@ -1610,7 +1611,7 @@ module.exports = {
 
 
 ================================================================================
-FILE (13/246): server\middleware\auth.js
+FILE (13/255): server\middleware\auth.js
 SIZE: 3301 bytes
 ================================================================================
 // server/middleware/auth.js
@@ -1684,7 +1685,7 @@ module.exports = { protect, authorize };
 
 
 ================================================================================
-FILE (14/246): server\middleware\ipWhitelist.js
+FILE (14/255): server\middleware\ipWhitelist.js
 SIZE: 1817 bytes
 ================================================================================
 // server/middleware/ipWhitelist.js
@@ -1742,7 +1743,7 @@ module.exports = function ipWhitelist(req, res, next) {
 
 
 ================================================================================
-FILE (15/246): server\middleware\rateLimiter.js
+FILE (15/255): server\middleware\rateLimiter.js
 SIZE: 776 bytes
 ================================================================================
 // server/middleware/rateLimiter.js
@@ -1776,7 +1777,7 @@ const aiLimiter = rateLimit({
 module.exports = { analyticsLimiter, globalLimiter, aiLimiter };
 
 ================================================================================
-FILE (16/246): server\middleware\requestId.js
+FILE (16/255): server\middleware\requestId.js
 SIZE: 1297 bytes
 ================================================================================
 // server/middleware/requestId.js
@@ -1810,7 +1811,7 @@ module.exports = function requestId(req, res, next) {
 
 
 ================================================================================
-FILE (17/246): server\middleware\requestLogger.js
+FILE (17/255): server\middleware\requestLogger.js
 SIZE: 1637 bytes
 ================================================================================
 // server/middleware/requestLogger.js
@@ -1857,7 +1858,7 @@ module.exports = function requestLogger(req, res, next) {
 
 
 ================================================================================
-FILE (18/246): server\middleware\roleMiddleware.js
+FILE (18/255): server\middleware\roleMiddleware.js
 SIZE: 9593 bytes
 ================================================================================
 // server/middleware/roleMiddleware.js
@@ -2093,7 +2094,7 @@ module.exports = {
 
 
 ================================================================================
-FILE (19/246): server\middleware\subscriptionGuard.js
+FILE (19/255): server\middleware\subscriptionGuard.js
 SIZE: 3172 bytes
 ================================================================================
 // server/middleware/subscriptionGuard.js
@@ -2194,7 +2195,7 @@ module.exports = async (req, res, next) => {
 
 
 ================================================================================
-FILE (20/246): server\middleware\xpMiddleware.js
+FILE (20/255): server\middleware\xpMiddleware.js
 SIZE: 7700 bytes
 ================================================================================
 // Called AFTER a successful answer or quiz submission.
@@ -2383,7 +2384,7 @@ module.exports = { awardXP, xpMiddleware };
 
 
 ================================================================================
-FILE (21/246): server\models\AiChatMessage.js
+FILE (21/255): server\models\AiChatMessage.js
 SIZE: 799 bytes
 ================================================================================
 'use strict';
@@ -2421,7 +2422,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (22/246): server\models\AiChatSession.js
+FILE (22/255): server\models\AiChatSession.js
 SIZE: 815 bytes
 ================================================================================
 const { DataTypes } = require('sequelize');
@@ -2449,7 +2450,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (23/246): server\models\associations.js
+FILE (23/255): server\models\associations.js
 SIZE: 2602 bytes
 ================================================================================
 'use strict';
@@ -2526,7 +2527,7 @@ module.exports = (db) => {
 
 
 ================================================================================
-FILE (24/246): server\models\Concept.js
+FILE (24/255): server\models\Concept.js
 SIZE: 1071 bytes
 ================================================================================
 const { DataTypes } = require('sequelize');
@@ -2559,7 +2560,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (25/246): server\models\Course.js
+FILE (25/255): server\models\Course.js
 SIZE: 1453 bytes
 ================================================================================
 const { DataTypes } = require('sequelize');
@@ -2597,7 +2598,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (26/246): server\models\Enrollment.js
+FILE (26/255): server\models\Enrollment.js
 SIZE: 1233 bytes
 ================================================================================
 const { DataTypes } = require('sequelize');
@@ -2628,7 +2629,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (27/246): server\models\ExamBoard.js
+FILE (27/255): server\models\ExamBoard.js
 SIZE: 994 bytes
 ================================================================================
 const { DataTypes } = require('sequelize');
@@ -2657,7 +2658,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (28/246): server\models\Note.js
+FILE (28/255): server\models\Note.js
 SIZE: 865 bytes
 ================================================================================
 const { DataTypes } = require('sequelize');
@@ -2687,7 +2688,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (29/246): server\models\Notification.js
+FILE (29/255): server\models\Notification.js
 SIZE: 1036 bytes
 ================================================================================
 const { DataTypes } = require('sequelize');
@@ -2719,7 +2720,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (30/246): server\models\PastPaper.js
+FILE (30/255): server\models\PastPaper.js
 SIZE: 1222 bytes
 ================================================================================
 const { DataTypes } = require('sequelize');
@@ -2753,7 +2754,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (31/246): server\models\Payment.js
+FILE (31/255): server\models\Payment.js
 SIZE: 1230 bytes
 ================================================================================
 const { DataTypes } = require('sequelize');
@@ -2787,7 +2788,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (32/246): server\models\PracticeAttempt.js
+FILE (32/255): server\models\PracticeAttempt.js
 SIZE: 1056 bytes
 ================================================================================
 const { DataTypes } = require('sequelize');
@@ -2817,7 +2818,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (33/246): server\models\Question.js
+FILE (33/255): server\models\Question.js
 SIZE: 1902 bytes
 ================================================================================
 const { DataTypes } = require('sequelize');
@@ -2860,7 +2861,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (34/246): server\models\Quiz.js
+FILE (34/255): server\models\Quiz.js
 SIZE: 1129 bytes
 ================================================================================
 const { DataTypes } = require('sequelize');
@@ -2893,7 +2894,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (35/246): server\models\Resource.js
+FILE (35/255): server\models\Resource.js
 SIZE: 1337 bytes
 ================================================================================
 const { DataTypes } = require('sequelize');
@@ -2929,7 +2930,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (36/246): server\models\StudentExamType.js
+FILE (36/255): server\models\StudentExamType.js
 SIZE: 1002 bytes
 ================================================================================
 const { DataTypes } = require('sequelize');
@@ -2962,7 +2963,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (37/246): server\models\Subject.js
+FILE (37/255): server\models\Subject.js
 SIZE: 649 bytes
 ================================================================================
 'use strict';
@@ -3004,7 +3005,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (38/246): server\models\Subtopic.js
+FILE (38/255): server\models\Subtopic.js
 SIZE: 837 bytes
 ================================================================================
 'use strict';
@@ -3056,7 +3057,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (39/246): server\models\SubtopicProgress.js
+FILE (39/255): server\models\SubtopicProgress.js
 SIZE: 1194 bytes
 ================================================================================
 'use strict';
@@ -3123,7 +3124,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (40/246): server\models\TeacherSubject.js
+FILE (40/255): server\models\TeacherSubject.js
 SIZE: 1615 bytes
 ================================================================================
 'use strict';
@@ -3185,7 +3186,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (41/246): server\models\Topic.js
+FILE (41/255): server\models\Topic.js
 SIZE: 825 bytes
 ================================================================================
 'use strict';
@@ -3237,7 +3238,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (42/246): server\models\User.js
+FILE (42/255): server\models\User.js
 SIZE: 3246 bytes
 ================================================================================
 'use strict';
@@ -3393,7 +3394,7 @@ module.exports = User;
 
 
 ================================================================================
-FILE (43/246): server\models\Video.js
+FILE (43/255): server\models\Video.js
 SIZE: 1441 bytes
 ================================================================================
 const { DataTypes } = require('sequelize');
@@ -3431,7 +3432,7 @@ module.exports = (sequelize) => {
 
 
 ================================================================================
-FILE (44/246): server\package.json
+FILE (44/255): server\package.json
 SIZE: 1265 bytes
 ================================================================================
 {
@@ -3491,7 +3492,7 @@ SIZE: 1265 bytes
 
 
 ================================================================================
-FILE (45/246): server\queues\aiQueue.js
+FILE (45/255): server\queues\aiQueue.js
 SIZE: 633 bytes
 ================================================================================
 'use strict';
@@ -3525,7 +3526,7 @@ module.exports = { getAiQueue };
 
 
 ================================================================================
-FILE (46/246): server\routes\adaptiveRoutes.js
+FILE (46/255): server\routes\adaptiveRoutes.js
 SIZE: 552 bytes
 ================================================================================
 // server/routes/adaptiveRoutes.js
@@ -3553,7 +3554,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (47/246): server\routes\adminRoutes.js
+FILE (47/255): server\routes\adminRoutes.js
 SIZE: 37445 bytes
 ================================================================================
 // server/routes/adminRoutes.js
@@ -4049,7 +4050,7 @@ router.get('/questions/pending', protect, adminOnly, async (req, res) => {
 ...TRUNCATED...
 
 ================================================================================
-FILE (48/246): server\routes\aiChatRoute.js
+FILE (48/255): server\routes\aiChatRoute.js
 SIZE: 13873 bytes
 ================================================================================
 'use strict';
@@ -4453,7 +4454,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (49/246): server\routes\aiQuestionGenerationRoutes.js
+FILE (49/255): server\routes\aiQuestionGenerationRoutes.js
 SIZE: 1041 bytes
 ================================================================================
 'use strict';
@@ -4492,7 +4493,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (50/246): server\routes\aiRoutes.js
+FILE (50/255): server\routes\aiRoutes.js
 SIZE: 13099 bytes
 ================================================================================
 'use strict';
@@ -4815,7 +4816,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (51/246): server\routes\analytics.js
+FILE (51/255): server\routes\analytics.js
 SIZE: 17019 bytes
 ================================================================================
 'use strict';
@@ -5221,7 +5222,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (52/246): server\routes\analyticsRoutes.js
+FILE (52/255): server\routes\analyticsRoutes.js
 SIZE: 17019 bytes
 ================================================================================
 'use strict';
@@ -5627,7 +5628,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (53/246): server\routes\authRoutes.js
+FILE (53/255): server\routes\authRoutes.js
 SIZE: 4931 bytes
 ================================================================================
 // server/routes/authRoutes.js
@@ -5765,7 +5766,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (54/246): server\routes\catalogRoutes.js
+FILE (54/255): server\routes\catalogRoutes.js
 SIZE: 19196 bytes
 ================================================================================
 'use strict';
@@ -6178,7 +6179,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (55/246): server\routes\conceptRoutes.js
+FILE (55/255): server\routes\conceptRoutes.js
 SIZE: 28945 bytes
 ================================================================================
 // server/routes/conceptRoutes.js
@@ -6676,7 +6677,7 @@ router.get('/:id/mastery', protect, async (req, res) => {
 ...TRUNCATED...
 
 ================================================================================
-FILE (56/246): server\routes\courses.js
+FILE (56/255): server\routes\courses.js
 SIZE: 431 bytes
 ================================================================================
 const express = require('express');
@@ -6695,7 +6696,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (57/246): server\routes\curriculumRoutes.js
+FILE (57/255): server\routes\curriculumRoutes.js
 SIZE: 2909 bytes
 ================================================================================
 'use strict';
@@ -6815,7 +6816,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (58/246): server\routes\engineValidationRoutes.js
+FILE (58/255): server\routes\engineValidationRoutes.js
 SIZE: 611 bytes
 ================================================================================
 'use strict';
@@ -6847,7 +6848,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (59/246): server\routes\enrollments.js
+FILE (59/255): server\routes\enrollments.js
 SIZE: 271 bytes
 ================================================================================
 const express = require('express');
@@ -6862,7 +6863,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (60/246): server\routes\eventReplayRoutes.js
+FILE (60/255): server\routes\eventReplayRoutes.js
 SIZE: 809 bytes
 ================================================================================
 'use strict';
@@ -6895,7 +6896,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (61/246): server\routes\examBoardRoutes.js
+FILE (61/255): server\routes\examBoardRoutes.js
 SIZE: 3015 bytes
 ================================================================================
 // server/routes/examBoardRoutes.js
@@ -6971,7 +6972,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (62/246): server\routes\examBoardsRoutes.js
+FILE (62/255): server\routes\examBoardsRoutes.js
 SIZE: 7635 bytes
 ================================================================================
 // server/routes/examBoardsRoutes.js
@@ -7188,7 +7189,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (63/246): server\routes\examIntelligenceRoutes.js
+FILE (63/255): server\routes\examIntelligenceRoutes.js
 SIZE: 491 bytes
 ================================================================================
 const express = require('express');
@@ -7213,7 +7214,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (64/246): server\routes\examTypeActivation.js
+FILE (64/255): server\routes\examTypeActivation.js
 SIZE: 4036 bytes
 ================================================================================
 // server/routes/examTypeActivation.js
@@ -7316,7 +7317,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (65/246): server\routes\explanationRoute.js
+FILE (65/255): server\routes\explanationRoute.js
 SIZE: 7489 bytes
 ================================================================================
 // server/routes/explanationRoute.js
@@ -7512,7 +7513,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (66/246): server\routes\learningEventRoutes.js
+FILE (66/255): server\routes\learningEventRoutes.js
 SIZE: 1927 bytes
 ================================================================================
 'use strict';
@@ -7605,7 +7606,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (67/246): server\routes\notesRoutes.js
+FILE (67/255): server\routes\notesRoutes.js
 SIZE: 3735 bytes
 ================================================================================
 // server/routes/notesRoutes.js
@@ -7703,7 +7704,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (68/246): server\routes\notificationsRoutes.js
+FILE (68/255): server\routes\notificationsRoutes.js
 SIZE: 2520 bytes
 ================================================================================
 const express = require('express');
@@ -7781,7 +7782,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (69/246): server\routes\pastPaperRoutes.js
+FILE (69/255): server\routes\pastPaperRoutes.js
 SIZE: 6247 bytes
 ================================================================================
 // server/routes/pastPaperRoutes.js
@@ -7932,7 +7933,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (70/246): server\routes\paymentRoutes.js
+FILE (70/255): server\routes\paymentRoutes.js
 SIZE: 27147 bytes
 ================================================================================
 // server/routes/paymentRoutes.js
@@ -8497,7 +8498,7 @@ router.get('/subscription', protect, async (req, res) => {
 ...TRUNCATED...
 
 ================================================================================
-FILE (71/246): server\routes\progressRoutes.js
+FILE (71/255): server\routes\progressRoutes.js
 SIZE: 1324 bytes
 ================================================================================
 'use strict';
@@ -8557,7 +8558,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (72/246): server\routes\progressSummaryBulk.js
+FILE (72/255): server\routes\progressSummaryBulk.js
 SIZE: 2615 bytes
 ================================================================================
 'use strict';
@@ -8653,7 +8654,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (73/246): server\routes\questionsRoutes.js
+FILE (73/255): server\routes\questionsRoutes.js
 SIZE: 8341 bytes
 ================================================================================
 'use strict';
@@ -8852,7 +8853,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (74/246): server\routes\quizGeneratorRoute.js
+FILE (74/255): server\routes\quizGeneratorRoute.js
 SIZE: 1286 bytes
 ================================================================================
 'use strict';
@@ -8890,7 +8891,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (75/246): server\routes\quizzes.js
+FILE (75/255): server\routes\quizzes.js
 SIZE: 9002 bytes
 ================================================================================
 'use strict';
@@ -9095,7 +9096,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (76/246): server\routes\recommendationRoutes.js
+FILE (76/255): server\routes\recommendationRoutes.js
 SIZE: 1011 bytes
 ================================================================================
 'use strict';
@@ -9134,7 +9135,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (77/246): server\routes\resourceRoutes.js
+FILE (77/255): server\routes\resourceRoutes.js
 SIZE: 2379 bytes
 ================================================================================
 'use strict';
@@ -9245,7 +9246,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (78/246): server\routes\sessionRoutes.js
+FILE (78/255): server\routes\sessionRoutes.js
 SIZE: 2918 bytes
 ================================================================================
 'use strict';
@@ -9330,7 +9331,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (79/246): server\routes\studentRoutes.js
+FILE (79/255): server\routes\studentRoutes.js
 SIZE: 20949 bytes
 ================================================================================
 'use strict';
@@ -9799,7 +9800,7 @@ router.delete('/subjects/:subjectId', protect, async (req, res) => {
 
 
 ================================================================================
-FILE (80/246): server\routes\studyPlannerRoute.js
+FILE (80/255): server\routes\studyPlannerRoute.js
 SIZE: 14772 bytes
 ================================================================================
 // server/routes/studyPlannerRoute.js
@@ -10197,7 +10198,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (81/246): server\routes\subjectsRoutes.js
+FILE (81/255): server\routes\subjectsRoutes.js
 SIZE: 390 bytes
 ================================================================================
 const express = require('express');
@@ -10213,7 +10214,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (82/246): server\routes\subtopicProgressRoutes.js
+FILE (82/255): server\routes\subtopicProgressRoutes.js
 SIZE: 1849 bytes
 ================================================================================
 'use strict';
@@ -10296,7 +10297,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (83/246): server\routes\subtopicRoutes.js
+FILE (83/255): server\routes\subtopicRoutes.js
 SIZE: 6612 bytes
 ================================================================================
 'use strict';
@@ -10525,7 +10526,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (84/246): server\routes\teacherRoutes.js
+FILE (84/255): server\routes\teacherRoutes.js
 SIZE: 19048 bytes
 ================================================================================
 'use strict';
@@ -10871,7 +10872,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (85/246): server\routes\testRoutes.js
+FILE (85/255): server\routes\testRoutes.js
 SIZE: 1533 bytes
 ================================================================================
 // server/routes/testRoutes.js
@@ -10900,7 +10901,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (86/246): server\routes\topicsRoutes.js
+FILE (86/255): server\routes\topicsRoutes.js
 SIZE: 2595 bytes
 ================================================================================
 'use strict';
@@ -11002,7 +11003,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (87/246): server\routes\userRoutes.js
+FILE (87/255): server\routes\userRoutes.js
 SIZE: 18406 bytes
 ================================================================================
 // server/routes/users.js
@@ -11397,7 +11398,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (88/246): server\routes\videosRoutes.js
+FILE (88/255): server\routes\videosRoutes.js
 SIZE: 23802 bytes
 ================================================================================
 // server/routes/videosRoutes.js
@@ -11929,7 +11930,7 @@ module.exports = router;
 
 
 ================================================================================
-FILE (89/246): server\routes\weakTopicRoutes.js
+FILE (89/255): server\routes\weakTopicRoutes.js
 SIZE: 839 bytes
 ================================================================================
 'use strict';
@@ -11975,8 +11976,8 @@ module.exports = router;
 
 
 ================================================================================
-FILE (90/246): server\server.js
-SIZE: 9385 bytes
+FILE (90/255): server\server.js
+SIZE: 5083 bytes
 ================================================================================
 'use strict';
 
@@ -11992,26 +11993,18 @@ const logger = require('./config/logger');
 const requestId = require('./middleware/requestId');
 const requestLogger = require('./middleware/requestLogger');
 
-// ─────────────────────────────────────────────
-// ENV LOADING (LOCAL ONLY)
-// ─────────────────────────────────────────────
+// ENV
 if (process.env.NODE_ENV !== 'production') {
   require('dotenv').config({ path: path.join(__dirname, '.env') });
 }
 
-// ─────────────────────────────────────────────
-// LOG DIRECTORY (PROD SAFETY)
-// ─────────────────────────────────────────────
+// LOG DIR
 if (process.env.NODE_ENV === 'production') {
   const logsDir = path.join(__dirname, 'logs');
-  if (!fs.existsSync(logsDir)) {
-    fs.mkdirSync(logsDir, { recursive: true });
-  }
+  if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
 }
 
-// ─────────────────────────────────────────────
-// ENV VALIDATION
-// ─────────────────────────────────────────────
+// VALIDATE ENV
 (function validateEnv() {
   const required = ['JWT_SECRET', 'PORT'];
 
@@ -12022,30 +12015,22 @@ if (process.env.NODE_ENV === 'production') {
   const missing = required.filter(k => !process.env[k]);
 
   if (missing.length) {
-    console.error('Missing environment variables:', missing.join(', '));
+    console.error('Missing env vars:', missing.join(', '));
     process.exit(1);
   }
 })();
 
-// ─────────────────────────────────────────────
-// APP INIT
-// ─────────────────────────────────────────────
+// APP
 const app = express();
 app.set('trust proxy', 1);
 
-// ─────────────────────────────────────────────
-// STATIC FRONTEND
-// ─────────────────────────────────────────────
+// STATIC CLIENT BUILD (optional)
 const clientDist = path.join(__dirname, '..', 'client', 'dist');
-
 if (fs.existsSync(clientDist)) {
   app.use(express.static(clientDist));
-  console.log('Serving frontend from client/dist');
 }
 
-// ─────────────────────────────────────────────
-// CORE MIDDLEWARE
-// ─────────────────────────────────────────────
+// MIDDLEWARE
 app.use(requestId);
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(globalLimiter);
@@ -12053,6 +12038,7 @@ app.use(globalLimiter);
 const ALLOWED_ORIGINS = [
   'http://localhost:5173',
   'http://localhost:3000',
+  'https://aischoolonair.onrender.com',
   process.env.CLIENT_URL,
   process.env.PROD_CLIENT_URL,
 ].filter(Boolean);
@@ -12061,7 +12047,6 @@ app.use(cors({
   origin: (origin, cb) => {
     if (!origin) return cb(null, true);
     if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
-
     logger.warn('CORS blocked', { origin });
     return cb(null, true);
   },
@@ -12072,149 +12057,114 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(requestLogger);
 
-// ─────────────────────────────────────────────
-// DATABASE
-// ─────────────────────────────────────────────
+// DB
 const db = require('./config/database');
 
-// ─────────────────────────────────────────────
+// MODELS
+const modelPaths = [
+  './models/User',
+  './models/SubtopicProgress',
+];
+
+for (const m of modelPaths) {
+  try {
+    const model = require(m);
+    if (typeof model === 'function') model(db);
+  } catch (e) {
+    logger.warn(`Model skipped: ${m} — ${e.message}`);
+  }
+}
+
+try {
+  require('./models/associations');
+} catch (e) {
+  logger.warn('Associations skipped');
+}
+
+// SERVICES (SAFE BOOTSTRAP)
+require('./services/eventBus');
+require('./services/analyticsEventEngine');
+require('./services/eventEngine');
+
 // AUTH
-// ─────────────────────────────────────────────
 const { protect } = require('./middleware/auth');
 
-// ─────────────────────────────────────────────
-// SAFE REQUIRE
-// ─────────────────────────────────────────────
+// SAFE ROUTER LOADER
 function safeRequire(p) {
   try {
     return require(p);
   } catch (e) {
-    logger.warn(`Missing module: ${p}`);
+    logger.warn(`Missing route: ${p}`);
     return null;
   }
 }
 
-// ─────────────────────────────────────────────
 // ROUTES
-// ─────────────────────────────────────────────
 const authRoutes = safeRequire('./routes/authRoutes');
 const subjectRoutes = safeRequire('./routes/subjectsRoutes');
 const topicsRoutes = safeRequire('./routes/topicsRoutes');
 const subtopicRoutes = safeRequire('./routes/subtopicRoutes');
-
+const replayRoutes = safeRequire('./routes/eventReplayRoutes');
 const weakTopicRoutes = safeRequire('./routes/weakTopicRoutes');
 const recommendationRoutes = safeRequire('./routes/recommendationRoutes');
 const sessionRoutes = safeRequire('./routes/sessionRoutes');
-const analyticsRoutes = safeRequire('./routes/analyticsRoutes');
 
-const replayRoutes = safeRequire('./routes/eventReplayRoutes');
+// ENGINE ROUTES
+require('./services/analyticsEngine');
 
-// ─────────────────────────────────────────────
-// ENGINE WRAPPER
-// ─────────────────────────────────────────────
-function safeInit(name, fn) {
-  try {
-    fn();
-    console.log(`✅ Engine loaded: ${name}`);
-  } catch (err) {
-    console.error(`❌ Engine failed: ${name}`, err.message);
+// STATIC FILES
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// ROUTE MOUNTING
+if (authRoutes) app.use('/api/auth', authRoutes);
+
+if (subjectRoutes) app.use('/api/subjects', protect, subjectRoutes);
+if (topicsRoutes) app.use('/api/topics', protect, topicsRoutes);
+if (subtopicRoutes) app.use('/api/subtopics', protect, subtopicRoutes);
+
+if (weakTopicRoutes) app.use('/api/weak-topics', protect, weakTopicRoutes);
+if (recommendationRoutes) app.use('/api/recommendations', protect, recommendationRoutes);
+if (sessionRoutes) app.use('/api/sessions', protect, sessionRoutes);
+
+if (replayRoutes) app.use('/api/replay', protect, replayRoutes);
+
+// HEALTH
+app.get('/health', (_req, res) => {
+  res.json({ success: true });
+});
+
+// ERROR HANDLER
+app.use((err, _req, res, _next) => {
+  logger.error('Unhandled error', { error: err.message });
+  res.status(500).json({ success: false });
+});
+
+// ===============================
+// SOCKET.IO + HTTP SERVER
+// ===============================
+
+const server = http.createServer(app);
+
+// Safe realtime engine init (prevents crash if missing)
+try {
+  const realtimeEngine = require('./services/realtimeEngine');
+  if (realtimeEngine && typeof realtimeEngine.init === 'function') {
+    realtimeEngine.init(server);
   }
+} catch (e) {
+  logger.warn('Realtime engine not loaded');
 }
 
-// ─────────────────────────────────────────────
-// STARTUP SEQUENCE (CRITICAL)
-// ─────────────────────────────────────────────
-async function startServer() {
-  try {
-    // 1. DB CONNECT
-    await db.authenticate();
-    logger.info('DB connected');
+// START SERVER
+const PORT = process.env.PORT || 5000;
 
-    // 2. MODELS LOAD (AFTER DB)
-    const modelPaths = [
-      './models/User',
-      './models/SubtopicProgress',
-    ];
-
-    for (const m of modelPaths) {
-      try {
-        const model = require(m);
-        if (typeof model === 'function') model(db);
-      } catch (e) {
-        logger.warn(`Model skipped: ${m}`);
-      }
-    }
-
-    try {
-      require('./models/associations');
-    } catch {}
-
-    // 3. ENGINE BOOTSTRAP
-    safeInit('eventBus', () => require('./services/eventBus'));
-    safeInit('analyticsEngine', () => require('./services/analyticsEngine'));
-    safeInit('eventEngine', () => require('./services/eventEngine'));
-    safeInit('analyticsEventEngine', () => require('./services/analyticsEventEngine'));
-
-    // 4. STATIC FILES
-    app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-    // 5. ROUTES
-    if (authRoutes) app.use('/api/auth', authRoutes);
-
-    if (subjectRoutes) app.use('/api/subjects', protect, subjectRoutes);
-    if (topicsRoutes) app.use('/api/topics', protect, topicsRoutes);
-    if (subtopicRoutes) app.use('/api/subtopics', protect, subtopicRoutes);
-
-    if (analyticsRoutes) app.use('/api/analytics', protect, analyticsRoutes);
-    if (weakTopicRoutes) app.use('/api/weak-topics', protect, weakTopicRoutes);
-    if (recommendationRoutes) app.use('/api/recommendations', protect, recommendationRoutes);
-    if (sessionRoutes) app.use('/api/sessions', protect, sessionRoutes);
-
-    if (replayRoutes) app.use('/api/replay', protect, replayRoutes);
-
-    // 6. HEALTH CHECK
-    app.get('/health', (_req, res) => {
-      res.json({ success: true });
-    });
-
-    // 7. ERROR HANDLER
-    app.use((err, _req, res, _next) => {
-      logger.error('Unhandled error', { error: err.message });
-      res.status(500).json({ success: false });
-    });
-
-    // 8. SERVER START
-    const PORT = process.env.PORT || 5000;
-
-    if (process.env.ENABLE_WS === 'true') {
-      const server = http.createServer(app);
-
-      safeInit('realtimeEngine', () => {
-        const RealtimeEngine = require('./services/realtimeEngine');
-        new RealtimeEngine(server);
-      });
-
-      server.listen(PORT, () => {
-        console.log(`🚀 Server running with WS on port ${PORT}`);
-      });
-
-    } else {
-      app.listen(PORT, () => {
-        console.log(`🚀 Server running on port ${PORT}`);
-      });
-    }
-
-  } catch (err) {
-    logger.error('FATAL SERVER BOOT ERROR', err.message);
-    process.exit(1);
-  }
-}
-
-startServer();
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
 
 
 ================================================================================
-FILE (91/246): server\services\adaptiveEngine.js
+FILE (91/255): server\services\adaptiveEngine.js
 SIZE: 3976 bytes
 ================================================================================
 'use strict';
@@ -12332,7 +12282,7 @@ module.exports = AdaptiveEngine;
 
 
 ================================================================================
-FILE (92/246): server\services\ai.js
+FILE (92/255): server\services\ai.js
 SIZE: 10779 bytes
 ================================================================================
 'use strict';
@@ -12584,7 +12534,7 @@ module.exports = { generate };
 
 
 ================================================================================
-FILE (93/246): server\services\aiOrchestrator.js
+FILE (93/255): server\services\aiOrchestrator.js
 SIZE: 6278 bytes
 ================================================================================
 'use strict';
@@ -12812,7 +12762,7 @@ module.exports = {
 
 
 ================================================================================
-FILE (94/246): server\services\aiQuestionGenerationEngine.js
+FILE (94/255): server\services\aiQuestionGenerationEngine.js
 SIZE: 4481 bytes
 ================================================================================
 'use strict';
@@ -12952,7 +12902,7 @@ module.exports = AIQuestionGenerationEngine;
 
 
 ================================================================================
-FILE (95/246): server\services\aiQuestionGenerator.js
+FILE (95/255): server\services\aiQuestionGenerator.js
 SIZE: 8256 bytes
 ================================================================================
 // server/services/aiQuestionGenerator.js
@@ -13187,7 +13137,7 @@ module.exports = { generateAIQuestion };
 
 
 ================================================================================
-FILE (96/246): server\services\aiService.js
+FILE (96/255): server\services\aiService.js
 SIZE: 14338 bytes
 ================================================================================
 'use strict';
@@ -13499,7 +13449,7 @@ module.exports = {
 
 
 ================================================================================
-FILE (97/246): server\services\analyticsEngine.js
+FILE (97/255): server\services\analyticsEngine.js
 SIZE: 9768 bytes
 ================================================================================
 'use strict';
@@ -13804,7 +13754,7 @@ module.exports = AnalyticsEngine;
 
 
 ================================================================================
-FILE (98/246): server\services\analyticsEventEngine.js
+FILE (98/255): server\services\analyticsEventEngine.js
 SIZE: 1626 bytes
 ================================================================================
 'use strict';
@@ -13874,7 +13824,7 @@ module.exports = new AnalyticsEventEngine();
 
 
 ================================================================================
-FILE (99/246): server\services\cacheService.js
+FILE (99/255): server\services\cacheService.js
 SIZE: 738 bytes
 ================================================================================
 'use strict';
@@ -13916,7 +13866,7 @@ module.exports = CacheService;
 
 
 ================================================================================
-FILE (100/246): server\services\difficultyService.js
+FILE (100/255): server\services\difficultyService.js
 SIZE: 593 bytes
 ================================================================================
 const db = require('../config/db');
@@ -13941,7 +13891,7 @@ async function getStudentDifficultyLevel(studentId, subtopicId) {
 module.exports = { getStudentDifficultyLevel };
 
 ================================================================================
-FILE (101/246): server\services\eacbuddyPersonality.js
+FILE (101/255): server\services\eacbuddyPersonality.js
 SIZE: 15054 bytes
 ================================================================================
 // server/services/AISchoolonairPersonality.js
@@ -14361,7 +14311,7 @@ module.exports = {
 
 
 ================================================================================
-FILE (102/246): server\services\emailService.js
+FILE (102/255): server\services\emailService.js
 SIZE: 12920 bytes
 ================================================================================
 // server/services/emailService.js
@@ -14645,7 +14595,7 @@ module.exports = {
 
 
 ================================================================================
-FILE (103/246): server\services\engineValidationService.js
+FILE (103/255): server\services\engineValidationService.js
 SIZE: 4093 bytes
 ================================================================================
 'use strict';
@@ -14775,7 +14725,7 @@ module.exports = EngineValidationService;
 
 
 ================================================================================
-FILE (104/246): server\services\evaluateCompletion.js
+FILE (104/255): server\services\evaluateCompletion.js
 SIZE: 1073 bytes
 ================================================================================
 'use strict';
@@ -14838,7 +14788,7 @@ module.exports = evaluateCompletion;
 
 
 ================================================================================
-FILE (105/246): server\services\eventBus.js
+FILE (105/255): server\services\eventBus.js
 SIZE: 350 bytes
 ================================================================================
 'use strict';
@@ -14864,7 +14814,7 @@ module.exports = new EventBus();
 
 
 ================================================================================
-FILE (106/246): server\services\eventEngine.js
+FILE (106/255): server\services\eventEngine.js
 SIZE: 472 bytes
 ================================================================================
 'use strict';
@@ -14893,7 +14843,7 @@ module.exports = new EventEngine();
 
 
 ================================================================================
-FILE (107/246): server\services\eventProcessorService.js
+FILE (107/255): server\services\eventProcessorService.js
 SIZE: 1308 bytes
 ================================================================================
 'use strict';
@@ -14968,7 +14918,7 @@ module.exports = {
 
 
 ================================================================================
-FILE (108/246): server\services\eventReplayEngine.js
+FILE (108/255): server\services\eventReplayEngine.js
 SIZE: 2234 bytes
 ================================================================================
 'use strict';
@@ -15073,7 +15023,7 @@ module.exports = new EventReplayEngine();
 
 
 ================================================================================
-FILE (109/246): server\services\eventStore.js
+FILE (109/255): server\services\eventStore.js
 SIZE: 1057 bytes
 ================================================================================
 'use strict';
@@ -15125,7 +15075,7 @@ module.exports = new EventStore();
 
 
 ================================================================================
-FILE (110/246): server\services\examIntelligenceEngine.js
+FILE (110/255): server\services\examIntelligenceEngine.js
 SIZE: 5681 bytes
 ================================================================================
 'use strict';
@@ -15296,7 +15246,7 @@ module.exports = ExamIntelligenceEngine;
 
 
 ================================================================================
-FILE (111/246): server\services\explanationEnhancer.js
+FILE (111/255): server\services\explanationEnhancer.js
 SIZE: 16205 bytes
 ================================================================================
 // server/services/explanationEnhancer.js
@@ -15697,7 +15647,7 @@ module.exports = { enhanceExplanation };
 
 
 ================================================================================
-FILE (112/246): server\services\learningEventService.js
+FILE (112/255): server\services\learningEventService.js
 SIZE: 1297 bytes
 ================================================================================
 'use strict';
@@ -15776,7 +15726,7 @@ module.exports = {
 
 
 ================================================================================
-FILE (113/246): server\services\memoryService.js
+FILE (113/255): server\services\memoryService.js
 SIZE: 21582 bytes
 ================================================================================
 // server/services/memoryService.js
@@ -16303,7 +16253,7 @@ function formatMemoryContext({ profile, weakTopics, memories }) {
 ...TRUNCATED...
 
 ================================================================================
-FILE (114/246): server\services\progressAggregator.js
+FILE (114/255): server\services\progressAggregator.js
 SIZE: 4093 bytes
 ================================================================================
 'use strict';
@@ -16478,7 +16428,7 @@ module.exports = {
 
 
 ================================================================================
-FILE (115/246): server\services\progressEngine.js
+FILE (115/255): server\services\progressEngine.js
 SIZE: 3993 bytes
 ================================================================================
 'use strict';
@@ -16628,7 +16578,7 @@ module.exports = ProgressEngine;
 
 
 ================================================================================
-FILE (116/246): server\services\progressSyncService.js
+FILE (116/255): server\services\progressSyncService.js
 SIZE: 607 bytes
 ================================================================================
 'use strict';
@@ -16658,7 +16608,7 @@ module.exports = syncProgressState;
 
 
 ================================================================================
-FILE (117/246): server\services\questionService.js
+FILE (117/255): server\services\questionService.js
 SIZE: 1603 bytes
 ================================================================================
 const db = require('../config/database');
@@ -16726,7 +16676,7 @@ module.exports = {
 };
 
 ================================================================================
-FILE (118/246): server\services\quizGenerator.js
+FILE (118/255): server\services\quizGenerator.js
 SIZE: 18414 bytes
 ================================================================================
 // server/services/quizGenerator.js
@@ -17175,7 +17125,7 @@ module.exports = { generateQuizByTopic, buildQuizPayload };
 
 
 ================================================================================
-FILE (119/246): server\services\quizService.js
+FILE (119/255): server\services\quizService.js
 SIZE: 2426 bytes
 ================================================================================
 'use strict';
@@ -17277,7 +17227,61 @@ module.exports = {
 
 
 ================================================================================
-FILE (120/246): server\services\recommendationService.js
+FILE (120/255): server\services\realtimeEngine.js
+SIZE: 1019 bytes
+================================================================================
+'use strict';
+
+const { Server } = require('socket.io');
+const eventBus = require('./eventBus');
+const logger = require('../config/logger');
+
+class RealtimeEngine {
+  constructor() {
+    this.io = null;
+  }
+
+  init(httpServer) {
+    this.io = new Server(httpServer, {
+      cors: {
+        origin: '*',
+        credentials: true,
+      },
+    });
+
+    this.io.on('connection', (socket) => {
+      logger.info(`Realtime client connected: ${socket.id}`);
+
+      socket.on('disconnect', () => {
+        logger.info(`Realtime client disconnected: ${socket.id}`);
+      });
+    });
+
+    this.bindEvents();
+
+    return this.io;
+  }
+
+  bindEvents() {
+    const forward = (eventName) => {
+      eventBus.registerListener(eventName, (payload) => {
+        if (!this.io) return;
+
+        this.io.emit(eventName, payload);
+      });
+    };
+
+    forward('progress.updated');
+    forward('quiz.completed');
+    forward('resource.viewed');
+  }
+}
+
+module.exports = new RealtimeEngine();
+
+
+================================================================================
+FILE (121/255): server\services\recommendationService.js
 SIZE: 3812 bytes
 ================================================================================
 'use strict';
@@ -17413,7 +17417,7 @@ module.exports = {
 
 
 ================================================================================
-FILE (121/246): server\services\remediationService.js
+FILE (122/255): server\services\remediationService.js
 SIZE: 8095 bytes
 ================================================================================
 'use strict';
@@ -17650,7 +17654,7 @@ module.exports = {
 
 
 ================================================================================
-FILE (122/246): server\services\sessionService.js
+FILE (123/255): server\services\sessionService.js
 SIZE: 4874 bytes
 ================================================================================
 'use strict';
@@ -17821,7 +17825,7 @@ module.exports = {
 
 
 ================================================================================
-FILE (123/246): server\services\subtopicProgressService.js
+FILE (124/255): server\services\subtopicProgressService.js
 SIZE: 3386 bytes
 ================================================================================
 'use strict';
@@ -17939,7 +17943,7 @@ module.exports = SubtopicProgressService;
 
 
 ================================================================================
-FILE (124/246): server\services\userMemory.js
+FILE (125/255): server\services\userMemory.js
 SIZE: 10175 bytes
 ================================================================================
 // server/services/userMemory.js
@@ -18187,7 +18191,7 @@ module.exports = { fetchUserMemory, formatMemoryBlock };
 
 
 ================================================================================
-FILE (125/246): server\services\weakConceptService.js
+FILE (126/255): server\services\weakConceptService.js
 SIZE: 2671 bytes
 ================================================================================
 // server/services/weakConceptService.js
@@ -18279,7 +18283,7 @@ module.exports = {
 
 
 ================================================================================
-FILE (126/246): server\services\weaknessService.js
+FILE (127/255): server\services\weaknessService.js
 SIZE: 3590 bytes
 ================================================================================
 'use strict';
@@ -18412,7 +18416,7 @@ module.exports = {
 };
 
 ================================================================================
-FILE (127/246): server\services\weakTopicEngine.js
+FILE (128/255): server\services\weakTopicEngine.js
 SIZE: 3100 bytes
 ================================================================================
 'use strict';
@@ -18549,7 +18553,7 @@ module.exports = new WeakTopicEngine();
 
 
 ================================================================================
-FILE (128/246): server\tests\pipeline.test.js
+FILE (129/255): server\tests\pipeline.test.js
 SIZE: 28497 bytes
 ================================================================================
 // tests/pipeline.test.js
@@ -19109,7 +19113,7 @@ describe('Test 6: Update mastery', () => {
 ...TRUNCATED...
 
 ================================================================================
-FILE (129/246): server\tools\_toolHelpers.js
+FILE (130/255): server\tools\_toolHelpers.js
 SIZE: 1988 bytes
 ================================================================================
 // server/tools/_toolHelpers.js
@@ -19173,7 +19177,7 @@ global.toolError = function toolError(toolName, message, originalError = null, s
 
 
 ================================================================================
-FILE (130/246): server\tools\analyticsTools.js
+FILE (131/255): server\tools\analyticsTools.js
 SIZE: 10794 bytes
 ================================================================================
 // server/tools/analyticsTools.js
@@ -19440,7 +19444,7 @@ module.exports = { getPerformance, predictGrade, getLeaderboard };
 
 
 ================================================================================
-FILE (131/246): server\tools\courseTools.js
+FILE (132/255): server\tools\courseTools.js
 SIZE: 4529 bytes
 ================================================================================
 // server/tools/courseTools.js
@@ -19563,7 +19567,7 @@ module.exports = { getCourses, getEnrollmentProgress };
 
 
 ================================================================================
-FILE (132/246): server\tools\explanationTools.js
+FILE (133/255): server\tools\explanationTools.js
 SIZE: 7892 bytes
 ================================================================================
 // server/tools/explanationTools.js
@@ -19795,7 +19799,7 @@ module.exports = { explainConcept, getHint };
 
 
 ================================================================================
-FILE (133/246): server\tools\importConcepts.js
+FILE (134/255): server\tools\importConcepts.js
 SIZE: 14798 bytes
 ================================================================================
 #!/usr/bin/env node
@@ -20157,7 +20161,7 @@ module.exports = { importConcepts }; // export for programmatic use / tests
 
 
 ================================================================================
-FILE (134/246): server\tools\index.js
+FILE (135/255): server\tools\index.js
 SIZE: 2650 bytes
 ================================================================================
 // server/tools/index.js
@@ -20218,7 +20222,7 @@ module.exports = TOOLS;
 
 
 ================================================================================
-FILE (135/246): server\tools\quizTools.js
+FILE (136/255): server\tools\quizTools.js
 SIZE: 5042 bytes
 ================================================================================
 // server/tools/quizTools.js
@@ -20363,7 +20367,7 @@ module.exports = { startQuiz, getQuizHistory };
 
 
 ================================================================================
-FILE (136/246): server\tools\testTools.js
+FILE (137/255): server\tools\testTools.js
 SIZE: 9845 bytes
 ================================================================================
 // server/tools/testTools.js
@@ -20650,7 +20654,7 @@ module.exports = { generateTest, getStudentTests, getTestDetails };
 
 
 ================================================================================
-FILE (137/246): server\tools\weaknessTools.js
+FILE (138/255): server\tools\weaknessTools.js
 SIZE: 2116 bytes
 ================================================================================
 'use strict';
@@ -20721,7 +20725,7 @@ module.exports = { getWeaknessProfile };
 
 
 ================================================================================
-FILE (138/246): server\utils\jwt.js
+FILE (139/255): server\utils\jwt.js
 SIZE: 876 bytes
 ================================================================================
 'use strict';
@@ -20761,7 +20765,7 @@ module.exports = { generateToken, verifyToken, extractToken };
 
 
 ================================================================================
-FILE (139/246): server\utils\questionImporter.js
+FILE (140/255): server\utils\questionImporter.js
 SIZE: 14368 bytes
 ================================================================================
 // server/utils/questionImporter.js
@@ -21123,7 +21127,7 @@ module.exports = { parseJSON, parseCSV, batchInsert, validateQuestion };
 
 
 ================================================================================
-FILE (140/246): server\utils\videoEncryption.js
+FILE (141/255): server\utils\videoEncryption.js
 SIZE: 10724 bytes
 ================================================================================
 // server/utils/videoEncryption.js
@@ -21327,7 +21331,7 @@ module.exports = {
 
 
 ================================================================================
-FILE (141/246): server\validators\aiQuestionSchema.js
+FILE (142/255): server\validators\aiQuestionSchema.js
 SIZE: 790 bytes
 ================================================================================
 const Ajv = require('ajv');
@@ -21369,7 +21373,7 @@ module.exports = (data) => {
 };
 
 ================================================================================
-FILE (142/246): server\workers\aiWorker.js
+FILE (143/255): server\workers\aiWorker.js
 SIZE: 7138 bytes
 ================================================================================
 'use strict';
@@ -21569,7 +21573,7 @@ SECTION: FRONTEND
 ================================================================================
 
 ================================================================================
-FILE (143/246): client\index.html
+FILE (144/255): client\index.html
 SIZE: 642 bytes
 ================================================================================
 <!doctype html>
@@ -21591,8 +21595,8 @@ SIZE: 642 bytes
 
 
 ================================================================================
-FILE (144/246): client\package.json
-SIZE: 721 bytes
+FILE (145/255): client\package.json
+SIZE: 758 bytes
 ================================================================================
 {
   "name": "edu-platform-client",
@@ -21605,6 +21609,7 @@ SIZE: 721 bytes
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.99.0",
     "axios": "^1.6.2",
     "hls.js": "^1.6.15",
     "lucide-react": "^0.294.0",
@@ -21612,7 +21617,7 @@ SIZE: 721 bytes
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.20.1",
     "recharts": "^2.15.4",
-    "@tanstack/react-query": "^5.99.0"
+    "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
     "@types/react": "^18.2.43",
@@ -21625,8 +21630,9 @@ SIZE: 721 bytes
   }
 }
 
+
 ================================================================================
-FILE (145/246): client\postcss.config.js
+FILE (146/255): client\postcss.config.js
 SIZE: 86 bytes
 ================================================================================
 export default {
@@ -21638,7 +21644,7 @@ export default {
 
 
 ================================================================================
-FILE (146/246): client\src\api\analyticsApi.js
+FILE (147/255): client\src\api\analyticsApi.js
 SIZE: 362 bytes
 ================================================================================
 import httpClient from './httpClient';
@@ -21652,7 +21658,7 @@ export const analyticsApi = {
 
 
 ================================================================================
-FILE (147/246): client\src\api\authApi.js
+FILE (148/255): client\src\api\authApi.js
 SIZE: 497 bytes
 ================================================================================
 import api from './axios';
@@ -21687,7 +21693,7 @@ export const getMe = async () => {
 
 
 ================================================================================
-FILE (148/246): client\src\api\axios.js
+FILE (149/255): client\src\api\axios.js
 SIZE: 407 bytes
 ================================================================================
 import axios from 'axios';
@@ -21712,7 +21718,7 @@ export default api;
 
 
 ================================================================================
-FILE (149/246): client\src\api\dashboardApi.js
+FILE (150/255): client\src\api\dashboardApi.js
 SIZE: 395 bytes
 ================================================================================
 import api from './axios';
@@ -21734,7 +21740,7 @@ export const getActiveSession = async () => {
 
 
 ================================================================================
-FILE (150/246): client\src\api\httpClient.js
+FILE (151/255): client\src\api\httpClient.js
 SIZE: 426 bytes
 ================================================================================
 import axios from 'axios';
@@ -21757,7 +21763,7 @@ export default httpClient;
 
 
 ================================================================================
-FILE (151/246): client\src\api\progressApi.js
+FILE (152/255): client\src\api\progressApi.js
 SIZE: 216 bytes
 ================================================================================
 import httpClient from './httpClient';
@@ -21770,7 +21776,7 @@ export const progressApi = {
 
 
 ================================================================================
-FILE (152/246): client\src\api\recommendationApi.js
+FILE (153/255): client\src\api\recommendationApi.js
 SIZE: 156 bytes
 ================================================================================
 import httpClient from './httpClient';
@@ -21782,7 +21788,7 @@ export const recommendationApi = {
 
 
 ================================================================================
-FILE (153/246): client\src\api\sessionApi.js
+FILE (154/255): client\src\api\sessionApi.js
 SIZE: 272 bytes
 ================================================================================
 import httpClient from './httpClient';
@@ -21795,47 +21801,193 @@ export const sessionApi = {
 
 
 ================================================================================
-FILE (154/246): client\src\App.jsx
-SIZE: 967 bytes
+FILE (155/255): client\src\App.jsx
+SIZE: 9552 bytes
 ================================================================================
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import Dashboard from './pages/Dashboard';
-import QueryProvider from './providers/QueryProvider';
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
-// realtime client (safe import)
-import realtimeClient from './services/realtimeClient';
-import { queryClient } from './providers/QueryProvider';
+// Layout shells
+import StudentLayout from "./layouts/StudentLayout";
+import TeacherLayout from "./layouts/TeacherLayout";
+import AdminLayout from "./layouts/AdminLayout";
 
-// optional: connect realtime once app loads
-realtimeClient.connect((event, data) => {
-  if (event === 'progress.updated') {
-    queryClient.invalidateQueries(['progress']);
-    queryClient.invalidateQueries(['analytics-summary']);
-  }
+// Auth guard
+import PrivateRoute from "./components/PrivateRoute";
 
-  if (event === 'quiz.completed') {
-    queryClient.invalidateQueries(['analytics-summary']);
-    queryClient.invalidateQueries(['weak-topics']);
-  }
-});
+// ── Public / auth pages ───────────────────────────────────────────────────────
+import LandingPage from "./pages/LandingPage";
+import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import VerifyEmailPage from "./pages/VerifyEmailPage";
+import OnboardingPage from "./pages/OnboardingPage";
+import PricingPage from "./pages/PricingPage";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsOfService from "./pages/TermsOfService";
+import PaymentVerify from "./pages/PaymentVerify";
+import NotFound from "./pages/NotFound";
 
-function App() {
+// ── Semi-public pages ─────────────────────────────────────────────────────────
+import PastPapersPage from "./pages/PastPapersPage";
+import SubjectCatalog from "./pages/SubjectCatalog";
+
+// ── Student pages ─────────────────────────────────────────────────────────────
+import StudentDashboard from "./pages/StudentDashboard";
+import StudentAnalyticsDashboard from "./pages/StudentAnalyticsDashboard";
+import StudentTestPage from "./pages/StudentTestPage";
+import SubjectPage from "./pages/SubjectPage";
+import SubtopicPage from "./pages/SubtopicPage";
+import QuizPage from "./pages/QuizPage";
+import QuizResultsPage from "./pages/QuizResultsPage";
+import QuizHistoryPage from "./pages/QuizHistoryPage";
+import PracticeMode from "./pages/PracticeMode";
+import MockExamPage from "./pages/MockExamPage";
+import ImageMarkingPage from "./pages/ImageMarkingPage";
+import SettingsPage from "./pages/SettingsPage";
+
+// ── Teacher pages ─────────────────────────────────────────────────────────────
+import TeacherDashboard from "./pages/TeacherDashboard";
+import TeacherAssignmentPage from "./pages/TeacherAssignmentPage";
+import TeacherContentPage from "./pages/TeacherContentPage";
+import TeacherPendingQuestions from "./pages/TeacherPendingQuestions";
+import TeacherResourcesPage from "./pages/TeacherResourcesPage";
+import ContributeQuestion from "./pages/ContributeQuestion";
+import QuestionReview from "./pages/QuestionReview";
+
+// ── Admin pages ───────────────────────────────────────────────────────────────
+import AdminDashboard from "./pages/AdminDashboard";
+import DashboardHome from "./pages/Dashboard/DashboardHome";
+
+// ── WhatsApp floating button ───────────────────────────────────────────────────
+const WA_NUMBER = "2348099123412";
+const WA_MESSAGE = encodeURIComponent(
+  "Hi! I'd like to know more about AISchoolonair."
+);
+
+function WhatsAppButton() {
   return (
-    <QueryProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-        </Routes>
-      </BrowserRouter>
-    </QueryProvider>
+    <a
+      href={`https://wa.me/${WA_NUMBER}?text=${WA_MESSAGE}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Contact us on WhatsApp"
+      style={{
+        position: "fixed",
+        bottom: 24,
+        right: 24,
+        zIndex: 9999,
+        width: 56,
+        height: 56,
+        borderRadius: "50%",
+        backgroundColor: "#25D366",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+      }}
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 32 32"
+        width="30"
+        height="30"
+        fill="white"
+      >
+        <path d="M16.003 2C8.28 2 2 8.28 2 16.003c0 2.478.65 4.812 1.783 6.838L2 30l7.363-1.76A13.94 13.94 0 0 0 16.003 30C23.72 30 30 23.72 30 16.003 30 8.28 23.72 2 16.003 2z" />
+      </svg>
+    </a>
   );
 }
 
-export default App;
+// ─────────────────────────────────────────────────────────────────────────────
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+
+        {/* ── PUBLIC ────────────────────────────────────────────────────────── */}
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/pricing" element={<PricingPage />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/terms" element={<TermsOfService />} />
+        <Route path="/past-papers" element={<PastPapersPage />} />
+        <Route path="/subjects" element={<SubjectCatalog />} />
+
+        {/* ── AUTH ──────────────────────────────────────────────────────────── */}
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
+        <Route path="/onboarding" element={<OnboardingPage />} />
+        <Route path="/payment/verify" element={<PaymentVerify />} />
+
+        {/* ── STUDENT ROUTES ─────────────────────────────────────────────────── */}
+        <Route element={<PrivateRoute allowedRoles={["student"]} />}>
+          <Route path="/student" element={<StudentLayout />}>
+            <Route path="dashboard" element={<StudentDashboard />} />
+            <Route path="analytics" element={<StudentAnalyticsDashboard />} />
+            <Route path="subject/:subjectId" element={<SubjectPage />} />
+            <Route path="subtopic/:subtopicId" element={<SubtopicPage />} />
+            <Route
+              path="subtopic/:subtopicId/quiz-history"
+              element={<QuizHistoryPage />}
+            />
+            <Route path="quiz/:subtopicId" element={<QuizPage />} />
+            <Route
+              path="quiz-results/:attemptId"
+              element={<QuizResultsPage />}
+            />
+            <Route path="mock/:subjectId" element={<MockExamPage />} />
+            <Route path="practice" element={<PracticeMode />} />
+            <Route path="mark-image" element={<ImageMarkingPage />} />
+            <Route path="test/:testId" element={<StudentTestPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+          </Route>
+        </Route>
+
+        {/* ── TEACHER ROUTES ────────────────────────────────────────────────── */}
+        <Route element={<PrivateRoute allowedRoles={["teacher", "admin"]} />}>
+          <Route path="/teacher" element={<TeacherLayout />}>
+            <Route path="dashboard" element={<TeacherDashboard />} />
+            <Route path="assignments" element={<TeacherAssignmentPage />} />
+            <Route path="content" element={<TeacherContentPage />} />
+            <Route
+              path="pending-questions"
+              element={<TeacherPendingQuestions />}
+            />
+            <Route path="resources" element={<TeacherResourcesPage />} />
+            <Route path="review" element={<QuestionReview />} />
+            <Route path="contribute" element={<ContributeQuestion />} />
+            <Route path="settings" element={<SettingsPage />} />
+          </Route>
+        </Route>
+
+        {/* ── ADMIN ROUTES ──────────────────────────────────────────────────── */}
+        <Route element={<PrivateRoute allowedRoles={["admin"]} />}>
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route path="dashboard" element={<AdminDashboard />} />
+            <Route path="home" element={<DashboardHome />} />
+            <Route path="questions/review" element={<QuestionReview />} />
+            <Route path="settings" element={<SettingsPage />} />
+          </Route>
+        </Route>
+
+        {/* ── FALLBACK ──────────────────────────────────────────────────────── */}
+        <Route path="/404" element={<NotFound />} />
+        <Route path="*" element={<Navigate to="/404" replace />} />
+      </Routes>
+
+      <WhatsAppButton />
+    </BrowserRouter>
+  );
+}
 
 
 ================================================================================
-FILE (155/246): client\src\components\AdminBulkUploadPanel.jsx
+FILE (156/255): client\src\components\AdminBulkUploadPanel.jsx
 SIZE: 28249 bytes
 ================================================================================
 // client/src/components/AdminBulkUploadPanel.jsx
@@ -22292,7 +22444,7 @@ export default function AdminBulkUploadPanel() {
 ...TRUNCATED...
 
 ================================================================================
-FILE (156/246): client\src\components\AIChatWidget.jsx
+FILE (157/255): client\src\components\AIChatWidget.jsx
 SIZE: 9925 bytes
 ================================================================================
 // client/src/components/AIChatWidget.jsx
@@ -22535,7 +22687,7 @@ export default function AIChatWidget({
 
 
 ================================================================================
-FILE (157/246): client\src\components\ConceptList.jsx
+FILE (158/255): client\src\components\ConceptList.jsx
 SIZE: 11844 bytes
 ================================================================================
 // client/src/components/ConceptList.jsx
@@ -22808,7 +22960,7 @@ export default function ConceptList({ subtopic, showToast }) {
 
 
 ================================================================================
-FILE (158/246): client\src\components\ExamBoardSelector.jsx
+FILE (159/255): client\src\components\ExamBoardSelector.jsx
 SIZE: 3341 bytes
 ================================================================================
 /**
@@ -22908,7 +23060,7 @@ export default ExamBoardSelector;
 
 
 ================================================================================
-FILE (159/246): client\src\components\ExamTypeSelector.jsx
+FILE (160/255): client\src\components\ExamTypeSelector.jsx
 SIZE: 4453 bytes
 ================================================================================
 // client/src/components/ExamTypeSelector.jsx
@@ -23030,7 +23182,7 @@ export default ExamTypeSelector;
 
 
 ================================================================================
-FILE (160/246): client\src\components\GamificationBar.jsx
+FILE (161/255): client\src\components\GamificationBar.jsx
 SIZE: 3992 bytes
 ================================================================================
 // Drop this anywhere in StudentDashboard.jsx:
@@ -23137,45 +23289,35 @@ export default function GamificationBar() {
 
 
 ================================================================================
-FILE (161/246): client\src\components\PrivateRoute.jsx
-SIZE: 917 bytes
+FILE (162/255): client\src\components\PrivateRoute.jsx
+SIZE: 640 bytes
 ================================================================================
-import { Navigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { Navigate, Outlet } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
-const PrivateRoute = ({ children, allowedRoles = [] }) => {
+export default function PrivateRoute({ allowedRoles = [] }) {
   const { user, loading } = useAuth();
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary-600"></div>
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-900" />
       </div>
     );
   }
 
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
+  if (!user) return <Navigate to="/login" replace />;
 
   if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
-    // Redirect to appropriate dashboard based on role
-    const redirectMap = {
-      student: '/student/dashboard',
-      teacher: '/teacher/dashboard',
-      admin: '/admin/dashboard',
-    };
-    return <Navigate to={redirectMap[user.role] || '/'} replace />;
+    return <Navigate to="/404" replace />;
   }
 
-  return children;
-};
-
-export default PrivateRoute;
+  return <Outlet />;
+}
 
 
 ================================================================================
-FILE (162/246): client\src\components\ProgressSummary.jsx
+FILE (163/255): client\src\components\ProgressSummary.jsx
 SIZE: 419 bytes
 ================================================================================
 export default function ProgressSummary({ data }) {
@@ -23196,7 +23338,7 @@ export default function ProgressSummary({ data }) {
 
 
 ================================================================================
-FILE (163/246): client\src\components\PublicNav.jsx
+FILE (164/255): client\src\components\PublicNav.jsx
 SIZE: 1970 bytes
 ================================================================================
 // client/src/components/PublicNav.jsx
@@ -23269,7 +23411,7 @@ export default function PublicNav({
 
 
 ================================================================================
-FILE (164/246): client\src\components\QuizTab.jsx
+FILE (165/255): client\src\components\QuizTab.jsx
 SIZE: 38876 bytes
 ================================================================================
 // client/src/components/QuizTab.jsx
@@ -23777,7 +23919,7 @@ function InProgressScreen({ subtopicId, subtopic, selectedPaper, onFinish, navig
 ...TRUNCATED...
 
 ================================================================================
-FILE (165/246): client\src\components\RecommendationPanel.jsx
+FILE (166/255): client\src\components\RecommendationPanel.jsx
 SIZE: 416 bytes
 ================================================================================
 export default function RecommendationPanel({ items }) {
@@ -23800,7 +23942,7 @@ export default function RecommendationPanel({ items }) {
 
 
 ================================================================================
-FILE (166/246): client\src\components\SessionPanel.jsx
+FILE (167/255): client\src\components\SessionPanel.jsx
 SIZE: 430 bytes
 ================================================================================
 export default function SessionPanel({ sessions }) {
@@ -23823,7 +23965,7 @@ export default function SessionPanel({ sessions }) {
 
 
 ================================================================================
-FILE (167/246): client\src\components\SubjectCard.jsx
+FILE (168/255): client\src\components\SubjectCard.jsx
 SIZE: 6190 bytes
 ================================================================================
 import React from 'react';
@@ -23999,7 +24141,7 @@ export default SubjectCard;
 
 
 ================================================================================
-FILE (168/246): client\src\components\TopicsModal.jsx
+FILE (169/255): client\src\components\TopicsModal.jsx
 SIZE: 5322 bytes
 ================================================================================
 // client/src/components/TopicsModal.jsx
@@ -24122,7 +24264,7 @@ export default function TopicsModal({ subjectId, mode, onClose }) {
 
 
 ================================================================================
-FILE (169/246): client\src\components\TopNav.jsx
+FILE (170/255): client\src\components\TopNav.jsx
 SIZE: 8268 bytes
 ================================================================================
 // client/src/components/TopNav.jsx
@@ -24324,7 +24466,7 @@ export default function TopNav() {
 
 
 ================================================================================
-FILE (170/246): client\src\components\VideoPlayer.jsx
+FILE (171/255): client\src\components\VideoPlayer.jsx
 SIZE: 21061 bytes
 ================================================================================
 // client/src/components/VideoPlayer.jsx
@@ -24874,7 +25016,7 @@ export default function VideoPlayer({ videoId, onComplete }) {
 
 
 ================================================================================
-FILE (171/246): client\src\components\WeakTopicsPanel.jsx
+FILE (172/255): client\src\components\WeakTopicsPanel.jsx
 SIZE: 410 bytes
 ================================================================================
 export default function WeakTopicsPanel({ items }) {
@@ -24897,7 +25039,7 @@ export default function WeakTopicsPanel({ items }) {
 
 
 ================================================================================
-FILE (172/246): client\src\components\WhatsAppButton.jsx
+FILE (173/255): client\src\components\WhatsAppButton.jsx
 SIZE: 2665 bytes
 ================================================================================
 // WhatsAppButton.jsx
@@ -24958,7 +25100,7 @@ export default WhatsAppButton;
 
 
 ================================================================================
-FILE (173/246): client\src\config\branding.js
+FILE (174/255): client\src\config\branding.js
 SIZE: 1199 bytes
 ================================================================================
 // EAC Platform Branding Configuration
@@ -25015,34 +25157,32 @@ export default branding;
 
 
 ================================================================================
-FILE (174/246): client\src\context\AuthContext.jsx
-SIZE: 1588 bytes
+FILE (175/255): client\src\context\AuthContext.jsx
+SIZE: 1725 bytes
 ================================================================================
-import { createContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import * as authApi from '../api/authApi';
 import { setToken, getToken, clearToken } from '../utils/token';
 
 export const AuthContext = createContext(null);
 
+export const useAuth = () => useContext(AuthContext);
+
 export default function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  /**
-   * INIT AUTH ON APP LOAD
-   */
   useEffect(() => {
     const init = async () => {
       const token = getToken();
-
       if (!token) {
         setLoading(false);
         return;
       }
-
       try {
         const res = await authApi.getMe();
-        setUser(res.data);
+        const userData = res?.data?.user || res?.data || null;
+        setUser(userData);
       } catch (err) {
         clearToken();
         setUser(null);
@@ -25050,37 +25190,27 @@ export default function AuthProvider({ children }) {
         setLoading(false);
       }
     };
-
     init();
   }, []);
 
-  /**
-   * LOGIN
-   */
   const login = async (email, password) => {
     const res = await authApi.login(email, password);
-
-    setToken(res.token);
-    setUser(res.user);
-
-    return res.user;
+    const token = res?.token;
+    const userData = res?.user;
+    if (token) setToken(token);
+    setUser(userData);
+    return userData;
   };
 
-  /**
-   * REGISTER
-   */
   const register = async (payload) => {
     const res = await authApi.register(payload);
-
-    setToken(res.token);
-    setUser(res.user);
-
-    return res.user;
+    const token = res?.token;
+    const userData = res?.user;
+    if (token) setToken(token);
+    setUser(userData);
+    return userData;
   };
 
-  /**
-   * LOGOUT
-   */
   const logout = () => {
     clearToken();
     setUser(null);
@@ -25104,7 +25234,7 @@ export default function AuthProvider({ children }) {
 
 
 ================================================================================
-FILE (175/246): client\src\hooks\useAnalytics.js
+FILE (176/255): client\src\hooks\useAnalytics.js
 SIZE: 461 bytes
 ================================================================================
 import { useQuery } from '@tanstack/react-query';
@@ -25126,7 +25256,7 @@ export function useWeakTopics() {
 
 
 ================================================================================
-FILE (176/246): client\src\hooks\useAuth.js
+FILE (177/255): client\src\hooks\useAuth.js
 SIZE: 169 bytes
 ================================================================================
 import { useContext } from 'react';
@@ -25138,7 +25268,7 @@ export default function useAuth() {
 
 
 ================================================================================
-FILE (177/246): client\src\hooks\useCatalog.js
+FILE (178/255): client\src\hooks\useCatalog.js
 SIZE: 6153 bytes
 ================================================================================
 /**
@@ -25293,73 +25423,50 @@ export function useCatalog() {
 
 
 ================================================================================
-FILE (178/246): client\src\hooks\useDashboardData.js
-SIZE: 1627 bytes
+FILE (179/255): client\src\hooks\useDashboardData.js
+SIZE: 1014 bytes
 ================================================================================
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { dashboardService } from "../services/dashboardService";
 
 export default function useDashboardData() {
-  const [loading, setLoading] = useState(true);
+  const summary = useQuery({
+    queryKey: ["dashboard", "summary"],
+    queryFn: dashboardService.getProgressSummary,
+  });
 
-  const [summary, setSummary] = useState(null);
-  const [weakTopics, setWeakTopics] = useState([]);
-  const [recommendations, setRecommendations] = useState([]);
-  const [sessions, setSessions] = useState([]);
+  const weakTopics = useQuery({
+    queryKey: ["dashboard", "weakTopics"],
+    queryFn: dashboardService.getWeakTopics,
+  });
 
-  const [error, setError] = useState(null);
+  const recommendations = useQuery({
+    queryKey: ["dashboard", "recommendations"],
+    queryFn: dashboardService.getRecommendations,
+  });
 
-  const fetchAll = async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const results = await Promise.allSettled([
-        dashboardService.getProgressSummary(),
-        dashboardService.getWeakTopics(),
-        dashboardService.getRecommendations(),
-        dashboardService.getSessions(),
-      ]);
-
-      const [s, w, r, se] = results;
-
-      setSummary(s.status === "fulfilled" ? s.value : null);
-      setWeakTopics(w.status === "fulfilled" ? w.value : []);
-      setRecommendations(r.status === "fulfilled" ? r.value : []);
-      setSessions(se.status === "fulfilled" ? se.value : []);
-
-      // optional debug logging
-      results.forEach((res, i) => {
-        if (res.status === "rejected") {
-          console.warn("Dashboard API failed:", i, res.reason?.message);
-        }
-      });
-
-    } catch (err) {
-      setError("Dashboard load failed");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchAll();
-  }, []);
+  const sessions = useQuery({
+    queryKey: ["dashboard", "sessions"],
+    queryFn: dashboardService.getSessions,
+  });
 
   return {
-    loading,
-    error,
-    summary,
-    weakTopics,
-    recommendations,
-    sessions,
-    refresh: fetchAll,
+    loading:
+      summary.isLoading ||
+      weakTopics.isLoading ||
+      recommendations.isLoading ||
+      sessions.isLoading,
+
+    summary: summary.data,
+    weakTopics: weakTopics.data || [],
+    recommendations: recommendations.data || [],
+    sessions: sessions.data || [],
   };
 }
 
 
 ================================================================================
-FILE (179/246): client\src\hooks\useProgress.js
+FILE (180/255): client\src\hooks\useProgress.js
 SIZE: 605 bytes
 ================================================================================
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -25386,7 +25493,76 @@ export function useUpdateProgress() {
 
 
 ================================================================================
-FILE (180/246): client\src\hooks\useRecommendations.js
+FILE (181/255): client\src\hooks\useRealtimeDashboard.js
+SIZE: 827 bytes
+================================================================================
+import { useEffect } from "react";
+import { io } from "socket.io-client";
+import { queryClient } from "../providers/queryClient";
+
+export default function useRealtimeDashboard() {
+  useEffect(() => {
+    const socket = io(import.meta.env.VITE_API_URL, {
+      withCredentials: true,
+    });
+
+    socket.on("connect", () => {
+      console.log("Realtime connected:", socket.id);
+    });
+
+    // invalidate cached dashboard queries on updates
+    socket.on("progress.updated", () => {
+      queryClient.invalidateQueries(["dashboard"]);
+    });
+
+    socket.on("quiz.completed", () => {
+      queryClient.invalidateQueries(["dashboard"]);
+    });
+
+    socket.on("resource.viewed", () => {
+      queryClient.invalidateQueries(["dashboard"]);
+    });
+
+    return () => socket.disconnect();
+  }, []);
+}
+
+
+================================================================================
+FILE (182/255): client\src\hooks\useRealtimeSync.js
+SIZE: 739 bytes
+================================================================================
+import { useEffect } from "react";
+import { initRealtime } from "../services/realtimeClient";
+import { queryClient } from "../providers/queryClient";
+
+export default function useRealtimeSync() {
+  useEffect(() => {
+    const socket = initRealtime();
+
+    // 🎯 CORE EVENTS → invalidate cache only (NO UI changes)
+    const eventsToInvalidate = [
+      "progress.updated",
+      "quiz.completed",
+      "resource.viewed",
+    ];
+
+    eventsToInvalidate.forEach((event) => {
+      socket.on(event, () => {
+        // invalidate ALL dashboard-related queries
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      });
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
+}
+
+
+================================================================================
+FILE (183/255): client\src\hooks\useRecommendations.js
 SIZE: 314 bytes
 ================================================================================
 import { useQuery } from '@tanstack/react-query';
@@ -25402,7 +25578,7 @@ export function useRecommendations() {
 
 
 ================================================================================
-FILE (181/246): client\src\hooks\useSession.js
+FILE (184/255): client\src\hooks\useSession.js
 SIZE: 504 bytes
 ================================================================================
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -25429,7 +25605,7 @@ export function useEndSession() {
 
 
 ================================================================================
-FILE (182/246): client\src\index.css
+FILE (185/255): client\src\index.css
 SIZE: 1923 bytes
 ================================================================================
 @tailwind base;
@@ -25533,7 +25709,49 @@ SIZE: 1923 bytes
 
 
 ================================================================================
-FILE (183/246): client\src\main.jsx
+FILE (186/255): client\src\layouts\AdminLayout.jsx
+SIZE: 354 bytes
+================================================================================
+import { Outlet } from "react-router-dom";
+
+// Layout shell — pages are self-contained and manage their own TopNav/container.
+// This shell exists to group routes by role and can be progressively enhanced
+// with shared chrome (sidebar, breadcrumbs, etc.) as pages are refactored.
+export default function AdminLayout() {
+  return <Outlet />;
+}
+
+
+================================================================================
+FILE (187/255): client\src\layouts\StudentLayout.jsx
+SIZE: 356 bytes
+================================================================================
+import { Outlet } from "react-router-dom";
+
+// Layout shell — pages are self-contained and manage their own TopNav/container.
+// This shell exists to group routes by role and can be progressively enhanced
+// with shared chrome (sidebar, breadcrumbs, etc.) as pages are refactored.
+export default function StudentLayout() {
+  return <Outlet />;
+}
+
+
+================================================================================
+FILE (188/255): client\src\layouts\TeacherLayout.jsx
+SIZE: 356 bytes
+================================================================================
+import { Outlet } from "react-router-dom";
+
+// Layout shell — pages are self-contained and manage their own TopNav/container.
+// This shell exists to group routes by role and can be progressively enhanced
+// with shared chrome (sidebar, breadcrumbs, etc.) as pages are refactored.
+export default function TeacherLayout() {
+  return <Outlet />;
+}
+
+
+================================================================================
+FILE (189/255): client\src\main.jsx
 SIZE: 273 bytes
 ================================================================================
 import React from 'react';
@@ -25549,7 +25767,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 
 
 ================================================================================
-FILE (184/246): client\src\pages\AdminDashboard.jsx
+FILE (190/255): client\src\pages\AdminDashboard.jsx
 SIZE: 81146 bytes
 ================================================================================
 import { useState, useEffect } from 'react';
@@ -26024,7 +26242,7 @@ const CatalogPanel = () => {
 ...TRUNCATED...
 
 ================================================================================
-FILE (185/246): client\src\pages\ContributeQuestion.jsx
+FILE (191/255): client\src\pages\ContributeQuestion.jsx
 SIZE: 23607 bytes
 ================================================================================
 // client/src/pages/ContributeQuestion.jsx
@@ -26459,13 +26677,13 @@ export default function ContributeQuestion() {
 ...TRUNCATED...
 
 ================================================================================
-FILE (186/246): client\src\pages\Dashboard.jsx
-SIZE: 598 bytes
+FILE (192/255): client\src\pages\Dashboard.jsx
+SIZE: 546 bytes
 ================================================================================
-import ProgressSummary from "../../components/dashboard/ProgressSummary";
-import WeakTopicsPanel from "../../components/dashboard/WeakTopicsPanel";
-import RecommendationPanel from "../../components/dashboard/RecommendationPanel";
-import SessionPanel from "../../components/dashboard/SessionPanel";
+import ProgressSummary from "../components/ProgressSummary";
+import WeakTopicsPanel from "../components/WeakTopicsPanel";
+import RecommendationPanel from "../components/RecommendationPanel";
+import SessionPanel from "../components/SessionPanel";
 
 export default function Dashboard() {
   return (
@@ -26480,7 +26698,44 @@ export default function Dashboard() {
 
 
 ================================================================================
-FILE (187/246): client\src\pages\ForgotPassword.jsx
+FILE (193/255): client\src\pages\Dashboard\DashboardHome.jsx
+SIZE: 966 bytes
+================================================================================
+import React from "react";
+import useDashboardData from "../../hooks/useDashboardData";
+import useRealtimeSync from "../../hooks/useRealtimeSync";
+
+import ProgressSummary from "../../components/ProgressSummary";
+import WeakTopicsPanel from "../../components/WeakTopicsPanel";
+import RecommendationPanel from "../../components/RecommendationPanel";
+import SessionPanel from "../../components/SessionPanel";
+
+export default function DashboardHome() {
+  useRealtimeSync(); // 🔥 ONLY ADDITION (UI untouched)
+
+  const {
+    loading,
+    summary,
+    weakTopics,
+    recommendations,
+    sessions,
+  } = useDashboardData();
+
+  if (loading) return <div>Loading dashboard...</div>;
+
+  return (
+    <div className="grid grid-cols-2 gap-4">
+      <ProgressSummary data={summary} />
+      <WeakTopicsPanel items={weakTopics} />
+      <RecommendationPanel items={recommendations} />
+      <SessionPanel sessions={sessions} />
+    </div>
+  );
+}
+
+
+================================================================================
+FILE (194/255): client\src\pages\ForgotPassword.jsx
 SIZE: 7930 bytes
 ================================================================================
 import { useState } from 'react';
@@ -26644,7 +26899,7 @@ export default ForgotPassword;
 
 
 ================================================================================
-FILE (188/246): client\src\pages\ImageMarkingPage.jsx
+FILE (195/255): client\src\pages\ImageMarkingPage.jsx
 SIZE: 24895 bytes
 ================================================================================
 // client/src/pages/ImageMarkingPage.jsx
@@ -27133,7 +27388,7 @@ export default function ImageMarkingPage() {
 ...TRUNCATED...
 
 ================================================================================
-FILE (189/246): client\src\pages\LandingPage.jsx
+FILE (196/255): client\src\pages\LandingPage.jsx
 SIZE: 35207 bytes
 ================================================================================
 // client/src/pages/LandingPage.jsx
@@ -27484,7 +27739,7 @@ export default function LandingPage() {
 ...TRUNCATED...
 
 ================================================================================
-FILE (190/246): client\src\pages\LoginPage.jsx
+FILE (197/255): client\src\pages\LoginPage.jsx
 SIZE: 10631 bytes
 ================================================================================
 import { useState } from 'react';
@@ -27716,7 +27971,7 @@ export default LoginPage;
 
 
 ================================================================================
-FILE (191/246): client\src\pages\MockExamPage.jsx
+FILE (198/255): client\src\pages\MockExamPage.jsx
 SIZE: 12423 bytes
 ================================================================================
 // client/src/pages/MockExamPage.jsx
@@ -28005,7 +28260,7 @@ export { predictGrade };
 
 
 ================================================================================
-FILE (192/246): client\src\pages\NotFound.jsx
+FILE (199/255): client\src\pages\NotFound.jsx
 SIZE: 1103 bytes
 ================================================================================
 import { Link } from 'react-router-dom';
@@ -28037,7 +28292,7 @@ export default NotFound;
 
 
 ================================================================================
-FILE (193/246): client\src\pages\OnboardingPage.jsx
+FILE (200/255): client\src\pages\OnboardingPage.jsx
 SIZE: 15038 bytes
 ================================================================================
 // client/src/pages/OnboardingPage.jsx
@@ -28391,7 +28646,7 @@ export default function OnboardingPage() {
 
 
 ================================================================================
-FILE (194/246): client\src\pages\PastPapersPage.jsx
+FILE (201/255): client\src\pages\PastPapersPage.jsx
 SIZE: 9016 bytes
 ================================================================================
 // client/src/pages/PastPapersPage.jsx
@@ -28597,7 +28852,7 @@ export default function PastPapersPage() {
 
 
 ================================================================================
-FILE (195/246): client\src\pages\PaymentVerify.jsx
+FILE (202/255): client\src\pages\PaymentVerify.jsx
 SIZE: 5732 bytes
 ================================================================================
 // client/src/pages/PaymentVerify.jsx
@@ -28737,7 +28992,7 @@ export default function PaymentVerify() {
 
 
 ================================================================================
-FILE (196/246): client\src\pages\PracticeMode.jsx
+FILE (203/255): client\src\pages\PracticeMode.jsx
 SIZE: 24748 bytes
 ================================================================================
 // client/src/pages/PracticeMode.jsx
@@ -29216,7 +29471,7 @@ export default function PracticeMode() {
 ...TRUNCATED...
 
 ================================================================================
-FILE (197/246): client\src\pages\PricingPage.jsx
+FILE (204/255): client\src\pages\PricingPage.jsx
 SIZE: 18544 bytes
 ================================================================================
 // client/src/pages/PricingPage.jsx
@@ -29626,7 +29881,7 @@ export function UpgradeWall({ score, max, time, accuracy, onRevise }) {
 
 
 ================================================================================
-FILE (198/246): client\src\pages\PrivacyPolicy.jsx
+FILE (205/255): client\src\pages\PrivacyPolicy.jsx
 SIZE: 8815 bytes
 ================================================================================
 import { Link } from 'react-router-dom';
@@ -29789,7 +30044,7 @@ export default PrivacyPolicy;
 
 
 ================================================================================
-FILE (199/246): client\src\pages\question_template.json
+FILE (206/255): client\src\pages\question_template.json
 SIZE: 8365 bytes
 ================================================================================
 {
@@ -30019,7 +30274,7 @@ SIZE: 8365 bytes
 
 
 ================================================================================
-FILE (200/246): client\src\pages\QuestionReview.jsx
+FILE (207/255): client\src\pages\QuestionReview.jsx
 SIZE: 16367 bytes
 ================================================================================
 // client/src/pages/QuestionReview.jsx
@@ -30355,7 +30610,7 @@ export default function QuestionReview() {
 
 
 ================================================================================
-FILE (201/246): client\src\pages\QuizHistoryPage.jsx
+FILE (208/255): client\src\pages\QuizHistoryPage.jsx
 SIZE: 6591 bytes
 ================================================================================
 // client/src/pages/QuizHistoryPage.jsx
@@ -30507,7 +30762,7 @@ export default function QuizHistoryPage() {
 
 
 ================================================================================
-FILE (202/246): client\src\pages\QuizPage.jsx
+FILE (209/255): client\src\pages\QuizPage.jsx
 SIZE: 14343 bytes
 ================================================================================
 // client/src/pages/QuizPage.jsx
@@ -30853,7 +31108,7 @@ export default function QuizPage() {
 
 
 ================================================================================
-FILE (203/246): client\src\pages\QuizResultsPage.jsx
+FILE (210/255): client\src\pages\QuizResultsPage.jsx
 SIZE: 15472 bytes
 ================================================================================
 // client/src/pages/QuizResultsPage.jsx
@@ -31204,7 +31459,7 @@ export default function QuizResultsPage() {
 
 
 ================================================================================
-FILE (204/246): client\src\pages\RegisterPage.jsx
+FILE (211/255): client\src\pages\RegisterPage.jsx
 SIZE: 33799 bytes
 ================================================================================
 import { useState, useEffect, useRef } from 'react';
@@ -31626,7 +31881,7 @@ const RegisterPage = () => {
 ...TRUNCATED...
 
 ================================================================================
-FILE (205/246): client\src\pages\ResetPassword.jsx
+FILE (212/255): client\src\pages\ResetPassword.jsx
 SIZE: 11032 bytes
 ================================================================================
 import { useState, useEffect } from 'react';
@@ -31851,7 +32106,7 @@ export default ResetPassword;
 
 
 ================================================================================
-FILE (206/246): client\src\pages\SettingsPage.jsx
+FILE (213/255): client\src\pages\SettingsPage.jsx
 SIZE: 20142 bytes
 ================================================================================
 // client/src/pages/SettingsPage.jsx
@@ -32225,7 +32480,7 @@ export default function SettingsPage() {
 
 
 ================================================================================
-FILE (207/246): client\src\pages\StudentAnalyticsDashboard.jsx
+FILE (214/255): client\src\pages\StudentAnalyticsDashboard.jsx
 SIZE: 20393 bytes
 ================================================================================
 // client/src/pages/StudentAnalyticsDashboard.jsx
@@ -32650,12 +32905,12 @@ export default function StudentAnalyticsDashboard() {
 
 
 ================================================================================
-FILE (208/246): client\src\pages\StudentDashboard.jsx
-SIZE: 5519 bytes
+FILE (215/255): client\src\pages\StudentDashboard.jsx
+SIZE: 6056 bytes
 ================================================================================
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Outlet, useLocation } from 'react-router-dom';
 import TopNav from '../components/TopNav';
 import api from '../services/api';
 
@@ -32663,91 +32918,65 @@ export default function StudentDashboard() {
 
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const firstName = user?.firstName || 'Student';
 
-/* ===============================
-   SUBJECTS
-=============================== */
+  /* ===============================
+     STATE
+  =============================== */
 
   const [subjects, setSubjects] = useState([]);
   const [loadingSubjects, setLoadingSubjects] = useState(true);
 
-/* ===============================
-   RESOURCES
-=============================== */
-
   const [resources, setResources] = useState([]);
   const [loadingResources, setLoadingResources] = useState(true);
 
-/* ===============================
-   LOAD SUBJECTS
-=============================== */
+  /* ===============================
+     LOAD SUBJECTS
+  =============================== */
 
   useEffect(() => {
-
     const loadSubjects = async () => {
-
       try {
-
         const res = await api.get('/students/my-subjects');
-
         setSubjects(res.data || []);
-
       } catch (err) {
-
         console.error('Subjects load failed:', err);
-
       } finally {
-
         setLoadingSubjects(false);
-
       }
-
     };
 
     loadSubjects();
-
   }, []);
 
-/* ===============================
-   LOAD RESOURCES
-=============================== */
+  /* ===============================
+     LOAD RESOURCES
+  =============================== */
 
   useEffect(() => {
-
     const loadResources = async () => {
-
       try {
-
         const res = await api.get('/resources');
-
         setResources(res.data.data || []);
-
       } catch (err) {
-
         console.error('Resources load failed:', err);
-
       } finally {
-
         setLoadingResources(false);
-
       }
-
     };
 
     loadResources();
-
   }, []);
 
-/* ===============================
-   GROUP RESOURCES
-=============================== */
+  /* ===============================
+     GROUP RESOURCES
+  =============================== */
 
   const grouped = {};
 
   resources.forEach(r => {
-
     const subject = r.subject_name || 'Other';
 
     if (!grouped[subject]) {
@@ -32755,15 +32984,19 @@ export default function StudentDashboard() {
     }
 
     grouped[subject].push(r);
-
   });
 
-/* ===============================
-   RENDER
-=============================== */
+  /* ===============================
+     ROUTE CHECK
+  =============================== */
+
+  const isRootDashboard = location.pathname === '/student';
+
+  /* ===============================
+     RENDER
+  =============================== */
 
   return (
-
     <div className="min-h-screen bg-gray-50">
 
       <TopNav />
@@ -32774,145 +33007,145 @@ export default function StudentDashboard() {
           Hi, {firstName}
         </h1>
 
-{/* ===============================
-   MY SUBJECTS
-=============================== */}
+        {/* ✅ ROUTER SLOT */}
+        <Outlet />
 
-        <div className="bg-white p-4 rounded-xl mb-4">
+        {/* ✅ DEFAULT DASHBOARD UI */}
+        {isRootDashboard && (
+          <>
+            {/* ================= SUBJECTS ================= */}
+            <div className="bg-white p-4 rounded-xl mb-4">
 
-          <h2 className="font-semibold mb-3">
-            My Subjects
-          </h2>
+              <h2 className="font-semibold mb-3">
+                My Subjects
+              </h2>
 
-          {loadingSubjects ? (
+              {loadingSubjects ? (
 
-            <p className="text-sm text-gray-400">
-              Loading subjects...
-            </p>
+                <p className="text-sm text-gray-400">
+                  Loading subjects...
+                </p>
 
-          ) : subjects.length === 0 ? (
+              ) : subjects.length === 0 ? (
 
-            <p className="text-sm text-gray-400">
-              No subjects available.
-            </p>
+                <p className="text-sm text-gray-400">
+                  No subjects available.
+                </p>
 
-          ) : (
+              ) : (
 
-            <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3">
 
-              {subjects.map(subject => (
+                  {subjects.map(subject => (
 
-                <button
-                  key={subject.id}
-                  onClick={() => navigate(`/student/subject/${subject.id}`)}
-                  className="border p-3 rounded-xl text-left hover:bg-gray-50"
-                >
-
-                  <p className="font-semibold text-sm">
-                    {subject.name}
-                  </p>
-
-                </button>
-
-              ))}
-
-            </div>
-
-          )}
-
-        </div>
-
-{/* ===============================
-   MY FILES
-=============================== */}
-
-        <div className="bg-white p-4 rounded-xl">
-
-          <h2 className="font-semibold mb-3">
-            My Files
-          </h2>
-
-          {loadingResources ? (
-
-            <p className="text-sm text-gray-400">
-              Loading files...
-            </p>
-
-          ) : resources.length === 0 ? (
-
-            <p className="text-sm text-gray-400">
-              No files assigned yet.
-            </p>
-
-          ) : (
-
-            Object.keys(grouped).map(subject => (
-
-              <div key={subject} className="mb-4">
-
-                <h3 className="font-semibold text-sm mb-2">
-                  {subject}
-                </h3>
-
-                <div className="space-y-2">
-
-                  {grouped[subject].map(file => (
-
-                    <div
-                      key={file.id}
-                      className="border p-3 rounded-lg flex justify-between items-center"
+                    <button
+                      key={subject.id}
+                      onClick={() => navigate(`/student/subject/${subject.id}`)}
+                      className="border p-3 rounded-xl text-left hover:bg-gray-50"
                     >
 
-                      <span className="text-sm">
-                        {file.title}
-                      </span>
+                      <p className="font-semibold text-sm">
+                        {subject.name}
+                      </p>
 
-                      <div className="flex gap-2">
-
-                        <a
-                          href={file.file_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-blue-500 text-sm"
-                        >
-                          View
-                        </a>
-
-                        <a
-                          href={file.file_url}
-                          download
-                          className="text-green-500 text-sm"
-                        >
-                          Download
-                        </a>
-
-                      </div>
-
-                    </div>
+                    </button>
 
                   ))}
 
                 </div>
 
-              </div>
+              )}
 
-            ))
+            </div>
 
-          )}
+            {/* ================= RESOURCES ================= */}
+            <div className="bg-white p-4 rounded-xl">
 
-        </div>
+              <h2 className="font-semibold mb-3">
+                My Files
+              </h2>
+
+              {loadingResources ? (
+
+                <p className="text-sm text-gray-400">
+                  Loading files...
+                </p>
+
+              ) : resources.length === 0 ? (
+
+                <p className="text-sm text-gray-400">
+                  No files assigned yet.
+                </p>
+
+              ) : (
+
+                Object.keys(grouped).map(subject => (
+
+                  <div key={subject} className="mb-4">
+
+                    <h3 className="font-semibold text-sm mb-2">
+                      {subject}
+                    </h3>
+
+                    <div className="space-y-2">
+
+                      {grouped[subject].map(file => (
+
+                        <div
+                          key={file.id}
+                          className="border p-3 rounded-lg flex justify-between items-center"
+                        >
+
+                          <span className="text-sm">
+                            {file.title}
+                          </span>
+
+                          <div className="flex gap-2">
+
+                            <a
+                              href={file.file_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-blue-500 text-sm"
+                            >
+                              View
+                            </a>
+
+                            <a
+                              href={file.file_url}
+                              download
+                              className="text-green-500 text-sm"
+                            >
+                              Download
+                            </a>
+
+                          </div>
+
+                        </div>
+
+                      ))}
+
+                    </div>
+
+                  </div>
+
+                ))
+
+              )}
+
+            </div>
+          </>
+        )}
 
       </div>
 
     </div>
-
   );
-
 }
 
 
 ================================================================================
-FILE (209/246): client\src\pages\StudentTestPage.jsx
+FILE (216/255): client\src\pages\StudentTestPage.jsx
 SIZE: 9077 bytes
 ================================================================================
 // Route: /student/test/:testId
@@ -33104,7 +33337,7 @@ export default function StudentTestPage() {
 
 
 ================================================================================
-FILE (210/246): client\src\pages\SubjectCatalog.jsx
+FILE (217/255): client\src\pages\SubjectCatalog.jsx
 SIZE: 11870 bytes
 ================================================================================
 import { useState, useEffect } from 'react';
@@ -33381,7 +33614,7 @@ export default SubjectCatalog;
 
 
 ================================================================================
-FILE (211/246): client\src\pages\SubjectPage.jsx
+FILE (218/255): client\src\pages\SubjectPage.jsx
 SIZE: 17678 bytes
 ================================================================================
 // client/src/pages/SubjectPage.jsx
@@ -33746,7 +33979,7 @@ export default function SubjectPage() {
 
 
 ================================================================================
-FILE (212/246): client\src\pages\SubtopicPage.jsx
+FILE (219/255): client\src\pages\SubtopicPage.jsx
 SIZE: 35870 bytes
 ================================================================================
 // client/src/pages/SubtopicPage.jsx
@@ -34193,22 +34426,21 @@ function OpenAnswerQuestion({ question, questionNumber, totalQuestions, dismisse
 ...TRUNCATED...
 
 ================================================================================
-FILE (213/246): client\src\pages\TeacherAssignmentPage.jsx
-SIZE: 19686 bytes
+FILE (220/255): client\src\pages\TeacherAssignmentPage.jsx
+SIZE: 10227 bytes
 ================================================================================
 // client/src/pages/admin/TeacherAssignmentPage.jsx
 // Admin page: assign subjects + exam types to teachers.
-// - "Exam Type" is the canonical label everywhere (no "exam board" / "curriculum").
-// - All 12 exam types load dynamically from /api/exam-boards on dialog open.
-// - Selecting an exam type populates the Subject dropdown from /api/exam-boards/:code/subjects.
 
 import { useState, useEffect } from 'react';
-import api from '../../services/api';
+import api from "../../services/api";
+
 import {
   UserCheck, Plus, Trash2, Loader2, CheckCircle,
   AlertTriangle, X, ChevronDown, Search,
 } from 'lucide-react';
-import TopNav from '../../components/TopNav';
+
+import TopNav from "../../components/TopNav";
 
 // ── Fallback static list (shown instantly; replaced by API data) ──────────────
 const FALLBACK_EXAM_TYPES = [
@@ -34242,35 +34474,37 @@ function Toast({ msg, type, onClose }) {
 
 // ── Add Assignment Dialog ─────────────────────────────────────────────────────
 function AddAssignmentDialog({ teachers, onClose, onSaved }) {
-  const [examTypes,    setExamTypes]    = useState(FALLBACK_EXAM_TYPES);
+  const [examTypes, setExamTypes] = useState(FALLBACK_EXAM_TYPES);
   const [loadingTypes, setLoadingTypes] = useState(true);
 
-  const [subjects,     setSubjects]     = useState([]);
-  const [loadingSubj,  setLoadingSubj]  = useState(false);
+  const [subjects, setSubjects] = useState([]);
+  const [loadingSubj, setLoadingSubj] = useState(false);
 
-  const [teacherId,    setTeacherId]    = useState('');
+  const [teacherId, setTeacherId] = useState('');
   const [examTypeCode, setExamTypeCode] = useState('');
-  const [examTypeId,   setExamTypeId]   = useState('');
-  const [subjectId,    setSubjectId]    = useState('');
-  const [saving,       setSaving]       = useState(false);
-  const [error,        setError]        = useState('');
+  const [examTypeId, setExamTypeId] = useState('');
+  const [subjectId, setSubjectId] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
-  // ── 1. Load exam boards dynamically on mount ───────────────────────────────
+  // ── Load exam boards ────────────────────────────────────────────────────────
   useEffect(() => {
-    const _ta = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-    const apiBase = _ta.endsWith('/api') ? _ta : `${_ta}/api`;
+    const base = (import.meta.env.VITE_API_URL || 'http://localhost:5000')
+      .replace(/\/$/, '');
+
     setLoadingTypes(true);
-    fetch(`${apiBase}/exam-boards`)
+
+    fetch(`${base}/api/exam-boards`)
       .then(r => r.json())
       .then(json => {
         const list = Array.isArray(json) ? json : (json.data || []);
         if (list.length > 0) setExamTypes(list);
       })
-      .catch(() => { /* keep fallback list */ })
+      .catch(() => {})
       .finally(() => setLoadingTypes(false));
   }, []);
 
-  // ── 2. Load subjects when exam type changes ────────────────────────────────
+  // ── Load subjects on exam type change ───────────────────────────────────────
   useEffect(() => {
     setSubjectId('');
     setSubjects([]);
@@ -34280,33 +34514,41 @@ function AddAssignmentDialog({ teachers, onClose, onSaved }) {
     setExamTypeId(found?.id ?? '');
 
     setLoadingSubj(true);
-    const _ta = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-    const apiBase = _ta.endsWith('/api') ? _ta : `${_ta}/api`;
-    fetch(`${apiBase}/exam-boards/${examTypeCode}/subjects`)
+
+    const base = (import.meta.env.VITE_API_URL || 'http://localhost:5000')
+      .replace(/\/$/, '');
+
+    fetch(`${base}/api/exam-boards/${examTypeCode}/subjects`)
       .then(r => r.json())
-      .then(json => setSubjects(Array.isArray(json) ? json : (json.data || [])))
+      .then(json => {
+        const list = Array.isArray(json) ? json : (json.data || []);
+        setSubjects(list);
+      })
       .catch(() => setSubjects([]))
       .finally(() => setLoadingSubj(false));
   }, [examTypeCode, examTypes]);
 
-  // ── Save ──────────────────────────────────────────────────────────────────
+  // ── Save ────────────────────────────────────────────────────────────────────
   const handleSave = async () => {
     if (!teacherId || !examTypeCode || !subjectId) {
       setError('Please fill in all fields.');
       return;
     }
+
     setSaving(true);
     setError('');
+
     try {
       await api.post('/admin/teacher-subjects', {
-        teacher_id:    teacherId,
-        subject_id:    subjectId,
+        teacher_id: teacherId,
+        subject_id: subjectId,
         exam_board_id: examTypeId || null,
       });
+
       onSaved();
       onClose();
     } catch (err) {
-      setError(err?.error || err?.message || 'Failed to save assignment.');
+      setError(err?.message || 'Failed to save assignment.');
     } finally {
       setSaving(false);
     }
@@ -34316,153 +34558,74 @@ function AddAssignmentDialog({ teachers, onClose, onSaved }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
 
-        {/* Header */}
         <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-teal-50 flex items-center justify-center">
-              <UserCheck size={16} className="text-teal-600" />
-            </div>
-            <h2 className="font-bold text-gray-900 text-base">Assign Subject to Teacher</h2>
-          </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <h2 className="font-bold text-gray-900 text-base">
+            Assign Subject to Teacher
+          </h2>
+          <button onClick={onClose}>
             <X size={18} />
           </button>
         </div>
 
         <div className="space-y-4">
 
-          {/* ── Teacher ── */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1.5">Teacher *</label>
-            <div className="relative">
-              <select
-                value={teacherId}
-                onChange={e => setTeacherId(e.target.value)}
-                className="w-full appearance-none border border-gray-200 rounded-xl px-4 py-2.5 pr-9 text-sm
-                  bg-white focus:outline-none focus:ring-2 focus:ring-teal-300"
-              >
-                <option value="">Select a teacher…</option>
-                {teachers.map(t => (
-                  <option key={t.id} value={t.id}>
-                    {t.first_name} {t.last_name} — {t.email}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            </div>
-          </div>
+          {/* Teacher */}
+          <select
+            value={teacherId}
+            onChange={e => setTeacherId(e.target.value)}
+            className="w-full border rounded-xl px-4 py-2.5 text-sm"
+          >
+            <option value="">Select a teacher…</option>
+            {teachers.map(t => (
+              <option key={t.id} value={t.id}>
+                {t.first_name} {t.last_name}
+              </option>
+            ))}
+          </select>
 
-          {/* ── Exam Type (dynamic) ── */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1.5">Exam Type *</label>
-            <div className="relative">
-              {loadingTypes ? (
-                <div className="flex items-center gap-2 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-400 bg-gray-50">
-                  <Loader2 size={13} className="animate-spin" /> Loading exam types…
-                </div>
-              ) : (
-                <>
-                  <select
-                    value={examTypeCode}
-                    onChange={e => setExamTypeCode(e.target.value)}
-                    className="w-full appearance-none border border-gray-200 rounded-xl px-4 py-2.5 pr-9 text-sm
-                      bg-white focus:outline-none focus:ring-2 focus:ring-teal-300"
-                  >
-                    <option value="">Select exam type…</option>
-                    {examTypes.map(et => (
-                      <option key={et.code} value={et.code}>
-                        {et.icon_emoji || ''} {et.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                </>
-              )}
-            </div>
-          </div>
+          {/* Exam Type */}
+          <select
+            value={examTypeCode}
+            onChange={e => setExamTypeCode(e.target.value)}
+            className="w-full border rounded-xl px-4 py-2.5 text-sm"
+          >
+            <option value="">Select exam type…</option>
+            {examTypes.map(et => (
+              <option key={et.code} value={et.code}>
+                {et.name}
+              </option>
+            ))}
+          </select>
 
-          {/* ── Subject (populates from selected exam type) ── */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1.5">Subject *</label>
-            <div className="relative">
-              {loadingSubj ? (
-                <div className="flex items-center gap-2 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-400 bg-gray-50">
-                  <Loader2 size={13} className="animate-spin" /> Loading subjects…
-                </div>
-              ) : (
-                <>
-                  <select
-                    value={subjectId}
-                    onChange={e => setSubjectId(e.target.value)}
-                    disabled={!examTypeCode}
-                    className="w-full appearance-none border border-gray-200 rounded-xl px-4 py-2.5 pr-9 text-sm
-                      bg-white focus:outline-none focus:ring-2 focus:ring-teal-300
-                      disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
-                  >
-                    <option value="">
-                      {examTypeCode
-                        ? subjects.length > 0
-                          ? 'Select a subject…'
-                          : 'No subjects found for this exam type'
-                        : 'Select exam type first'}
-                    </option>
-                    {subjects.map(s => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                        {s.level && s.level !== 'All' ? ` (${s.level})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                </>
-              )}
-            </div>
-
-            {/* Subject count badge */}
-            {examTypeCode && subjects.length > 0 && !loadingSubj && (
-              <p className="text-xs text-teal-600 mt-1">
-                 {subjects.length} subject{subjects.length !== 1 ? 's' : ''} available
-              </p>
-            )}
-
-            {/* Warning when no subjects */}
-            {examTypeCode && subjects.length === 0 && !loadingSubj && (
-              <p className="text-xs text-amber-600 mt-1">
-                 No subjects exist for this exam type yet. Run the seed SQL or add subjects via Content Management.
-              </p>
-            )}
-          </div>
-
-          {/* Subject description preview */}
-          {subjectId && (() => {
-            const found = subjects.find(s => String(s.id) === String(subjectId));
-            return found?.description ? (
-              <p className="text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2">
-                 {found.description}
-              </p>
-            ) : null;
-          })()}
+          {/* Subject */}
+          <select
+            value={subjectId}
+            onChange={e => setSubjectId(e.target.value)}
+            className="w-full border rounded-xl px-4 py-2.5 text-sm"
+          >
+            <option value="">Select subject…</option>
+            {subjects.map(s => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
 
           {error && (
-            <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
-              {error}
-            </p>
+            <p className="text-red-600 text-xs">{error}</p>
           )}
         </div>
 
         <div className="flex gap-3 mt-6">
-          <button
-            onClick={onClose}
-            className="flex-1 border border-gray-200 text-gray-700 font-semibold py-2.5 rounded-xl hover:bg-gray-50 transition-colors text-sm"
-          >
+          <button onClick={onClose} className="flex-1 border rounded-xl py-2.5">
             Cancel
           </button>
+
           <button
             onClick={handleSave}
-            disabled={saving || !teacherId || !examTypeCode || !subjectId}
-            className="flex-1 bg-teal-500 hover:bg-teal-600 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl transition-colors text-sm flex items-center justify-center gap-2"
+            disabled={saving}
+            className="flex-1 bg-teal-500 text-white rounded-xl py-2.5"
           >
-            {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
             {saving ? 'Saving…' : 'Assign'}
           </button>
         </div>
@@ -34474,12 +34637,12 @@ function AddAssignmentDialog({ teachers, onClose, onSaved }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function TeacherAssignmentPage() {
   const [assignments, setAssignments] = useState([]);
-  const [teachers,    setTeachers]    = useState([]);
-  const [loading,     setLoading]     = useState(true);
-  const [showDialog,  setShowDialog]  = useState(false);
-  const [toast,       setToast]       = useState(null);
-  const [search,      setSearch]      = useState('');
-  const [removing,    setRemoving]    = useState(null);
+  const [teachers, setTeachers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showDialog, setShowDialog] = useState(false);
+  const [toast, setToast] = useState(null);
+  const [search, setSearch] = useState('');
+  const [removing, setRemoving] = useState(null);
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
@@ -34488,13 +34651,16 @@ export default function TeacherAssignmentPage() {
 
   const load = () => {
     setLoading(true);
+
     Promise.all([
       api.get('/admin/teacher-subjects').catch(() => ({ data: [] })),
       api.get('/admin/users?role=teacher').catch(() => ({ data: [] })),
-    ]).then(([asgRes, teacherRes]) => {
-      setAssignments(asgRes.data || []);
-      setTeachers(teacherRes.data || []);
-    }).finally(() => setLoading(false));
+    ])
+      .then(([a, t]) => {
+        setAssignments(a.data || []);
+        setTeachers(t.data || []);
+      })
+      .finally(() => setLoading(false));
   };
 
   useEffect(load, []);
@@ -34517,8 +34683,7 @@ export default function TeacherAssignmentPage() {
     return (
       a.teacher_name?.toLowerCase().includes(q) ||
       a.subject_name?.toLowerCase().includes(q) ||
-      a.exam_type_name?.toLowerCase().includes(q) ||
-      a.exam_board_name?.toLowerCase().includes(q)
+      a.exam_type_name?.toLowerCase().includes(q)
     );
   });
 
@@ -34526,111 +34691,30 @@ export default function TeacherAssignmentPage() {
     <div className="min-h-screen bg-gray-50">
       <TopNav />
 
-      {/* Header */}
-      <div className="bg-[#0a4a3f] px-4 py-5">
-        <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
-          <div>
-            <p className="text-white/50 text-xs mb-1">Admin</p>
-            <h1 className="text-white text-xl font-bold">Teacher Assignment</h1>
-            <p className="text-white/60 text-sm mt-0.5">Assign subjects and exam types to teachers</p>
-          </div>
-          <button
-            onClick={() => setShowDialog(true)}
-            className="flex items-center gap-2 bg-teal-500 hover:bg-teal-400 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors shrink-0"
-          >
-            <Plus size={15} /> Add Assignment
-          </button>
-        </div>
-      </div>
-
-      <div className="max-w-5xl mx-auto px-4 py-6 space-y-4">
-        {/* Search */}
-        <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search by teacher, subject, or exam type…"
-            className="w-full border border-gray-200 rounded-xl pl-8 pr-4 py-2.5 text-sm bg-white
-              focus:outline-none focus:ring-2 focus:ring-teal-300"
-          />
-        </div>
-
-        {/* Table */}
-        {loading ? (
-          <div className="flex justify-center py-12">
-            <Loader2 size={24} className="text-teal-400 animate-spin" />
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center">
-            <UserCheck size={36} className="mx-auto mb-3 text-gray-200" />
-            <p className="text-sm text-gray-400">No assignments found. Add one to get started.</p>
-          </div>
-        ) : (
-          <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500">Teacher</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500">Exam Type</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500">Subject</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500">Status</th>
-                  <th className="px-5 py-3" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {filtered.map(a => (
-                  <tr key={a.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-5 py-3.5">
-                      <p className="font-medium text-gray-900">{a.teacher_name || a.teacher_email}</p>
-                      <p className="text-xs text-gray-400">{a.teacher_email}</p>
-                    </td>
-                    <td className="px-5 py-3.5 text-gray-700">
-                      {a.exam_type_name || a.exam_board_name || '—'}
-                    </td>
-                    <td className="px-5 py-3.5 text-gray-700">{a.subject_name}</td>
-                    <td className="px-5 py-3.5">
-                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold
-                        ${a.is_active ? 'bg-teal-50 text-teal-600' : 'bg-gray-100 text-gray-400'}`}>
-                        {a.is_active ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3.5 text-right">
-                      <button
-                        onClick={() => handleRemove(a.id)}
-                        disabled={removing === a.id}
-                        className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
-                        title="Remove assignment"
-                      >
-                        {removing === a.id
-                          ? <Loader2 size={14} className="animate-spin" />
-                          : <Trash2 size={14} />}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+      <div className="p-6">
+        <button onClick={() => setShowDialog(true)}>
+          <Plus /> Add Assignment
+        </button>
       </div>
 
       {showDialog && (
         <AddAssignmentDialog
           teachers={teachers}
           onClose={() => setShowDialog(false)}
-          onSaved={() => { load(); showToast('Assignment saved successfully!'); }}
+          onSaved={() => { load(); showToast('Saved'); }}
         />
       )}
 
-      {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+      {toast && (
+        <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />
+      )}
     </div>
   );
 }
 
 
 ================================================================================
-FILE (214/246): client\src\pages\TeacherContentPage.jsx
+FILE (221/255): client\src\pages\TeacherContentPage.jsx
 SIZE: 23493 bytes
 ================================================================================
 // client/src/pages/TeacherContentPage.jsx
@@ -35147,23 +35231,22 @@ export default function TeacherContentPage() {
 ...TRUNCATED...
 
 ================================================================================
-FILE (215/246): client\src\pages\TeacherDashboard.jsx
-SIZE: 28328 bytes
+FILE (222/255): client\src\pages\TeacherDashboard.jsx
+SIZE: 7745 bytes
 ================================================================================
-// client/src/pages/TeacherDashboard.jsx
-
 import { useState, useEffect } from 'react';
-import { useNavigate, Link }   from 'react-router-dom';
-import api                     from '../services/api';
+import { useNavigate, Link, Outlet } from 'react-router-dom';
+import api from '../services/api';
 import {
   Users, Plus, Copy, CheckCircle, Loader2, AlertTriangle,
   BarChart2, Zap, X, ChevronRight, Send, PenTool,
   BookOpen, Upload, AlertCircle,
 } from 'lucide-react';
-import TopNav       from '../components/TopNav';
-import { useAuth }  from '../context/AuthContext';
+import TopNav from '../components/TopNav';
+import { useAuth } from '../context/AuthContext';
 
-// -€-€ Shared helpers -€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€
+/* ================= HELPERS ================= */
+
 const accColor = (pct) => {
   if (!pct && pct !== 0) return 'text-gray-400';
   if (pct >= 70) return 'text-green-600';
@@ -35185,22 +35268,27 @@ function Toast({ msg, type, onClose }) {
   return (
     <div className={`fixed bottom-6 right-4 z-50 flex items-center gap-2.5 px-5 py-3 rounded-2xl shadow-xl text-sm font-semibold text-white
       ${type === 'success' ? 'bg-gray-900' : 'bg-red-600'}`}>
-      {type === 'success' ? <CheckCircle size={14} className="text-teal-400" /> : <AlertTriangle size={14} />}
+      {type === 'success'
+        ? <CheckCircle size={14} className="text-teal-400" />
+        : <AlertTriangle size={14} />}
       {msg}
-      <button onClick={onClose}><X size={13} className="opacity-60" /></button>
+      <button onClick={onClose}>
+        <X size={13} className="opacity-60" />
+      </button>
     </div>
   );
 }
 
-// -€-€ Classes tab -€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€
+/* ================= CLASSES TAB ================= */
+
 function ClassesTab({ onViewAnalytics }) {
-  const [classes,    setClasses]    = useState([]);
-  const [loading,    setLoading]    = useState(true);
+  const [classes, setClasses] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
-  const [newName,    setNewName]    = useState('');
-  const [creating,   setCreating]  = useState(false);
-  const [copied,     setCopied]    = useState(null);
-  const [toast,      setToast]     = useState(null);
+  const [newName, setNewName] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [copied, setCopied] = useState(null);
+  const [toast, setToast] = useState(null);
 
   const load = () => {
     setLoading(true);
@@ -35209,6 +35297,7 @@ function ClassesTab({ onViewAnalytics }) {
       .catch(() => {})
       .finally(() => setLoading(false));
   };
+
   useEffect(load, []);
 
   const createClass = async () => {
@@ -35235,360 +35324,174 @@ function ClassesTab({ onViewAnalytics }) {
     });
   };
 
-  if (loading) return <div className="flex justify-center py-12"><Loader2 size={24} className="text-teal-400 animate-spin" /></div>;
+  if (loading) {
+    return (
+      <div className="flex justify-center py-12">
+        <Loader2 size={24} className="text-teal-400 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-500">{classes.length} class{classes.length !== 1 ? 'es' : ''}</p>
+        <p className="text-sm text-gray-500">
+          {classes.length} class{classes.length !== 1 ? 'es' : ''}
+        </p>
+
         <button
           onClick={() => setShowCreate(true)}
-          className="flex items-center gap-1.5 bg-teal-500 hover:bg-teal-600 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
+          className="flex items-center gap-1.5 bg-teal-500 hover:bg-teal-600 text-white text-sm font-semibold px-4 py-2 rounded-xl"
         >
           <Plus size={14} /> New Class
         </button>
       </div>
 
       {showCreate && (
-        <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4 flex items-center gap-3">
+        <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4 flex gap-3">
           <input
             value={newName}
             onChange={e => setNewName(e.target.value)}
-            placeholder="Class name e.g. SS3 Mathematics"
-            className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
-            onKeyDown={e => e.key === 'Enter' && createClass()}
+            placeholder="Class name"
+            className="flex-1 border rounded-xl px-3 py-2 text-sm"
           />
-          <button onClick={createClass} disabled={creating}
-            className="bg-teal-500 hover:bg-teal-600 text-white text-sm font-semibold px-4 py-2 rounded-xl disabled:opacity-60 transition-colors">
-            {creating ? <Loader2 size={14} className="animate-spin" /> : 'Create'}
+
+          <button onClick={createClass} disabled={creating}>
+            {creating ? <Loader2 size={14} /> : 'Create'}
           </button>
-          <button onClick={() => setShowCreate(false)} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
+
+          <button onClick={() => setShowCreate(false)}>
+            <X size={16} />
+          </button>
         </div>
       )}
 
-      {classes.length === 0 ? (
-        <div className="text-center py-12 text-gray-400">
-          <Users size={36} className="mx-auto mb-3 opacity-30" />
-          <p className="text-sm">No classes yet. Create one to get started.</p>
+      {classes.map(cls => (
+        <div key={cls.id} className="bg-white rounded-2xl border p-5">
+          <p className="font-semibold">{cls.name}</p>
+
+          <button onClick={() => onViewAnalytics(cls)}>
+            View Analytics
+          </button>
+
+          <button onClick={() => copyCode(cls.join_code)}>
+            {copied === cls.join_code ? 'Copied!' : 'Copy Code'}
+          </button>
         </div>
-      ) : (
-        classes.map(cls => (
-          <div key={cls.id} className="bg-white rounded-2xl border border-gray-100 p-5">
-            <div className="flex items-start justify-between gap-3 mb-3">
-              <div>
-                <p className="font-semibold text-gray-900">{cls.name}</p>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  {cls.student_count} students · Avg accuracy {cls.avg_accuracy ?? '-”'}%
-                </p>
-              </div>
-              <button
-                onClick={() => onViewAnalytics(cls)}
-                className="flex items-center gap-1 text-xs text-teal-600 font-semibold hover:text-teal-800 shrink-0"
-              >
-                Analytics <ChevronRight size={12} />
-              </button>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500 font-mono bg-gray-100 px-2.5 py-1 rounded-lg">
-                Join code: <span className="font-bold text-gray-800">{cls.join_code}</span>
-              </span>
-              <button onClick={() => copyCode(cls.join_code)}
-                className="flex items-center gap-1 text-xs text-gray-400 hover:text-teal-600 transition-colors">
-                {copied === cls.join_code
-                  ? <CheckCircle size={12} className="text-teal-500" />
-                  : <Copy size={12} />}
-              </button>
-            </div>
-          </div>
-        ))
-      )}
-      {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+      ))}
+
+      {toast && <Toast {...toast} onClose={() => setToast(null)} />}
     </div>
   );
 }
 
-// -€-€ Analytics tab -€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€
-function AnalyticsTab({ cls }) {
-  const [data,       setData]       = useState(null);
-  const [loading,    setLoading]    = useState(true);
-  const [nudging,    setNudging]    = useState(null);
-  const [toast,      setToast]      = useState(null);
-  const [gapData,    setGapData]    = useState(null);
-  const [gapLoading, setGapLoading] = useState(false);
+/* ================= MAIN DASHBOARD ================= */
+
+export default function TeacherDashboard() {
+
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  const [activeTab, setActiveTab] = useState('classes');
+  const [selectedClass, setSelectedClass] = useState(null);
+
+  const [assignedSubjects, setAssignedSubjects] = useState(null);
 
   useEffect(() => {
-    if (!cls) { setLoading(false); return; }
-    setLoading(true);
-    api.get(`/teacher/class/${cls.id}/analytics`)
-      .then(r => setData(r.data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [cls?.id]); // eslint-disable-line
-
-  const nudge = async (student) => {
-    setNudging(student.id);
-    try {
-      await api.post(`/teacher/nudge/${student.id}`);
-      setToast({ type: 'success', msg: `Nudge sent to ${student.name}` });
-    } catch {
-      setToast({ type: 'error', msg: 'Failed to send nudge.' });
-    } finally {
-      setNudging(null);
-      setTimeout(() => setToast(null), 3000);
-    }
-  };
-
-  const runGapAnalysis = async () => {
-    setGapLoading(true);
-    try {
-      const res = await api.get('/analytics/cohort-gaps', { params: { class_id: cls.id } });
-      setGapData(res.data?.gaps || []);
-    } catch {
-      setToast({ type: 'error', msg: 'AI analysis failed. Try again.' });
-    } finally {
-      setGapLoading(false);
-      setTimeout(() => setToast(null), 4000);
-    }
-  };
-
-  if (!cls) return (
-    <div className="text-center py-12 text-gray-400">
-      <BarChart2 size={36} className="mx-auto mb-3 opacity-30" />
-      <p className="text-sm">Select a class from My Classes to view analytics.</p>
-    </div>
-  );
-
-  if (loading) return <div className="flex justify-center py-12"><Loader2 size={24} className="text-teal-400 animate-spin" /></div>;
-  if (!data)   return <p className="text-center py-8 text-gray-400 text-sm">No data available.</p>;
-
-  return (
-    <div className="space-y-5">
-      <div className="flex items-center gap-2">
-        <BarChart2 size={16} className="text-teal-500" />
-        <p className="font-semibold text-gray-800">{cls.name} -” Analytics</p>
-      </div>
-
-      {data.weak_topics?.length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-100 p-5">
-          <p className="text-sm font-semibold text-gray-700 mb-3">Class weak topics</p>
-          <div className="space-y-2">
-            {data.weak_topics.map((t, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <span className="text-xs text-gray-600 flex-1 truncate">{t.topic}</span>
-                <span className="text-xs text-gray-400">{t.student_count} students</span>
-                <span className={`text-xs font-bold w-12 text-right ${accColor(t.avg_accuracy)}`}>{t.avg_accuracy}%</span>
-                <div className="w-24 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-red-400 rounded-full" style={{ width: `${100 - t.avg_accuracy}%` }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="bg-white rounded-2xl border border-gray-100 p-5">
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-sm font-semibold text-gray-700">AI Gap Analysis</p>
-          <button onClick={runGapAnalysis} disabled={gapLoading}
-            className="flex items-center gap-1.5 bg-teal-500 hover:bg-teal-600 disabled:opacity-60 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
-            {gapLoading ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
-            {gapLoading ? 'Analysing...' : 'Run AI Analysis'}
-          </button>
-        </div>
-        {gapData === null && <p className="text-xs text-gray-400">Click to run AI analysis of your class gaps.</p>}
-        {gapData?.length === 0 && <p className="text-xs text-gray-400">No significant gaps detected for this class.</p>}
-        {gapData?.length > 0 && (
-          <div className="space-y-2">
-            {gapData.map((g, i) => (
-              <div key={i} className="border border-gray-100 rounded-xl p-3">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-semibold text-gray-700">{g.topic}</span>
-                  <span className="text-xs font-bold text-red-500">{g.avg_accuracy}% avg</span>
-                </div>
-                <p className="text-[11px] text-gray-500">{g.recommendation}</p>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {data.students?.length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-100 p-5">
-          <p className="text-sm font-semibold text-gray-700 mb-3">Students</p>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-gray-400 border-b border-gray-100">
-                  <th className="text-left py-2 font-medium">Name</th>
-                  <th className="text-center py-2 font-medium">Accuracy</th>
-                  <th className="text-center py-2 font-medium">Attempts</th>
-                  <th className="text-center py-2 font-medium">Streak</th>
-                  <th className="text-center py-2 font-medium">Last active</th>
-                  <th className="text-center py-2 font-medium"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.students.map((s, i) => {
-                  const inactive = s.days_since_active !== null && s.days_since_active > 7;
-                  return (
-                    <tr key={i} className={`border-b border-gray-50 ${inactive ? 'bg-red-50' : ''}`}>
-                      <td className="py-2 font-medium text-gray-700">{s.name}</td>
-                      <td className={`py-2 text-center font-bold ${accColor(s.accuracy_pct)}`}>{s.accuracy_pct ?? '-”'}%</td>
-                      <td className="py-2 text-center text-gray-500">{s.attempts}</td>
-                      <td className="py-2 text-center text-amber-600">{s.streak}d</td>
-                      <td className="py-2 text-center text-gray-400">
-                        {s.days_since_active !== null ? `${s.days_since_active}d ago` : '-”'}
-                      </td>
-                      <td className="py-2 text-center">
-                        {inactive && (
-                          <button onClick={() => nudge(s)} disabled={nudging === s.id}
-                            className="flex items-center gap-1 text-[10px] font-semibold text-white bg-amber-500 hover:bg-amber-600 px-2 py-1 rounded-lg transition-colors mx-auto disabled:opacity-60">
-                            {nudging === s.id ? <Loader2 size={10} className="animate-spin" /> : <Send size={10} />}
-                            Nudge
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
-    </div>
-  );
-}
-
-// -€-€ Test Builder tab -€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€-€
-function TestBuilderTab() {
-  const [step,        setStep]        = useState(1);
-  const [classes,     setClasses]     = useState([]);
-  const [subjects,    setSubjects]    = useState([]);
-  const [form,        setForm]        = useState({
-    title: '', class_id: '', subject_id: '', difficulty: 'mixed',
-    question_count: 10, time_limit_minutes: 30, due_date: '',
-  });
-  const [creating,    setCreating]    = useState(false);
-  const [createdTest, setCreatedTest] = useState(null);
-  const [toast,       setToast]       = useState(null);
-  const [copied,      setCopied]      = useState(false);
-
-  useEffect(() => {
-    api.get('/teacher/classes').then(r => setClasses(r.data || [])).catch(() => {});
-    api.get('/subjects', { params: { for_test_builder: true } }).then(r => setSubjects(r.data || [])).catch(() => {});
+    api.get('/teacher/my-subjects')
+      .then(r => setAssignedSubjects(r.data ?? []))
+      .catch(() => setAssignedSubjects([]));
   }, []);
 
-  const create = async () => {
-    if (!form.title.trim()) { setToast({ type: 'error', msg: 'Title required' }); return; }
-    setCreating(true);
-    try {
-      const res = await api.post('/teacher/tests', {
-        title:              form.title.trim(),
-        class_id:           form.class_id  || null,
-        subject_id:         form.subject_id || null,
-        difficulty:         form.difficulty,
-        question_count:     parseInt(form.question_count)     || 10,
-        time_limit_minutes: parseInt(form.time_limit_minutes) || 30,
-        due_date:           form.due_date || null,
-      });
-      setCreatedTest(res.data);
-      setStep(2);
-    } catch (err) {
-      setToast({ type: 'error', msg: err?.error || err?.message || 'Failed to create test' });
-    } finally {
-      setCreating(false);
-      setTimeout(() => setToast(null), 4000);
-    }
-  };
+  const subjectsLoading = assignedSubjects === null;
+  const hasSubjects = assignedSubjects?.length > 0;
 
-  const shareLink = createdTest ? `${window.location.origin}/student/test/${createdTest.id}` : '';
+  const displayName = getDisplayName(user);
 
-  const copyLink = () => {
-    navigator.clipboard.writeText(shareLink).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2500); });
-  };
-
-  const f = field => e => setForm(prev => ({ ...prev, [field]: e.target.value }));
-
-  if (step === 2 && createdTest) return (
-    <div className="space-y-4">
-      <div className="bg-teal-50 border border-teal-200 rounded-2xl p-6 text-center">
-        <div className="text-3xl mb-2">âœ…</div>
-        <p className="font-bold text-gray-900 text-lg">{createdTest.title}</p>
-        <p className="text-sm text-gray-500 mt-1">
-          {createdTest.question_count} questions · {createdTest.time_limit_minutes || form.time_limit_minutes} min
-          {createdTest.due_date ? ` · Due ${new Date(createdTest.due_date).toLocaleDateString('en-GB')}` : ''}
-        </p>
-        <div className="mt-4 flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-4 py-3">
-          <span className="text-xs font-mono text-gray-600 flex-1 truncate">{shareLink}</span>
-          <button onClick={copyLink}
-            className="flex items-center gap-1 text-xs font-semibold text-teal-600 hover:text-teal-800 shrink-0">
-            {copied ? <CheckCircle size={13} /> : <Copy size={13} />}
-            {copied ? 'Copied!' : 'Copy'}
-          </button>
-        </div>
-        <p className="text-xs text-gray-400 mt-3">Share this link with your students</p>
-      </div>
-
-      <button
-        onClick={() => {
-          setStep(1);
-          setForm({ title:'', class_id:'', subject_id:'', difficulty:'mixed', question_count:10, time_limit_minutes:30, due_date:'' });
-          setCreatedTest(null);
-        }}
-        className="w-full border border-gray-200 rounded-xl py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
-      >
-        Create Another Test
-      </button>
-      {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
-    </div>
-  );
+  const tabs = [
+    { id: 'classes', label: 'My Classes', icon: Users },
+    { id: 'analytics', label: 'Analytics', icon: BarChart2 },
+    { id: 'testbuilder', label: 'Test Builder', icon: PenTool },
+  ];
 
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-gray-500">Configure a test -” questions are auto-selected from the question bank.</p>
+    <div className="min-h-screen bg-gray-50">
 
-      <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
-        <div>
-          <label className="block text-xs font-semibold text-gray-600 mb-1.5">Test Title *</label>
-          <input value={form.title} onChange={f('title')} placeholder="e.g. SS3 Chemistry Mid-Term"
-            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300" />
+      <TopNav />
+
+      {/* HEADER */}
+      <div className="bg-[#0a4a3f] px-4 py-5">
+        <div className="max-w-4xl mx-auto flex justify-between">
+          <div>
+            <p className="text-white/50 text-xs">Teacher Dashboard</p>
+            <h1 className="text-white text-xl font-bold">
+              Welcome back, {displayName} 👋
+            </h1>
+          </div>
+
+          {hasSubjects && (
+            <Link to="/teacher/resources" className="bg-teal-500 text-white px-4 py-2 rounded-xl">
+              Upload Resources
+            </Link>
+          )}
         </div>
+      </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1.5">Assign to Class</label>
-            <select value={form.class_id} onChange={f('class_id')}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 bg-white">
-              <option value="">All / Unassigned</option>
-              {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1.5">Subject</label>
-            <select value={form.subject_id} onChange={f('subject_id')}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 bg-white">
-              <option value="">Any subject</option>
-              {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1.5">Difficulty</label>
-            <select value={form.difficulty} onChange={f('difficulty')}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 bg-white">
-              <option value="mixed">Mixed</option>
-              <option value="easy">Easy</option>
-              <option value="medium">Medium</option>
-              <option value="hard">Hard</option>
-            </select>
-          </div>
+      {/* SUBJECT BANNER */}
+      {!subjectsLoading && (
+        <div className="px-4 py-3 border-b">
+          {hasSubjects ? (
+            <p className="text-sm text-teal-700">
+              Subjects assigned: {assignedSubjects.map(s => s.name).join(', ')}
+            </p>
+          ) : (
+            <p className="text-sm text-amber-700">
+              Awaiting subject assignment
+            </p>
+          )}
+        </div>
+      )}
 
-...TRUNCATED...
+      {/* TABS */}
+      <div className="bg-white border-b sticky top-14">
+        <div className="max-w-4xl mx-auto flex gap-2 px-4">
+          {tabs.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              className={`px-4 py-3 text-sm ${
+                activeTab === t.id ? 'text-teal-600' : 'text-gray-400'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* CONTENT */}
+      <div className="max-w-4xl mx-auto px-4 py-6">
+
+        {/* ✅ NEW: ROUTER OUTLET */}
+        <Outlet />
+
+        {/* ✅ FALLBACK: EXISTING UI */}
+        {!window.location.pathname.startsWith('/teacher/') && (
+          <>
+            {activeTab === 'classes' && (
+              <ClassesTab onViewAnalytics={setSelectedClass} />
+            )}
+          </>
+        )}
+
+      </div>
+    </div>
+  );
+}
+
 
 ================================================================================
-FILE (216/246): client\src\pages\TeacherPendingQuestions.jsx
+FILE (223/255): client\src\pages\TeacherPendingQuestions.jsx
 SIZE: 4394 bytes
 ================================================================================
 // client/src/pages/TeacherPendingQuestions.jsx
@@ -35688,7 +35591,7 @@ export default function TeacherPendingQuestions() {
 
 
 ================================================================================
-FILE (217/246): client\src\pages\TeacherResourcesPage.jsx
+FILE (224/255): client\src\pages\TeacherResourcesPage.jsx
 SIZE: 30584 bytes
 ================================================================================
 // client/src/pages/TeacherResourcesPage.jsx
@@ -36226,7 +36129,7 @@ function QuestionsTab({ showToast }) {
 ...TRUNCATED...
 
 ================================================================================
-FILE (218/246): client\src\pages\TermsOfService.jsx
+FILE (225/255): client\src\pages\TermsOfService.jsx
 SIZE: 7765 bytes
 ================================================================================
 import { Link } from 'react-router-dom';
@@ -36378,7 +36281,7 @@ export default TermsOfService;
 
 
 ================================================================================
-FILE (219/246): client\src\pages\VerifyEmailPage.jsx
+FILE (226/255): client\src\pages\VerifyEmailPage.jsx
 SIZE: 3874 bytes
 ================================================================================
 // client/src/pages/VerifyEmailPage.jsx
@@ -36491,19 +36394,28 @@ export default function VerifyEmailPage() {
 
 
 ================================================================================
-FILE (220/246): client\src\providers\QueryProvider.jsx
-SIZE: 397 bytes
+FILE (227/255): client\src\providers\queryClient.js
+SIZE: 240 bytes
 ================================================================================
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient } from "@tanstack/react-query";
 
-const queryClient = new QueryClient({
+export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
       retry: 1,
+      staleTime: 30 * 1000,
     },
   },
 });
+
+
+================================================================================
+FILE (228/255): client\src\providers\QueryProvider.jsx
+SIZE: 280 bytes
+================================================================================
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "./queryClient";
 
 export default function QueryProvider({ children }) {
   return (
@@ -36515,7 +36427,7 @@ export default function QueryProvider({ children }) {
 
 
 ================================================================================
-FILE (221/246): client\src\services\analyticsEngine.js
+FILE (229/255): client\src\services\analyticsEngine.js
 SIZE: 2178 bytes
 ================================================================================
 'use strict';
@@ -36591,7 +36503,23 @@ module.exports = AnalyticsEngine;
 
 
 ================================================================================
-FILE (222/246): client\src\services\apiClient.js
+FILE (230/255): client\src\services\api.js
+SIZE: 197 bytes
+================================================================================
+// client/src/services/api.js
+import apiClient from "./apiClient";
+
+/**
+ * Unified API wrapper
+ * prevents import mismatch across codebase
+ */
+const api = apiClient;
+
+export default api;
+
+
+================================================================================
+FILE (231/255): client\src\services\apiClient.js
 SIZE: 464 bytes
 ================================================================================
 // client/src/services/apiClient.js
@@ -36615,7 +36543,7 @@ export default apiClient;
 
 
 ================================================================================
-FILE (223/246): client\src\services\dashboardService.js
+FILE (232/255): client\src\services\dashboardService.js
 SIZE: 1966 bytes
 ================================================================================
 // client/src/services/dashboardService.js
@@ -36710,29 +36638,39 @@ export const dashboardService = {
 
 
 ================================================================================
-FILE (224/246): client\src\services\realtimeClient.js
-SIZE: 359 bytes
+FILE (233/255): client\src\services\realtimeClient.js
+SIZE: 501 bytes
 ================================================================================
-class RealtimeClient {
-  constructor() {
-    this.ws = null;
-  }
+import { io } from "socket.io-client";
 
-  connect(onEvent) {
-    this.ws = new WebSocket(import.meta.env.VITE_API_URL.replace('http', 'ws'));
+let socket = null;
 
-    this.ws.onmessage = (message) => {
-      const { event, data } = JSON.parse(message.data);
-      onEvent(event, data);
-    };
-  }
+export function initRealtime() {
+  if (socket) return socket;
+
+  socket = io(import.meta.env.VITE_API_URL, {
+    withCredentials: true,
+    transports: ["websocket"],
+  });
+
+  socket.on("connect", () => {
+    console.log("Realtime connected:", socket.id);
+  });
+
+  socket.on("disconnect", () => {
+    console.log("Realtime disconnected");
+  });
+
+  return socket;
 }
 
-export default new RealtimeClient();
+export function getSocket() {
+  return socket;
+}
 
 
 ================================================================================
-FILE (225/246): client\src\services\realtimeEngine.js
+FILE (234/255): client\src\services\realtimeEngine.js
 SIZE: 1190 bytes
 ================================================================================
 'use strict';
@@ -36792,7 +36730,7 @@ module.exports = RealtimeEngine;
 
 
 ================================================================================
-FILE (226/246): client\src\services\recommendationEngine.js
+FILE (235/255): client\src\services\recommendationEngine.js
 SIZE: 454 bytes
 ================================================================================
 'use strict';
@@ -36816,7 +36754,7 @@ module.exports = RecommendationEngine;
 
 
 ================================================================================
-FILE (227/246): client\src\services\sessionEngine.js
+FILE (236/255): client\src\services\sessionEngine.js
 SIZE: 728 bytes
 ================================================================================
 'use strict';
@@ -36851,7 +36789,7 @@ module.exports = SessionEngine;
 
 
 ================================================================================
-FILE (228/246): client\src\utils\token.js
+FILE (237/255): client\src\utils\token.js
 SIZE: 282 bytes
 ================================================================================
 'use strict';
@@ -36872,7 +36810,7 @@ export function clearToken() {
 
 
 ================================================================================
-FILE (229/246): client\tailwind.config.js
+FILE (238/255): client\tailwind.config.js
 SIZE: 611 bytes
 ================================================================================
 /** @type {import('tailwindcss').Config} */
@@ -36907,7 +36845,7 @@ export default {
 
 
 ================================================================================
-FILE (230/246): client\vite.config.js
+FILE (239/255): client\vite.config.js
 SIZE: 292 bytes
 ================================================================================
 import { defineConfig } from 'vite'
@@ -36928,7 +36866,7 @@ export default defineConfig({
 
 
 ================================================================================
-FILE (231/246): server\config\redisClient.js
+FILE (240/255): server\config\redisClient.js
 SIZE: 616 bytes
 ================================================================================
 'use strict';
@@ -36967,7 +36905,7 @@ SECTION: OTHER
 ================================================================================
 
 ================================================================================
-FILE (232/246): .gitignore
+FILE (241/255): .gitignore
 SIZE: 2446 bytes
 ================================================================================
 # ── Dependencies ─────────────────────────────────────────────────────────────
@@ -37037,7 +36975,7 @@ coverage/
 !ai-ready-dump.txt
 
 ================================================================================
-FILE (233/246): database\add_ielts_toefl_sat_subjects.sql
+FILE (242/255): database\add_ielts_toefl_sat_subjects.sql
 SIZE: 4580 bytes
 ================================================================================
 -- 
@@ -37128,7 +37066,7 @@ ORDER BY eb.display_order;
 
 
 ================================================================================
-FILE (234/246): database\eac_courses_topics_enrollments.sql
+FILE (243/255): database\eac_courses_topics_enrollments.sql
 SIZE: 20557 bytes
 ================================================================================
 -- ============================================================
@@ -37588,7 +37526,7 @@ COMMIT;
 ...TRUNCATED...
 
 ================================================================================
-FILE (235/246): database\eac_explanations.sql
+FILE (244/255): database\eac_explanations.sql
 SIZE: 47336 bytes
 ================================================================================
 -- ============================================================
@@ -37915,7 +37853,7 @@ FROM subjects s, exam_boards eb, (VALUES
 ...TRUNCATED...
 
 ================================================================================
-FILE (236/246): database\fix_type_mismatches_v2.sql
+FILE (245/255): database\fix_type_mismatches_v2.sql
 SIZE: 2808 bytes
 ================================================================================
 -- ============================================================
@@ -37979,7 +37917,7 @@ COMMIT;
 
 
 ================================================================================
-FILE (237/246): database\migrate_roles_and_curricula.sql
+FILE (246/255): database\migrate_roles_and_curricula.sql
 SIZE: 3931 bytes
 ================================================================================
 -- ============================================================
@@ -38165,7 +38103,7 @@ SELECT 'Migration complete.' AS status;
 
 
 ================================================================================
-FILE (238/246): database\migration_001.sql
+FILE (247/255): database\migration_001.sql
 SIZE: 6601 bytes
 ================================================================================
 -- =============================================================================
@@ -38345,7 +38283,7 @@ WHERE table_name = 'subtopics' AND column_name = 'created_by';
 
 
 ================================================================================
-FILE (239/246): database\migration_002.sql
+FILE (248/255): database\migration_002.sql
 SIZE: 8872 bytes
 ================================================================================
 -- =============================================================================
@@ -38563,7 +38501,7 @@ WHERE table_name       = 'users'
 
 
 ================================================================================
-FILE (240/246): database\migration_003.sql
+FILE (249/255): database\migration_003.sql
 SIZE: 24552 bytes
 ================================================================================
 -- =============================================================================
@@ -39056,7 +38994,7 @@ CREATE TABLE IF NOT EXISTS video_progress (
 ...TRUNCATED...
 
 ================================================================================
-FILE (241/246): database\migration_004_student_subjects.sql
+FILE (250/255): database\migration_004_student_subjects.sql
 SIZE: 2774 bytes
 ================================================================================
 -- migration_004_student_subjects.sql
@@ -39113,7 +39051,7 @@ ALTER TABLE student_exam_types
 
 
 ================================================================================
-FILE (242/246): database\notifications_and_healthcheck.sql
+FILE (251/255): database\notifications_and_healthcheck.sql
 SIZE: 6831 bytes
 ================================================================================
 -- ============================================================
@@ -39335,7 +39273,7 @@ SELECT
 
 
 ================================================================================
-FILE (243/246): database\patch_answer_options.sql
+FILE (252/255): database\patch_answer_options.sql
 SIZE: 10352 bytes
 ================================================================================
 -- ============================================================
@@ -39494,7 +39432,7 @@ COMMIT;
 
 
 ================================================================================
-FILE (244/246): schema.sql
+FILE (253/255): schema.sql
 SIZE: 82729 bytes
 ================================================================================
 --
@@ -40351,7 +40289,7 @@ CREATE SEQUENCE public.resource_user_assignments_id_seq
 ...TRUNCATED...
 
 ================================================================================
-FILE (245/246): venv\.gitignore
+FILE (254/255): venv\.gitignore
 SIZE: 71 bytes
 ================================================================================
 # Created by venv; see https://docs.python.org/3/library/venv.html
@@ -40359,7 +40297,7 @@ SIZE: 71 bytes
 
 
 ================================================================================
-FILE (246/246): venv\Lib\site-packages\pip-25.2.dist-info\licenses\src\pip\_vendor\idna\LICENSE.md
+FILE (255/255): venv\Lib\site-packages\pip-25.2.dist-info\licenses\src\pip\_vendor\idna\LICENSE.md
 SIZE: 1541 bytes
 ================================================================================
 BSD 3-Clause License
@@ -40396,5 +40334,5 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 ================================================================================
-END OF DUMP | 246 files
+END OF DUMP | 255 files
 ================================================================================
