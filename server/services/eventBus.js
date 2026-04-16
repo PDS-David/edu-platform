@@ -3,16 +3,17 @@
 const EventEmitter = require('events');
 
 /**
- * Global application event bus
- * Used for decoupling engines (progress, analytics, AI, etc.)
+ * Global event bus (singleton)
+ * Used by ALL engines
  */
+
 class EventBus extends EventEmitter {
-  emitEvent(eventName, payload) {
-    this.emit(eventName, payload);
+  registerListener(event, handler) {
+    this.on(event, handler);
   }
 
-  registerListener(eventName, handler) {
-    this.on(eventName, handler);
+  emitEvent(event, payload) {
+    this.emit(event, payload);
   }
 }
 
