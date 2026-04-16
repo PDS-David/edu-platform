@@ -1,15 +1,10 @@
 // client/src/queries/admin/users.queries.js
-// ─────────────────────────────────────────────────────────────
-// ADMIN USERS QUERIES (React Query v5 style)
-// Single source of truth for server-state access
-// Mirrors backend: /api/admin/users routes
-// ─────────────────────────────────────────────────────────────
 
 import { useQuery } from '@tanstack/react-query';
 import { adminUsersApi } from '../../api/admin/adminUsers.api';
 
 /**
- * Query Keys (centralized to avoid mismatch bugs)
+ * QUERY KEYS (centralized)
  */
 export const adminUsersQueryKeys = {
   all: ['admin-users'],
@@ -18,18 +13,16 @@ export const adminUsersQueryKeys = {
 };
 
 /* ─────────────────────────────────────────────
-   1. USERS LIST QUERY
+   USERS LIST
    GET /api/admin/users
 ───────────────────────────────────────────── */
 
-export const useAdminUsersQuery = (params = {}) => {
-  const {
-    page = 1,
-    limit = 20,
-    search = '',
-    role = '',
-  } = params;
-
+export const useAdminUsersQuery = ({
+  page = 1,
+  limit = 20,
+  search = '',
+  role = '',
+}) => {
   return useQuery({
     queryKey: adminUsersQueryKeys.list({ page, limit, search, role }),
 
@@ -37,22 +30,19 @@ export const useAdminUsersQuery = (params = {}) => {
       adminUsersApi.getUsers({ page, limit, search, role }),
 
     keepPreviousData: true,
-
-    staleTime: 1000 * 30, // 30s cache freshness
+    staleTime: 1000 * 30,
   });
 };
 
 /* ─────────────────────────────────────────────
-   2. USER STATS QUERY
+   USER STATS
    GET /api/admin/users/stats
 ───────────────────────────────────────────── */
 
 export const useAdminUserStatsQuery = () => {
   return useQuery({
     queryKey: adminUsersQueryKeys.stats(),
-
-    queryFn: () => adminUsersApi.getStats(),
-
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    queryFn: adminUsersApi.getStats,
+    staleTime: 1000 * 60 * 5,
   });
 };
