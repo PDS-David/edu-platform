@@ -12,26 +12,18 @@ const logger = require('./config/logger');
 const requestId = require('./middleware/requestId');
 const requestLogger = require('./middleware/requestLogger');
 
-// ─────────────────────────────────────────────
-// ENV LOADING (LOCAL ONLY)
-// ─────────────────────────────────────────────
+// ENV
 if (process.env.NODE_ENV !== 'production') {
   require('dotenv').config({ path: path.join(__dirname, '.env') });
 }
 
-// ─────────────────────────────────────────────
-// LOG DIRECTORY (PROD SAFETY)
-// ─────────────────────────────────────────────
+// LOG DIR
 if (process.env.NODE_ENV === 'production') {
   const logsDir = path.join(__dirname, 'logs');
-  if (!fs.existsSync(logsDir)) {
-    fs.mkdirSync(logsDir, { recursive: true });
-  }
+  if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
 }
 
-// ─────────────────────────────────────────────
-// ENV VALIDATION
-// ─────────────────────────────────────────────
+// VALIDATE ENV
 (function validateEnv() {
   const required = ['JWT_SECRET', 'PORT'];
 
@@ -42,30 +34,22 @@ if (process.env.NODE_ENV === 'production') {
   const missing = required.filter(k => !process.env[k]);
 
   if (missing.length) {
-    console.error('Missing environment variables:', missing.join(', '));
+    console.error('Missing env vars:', missing.join(', '));
     process.exit(1);
   }
 })();
 
-// ─────────────────────────────────────────────
-// APP INIT
-// ─────────────────────────────────────────────
+// APP
 const app = express();
 app.set('trust proxy', 1);
 
-// ─────────────────────────────────────────────
-// STATIC FRONTEND
-// ─────────────────────────────────────────────
+// STATIC CLIENT BUILD (optional)
 const clientDist = path.join(__dirname, '..', 'client', 'dist');
-
 if (fs.existsSync(clientDist)) {
   app.use(express.static(clientDist));
-  console.log('Serving frontend from client/dist');
 }
 
-// ─────────────────────────────────────────────
-// CORE MIDDLEWARE
-// ─────────────────────────────────────────────
+// MIDDLEWARE
 app.use(requestId);
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(globalLimiter);
@@ -73,6 +57,7 @@ app.use(globalLimiter);
 const ALLOWED_ORIGINS = [
   'http://localhost:5173',
   'http://localhost:3000',
+  'https://aischoolonair.onrender.com',
   process.env.CLIENT_URL,
   process.env.PROD_CLIENT_URL,
 ].filter(Boolean);
@@ -81,7 +66,6 @@ app.use(cors({
   origin: (origin, cb) => {
     if (!origin) return cb(null, true);
     if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
-
     logger.warn('CORS blocked', { origin });
     return cb(null, true);
   },
@@ -92,150 +76,107 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(requestLogger);
 
-// ─────────────────────────────────────────────
-// DATABASE
-// ─────────────────────────────────────────────
+// DB
 const db = require('./config/database');
 
-// ─────────────────────────────────────────────
+// MODELS
+const modelPaths = [
+  './models/User',
+  './models/SubtopicProgress',
+];
+
+for (const m of modelPaths) {
+  try {
+    const model = require(m);
+    if (typeof model === 'function') model(db);
+  } catch (e) {
+    logger.warn(`Model skipped: ${m} — ${e.message}`);
+  }
+}
+
+try {
+  require('./models/associations');
+} catch (e) {
+  logger.warn('Associations skipped');
+}
+
+// SERVICES (SAFE BOOTSTRAP)
+require('./services/eventBus');
+require('./services/analyticsEventEngine');
+require('./services/eventEngine');
+
 // AUTH
-// ─────────────────────────────────────────────
 const { protect } = require('./middleware/auth');
 
-// ─────────────────────────────────────────────
-// SAFE REQUIRE
-// ─────────────────────────────────────────────
+// SAFE ROUTER LOADER
 function safeRequire(p) {
   try {
     return require(p);
   } catch (e) {
-    logger.warn(`Missing module: ${p}`);
+    logger.warn(`Missing route: ${p}`);
     return null;
   }
 }
 
-// ─────────────────────────────────────────────
 // ROUTES
-// ─────────────────────────────────────────────
 const authRoutes = safeRequire('./routes/authRoutes');
 const subjectRoutes = safeRequire('./routes/subjectsRoutes');
 const topicsRoutes = safeRequire('./routes/topicsRoutes');
 const subtopicRoutes = safeRequire('./routes/subtopicRoutes');
-
+const replayRoutes = safeRequire('./routes/eventReplayRoutes');
 const weakTopicRoutes = safeRequire('./routes/weakTopicRoutes');
 const recommendationRoutes = safeRequire('./routes/recommendationRoutes');
 const sessionRoutes = safeRequire('./routes/sessionRoutes');
-const analyticsRoutes = safeRequire('./routes/analyticsRoutes');
 
-const replayRoutes = safeRequire('./routes/eventReplayRoutes');
+// ENGINE ROUTES
+require('./services/analyticsEngine');
 
-// ─────────────────────────────────────────────
-// ENGINE WRAPPER
-// ─────────────────────────────────────────────
-function safeInit(name, fn) {
-  try {
-    fn();
-    console.log(`✅ Engine loaded: ${name}`);
-  } catch (err) {
-    console.error(`❌ Engine failed: ${name}`, err.message);
-  }
-}
+// STATIC FILES
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// ─────────────────────────────────────────────
-// STARTUP SEQUENCE (CRITICAL)
-// ─────────────────────────────────────────────
-async function startServer() {
-  try {
-    // 1. DB CONNECT
-    await db.authenticate();
-    logger.info('DB connected');
+// ROUTE MOUNTING
+if (authRoutes) app.use('/api/auth', authRoutes);
 
-    // 2. MODELS LOAD (AFTER DB)
-    const modelPaths = [
-      './models/User',
-      './models/SubtopicProgress',
-    ];
+if (subjectRoutes) app.use('/api/subjects', protect, subjectRoutes);
+if (topicsRoutes) app.use('/api/topics', protect, topicsRoutes);
+if (subtopicRoutes) app.use('/api/subtopics', protect, subtopicRoutes);
 
-    for (const m of modelPaths) {
-      try {
-        const model = require(m);
-        if (typeof model === 'function') model(db);
-      } catch (e) {
-        logger.warn(`Model skipped: ${m}`);
-      }
-    }
+if (weakTopicRoutes) app.use('/api/weak-topics', protect, weakTopicRoutes);
+if (recommendationRoutes) app.use('/api/recommendations', protect, recommendationRoutes);
+if (sessionRoutes) app.use('/api/sessions', protect, sessionRoutes);
 
-    try {
-      require('./models/associations');
-    } catch {}
+if (replayRoutes) app.use('/api/replay', protect, replayRoutes);
 
-    // 3. ENGINE BOOTSTRAP
-    safeInit('eventBus', () => require('./services/eventBus'));
-    safeInit('analyticsEngine', () => require('./services/analyticsEngine'));
-    safeInit('eventEngine', () => require('./services/eventEngine'));
-    safeInit('analyticsEventEngine', () => require('./services/analyticsEventEngine'));
+// HEALTH
+app.get('/health', (_req, res) => {
+  res.json({ success: true });
+});
 
-    // 4. STATIC FILES
-    app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// ERROR HANDLER
+app.use((err, _req, res, _next) => {
+  logger.error('Unhandled error', { error: err.message });
+  res.status(500).json({ success: false });
+});
 
-    // 5. ROUTES
-    if (authRoutes) app.use('/api/auth', authRoutes);
-
-    if (subjectRoutes) app.use('/api/subjects', protect, subjectRoutes);
-    if (topicsRoutes) app.use('/api/topics', protect, topicsRoutes);
-    if (subtopicRoutes) app.use('/api/subtopics', protect, subtopicRoutes);
-
-    if (analyticsRoutes) app.use('/api/analytics', protect, analyticsRoutes);
-    if (weakTopicRoutes) app.use('/api/weak-topics', protect, weakTopicRoutes);
-    if (recommendationRoutes) app.use('/api/recommendations', protect, recommendationRoutes);
-    if (sessionRoutes) app.use('/api/sessions', protect, sessionRoutes);
-
-    if (replayRoutes) app.use('/api/replay', protect, replayRoutes);
-
-    // 6. HEALTH CHECK
-    app.get('/health', (_req, res) => {
-      res.json({ success: true });
-    });
-
-    // 7. ERROR HANDLER
-    app.use((err, _req, res, _next) => {
-      logger.error('Unhandled error', { error: err.message });
-      res.status(500).json({ success: false });
-    });
-
-    // 8. SERVER START
-    const PORT = process.env.PORT || 5000;
-
-    if (process.env.ENABLE_WS === 'true') {
-      const server = http.createServer(app);
-
-      safeInit('realtimeEngine', () => {
-        const RealtimeEngine = require('./services/realtimeEngine');
-        new RealtimeEngine(server);
-      });
-
-      server.listen(PORT, () => {
-        console.log(`🚀 Server running with WS on port ${PORT}`);
-      });
-
-    } else {
-      const http = require('http');
-const realtimeEngine = require('./services/realtimeEngine');
+// ===============================
+// SOCKET.IO + HTTP SERVER
+// ===============================
 
 const server = http.createServer(app);
 
-// INIT REALTIME
-realtimeEngine.init(server);
+// Safe realtime engine init (prevents crash if missing)
+try {
+  const realtimeEngine = require('./services/realtimeEngine');
+  if (realtimeEngine && typeof realtimeEngine.init === 'function') {
+    realtimeEngine.init(server);
+  }
+} catch (e) {
+  logger.warn('Realtime engine not loaded');
+}
+
+// START SERVER
+const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
-    }
-
-  } catch (err) {
-    logger.error('FATAL SERVER BOOT ERROR', err.message);
-    process.exit(1);
-  }
-}
-
-startServer();
