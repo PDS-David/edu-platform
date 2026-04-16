@@ -1,32 +1,18 @@
-import { Navigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from "../context/AuthContext";
+import { Navigate } from "react-router-dom";
 
-const PrivateRoute = ({ children, allowedRoles = [] }) => {
+export default function PrivateRoute({ children, allowedRoles }) {
   const { user, loading } = useAuth();
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary-600"></div>
-      </div>
-    );
-  }
+  if (loading) return null;
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/auth/login" replace />;
   }
 
-  if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
-    // Redirect to appropriate dashboard based on role
-    const redirectMap = {
-      student: '/student/dashboard',
-      teacher: '/teacher/dashboard',
-      admin: '/admin/dashboard',
-    };
-    return <Navigate to={redirectMap[user.role] || '/'} replace />;
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
+    return <Navigate to="/404" replace />;
   }
 
   return children;
-};
-
-export default PrivateRoute;
+}
