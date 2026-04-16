@@ -1,19 +1,12 @@
 import { useEffect } from "react";
-import { initRealtime } from "../services/realtimeClient";
+import { initRealtime, on, off } from "../services/realtimeClient";
 import { queryClient } from "../providers/queryClient";
 
-/**
- * Single source of truth for realtime dashboard sync
- * - One socket connection only
- * - Standardized cache invalidation
- */
 export default function useRealtimeSync() {
   useEffect(() => {
     const socket = initRealtime();
 
-    if (!socket) return;
-
-    const handleInvalidate = () => {
+    const invalidateDashboard = () => {
       queryClient.invalidateQueries({
         queryKey: ["dashboard"],
       });
@@ -26,17 +19,13 @@ export default function useRealtimeSync() {
     ];
 
     events.forEach((event) => {
-      socket.on(event, handleInvalidate);
+      on(event, invalidateDashboard);
     });
 
     return () => {
       events.forEach((event) => {
-        socket.off(event, handleInvalidate);
+        off(event, invalidateDashboard);
       });
-
-      // IMPORTANT:
-      // Do NOT disconnect here if socket is shared globally
-      // (prevents breaking other components)
     };
   }, []);
 }
