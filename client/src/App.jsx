@@ -11,9 +11,11 @@ import StudentDashboard from "./pages/StudentDashboard";
 import StudentAnalyticsDashboard from "./pages/StudentAnalyticsDashboard";
 
 import TeacherDashboard from "./pages/TeacherDashboard";
+
 import AdminDashboard from "./pages/AdminDashboard";
 
 import NotFound from "./pages/NotFound";
+
 import PrivateRoute from "./components/PrivateRoute";
 
 function App() {
@@ -21,56 +23,57 @@ function App() {
     <BrowserRouter>
       <Routes>
 
-        {/* PUBLIC */}
+        {/* ================= PUBLIC ================= */}
         <Route path="/" element={<LandingPage />} />
 
-        {/* AUTH */}
+        {/* ================= AUTH ================= */}
         <Route path="/auth/login" element={<LoginPage />} />
         <Route path="/auth/register" element={<RegisterPage />} />
         <Route path="/auth/forgot-password" element={<ForgotPassword />} />
         <Route path="/auth/reset-password" element={<ResetPassword />} />
         <Route path="/auth/verify-email" element={<VerifyEmailPage />} />
 
-        {/* STUDENT (LAYOUT READY) */}
+        {/* ================= STUDENT (NESTED) ================= */}
         <Route
-          path="/student"
+          path="/student/*"
           element={
             <PrivateRoute>
               <StudentDashboard />
             </PrivateRoute>
           }
-        />
+        >
+          {/* default = /student */}
+          <Route index element={null} />
 
-        <Route
-          path="/student/analytics"
-          element={
-            <PrivateRoute>
-              <StudentAnalyticsDashboard />
-            </PrivateRoute>
-          }
-        />
+          {/* nested routes */}
+          <Route path="analytics" element={<StudentAnalyticsDashboard />} />
+        </Route>
 
-        {/* TEACHER */}
+        {/* ================= TEACHER (NESTED) ================= */}
         <Route
-          path="/teacher"
+          path="/teacher/*"
           element={
             <PrivateRoute>
               <TeacherDashboard />
             </PrivateRoute>
           }
-        />
+        >
+          <Route index element={null} />
+        </Route>
 
-        {/* ADMIN */}
+        {/* ================= ADMIN (NESTED) ================= */}
         <Route
-          path="/admin"
+          path="/admin/*"
           element={
             <PrivateRoute>
               <AdminDashboard />
             </PrivateRoute>
           }
-        />
+        >
+          <Route index element={null} />
+        </Route>
 
-        {/* FALLBACK */}
+        {/* ================= FALLBACK ================= */}
         <Route path="/404" element={<NotFound />} />
         <Route path="*" element={<Navigate to="/404" replace />} />
 
