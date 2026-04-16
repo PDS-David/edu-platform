@@ -231,8 +231,16 @@ app.use((err, _req, res, _next) => {
 // ─────────────────────────────────────────────
 // START SERVER
 // ─────────────────────────────────────────────
+const http = require('http');
+const server = http.createServer(app);
+
+// attach realtime engine
+const RealtimeEngine = require('./services/realtimeEngine');
+new RealtimeEngine(server);
+
+// START
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
