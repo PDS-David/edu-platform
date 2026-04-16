@@ -3,9 +3,9 @@ import useDashboardData from "../../hooks/useDashboardData";
 import useRealtimeSync from "../../hooks/useRealtimeSync";
 
 import ProgressSummary from "../../components/ProgressSummary";
-import WeakTopicsPanel from "../../components/dashboard/WeakTopicsPanel";
-import RecommendationPanel from "../../components/dashboard/RecommendationPanel";
-import SessionPanel from "../../components/dashboard/SessionPanel";
+import WeakTopicsPanel from "../../components/WeakTopicsPanel";
+import RecommendationPanel from "../../components/RecommendationPanel";
+import SessionPanel from "../../components/SessionPanel";
 
 export default function DashboardHome() {
   useRealtimeSync(); // 🔥 ONLY ADDITION (UI untouched)
