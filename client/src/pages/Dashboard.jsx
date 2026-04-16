@@ -1,7 +1,7 @@
-import ProgressSummary from "../../components/dashboard/ProgressSummary";
-import WeakTopicsPanel from "../../components/dashboard/WeakTopicsPanel";
-import RecommendationPanel from "../../components/dashboard/RecommendationPanel";
-import SessionPanel from "../../components/dashboard/SessionPanel";
+import ProgressSummary from "../../components/ProgressSummary";
+import WeakTopicsPanel from "../../components/WeakTopicsPanel";
+import RecommendationPanel from "../../components/RecommendationPanel";
+import SessionPanel from "../../components/SessionPanel";
 
 export default function Dashboard() {
   return (
