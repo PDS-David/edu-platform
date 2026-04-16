@@ -1,6 +1,6 @@
 ================================================================================
   AI-OPTIMIZED PROJECT DUMP
-  Generated : 2026-04-15 15:56:17
+  Generated : 2026-04-16 04:44:38
   Root      : C:\Users\MASHAALLAH\Desktop\edu-platform
 ================================================================================
 
@@ -8474,453 +8474,110 @@ module.exports = router;
 
 ================================================================================
 FILE (64/182): server\routes\resourceRoutes.js
-SIZE: 22569 bytes
+SIZE: 2379 bytes
 ================================================================================
 'use strict';
-// server/routes/resourceRoutes.js  v4
-//
-// FIX v4 — Column name alignment with migration_003 schema:
-//   The resources table (migration_003) uses:
-//     resource_type  (NOT "type")
-//     file_url       (NOT "url")
-//     is_free        (NOT "is_premium")
-//   All INSERTs, UPDATEs, and SELECTs now use the correct column names.
-//   The safeInsert fallback cascade has been updated accordingly.
-//
-//   Also fixed student visibility logic:
-//     Students see resources that are:
-//       (a) explicitly assigned to them via resource_user_assignments, OR
-//       (b) linked to a subtopic/topic (is_staged=false or topic_id IS NOT NULL)
-//           and NOT premium (is_free=true or is_free IS NULL treated as free)
-//     The old query referenced r.is_staged which doesn't exist in migration_003.
-//
-// Routes:
-//   POST   /upload              — single upload (teacher/admin)
-//   POST   /bulk-upload         — admin bulk upload up to 20 files
-//   PUT    /:id/assign-meta     — admin assigns exam_type, subject, topic, subtopic
-//   PUT    /:id/assign-users    — admin assigns resource to specific students or all
-//   GET    /staged              — admin: list files awaiting metadata assignment
-//   GET    /                    — teacher sees own; student sees accessible; admin sees all
-//   GET    /:id                 — single resource
-//   DELETE /:id                 — teacher (own) or admin
 
-const express    = require('express');
-const router     = express.Router();
-const multer     = require('multer');
-const path       = require('path');
-const fs         = require('fs');
+const express = require('express');
+const router = express.Router();
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const { QueryTypes } = require('sequelize');
-const sequelize  = require('../config/database');
+const sequelize = require('../config/database');
 const { protect, authorize } = require('../middleware/auth');
 
-// ── MIME → resource_type ──────────────────────────────────────────────────────
-const MIME_TO_TYPE = {
-  'video/mp4': 'video', 'video/webm': 'video', 'video/quicktime': 'video',
-  'audio/mpeg': 'audio', 'audio/wav': 'audio', 'audio/mp4': 'audio',
-  'application/pdf': 'pdf',
-  'application/msword': 'document',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'document',
-  'application/vnd.ms-powerpoint': 'document',
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'document',
-  'image/jpeg': 'image', 'image/png': 'image', 'image/gif': 'image', 'image/webp': 'image',
-};
+/* ================================
+   ENSURE EXTRA COLUMNS
+================================ */
 
-// ── Multer ────────────────────────────────────────────────────────────────────
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = path.join(__dirname, '..', 'uploads', 'resources');
-    fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `${Date.now()}_${Math.random().toString(36).slice(2, 7)}${ext}`);
-  },
-});
-const fileFilter = (_req, file, cb) => {
-  if (MIME_TO_TYPE[file.mimetype]) cb(null, true);
-  else cb(new Error(`File type not allowed: ${file.mimetype}`));
-};
-const uploadSingle = multer({ storage, limits: { fileSize: 500 * 1024 * 1024 }, fileFilter });
-const uploadBulk   = multer({ storage, limits: { fileSize: 500 * 1024 * 1024, files: 20 }, fileFilter });
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-const adminOnly = (req, res, next) => {
-  if (req.user?.role !== 'admin') return res.status(403).json({ success: false, error: 'Admin access required' });
-  next();
-};
-
-// Ensure resource_user_assignments table exists (idempotent)
-async function ensureAssignmentTable() {
-  await sequelize.query(`
-    CREATE TABLE IF NOT EXISTS resource_user_assignments (
-      id          SERIAL      PRIMARY KEY,
-      resource_id INTEGER     NOT NULL REFERENCES resources(id) ON DELETE CASCADE,
-      user_id     UUID        NOT NULL REFERENCES users(id)     ON DELETE CASCADE,
-      assigned_by UUID        REFERENCES users(id) ON DELETE SET NULL,
-      assigned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE (resource_id, user_id)
-    )
-  `, { type: QueryTypes.RAW });
-}
-
-// ── Safe insert using migration_003 column names ───────────────────────────────
-// resources table has: resource_type, file_url, file_size_bytes, is_free
-// NOT: type, url, is_premium, is_staged, is_active, original_filename
-// We add the missing columns gracefully via ALTER TABLE IF NOT EXISTS.
 async function ensureExtraColumns() {
-  // Add columns introduced by bulk-upload flow that aren't in migration_003
   const alters = [
-    `ALTER TABLE resources ADD COLUMN IF NOT EXISTS is_staged          BOOLEAN DEFAULT false`,
-    `ALTER TABLE resources ADD COLUMN IF NOT EXISTS is_active          BOOLEAN DEFAULT true`,
-    `ALTER TABLE resources ADD COLUMN IF NOT EXISTS original_filename  VARCHAR(255)`,
-    `ALTER TABLE resources ADD COLUMN IF NOT EXISTS description        TEXT`,
-    `ALTER TABLE resources ADD COLUMN IF NOT EXISTS updated_at         TIMESTAMPTZ DEFAULT NOW()`,
+    `ALTER TABLE resources ADD COLUMN IF NOT EXISTS is_staged BOOLEAN DEFAULT false`,
+    `ALTER TABLE resources ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true`,
+    `ALTER TABLE resources ADD COLUMN IF NOT EXISTS original_filename VARCHAR(255)`,
+    `ALTER TABLE resources ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()`
   ];
+
   for (const sql of alters) {
-    await sequelize.query(sql, { type: QueryTypes.RAW }).catch(() => {});
+    await sequelize.query(sql).catch(() => {});
   }
 }
 
-async function safeInsert({ topicId, subtopicId, uploadedBy, title, resourceType, fileUrl,
-                             description, isStaged, fileSize, originalFilename }) {
-  await ensureExtraColumns();
-  const r = await sequelize.query(
-    `INSERT INTO resources
-       (topic_id, subtopic_id, uploaded_by, title, resource_type, file_url,
-        description, is_free, is_active, is_staged, file_size_bytes, original_filename,
-        created_at, updated_at)
-     VALUES
-       (:topicId, :subtopicId, :uploadedBy, :title, :resourceType, :fileUrl,
-        :description, true, true, :isStaged, :fileSize, :originalFilename,
-        NOW(), NOW())
-     RETURNING id`,
-    {
-      replacements: {
-        topicId:          topicId          || null,
-        subtopicId:       subtopicId       || null,
-        uploadedBy:       uploadedBy       || null,
-        title,
-        resourceType,
-        fileUrl,
-        description:      description      || null,
-        isStaged:         isStaged         ?? true,
-        fileSize:         fileSize         || null,
-        originalFilename: originalFilename || null,
-      },
-      type: QueryTypes.SELECT,
-    }
-  );
-  return r[0];
-}
+/* ================================
+   GET /api/resources
+================================ */
 
-// ═════════════════════════════════════════════════════════════════════════════
-// POST /api/resources/upload  — single upload (teacher/admin)
-// ═════════════════════════════════════════════════════════════════════════════
-router.post('/upload', protect, authorize('teacher', 'admin'), uploadSingle.single('file'), async (req, res) => {
-  if (!req.file) return res.status(400).json({ success: false, error: 'No file uploaded.' });
-  const { title, topic_id, subtopic_id, description } = req.body;
-  if (!title?.trim()) {
-    fs.unlink(req.file.path, () => {});
-    return res.status(400).json({ success: false, error: 'title is required' });
-  }
-
-  const resourceType = MIME_TO_TYPE[req.file.mimetype] || 'document';
-  const fileUrl      = `/uploads/resources/${req.file.filename}`;
-  try {
-    const row = await safeInsert({
-      topicId:          topic_id || null,
-      subtopicId:       subtopic_id || null,
-      uploadedBy:       req.user.id,
-      title:            title.trim(),
-      resourceType,
-      fileUrl,
-      description:      description || null,
-      isStaged:         false,
-      fileSize:         req.file.size,
-      originalFilename: req.file.originalname,
-    });
-    return res.status(201).json({
-      success: true,
-      message: 'Resource uploaded.',
-      data:    { id: row.id, title: title.trim(), resource_type: resourceType, file_url: fileUrl },
-    });
-  } catch (err) {
-    fs.unlink(req.file.path, () => {});
-    return res.status(500).json({ success: false, error: 'Failed to save: ' + err.message });
-  }
-});
-
-// ═════════════════════════════════════════════════════════════════════════════
-// POST /api/resources/bulk-upload  — admin uploads up to 20 files at once
-// Files are saved as is_staged=true; admin assigns metadata separately.
-// ═════════════════════════════════════════════════════════════════════════════
-router.post('/bulk-upload', protect, adminOnly, uploadBulk.array('files', 20), async (req, res) => {
-  if (!req.files || req.files.length === 0) {
-    return res.status(400).json({ success: false, error: 'No files uploaded. Use field name "files".' });
-  }
-
-  const results  = [];
-  const failures = [];
-
-  for (const file of req.files) {
-    const resourceType    = MIME_TO_TYPE[file.mimetype] || 'document';
-    const fileUrl         = `/uploads/resources/${file.filename}`;
-    const title           = file.originalname.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
-
-    try {
-      const row = await safeInsert({
-        topicId:          null,
-        subtopicId:       null,
-        uploadedBy:       req.user.id,
-        title,
-        resourceType,
-        fileUrl,
-        description:      null,
-        isStaged:         true,
-        fileSize:         file.size,
-        originalFilename: file.originalname,
-      });
-      results.push({
-        id:                row.id,
-        title,
-        resource_type:     resourceType,
-        file_url:          fileUrl,
-        original_filename: file.originalname,
-        file_size:         file.size,
-        is_staged:         true,
-      });
-    } catch (err) {
-      fs.unlink(file.path, () => {});
-      failures.push({ filename: file.originalname, error: err.message });
-    }
-  }
-
-  return res.status(201).json({
-    success:  true,
-    uploaded: results.length,
-    failed:   failures.length,
-    message:  `${results.length} file(s) uploaded. ${failures.length > 0 ? failures.length + ' failed.' : ''} Assign metadata to make them visible to students.`,
-    files:    results,
-    failures,
-  });
-});
-
-// ═════════════════════════════════════════════════════════════════════════════
-// PUT /api/resources/:id/assign-meta  — admin assigns topic/subtopic, clears staged flag
-// ═════════════════════════════════════════════════════════════════════════════
-router.put('/:id/assign-meta', protect, adminOnly, async (req, res) => {
-  const id = parseInt(req.params.id);
-  const { title, topic_id, subtopic_id, description } = req.body;
-
-  if (!topic_id && !subtopic_id) {
-    return res.status(400).json({ success: false, error: 'At least a topic or subtopic must be assigned.' });
-  }
-
-  try {
-    await ensureExtraColumns();
-    await sequelize.query(
-      `UPDATE resources SET
-         title       = COALESCE(NULLIF(:title, ''), title),
-         topic_id    = COALESCE(:topic_id,    topic_id),
-         subtopic_id = COALESCE(:subtopic_id, subtopic_id),
-         description = COALESCE(:description, description),
-         is_staged   = false,
-         updated_at  = NOW()
-       WHERE id = :id`,
-      {
-        replacements: {
-          id,
-          title:       title       || '',
-          topic_id:    topic_id    || null,
-          subtopic_id: subtopic_id || null,
-          description: description || null,
-        },
-        type: QueryTypes.UPDATE,
-      }
-    );
-    return res.json({ success: true, message: 'Metadata assigned. Resource is now visible to students.' });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// ═════════════════════════════════════════════════════════════════════════════
-// PUT /api/resources/:id/assign-users
-// Body: { user_ids: ['uuid1','uuid2'] }  OR  { assign_all: true }
-// ═════════════════════════════════════════════════════════════════════════════
-router.put('/:id/assign-users', protect, adminOnly, async (req, res) => {
-  const resourceId = parseInt(req.params.id);
-  const { user_ids, assign_all } = req.body;
-
-  try {
-    await ensureAssignmentTable();
-
-    if (assign_all) {
-      await sequelize.query(`
-        INSERT INTO resource_user_assignments (resource_id, user_id, assigned_by, assigned_at)
-        SELECT :resourceId, u.id, :assignedBy, NOW()
-        FROM users u
-        WHERE u.role = 'student' AND u.is_active = true
-        ON CONFLICT (resource_id, user_id) DO NOTHING
-      `, { replacements: { resourceId, assignedBy: req.user.id }, type: QueryTypes.INSERT });
-      return res.json({ success: true, message: 'Resource assigned to all active students.' });
-    }
-
-    if (!Array.isArray(user_ids) || user_ids.length === 0) {
-      return res.status(400).json({ success: false, error: 'user_ids array or assign_all:true is required.' });
-    }
-
-    for (const userId of user_ids) {
-      await sequelize.query(`
-        INSERT INTO resource_user_assignments (resource_id, user_id, assigned_by, assigned_at)
-        VALUES (:resourceId, :userId, :assignedBy, NOW())
-        ON CONFLICT (resource_id, user_id) DO NOTHING
-      `, { replacements: { resourceId, userId, assignedBy: req.user.id }, type: QueryTypes.INSERT });
-    }
-    return res.json({ success: true, message: `Resource assigned to ${user_ids.length} student(s).` });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// ═════════════════════════════════════════════════════════════════════════════
-// GET /api/resources/staged  — admin: files awaiting metadata assignment
-// ═════════════════════════════════════════════════════════════════════════════
-router.get('/staged', protect, adminOnly, async (req, res) => {
-  try {
-    await ensureExtraColumns();
-    const rows = await sequelize.query(
-      `SELECT r.id, r.title, r.resource_type, r.file_url, r.original_filename,
-              r.file_size_bytes, r.created_at,
-              u.first_name AS uploaded_by_first, u.last_name AS uploaded_by_last
-       FROM resources r
-       LEFT JOIN users u ON r.uploaded_by = u.id
-       WHERE r.is_active = true
-         AND (r.is_staged = true OR r.topic_id IS NULL)
-       ORDER BY r.created_at DESC`,
-      { type: QueryTypes.SELECT }
-    );
-    return res.json({ success: true, count: rows.length, data: rows });
-  } catch (err) {
-    return res.json({ success: true, count: 0, data: [], _error: err.message });
-  }
-});
-
-// ═════════════════════════════════════════════════════════════════════════════
-// GET /api/resources  — list resources
-//   Admin   → all resources
-//   Teacher → own uploads only
-//   Student → resources linked to their subtopics/topics
-//             + resources explicitly assigned to them
-// ═════════════════════════════════════════════════════════════════════════════
 router.get('/', protect, async (req, res) => {
-  const { topic_id, subtopic_id, type } = req.query;
-  const filters      = ['r.is_active = true'];
+
+  await ensureExtraColumns();
+
+  const filters = ['r.is_active = true'];
   const replacements = {};
 
-  if (topic_id)    { filters.push('r.topic_id    = :topic_id');    replacements.topic_id    = topic_id;    }
-  if (subtopic_id) { filters.push('r.subtopic_id = :subtopic_id'); replacements.subtopic_id = subtopic_id; }
-  if (type)        { filters.push('r.resource_type = :type');      replacements.type        = type;        }
+  if (req.user.role === 'student') {
 
-  if (req.user.role === 'teacher') {
-    filters.push('r.uploaded_by = :uid');
-    replacements.uid = req.user.id;
-  } else if (req.user.role === 'student') {
-    // Students see resources that:
-    //  (a) have been explicitly assigned to them, OR
-    //  (b) are linked to a subtopic/topic (not staged, not premium)
-    await ensureAssignmentTable();
-    filters.push(`(
-      EXISTS (
-        SELECT 1 FROM resource_user_assignments rua
-        WHERE rua.resource_id = r.id AND rua.user_id = :uid
+    filters.push(`
+      (
+        EXISTS (
+          SELECT 1 FROM resource_user_assignments rua
+          WHERE rua.resource_id = r.id
+          AND rua.user_id = :uid
+        )
+        OR (
+          r.topic_id IS NOT NULL
+          AND COALESCE(r.is_staged, false) = false
+          AND COALESCE(r.is_free, true) = true
+        )
       )
-      OR (
-        r.topic_id IS NOT NULL
-        AND r.is_staged = false
-        AND (r.is_free = true OR r.is_free IS NULL)
-      )
-    )`);
+    `);
+
     replacements.uid = req.user.id;
   }
-  // admin → no extra filter, sees everything
 
   try {
-    await ensureExtraColumns();
-    const rows = await sequelize.query(
-      `SELECT r.id, r.title, r.resource_type, r.file_url, r.description,
-              r.topic_id, r.subtopic_id, r.file_size_bytes, r.original_filename,
-              r.created_at, r.is_staged,
-              u.first_name AS uploaded_by_first, u.last_name AS uploaded_by_last,
-              t.name  AS topic_name,
-              s.name  AS subject_name,
-              st.name AS subtopic_name
-       FROM resources r
-       LEFT JOIN users     u  ON r.uploaded_by = u.id
-       LEFT JOIN topics    t  ON r.topic_id    = t.id
-       LEFT JOIN subtopics st ON r.subtopic_id = st.id
-       LEFT JOIN subjects  s  ON s.id = t.subject_id
-       WHERE ${filters.join(' AND ')}
-       ORDER BY r.created_at DESC`,
-      { replacements, type: QueryTypes.SELECT }
-    );
-    return res.json({ success: true, count: rows.length, data: rows });
-  } catch (err) {
-    return res.json({ success: true, count: 0, data: [], _error: err.message });
-  }
-});
 
-// ═════════════════════════════════════════════════════════════════════════════
-// GET /api/resources/:id
-// ═════════════════════════════════════════════════════════════════════════════
-router.get('/:id', protect, async (req, res) => {
-  try {
     const rows = await sequelize.query(
-      `SELECT r.*,
-              u.first_name AS uploaded_by_first, u.last_name AS uploaded_by_last,
-              t.name  AS topic_name,
-              s.name  AS subject_name,
-              st.name AS subtopic_name
-       FROM resources r
-       LEFT JOIN users     u  ON r.uploaded_by = u.id
-       LEFT JOIN topics    t  ON r.topic_id    = t.id
-       LEFT JOIN subtopics st ON r.subtopic_id = st.id
-       LEFT JOIN subjects  s  ON s.id = t.subject_id
-       WHERE r.id = :id AND r.is_active = true`,
-      { replacements: { id: parseInt(req.params.id) }, type: QueryTypes.SELECT }
+`
+SELECT
+  r.id,
+  r.title,
+  r.file_url,
+  r.resource_type,
+  r.topic_id,
+  r.subtopic_id,
+  r.is_staged,
+  s.name AS subject_name
+FROM resources r
+LEFT JOIN topics t ON r.topic_id = t.id
+LEFT JOIN subjects s ON s.id = t.subject_id
+WHERE ${filters.join(' AND ')}
+ORDER BY r.created_at DESC
+`,
+      {
+        replacements,
+        type: QueryTypes.SELECT
+      }
     );
-    if (!rows.length) return res.status(404).json({ success: false, error: 'Resource not found' });
-    return res.json({ success: true, data: rows[0] });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
-  }
-});
 
-// ═════════════════════════════════════════════════════════════════════════════
-// DELETE /api/resources/:id
-// ═════════════════════════════════════════════════════════════════════════════
-router.delete('/:id', protect, authorize('teacher', 'admin'), async (req, res) => {
-  try {
-    const rows = await sequelize.query(
-      `SELECT id, file_url, uploaded_by FROM resources WHERE id = :id`,
-      { replacements: { id: parseInt(req.params.id) }, type: QueryTypes.SELECT }
-    );
-    if (!rows.length) return res.status(404).json({ success: false, error: 'Resource not found' });
-    const resource = rows[0];
-    if (req.user.role === 'teacher' && String(resource.uploaded_by) !== String(req.user.id)) {
-      return res.status(403).json({ success: false, error: 'You can only delete your own resources.' });
-    }
-    await sequelize.query(
-      `UPDATE resources SET is_active = false WHERE id = :id`,
-      { replacements: { id: parseInt(req.params.id) }, type: QueryTypes.UPDATE }
-    );
-    const filePath = path.join(__dirname, '..', (resource.file_url || '').replace(/^\//, ''));
-    fs.unlink(filePath, () => {});
-    return res.json({ success: true, message: 'Resource deleted.' });
+    return res.json({
+      success: true,
+      count: rows.length,
+      data: rows
+    });
+
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+
+    console.error(err);
+
+    return res.json({
+      success: true,
+      count: 0,
+      data: []
+    });
+
   }
+
 });
 
 module.exports = router;
@@ -19011,7 +18668,7 @@ SIZE: 642 bytes
 
 ================================================================================
 FILE (107/182): client\package.json
-SIZE: 682 bytes
+SIZE: 723 bytes
 ================================================================================
 {
   "name": "edu-platform-client",
@@ -19024,6 +18681,7 @@ SIZE: 682 bytes
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.99.0",
     "axios": "^1.6.2",
     "hls.js": "^1.6.15",
     "lucide-react": "^0.294.0",
@@ -29879,148 +29537,121 @@ export default function StudentAnalyticsDashboard() {
 
 ================================================================================
 FILE (152/182): client\src\pages\StudentDashboard.jsx
-SIZE: 7445 bytes
+SIZE: 5519 bytes
 ================================================================================
-// client/src/pages/StudentDashboard.jsx
-// FIXED + OPTIMIZED VERSION
-
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import {
-  ChevronDown, ChevronLeft, ChevronRight,
-  Loader2, ArrowRight, TrendingUp, TrendingDown,
-  Users, X, Plus, BookOpen,
-} from 'lucide-react';
 import TopNav from '../components/TopNav';
-import GamificationBar from '../components/GamificationBar';
 import api from '../services/api';
 
-// ─── Subject icon map ─────────────────────────────────────────────────────────
-const SUBJECT_ICONS = {
-  'Biology':          { icon: '', bg: '#DCFCE7', color: '#16A34A' },
-  'Chemistry':        { icon: '', bg: '#FEF9C3', color: '#CA8A04' },
-  'Physics':          { icon: '', bg: '#DBEAFE', color: '#2563EB' },
-  'Mathematics':      { icon: '', bg: '#EDE9FE', color: '#7C3AED' },
-  'English Language': { icon: '', bg: '#FCE7F3', color: '#DB2777' },
-  'English':          { icon: '', bg: '#FCE7F3', color: '#DB2777' },
-  'Economics':        { icon: '', bg: '#FFEDD5', color: '#EA580C' },
-  'default':          { icon: '', bg: '#EFF6FF', color: '#14B8A6' },
-};
-
-const getSubjectIcon = (name) => {
-  if (!name) return SUBJECT_ICONS.default;
-  const key = Object.keys(SUBJECT_ICONS).find(k =>
-    name.toLowerCase().includes(k.toLowerCase())
-  );
-  return SUBJECT_ICONS[key] || SUBJECT_ICONS.default;
-};
-
-const PALETTES = [
-  { bg: '#EFF6FF', color: '#3B82F6' },
-  { bg: '#F0FDF4', color: '#22C55E' },
-  { bg: '#FFF7ED', color: '#F97316' },
-  { bg: '#FAF5FF', color: '#A855F7' },
-];
-
-// ─── Main Dashboard ───────────────────────────────────────────────────────────
 export default function StudentDashboard() {
+
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [boards, setBoards] = useState([]);
-  const [selectedBoard, setSelectedBoard] = useState(null);
-
-  const [mySubjects, setMySubjects] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  const [selectedPerfSub, setSelectedPerfSub] = useState(null);
-  const [perfLoading, setPerfLoading] = useState(false);
-
-  const [whatNext, setWhatNext] = useState(null);
-  const [error, setError] = useState(null);
-
   const firstName = user?.firstName || 'Student';
 
-  // ── Load Boards ────────────────────────────────────────────────────────────
+/* ===============================
+   SUBJECTS
+=============================== */
+
+  const [subjects, setSubjects] = useState([]);
+  const [loadingSubjects, setLoadingSubjects] = useState(true);
+
+/* ===============================
+   RESOURCES
+=============================== */
+
+  const [resources, setResources] = useState([]);
+  const [loadingResources, setLoadingResources] = useState(true);
+
+/* ===============================
+   LOAD SUBJECTS
+=============================== */
+
   useEffect(() => {
-    api.get('/students/my-boards')
-      .then(r => {
-        const list = r.data || [];
-        setBoards(list);
-        if (list.length > 0) setSelectedBoard(list[0]);
-      })
-      .catch(err => {
-        console.error('Boards load failed:', err);
-      });
+
+    const loadSubjects = async () => {
+
+      try {
+
+        const res = await api.get('/students/my-subjects');
+
+        setSubjects(res.data || []);
+
+      } catch (err) {
+
+        console.error('Subjects load failed:', err);
+
+      } finally {
+
+        setLoadingSubjects(false);
+
+      }
+
+    };
+
+    loadSubjects();
+
   }, []);
 
-  // ── Load Subjects (FIXED + BULK PROGRESS) ───────────────────────────────────
-  const loadMySubjects = useCallback(async () => {
-    if (!user) return;
-    setLoading(true);
-    setError(null);
+/* ===============================
+   LOAD RESOURCES
+=============================== */
 
-    try {
-      const res = await api.get('/students/my-subjects');
-      const list = res.data || [];
-
-      // ✅ BULK PROGRESS (no more N+1)
-      const progressRes = await api.get('/subtopics/progress-summary/bulk', {
-        params: { student_id: user.id }
-      });
-
-      const progressMap = progressRes.data || {};
-
-      const withProgress = list.map((s, i) => ({
-        ...s,
-        palette: PALETTES[i % PALETTES.length],
-        completion_pct: progressMap[s.id]?.completion_pct || 0,
-        subtopic_count: progressMap[s.id]?.total_subtopics || 0,
-        topics_completed: progressMap[s.id]?.completed_subtopics || 0,
-      }));
-
-      setMySubjects(withProgress);
-
-    } catch (err) {
-      console.error('Subjects load failed:', err);
-      setError('Failed to load subjects');
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
-
-  useEffect(() => { loadMySubjects(); }, [loadMySubjects]);
-
-  // ── Derived filtered subjects (NO DUPLICATION) ─────────────────────────────
-  const filteredSubjects = useMemo(() => {
-    if (!selectedBoard) return mySubjects;
-
-    return mySubjects.filter(s =>
-      s.exam_board_id === selectedBoard.id || s.source === 'class'
-    );
-  }, [selectedBoard, mySubjects]);
-
-  // ── Sync selectedPerfSub (FIXED BUG) ───────────────────────────────────────
   useEffect(() => {
-    if (filteredSubjects.length > 0) {
-      setSelectedPerfSub(filteredSubjects[0]);
+
+    const loadResources = async () => {
+
+      try {
+
+        const res = await api.get('/resources');
+
+        setResources(res.data.data || []);
+
+      } catch (err) {
+
+        console.error('Resources load failed:', err);
+
+      } finally {
+
+        setLoadingResources(false);
+
+      }
+
+    };
+
+    loadResources();
+
+  }, []);
+
+/* ===============================
+   GROUP RESOURCES
+=============================== */
+
+  const grouped = {};
+
+  resources.forEach(r => {
+
+    const subject = r.subject_name || 'Other';
+
+    if (!grouped[subject]) {
+      grouped[subject] = [];
     }
-  }, [filteredSubjects]);
 
-  // ── Load "What's Next" ─────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!user) return;
+    grouped[subject].push(r);
 
-    api.get('/subtopics/next', {
-      params: { student_id: user.id }
-    })
-      .then(r => setWhatNext(r.data))
-      .catch(err => console.error('Next failed:', err));
-  }, [user]);
+  });
+
+/* ===============================
+   RENDER
+=============================== */
 
   return (
+
     <div className="min-h-screen bg-gray-50">
+
       <TopNav />
 
       <div className="max-w-2xl mx-auto p-4">
@@ -30029,62 +29660,140 @@ export default function StudentDashboard() {
           Hi, {firstName}
         </h1>
 
-        {/* ERROR */}
-        {error && (
-          <div className="bg-red-50 text-red-600 p-3 rounded mb-3 text-sm">
-            {error}
-          </div>
-        )}
+{/* ===============================
+   MY SUBJECTS
+=============================== */}
 
-        {/* CONTINUE LEARNING */}
         <div className="bg-white p-4 rounded-xl mb-4">
-          <h2 className="font-semibold mb-2">Continue Learning</h2>
 
-          {whatNext ? (
-            <button
-              onClick={() => navigate(`/student/subtopic/${whatNext.subtopic_id}`)}
-              className="bg-blue-500 text-white px-4 py-2 rounded"
-            >
-              Continue
-            </button>
-          ) : (
+          <h2 className="font-semibold mb-3">
+            My Subjects
+          </h2>
+
+          {loadingSubjects ? (
+
             <p className="text-sm text-gray-400">
-              No recent activity yet. Start learning.
+              Loading subjects...
             </p>
+
+          ) : subjects.length === 0 ? (
+
+            <p className="text-sm text-gray-400">
+              No subjects available.
+            </p>
+
+          ) : (
+
+            <div className="grid grid-cols-2 gap-3">
+
+              {subjects.map(subject => (
+
+                <button
+                  key={subject.id}
+                  onClick={() => navigate(`/student/subject/${subject.id}`)}
+                  className="border p-3 rounded-xl text-left hover:bg-gray-50"
+                >
+
+                  <p className="font-semibold text-sm">
+                    {subject.name}
+                  </p>
+
+                </button>
+
+              ))}
+
+            </div>
+
           )}
+
         </div>
 
-        {/* SUBJECTS */}
-        <div className="bg-white p-4 rounded-xl">
-          <h2 className="font-semibold mb-3">My Subjects</h2>
+{/* ===============================
+   MY FILES
+=============================== */}
 
-          {loading ? (
-            <Loader2 className="animate-spin" />
-          ) : filteredSubjects.length === 0 ? (
+        <div className="bg-white p-4 rounded-xl">
+
+          <h2 className="font-semibold mb-3">
+            My Files
+          </h2>
+
+          {loadingResources ? (
+
             <p className="text-sm text-gray-400">
-              No subjects yet.
+              Loading files...
             </p>
+
+          ) : resources.length === 0 ? (
+
+            <p className="text-sm text-gray-400">
+              No files assigned yet.
+            </p>
+
           ) : (
-            <div className="grid grid-cols-2 gap-3">
-              {filteredSubjects.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => navigate(`/student/subject/${s.id}`)}
-                  className="border p-3 rounded-xl"
-                >
-                  <p className="font-semibold text-sm">{s.name}</p>
-                  <p className="text-xs text-gray-400">
-                    {s.completion_pct}%
-                  </p>
-                </button>
-              ))}
-            </div>
+
+            Object.keys(grouped).map(subject => (
+
+              <div key={subject} className="mb-4">
+
+                <h3 className="font-semibold text-sm mb-2">
+                  {subject}
+                </h3>
+
+                <div className="space-y-2">
+
+                  {grouped[subject].map(file => (
+
+                    <div
+                      key={file.id}
+                      className="border p-3 rounded-lg flex justify-between items-center"
+                    >
+
+                      <span className="text-sm">
+                        {file.title}
+                      </span>
+
+                      <div className="flex gap-2">
+
+                        <a
+                          href={file.file_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-blue-500 text-sm"
+                        >
+                          View
+                        </a>
+
+                        <a
+                          href={file.file_url}
+                          download
+                          className="text-green-500 text-sm"
+                        >
+                          Download
+                        </a>
+
+                      </div>
+
+                    </div>
+
+                  ))}
+
+                </div>
+
+              </div>
+
+            ))
+
           )}
+
         </div>
 
       </div>
+
     </div>
+
   );
+
 }
 
 
