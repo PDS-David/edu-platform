@@ -130,6 +130,7 @@ const topicsRoutes = safeRequire('./routes/topicsRoutes');
 const subtopicRoutes = safeRequire('./routes/subtopicRoutes');
 const replayRoutes = safeRequire('./routes/eventReplayRoutes');
 const weakTopicRoutes = safeRequire('./routes/weakTopicRoutes');
+const recommendationRoutes = safeRequire('./routes/recommendationRoutes');
 
 // ENGINE BOOTSTRAP (CRITICAL)
 require('./services/eventEngine');
@@ -146,6 +147,9 @@ if (topicsRoutes) app.use('/api/topics', protect, topicsRoutes);
 if (subtopicRoutes) app.use('/api/subtopics', protect, subtopicRoutes);
 if (weakTopicRoutes) {
   app.use('/api/weak-topics', protect, weakTopicRoutes);
+}
+if (recommendationRoutes) {
+  app.use('/api/recommendations', protect, recommendationRoutes);
 }
 
 // ✅ NEW ENGINE ROUTE
