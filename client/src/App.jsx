@@ -16,10 +16,6 @@ import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
 import PrivateRoute from "./components/PrivateRoute";
 
-import StudentLayout from "./layouts/StudentLayout";
-import TeacherLayout from "./layouts/TeacherLayout";
-import AdminLayout from "./layouts/AdminLayout";
-
 function App() {
   return (
     <BrowserRouter>
@@ -35,14 +31,12 @@ function App() {
         <Route path="/auth/reset-password" element={<ResetPassword />} />
         <Route path="/auth/verify-email" element={<VerifyEmailPage />} />
 
-        {/* STUDENT */}
+        {/* STUDENT (LAYOUT READY) */}
         <Route
           path="/student"
           element={
             <PrivateRoute>
-              <StudentLayout>
-                <StudentDashboard />
-              </StudentLayout>
+              <StudentDashboard />
             </PrivateRoute>
           }
         />
@@ -51,9 +45,7 @@ function App() {
           path="/student/analytics"
           element={
             <PrivateRoute>
-              <StudentLayout>
-                <StudentAnalyticsDashboard />
-              </StudentLayout>
+              <StudentAnalyticsDashboard />
             </PrivateRoute>
           }
         />
@@ -63,9 +55,7 @@ function App() {
           path="/teacher"
           element={
             <PrivateRoute>
-              <TeacherLayout>
-                <TeacherDashboard />
-              </TeacherLayout>
+              <TeacherDashboard />
             </PrivateRoute>
           }
         />
@@ -75,9 +65,7 @@ function App() {
           path="/admin"
           element={
             <PrivateRoute>
-              <AdminLayout>
-                <AdminDashboard />
-              </AdminLayout>
+              <AdminDashboard />
             </PrivateRoute>
           }
         />
