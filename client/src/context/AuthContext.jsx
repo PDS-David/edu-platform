@@ -8,9 +8,6 @@ export default function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  /**
-   * INIT AUTH ON APP LOAD
-   */
   useEffect(() => {
     const init = async () => {
       const token = getToken();
@@ -22,7 +19,11 @@ export default function AuthProvider({ children }) {
 
       try {
         const res = await authApi.getMe();
-        setUser(res.data);
+
+        // defensive extraction (prevents backend shape issues)
+        const userData = res?.data?.user || res?.data || null;
+
+        setUser(userData);
       } catch (err) {
         clearToken();
         setUser(null);
@@ -34,33 +35,30 @@ export default function AuthProvider({ children }) {
     init();
   }, []);
 
-  /**
-   * LOGIN
-   */
   const login = async (email, password) => {
     const res = await authApi.login(email, password);
 
-    setToken(res.token);
-    setUser(res.user);
+    const token = res?.token;
+    const userData = res?.user;
 
-    return res.user;
+    if (token) setToken(token);
+    setUser(userData);
+
+    return userData;
   };
 
-  /**
-   * REGISTER
-   */
   const register = async (payload) => {
     const res = await authApi.register(payload);
 
-    setToken(res.token);
-    setUser(res.user);
+    const token = res?.token;
+    const userData = res?.user;
 
-    return res.user;
+    if (token) setToken(token);
+    setUser(userData);
+
+    return userData;
   };
 
-  /**
-   * LOGOUT
-   */
   const logout = () => {
     clearToken();
     setUser(null);
