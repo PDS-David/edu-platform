@@ -172,6 +172,11 @@ try {
   logger.warn('subscriptionGuard missing');
 }
 
+// ENGINE BOOTSTRAP
+require('./services/eventEngine');
+require('./services/analyticsEngine');
+
+
 // ─────────────────────────────────────────────────────────────
 // ROUTES
 // ─────────────────────────────────────────────────────────────
