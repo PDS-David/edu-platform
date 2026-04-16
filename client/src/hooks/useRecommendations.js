@@ -1,15 +1,10 @@
-import { useEffect, useState } from 'react';
-import { getRecommendations } from '../api/recommendationApi';
+import { useQuery } from '@tanstack/react-query';
+import { recommendationApi } from '../api/recommendationApi';
 
-export default function useRecommendations() {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    getRecommendations()
-      .then(res => setData(res.data.data))
-      .finally(() => setLoading(false));
-  }, []);
-
-  return { data, loading };
+export function useRecommendations() {
+  return useQuery({
+    queryKey: ['recommendations'],
+    queryFn: async () =>
+      (await recommendationApi.getRecommendations()).data.data,
+  });
 }
