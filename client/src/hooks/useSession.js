@@ -1,19 +1,21 @@
-import { useState } from 'react';
-import * as sessionApi from '../api/sessionApi';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { sessionApi } from '../api/sessionApi';
 
-export default function useSession() {
-  const [session, setSession] = useState(null);
+export function useSessions() {
+  return useQuery({
+    queryKey: ['sessions'],
+    queryFn: async () => (await sessionApi.getSessions()).data.data,
+  });
+}
 
-  const start = async (subtopicId) => {
-    const res = await sessionApi.startSession(subtopicId);
-    setSession(res.data.data);
-  };
+export function useStartSession() {
+  return useMutation({
+    mutationFn: sessionApi.startSession,
+  });
+}
 
-  const end = async () => {
-    if (!session) return;
-    await sessionApi.endSession(session.id);
-    setSession(null);
-  };
-
-  return { session, start, end };
+export function useEndSession() {
+  return useMutation({
+    mutationFn: sessionApi.endSession,
+  });
 }
