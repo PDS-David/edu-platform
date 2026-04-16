@@ -8,10 +8,7 @@ import AdminLayout from "./layouts/AdminLayout";
 // Auth guard
 import PrivateRoute from "./components/PrivateRoute";
 
-// Floating action button (reusable)
-import WhatsAppButton from "./components/WhatsAppButton";
-
-// ── Public / auth pages ───────────────────────────────────────────────
+// Public / auth pages
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -25,11 +22,11 @@ import TermsOfService from "./pages/TermsOfService";
 import PaymentVerify from "./pages/PaymentVerify";
 import NotFound from "./pages/NotFound";
 
-// ── Semi-public pages ────────────────────────────────────────────────
+// Semi-public
 import PastPapersPage from "./pages/PastPapersPage";
 import SubjectCatalog from "./pages/SubjectCatalog";
 
-// ── Student pages ─────────────────────────────────────────────────────
+// Student
 import StudentDashboard from "./pages/StudentDashboard";
 import StudentAnalyticsDashboard from "./pages/StudentAnalyticsDashboard";
 import StudentTestPage from "./pages/StudentTestPage";
@@ -43,7 +40,7 @@ import MockExamPage from "./pages/MockExamPage";
 import ImageMarkingPage from "./pages/ImageMarkingPage";
 import SettingsPage from "./pages/SettingsPage";
 
-// ── Teacher pages ─────────────────────────────────────────────────────
+// Teacher
 import TeacherDashboard from "./pages/TeacherDashboard";
 import TeacherAssignmentPage from "./pages/TeacherAssignmentPage";
 import TeacherContentPage from "./pages/TeacherContentPage";
@@ -52,18 +49,19 @@ import TeacherResourcesPage from "./pages/TeacherResourcesPage";
 import ContributeQuestion from "./pages/ContributeQuestion";
 import QuestionReview from "./pages/QuestionReview";
 
-// ── Admin pages ───────────────────────────────────────────────────────
+// Admin
 import AdminDashboard from "./pages/AdminDashboard";
 import DashboardHome from "./pages/Dashboard/DashboardHome";
 
-// ───────────────────────────────────────────────────────────────────────
+// Global floating widget
+import WhatsAppButton from "./components/WhatsAppButton";
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
 
-        {/* ── PUBLIC ───────────────────────────────────────────────────── */}
+        {/* PUBLIC */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
@@ -71,7 +69,7 @@ export default function App() {
         <Route path="/past-papers" element={<PastPapersPage />} />
         <Route path="/subjects" element={<SubjectCatalog />} />
 
-        {/* ── AUTH ─────────────────────────────────────────────────────── */}
+        {/* AUTH */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -80,9 +78,10 @@ export default function App() {
         <Route path="/onboarding" element={<OnboardingPage />} />
         <Route path="/payment/verify" element={<PaymentVerify />} />
 
-        {/* ── STUDENT ROUTES ───────────────────────────────────────────── */}
+        {/* STUDENT */}
         <Route element={<PrivateRoute allowedRoles={["student"]} />}>
           <Route path="/student" element={<StudentLayout />}>
+            <Route index element={<StudentDashboard />} />
             <Route path="dashboard" element={<StudentDashboard />} />
             <Route path="analytics" element={<StudentAnalyticsDashboard />} />
             <Route path="subject/:subjectId" element={<SubjectPage />} />
@@ -98,7 +97,7 @@ export default function App() {
           </Route>
         </Route>
 
-        {/* ── TEACHER ROUTES ───────────────────────────────────────────── */}
+        {/* TEACHER */}
         <Route element={<PrivateRoute allowedRoles={["teacher", "admin"]} />}>
           <Route path="/teacher" element={<TeacherLayout />}>
             <Route path="dashboard" element={<TeacherDashboard />} />
@@ -112,7 +111,7 @@ export default function App() {
           </Route>
         </Route>
 
-        {/* ── ADMIN ROUTES ─────────────────────────────────────────────── */}
+        {/* ADMIN */}
         <Route element={<PrivateRoute allowedRoles={["admin"]} />}>
           <Route path="/admin" element={<AdminLayout />}>
             <Route path="dashboard" element={<AdminDashboard />} />
@@ -122,12 +121,13 @@ export default function App() {
           </Route>
         </Route>
 
-        {/* ── FALLBACK ──────────────────────────────────────────────────── */}
+        {/* FALLBACK */}
         <Route path="/404" element={<NotFound />} />
         <Route path="*" element={<Navigate to="/404" replace />} />
+
       </Routes>
 
-      {/* Global floating widget */}
+      {/* GLOBAL WIDGET */}
       <WhatsAppButton />
     </BrowserRouter>
   );
