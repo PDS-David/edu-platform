@@ -5,18 +5,13 @@ import WeakTopicsPanel from "../../components/dashboard/WeakTopicsPanel";
 import RecommendationPanel from "../../components/dashboard/RecommendationPanel";
 import SessionPanel from "../../components/dashboard/SessionPanel";
 
-export default function DashboardHome() {
+export default function Dashboard() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
-
       <ProgressSummary />
-
       <WeakTopicsPanel />
-
       <RecommendationPanel />
-
       <SessionPanel />
-
     </div>
   );
 }
