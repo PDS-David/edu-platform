@@ -1,27 +1,17 @@
-import React from 'react';
-import { useWeakTopics } from '../hooks/useAnalytics';
-
-export default function WeakTopicsPanel() {
-  const { data, isLoading } = useWeakTopics();
-
-  if (isLoading) {
-    return <div>Loading weak topics...</div>;
+export default function WeakTopicsPanel({ items }) {
+  if (!items || items.length === 0) {
+    return <div className="p-4">No weak topics detected</div>;
   }
 
   return (
-    <div className="p-4 rounded-xl border">
-      <h2 className="text-lg font-semibold">Weak Topics</h2>
+    <div className="p-4 border rounded">
+      <h2>Weak Topics</h2>
 
-      <ul className="mt-3 space-y-2">
-        {data?.map((topic, idx) => (
-          <li key={idx} className="p-2 border rounded">
-            <div className="font-medium">{topic.topic}</div>
-            <div className="text-sm text-gray-600">
-              Accuracy: {topic.accuracy_pct}%
-            </div>
-          </li>
-        ))}
-      </ul>
+      {items.map((t, i) => (
+        <div key={i}>
+          {t.topic ?? "Unknown"} — {t.accuracy_pct ?? 0}%
+        </div>
+      ))}
     </div>
   );
 }
