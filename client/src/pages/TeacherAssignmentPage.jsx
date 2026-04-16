@@ -5,7 +5,7 @@
 // - Selecting an exam type populates the Subject dropdown from /api/exam-boards/:code/subjects.
 
 import { useState, useEffect } from 'react';
-import api from '../../services/api';
+import api from "../services/api";
 import {
   UserCheck, Plus, Trash2, Loader2, CheckCircle,
   AlertTriangle, X, ChevronDown, Search,
