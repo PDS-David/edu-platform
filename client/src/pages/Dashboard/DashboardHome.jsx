@@ -2,7 +2,7 @@ import React from "react";
 import useDashboardData from "../../hooks/useDashboardData";
 import useRealtimeSync from "../../hooks/useRealtimeSync";
 
-import ProgressSummary from "../../components/dashboard/ProgressSummary";
+import ProgressSummary from "../../components/ProgressSummary";
 import WeakTopicsPanel from "../../components/dashboard/WeakTopicsPanel";
 import RecommendationPanel from "../../components/dashboard/RecommendationPanel";
 import SessionPanel from "../../components/dashboard/SessionPanel";
