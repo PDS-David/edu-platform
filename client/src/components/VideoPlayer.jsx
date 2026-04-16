@@ -1,3 +1,5 @@
+// client/src/components/VideoPlayer.jsx
+
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Hls from 'hls.js';
 import api from '../services/api';
@@ -7,7 +9,7 @@ import {
 } from 'lucide-react';
 
 // ─────────────────────────────────────────────
-// Format time helper
+// Utils
 // ─────────────────────────────────────────────
 const formatTime = (secs) => {
   if (!secs || isNaN(secs)) return '0:00';
@@ -15,16 +17,14 @@ const formatTime = (secs) => {
   const m = Math.floor((secs % 3600) / 60);
   const s = Math.floor(secs % 60);
 
-  if (h > 0) {
-    return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-  }
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   return `${m}:${String(s).padStart(2, '0')}`;
 };
 
 export default function VideoPlayer({ videoId, onComplete }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
-  const progressIntervalRef = useRef(null);
+  const intervalRef = useRef(null);
 
   // ─────────────────────────────────────────────
   // State
@@ -41,24 +41,21 @@ export default function VideoPlayer({ videoId, onComplete }) {
   const [volume, setVolume] = useState(1);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-
   const [buffered, setBuffered] = useState(0);
 
-  const [showControls, setShowControls] = useState(true);
-
-  const [isCompleted, setIsCompleted] = useState(false);
   const [watchPct, setWatchPct] = useState(0);
+  const [isCompleted, setIsCompleted] = useState(false);
 
   const [resumePos, setResumePos] = useState(0);
-  const [showResumeBanner, setShowResumeBanner] = useState(false);
+  const [showResume, setShowResume] = useState(false);
 
   // ─────────────────────────────────────────────
-  // Fetch video + progress
+  // Load video + progress (SINGLE API LAYER)
   // ─────────────────────────────────────────────
   useEffect(() => {
     if (!videoId) return;
 
-    const fetchVideo = async () => {
+    const load = async () => {
       setLoading(true);
       setError(null);
 
@@ -70,105 +67,78 @@ export default function VideoPlayer({ videoId, onComplete }) {
 
         setVideoData(videoRes.data);
 
-        const prog = progressRes.data;
+        const p = progressRes.data;
 
-        if (prog?.current_position_seconds > 10) {
-          setResumePos(prog.current_position_seconds);
-          setShowResumeBanner(true);
+        if (p?.current_position_seconds > 10) {
+          setResumePos(p.current_position_seconds);
+          setShowResume(true);
         }
 
-        setIsCompleted(prog?.is_completed || false);
-        setWatchPct(prog?.watch_percentage || 0);
+        setWatchPct(p?.watch_percentage ?? 0);
+        setIsCompleted(p?.is_completed ?? false);
 
       } catch (err) {
-        const status = err?.status;
+        const status = err?.response?.status;
 
         if (status === 403) {
           setAccessDenied(true);
         } else {
-          setError(err?.message || 'Failed to load video');
+          setError(err?.response?.data?.error || 'Failed to load video');
         }
       } finally {
         setLoading(false);
       }
     };
 
-    fetchVideo();
+    load();
   }, [videoId]);
 
   // ─────────────────────────────────────────────
-  // Initialize HLS
+  // HLS INIT
   // ─────────────────────────────────────────────
   useEffect(() => {
     if (!videoData || !videoRef.current) return;
 
     const video = videoRef.current;
 
-    const baseUrl =
-      (import.meta.env.VITE_API_URL || 'http://localhost:5000')
-        .replace(/\/api\/?$/, '');
+    const baseURL = (import.meta.env.VITE_API_URL || 'http://localhost:5000')
+      .replace(/\/api$/, '');
 
-    const streamUrl = `${baseUrl}/videos/stream/${videoId}/master.m3u8`;
+    const streamUrl = `${baseURL}/videos/stream/${videoId}/master.m3u8`;
 
-    const initHls = () => {
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
-        hlsRef.current = null;
-      }
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
 
-      if (Hls.isSupported()) {
-        const hls = new Hls({
-          xhrSetup: (xhr) => {
-            const token = localStorage.getItem('token');
-            if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-          }
-        });
+    if (Hls.isSupported()) {
+      const hls = new Hls({
+        xhrSetup: (xhr) => {
+          const token = localStorage.getItem('token');
+          if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        }
+      });
 
-        hls.loadSource(streamUrl);
-        hls.attachMedia(video);
+      hls.loadSource(streamUrl);
+      hls.attachMedia(video);
 
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          // Auto-resume AFTER manifest is ready
-          if (resumePos > 0) {
-            video.currentTime = resumePos;
-            setShowResumeBanner(false);
-          }
-        });
+      hls.on(Hls.Events.ERROR, (_, data) => {
+        if (data.fatal) setError('Video stream error');
+      });
 
-        hls.on(Hls.Events.ERROR, (_, data) => {
-          if (data.fatal) {
-            setError('Video stream error');
-          }
-        });
-
-        hlsRef.current = hls;
-
-      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        video.src = streamUrl;
-
-        video.addEventListener('loadedmetadata', () => {
-          if (resumePos > 0) {
-            video.currentTime = resumePos;
-            setShowResumeBanner(false);
-          }
-        });
-      } else {
-        setError('HLS not supported in this browser');
-      }
-    };
-
-    initHls();
+      hlsRef.current = hls;
+    } else {
+      video.src = streamUrl;
+    }
 
     return () => {
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
-        hlsRef.current = null;
-      }
+      hlsRef.current?.destroy();
+      hlsRef.current = null;
     };
-  }, [videoData, videoId, resumePos]);
+  }, [videoData, videoId]);
 
   // ─────────────────────────────────────────────
-  // Save progress
+  // Save progress (deduplicated + stable)
   // ─────────────────────────────────────────────
   const saveProgress = useCallback(async (pos, dur) => {
     if (!videoId || !dur) return;
@@ -179,7 +149,7 @@ export default function VideoPlayer({ videoId, onComplete }) {
       await api.post(`/videos/${videoId}/progress`, {
         current_position_seconds: Math.round(pos),
         total_watched_seconds: Math.round(pos),
-        watch_percentage: parseFloat(pct.toFixed(2))
+        watch_percentage: Number(pct.toFixed(2))
       });
 
       setWatchPct(pct);
@@ -190,12 +160,12 @@ export default function VideoPlayer({ videoId, onComplete }) {
       }
 
     } catch {
-      // silent fail (intentional)
+      // silent fail (don’t break UX)
     }
   }, [videoId, isCompleted, onComplete]);
 
   // ─────────────────────────────────────────────
-  // Video event listeners
+  // Video listeners
   // ─────────────────────────────────────────────
   useEffect(() => {
     const video = videoRef.current;
@@ -210,7 +180,6 @@ export default function VideoPlayer({ videoId, onComplete }) {
     };
 
     const onPlay = () => setIsPlaying(true);
-
     const onPause = () => {
       setIsPlaying(false);
       saveProgress(video.currentTime, video.duration);
@@ -226,7 +195,8 @@ export default function VideoPlayer({ videoId, onComplete }) {
     video.addEventListener('pause', onPause);
     video.addEventListener('ended', onEnded);
 
-    progressIntervalRef.current = setInterval(() => {
+    // interval save
+    intervalRef.current = setInterval(() => {
       if (!video.paused && video.duration) {
         saveProgress(video.currentTime, video.duration);
       }
@@ -238,11 +208,9 @@ export default function VideoPlayer({ videoId, onComplete }) {
       video.removeEventListener('pause', onPause);
       video.removeEventListener('ended', onEnded);
 
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
-      }
+      clearInterval(intervalRef.current);
 
-      if (video.currentTime > 0) {
+      if (video.currentTime && video.duration) {
         saveProgress(video.currentTime, video.duration);
       }
     };
@@ -274,12 +242,6 @@ export default function VideoPlayer({ videoId, onComplete }) {
     v.currentTime = pct * duration;
   };
 
-  const skip = (sec) => {
-    const v = videoRef.current;
-    if (!v) return;
-    v.currentTime = Math.max(0, Math.min(v.currentTime + sec, duration));
-  };
-
   const toggleFullscreen = () => {
     const el = videoRef.current?.parentElement;
     if (!el) return;
@@ -293,26 +255,19 @@ export default function VideoPlayer({ videoId, onComplete }) {
     }
   };
 
-  const handleResume = () => {
+  const skip = (s) => {
     const v = videoRef.current;
-    if (v && resumePos) v.currentTime = resumePos;
-    setShowResumeBanner(false);
-  };
-
-  const handleRestart = () => {
-    const v = videoRef.current;
-    if (v) v.currentTime = 0;
-    setShowResumeBanner(false);
+    if (!v) return;
+    v.currentTime = Math.max(0, Math.min(v.currentTime + s, duration));
   };
 
   // ─────────────────────────────────────────────
-  // UI states
+  // UI STATES
   // ─────────────────────────────────────────────
   if (loading) {
     return (
       <div className="aspect-video bg-black flex items-center justify-center text-white">
-        <Loader2 className="animate-spin mr-2" />
-        Loading...
+        <Loader2 className="animate-spin" />
       </div>
     );
   }
@@ -320,17 +275,17 @@ export default function VideoPlayer({ videoId, onComplete }) {
   if (accessDenied) {
     return (
       <div className="aspect-video bg-gray-900 flex items-center justify-center text-white">
-        <Lock className="mr-2" />
-        Upgrade required
+        <Lock />
+        <p>Upgrade required</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="aspect-video bg-black flex items-center justify-center text-white">
-        <AlertTriangle className="mr-2 text-red-400" />
-        {error}
+      <div className="aspect-video bg-gray-900 flex items-center justify-center text-white">
+        <AlertTriangle />
+        <p>{error}</p>
       </div>
     );
   }
@@ -339,25 +294,19 @@ export default function VideoPlayer({ videoId, onComplete }) {
   const bufferedPct = duration ? (buffered / duration) * 100 : 0;
 
   // ─────────────────────────────────────────────
-  // Render
+  // RENDER
   // ─────────────────────────────────────────────
   return (
     <div className="space-y-3">
 
-      {/* Title */}
       {videoData && (
         <div className="flex justify-between">
-          <h3 className="font-bold">{videoData.title}</h3>
-          {isCompleted && (
-            <span className="text-green-600 flex items-center gap-1">
-              <CheckCircle2 size={14} /> Completed
-            </span>
-          )}
+          <h2 className="font-bold">{videoData.title}</h2>
+          {isCompleted && <CheckCircle2 className="text-green-600" />}
         </div>
       )}
 
-      {/* Player */}
-      <div className="relative bg-black rounded-xl overflow-hidden aspect-video">
+      <div className="relative aspect-video bg-black rounded-xl overflow-hidden">
 
         <video
           ref={videoRef}
@@ -366,27 +315,18 @@ export default function VideoPlayer({ videoId, onComplete }) {
           crossOrigin="use-credentials"
         />
 
-        {/* Resume */}
-        {showResumeBanner && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/80 text-white px-3 py-2 rounded">
-            Resume from {formatTime(resumePos)}?
-            <button onClick={handleResume} className="ml-2 text-green-400">Resume</button>
-            <button onClick={handleRestart} className="ml-2 text-gray-300">Restart</button>
-          </div>
-        )}
+        <div className="absolute inset-0" onClick={togglePlay} />
 
-        {/* Overlay click */}
-        <div className="absolute inset-0 z-10" onClick={togglePlay} />
+        <div className="absolute bottom-0 w-full bg-gradient-to-t from-black/80 p-3">
 
-        {/* Controls */}
-        <div className="absolute bottom-0 w-full bg-gradient-to-t from-black/80 p-3 z-20">
-
-          {/* Progress */}
-          <div className="h-1 bg-white/30 rounded cursor-pointer" onClick={handleSeek}>
-            <div className="h-full bg-green-500" style={{ width: `${progressPct}%` }} />
+          <div
+            className="h-1 bg-white/30 rounded cursor-pointer relative"
+            onClick={handleSeek}
+          >
+            <div className="absolute h-full bg-white/40" style={{ width: `${bufferedPct}%` }} />
+            <div className="absolute h-full bg-green-500" style={{ width: `${progressPct}%` }} />
           </div>
 
-          {/* Buttons */}
           <div className="flex items-center gap-2 mt-2 text-white">
 
             <button onClick={togglePlay}>
@@ -397,9 +337,7 @@ export default function VideoPlayer({ videoId, onComplete }) {
               <RotateCcw />
             </button>
 
-            <span className="text-xs">
-              {formatTime(currentTime)} / {formatTime(duration)}
-            </span>
+            <span>{formatTime(currentTime)} / {formatTime(duration)}</span>
 
             <div className="flex-1" />
 
@@ -410,20 +348,13 @@ export default function VideoPlayer({ videoId, onComplete }) {
             <button onClick={toggleFullscreen}>
               {isFullscreen ? <Minimize /> : <Maximize />}
             </button>
+
           </div>
         </div>
       </div>
 
-      {/* Progress */}
-      <div>
-        <div className="flex justify-between text-xs">
-          <span>Progress</span>
-          <span>{Math.round(watchPct)}%</span>
-        </div>
-
-        <div className="h-2 bg-gray-200 rounded">
-          <div className="h-full bg-green-500" style={{ width: `${watchPct}%` }} />
-        </div>
+      <div className="text-sm text-gray-500">
+        {Math.round(watchPct)}% watched
       </div>
     </div>
   );
