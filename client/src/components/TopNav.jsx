@@ -1,4 +1,3 @@
-// client/src/components/TopNav.jsx
 import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -9,66 +8,79 @@ import { MessageSquare, ChevronDown, LogOut, Settings, Bell } from 'lucide-react
 export default function TopNav() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [dropOpen,   setDropOpen]   = useState(false);
-  const [notifOpen,  setNotifOpen]  = useState(false);
+
+  const [dropOpen, setDropOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
-  const dropRef  = useRef(null);
+
+  const dropRef = useRef(null);
   const notifRef = useRef(null);
 
   const firstName = user?.firstName || user?.first_name || '';
-  const lastName  = user?.lastName  || user?.last_name  || '';
-  const fullName  = `${firstName} ${lastName}`.trim() || 'User';
-  const initials  = (firstName[0] || '') + (lastName[0] || '');
-  const role      = user?.role || 'student';
+  const lastName = user?.lastName || user?.last_name || '';
+  const fullName = `${firstName} ${lastName}`.trim() || 'User';
+  const initials = (firstName[0] || '') + (lastName[0] || '');
+  const role = user?.role || 'student';
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   const dashboardPath =
-    role === 'admin'   ? '/admin/dashboard'   :
-    role === 'teacher' ? '/teacher/dashboard' :
-                         '/student/dashboard';
+    role === 'admin'
+      ? '/admin/dashboard'
+      : role === 'teacher'
+      ? '/teacher/dashboard'
+      : '/student/dashboard';
 
+  // ── Notifications fetch ─────────────────────────────
   useEffect(() => {
     if (!user) return;
-    api.get('/notifications')
-      .then(r => setNotifications(r.data.data || []))
-      .catch(() => {});
+
+    (async () => {
+      try {
+        const res = await api.get('/notifications');
+        setNotifications(res.data || []);
+      } catch {
+        setNotifications([]);
+      }
+    })();
   }, [user]);
 
-  const handleNotifOpen = () => {
-    setNotifOpen(o => !o);
-    if (!notifOpen && unreadCount > 0) {
-      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-      api.patch('/notifications/read-all').catch(() => {});
-    }
-  };
-
+  // ── Outside click handler ───────────────────────────
   useEffect(() => {
     const handler = (e) => {
-      if (dropRef.current  && !dropRef.current.contains(e.target))  setDropOpen(false);
+      if (dropRef.current && !dropRef.current.contains(e.target)) setDropOpen(false);
       if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false);
     };
+
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const handleLogout = () => {
-    logout();
+  // ── Notifications toggle (FIXED STATE BUG) ───────────
+  const handleNotifOpen = async () => {
+    setNotifOpen(prev => {
+      const next = !prev;
+
+      if (next && unreadCount > 0) {
+        setNotifications(n => n.map(x => ({ ...x, is_read: true })));
+        api.patch('/notifications/read-all').catch(() => {});
+      }
+
+      return next;
+    });
+  };
+
+  const handleLogout = async () => {
+    await logout?.();
     navigate('/login');
   };
 
   return (
     <nav className="w-full bg-white border-b border-gray-100 sticky top-0 z-50 h-14 flex items-center px-4 md:px-6">
 
-      {/* Left — home button + AISchoolonair logo */}
+      {/* LEFT */}
       <div className="flex items-center gap-3 shrink-0">
-
-        {/* Four-dot grid = Home button */}
-        <Link
-          to="/"
-          title="Go to Home"
-          className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-blue-50 transition-colors"
-        >
+        <Link to="/" className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-blue-50">
           <div className="grid grid-cols-2 gap-0.5 w-5 h-5">
             {[...Array(4)].map((_, i) => (
               <div key={i} className="w-2 h-2 rounded-sm bg-blue-600" />
@@ -76,116 +88,55 @@ export default function TopNav() {
           </div>
         </Link>
 
-        {/* AISchoolonair — product logo */}
-        <span className="flex items-center gap-1">
-          <span style={{ background: '#2563eb' }} className="px-1.5 py-0.5 rounded text-white font-bold text-sm">AISchoolonair</span>
+        <span className="px-2 py-0.5 bg-blue-600 text-white text-sm font-bold rounded">
+          AISchoolonair
         </span>
 
-        {/* Divider */}
         <span className="hidden md:block h-6 w-px bg-gray-200" />
 
-        {/* Org logo */}
-        <img
-          src={branding.logo.main}
-          alt="AISchoolonair"
-          className="hidden md:block h-7 w-auto object-contain"
-        />
+        <img src={branding.logo.main} className="hidden md:block h-7" />
       </div>
 
-      {/* Right */}
-      <div className="ml-auto flex items-center gap-2 md:gap-3">
+      {/* RIGHT */}
+      <div className="ml-auto flex items-center gap-3">
 
-        {/* Upgrade button: only for free students */}
         {user?.role === 'student' && user?.subscription_status === 'free' && (
-          <Link
-            to="/pricing"
-            className="bg-amber-400 hover:bg-amber-500 text-white text-xs font-bold px-3 py-1.5 rounded-md transition-colors shrink-0"
-          >
+          <Link to="/pricing" className="bg-amber-400 text-white text-xs px-3 py-1.5 rounded-md">
             Upgrade
           </Link>
         )}
 
-        {/* Notifications bell */}
-        <div className="relative" ref={notifRef} onClick={e => e.stopPropagation()}>
-          <button
-            onClick={handleNotifOpen}
-            className="relative p-1.5 text-gray-400 hover:text-gray-600 transition-colors"
-          >
+        {/* Notifications */}
+        <div ref={notifRef}>
+          <button onClick={handleNotifOpen} className="relative p-1.5">
             <Bell size={18} />
             {unreadCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">
                 {unreadCount > 9 ? '9+' : unreadCount}
               </span>
             )}
           </button>
-
-          {notifOpen && (
-            <div className="absolute right-0 top-full mt-1 w-72 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50">
-              <div className="px-4 py-2 border-b border-gray-50">
-                <p className="text-sm font-semibold text-gray-800">Notifications</p>
-              </div>
-              {notifications.length === 0 ? (
-                <p className="text-xs text-gray-400 text-center py-6">No notifications yet</p>
-              ) : (
-                notifications.slice(0, 5).map(n => (
-                  <div key={n.id} className={`px-4 py-3 border-b border-gray-50 last:border-0 ${!n.is_read ? 'bg-blue-50/50' : ''}`}>
-                    <p className="text-xs font-semibold text-gray-800">{n.title}</p>
-                    <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{n.message}</p>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
         </div>
 
-        {/* Chat icon */}
-        <button className="p-1.5 text-gray-400 hover:text-gray-600 transition-colors hidden sm:block">
-          <MessageSquare size={18} />
-        </button>
-
-        {/* User avatar + dropdown */}
-        <div className="relative" ref={dropRef}>
-          <button
-            onClick={() => setDropOpen(o => !o)}
-            className="flex items-center gap-2 hover:bg-gray-50 rounded-lg px-2 py-1.5 transition-colors"
-          >
-            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold shrink-0 uppercase">
+        {/* User */}
+        <div ref={dropRef}>
+          <button onClick={() => setDropOpen(o => !o)} className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs">
               {initials || fullName[0]}
             </div>
-            <div className="hidden md:flex flex-col items-start leading-tight">
-              <span className="text-sm font-semibold text-gray-800 truncate max-w-[120px]">{fullName}</span>
-              <span className="text-xs text-gray-400 capitalize">{role}</span>
-            </div>
-            <ChevronDown size={14} className="text-gray-400 hidden md:block" />
+            <ChevronDown size={14} />
           </button>
 
           {dropOpen && (
-            <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50">
-              <div className="px-4 py-2 border-b border-gray-50">
-                <p className="text-sm font-semibold text-gray-800">{fullName}</p>
-                <p className="text-xs text-gray-400 capitalize">{role}</p>
-              </div>
-              <button
-                onClick={() => { setDropOpen(false); navigate(dashboardPath); }}
-                className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors text-left"
-              >
-                <div className="grid grid-cols-2 gap-0.5 w-4 h-4 shrink-0">
-                  {[...Array(4)].map((_, i) => <div key={i} className="w-1.5 h-1.5 rounded-sm bg-blue-500" />)}
-                </div>
+            <div className="absolute right-0 mt-2 w-48 bg-white shadow rounded-xl border">
+              <button onClick={() => navigate(dashboardPath)} className="w-full px-4 py-2 text-left">
                 Dashboard
               </button>
-              <button
-                onClick={() => { setDropOpen(false); navigate('/settings'); }}
-                className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors text-left"
-              >
-                <Settings size={15} /> Settings
+              <button onClick={() => navigate('/settings')} className="w-full px-4 py-2 text-left">
+                Settings
               </button>
-              <div className="border-t border-gray-50 my-1" />
-              <button
-                onClick={handleLogout}
-                className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors text-left"
-              >
-                <LogOut size={15} /> Sign Out
+              <button onClick={handleLogout} className="w-full px-4 py-2 text-left text-red-500">
+                Sign Out
               </button>
             </div>
           )}
