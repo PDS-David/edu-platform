@@ -1,16 +1,26 @@
-class RealtimeClient {
-  constructor() {
-    this.ws = null;
-  }
+import { io } from "socket.io-client";
 
-  connect(onEvent) {
-    this.ws = new WebSocket(import.meta.env.VITE_API_URL.replace('http', 'ws'));
+let socket = null;
 
-    this.ws.onmessage = (message) => {
-      const { event, data } = JSON.parse(message.data);
-      onEvent(event, data);
-    };
-  }
+export function initRealtime() {
+  if (socket) return socket;
+
+  socket = io(import.meta.env.VITE_API_URL, {
+    withCredentials: true,
+    transports: ["websocket"],
+  });
+
+  socket.on("connect", () => {
+    console.log("Realtime connected:", socket.id);
+  });
+
+  socket.on("disconnect", () => {
+    console.log("Realtime disconnected");
+  });
+
+  return socket;
 }
 
-export default new RealtimeClient();
+export function getSocket() {
+  return socket;
+}
