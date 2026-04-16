@@ -2,26 +2,41 @@ import { useEffect } from "react";
 import { initRealtime } from "../services/realtimeClient";
 import { queryClient } from "../providers/queryClient";
 
+/**
+ * Single source of truth for realtime dashboard sync
+ * - One socket connection only
+ * - Standardized cache invalidation
+ */
 export default function useRealtimeSync() {
   useEffect(() => {
     const socket = initRealtime();
 
-    // 🎯 CORE EVENTS → invalidate cache only (NO UI changes)
-    const eventsToInvalidate = [
+    if (!socket) return;
+
+    const handleInvalidate = () => {
+      queryClient.invalidateQueries({
+        queryKey: ["dashboard"],
+      });
+    };
+
+    const events = [
       "progress.updated",
       "quiz.completed",
       "resource.viewed",
     ];
 
-    eventsToInvalidate.forEach((event) => {
-      socket.on(event, () => {
-        // invalidate ALL dashboard-related queries
-        queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      });
+    events.forEach((event) => {
+      socket.on(event, handleInvalidate);
     });
 
     return () => {
-      socket.disconnect();
+      events.forEach((event) => {
+        socket.off(event, handleInvalidate);
+      });
+
+      // IMPORTANT:
+      // Do NOT disconnect here if socket is shared globally
+      // (prevents breaking other components)
     };
   }, []);
 }
