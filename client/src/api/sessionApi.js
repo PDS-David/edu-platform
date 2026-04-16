@@ -1,13 +1,7 @@
-import api from './axios';
+import httpClient from './httpClient';
 
-export const startSession = (subtopicId) =>
-  api.post('/sessions/start', { subtopicId });
-
-export const endSession = (sessionId) =>
-  api.post('/sessions/end', { sessionId });
-
-export const getActiveSession = () =>
-  api.get('/sessions/active');
-
-export const getSessionStats = () =>
-  api.get('/sessions/stats');
+export const sessionApi = {
+  getSessions: () => httpClient.get('/api/sessions'),
+  startSession: (data) => httpClient.post('/api/sessions/start', data),
+  endSession: (data) => httpClient.post('/api/sessions/end', data),
+};
