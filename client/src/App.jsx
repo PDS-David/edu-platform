@@ -51,7 +51,7 @@ import QuestionReview from "./pages/QuestionReview";
 
 // ── Admin pages ───────────────────────────────────────────────────────────────
 import AdminDashboard from "./pages/AdminDashboard";
-import DashboardHome from "./pages/dashboard/DashboardHome";
+import DashboardHome from "./pages/Dashboard/DashboardHome";
 
 // ── WhatsApp floating button ───────────────────────────────────────────────────
 const WA_NUMBER = "2348099123412";
