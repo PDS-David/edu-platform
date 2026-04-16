@@ -1,11 +1,18 @@
-export default function ProgressSummary({ sessionStats }) {
-  return (
-    <div>
-      <h2>Study Overview</h2>
+import React from "react";
 
-      <p>Total Sessions: {sessionStats?.total_sessions}</p>
-      <p>Total Time: {sessionStats?.total_time} sec</p>
-      <p>Average Session: {sessionStats?.avg_session_time} sec</p>
+export default function ProgressSummary({ data }) {
+  if (!data) return null;
+
+  return (
+    <div className="p-4 bg-white rounded-xl shadow">
+      <h2 className="text-lg font-semibold mb-3">Progress Summary</h2>
+
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <div>XP Points: {data.xp_points}</div>
+        <div>Streak: {data.study_streak_days}</div>
+        <div>Completed: {data.completed_subtopics}</div>
+        <div>Accuracy: {data.accuracy_rate}%</div>
+      </div>
     </div>
   );
 }
