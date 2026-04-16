@@ -2,7 +2,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminUsersApi } from '../../api/admin/adminUsers.api';
-import { adminUsersQueryKeys } from './users.queries';
+import { adminQueryKeys } from './admin.queryKeys';
 
 /* ─────────────────────────────────────────────
    UPDATE ROLE
@@ -17,11 +17,11 @@ export const useUpdateUserRole = () => {
 
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: adminUsersQueryKeys.all,
+        queryKey: adminQueryKeys.users.all,
       });
 
       queryClient.invalidateQueries({
-        queryKey: adminUsersQueryKeys.stats(),
+        queryKey: adminQueryKeys.users.stats(),
       });
     },
   });
@@ -40,11 +40,11 @@ export const useToggleUserActive = () => {
 
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: adminUsersQueryKeys.all,
+        queryKey: adminQueryKeys.users.all,
       });
 
       queryClient.invalidateQueries({
-        queryKey: adminUsersQueryKeys.stats(),
+        queryKey: adminQueryKeys.users.stats(),
       });
     },
   });
@@ -63,11 +63,11 @@ export const useDeleteUser = () => {
 
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: adminUsersQueryKeys.all,
+        queryKey: adminQueryKeys.users.all,
       });
 
       queryClient.invalidateQueries({
-        queryKey: adminUsersQueryKeys.stats(),
+        queryKey: adminQueryKeys.users.stats(),
       });
     },
   });
