@@ -19,11 +19,10 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../api/axios';
 
 // ── Module-level store (survives re-renders and re-mounts) ────────────────────
-let _examTypesCache = null;       // null = not yet fetched; [] = fetched but empty
-let _subjectCache   = {};         // { [typeId]: Subject[] }  — only non-empty arrays
-const _inFlight     = new Set();  // typeIds currently being fetched (dedup guard)
+let _examTypesCache = null;
+let _subjectCache   = {};
+const _inFlight     = new Set();
 
-// ─────────────────────────────────────────────────────────────────────────────
 export function useCatalog() {
   const [examTypes,      setExamTypes]      = useState(_examTypesCache || []);
   const [loadingTypes,   setLoadingTypes]   = useState(_examTypesCache === null);
@@ -36,7 +35,6 @@ export function useCatalog() {
     return () => { mounted.current = false; };
   }, []);
 
-  // ── Fetch exam types once per session ──────────────────────────────────────
   useEffect(() => {
     if (_examTypesCache !== null) {
       setExamTypes(_examTypesCache);
@@ -50,6 +48,7 @@ export function useCatalog() {
         const res  = await api.get('/catalog/types');
         const list = res?.success ? (res.data || []) : [];
         _examTypesCache = list;
+
         if (!cancelled && mounted.current) {
           setExamTypes(list);
           setLoadingTypes(false);
@@ -61,35 +60,30 @@ export function useCatalog() {
     })();
 
     return () => { cancelled = true; };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
-  // ── Fetch subjects for a given typeId ─────────────────────────────────────
-  // KEY RULE: only serve from cache if cached array is NON-EMPTY.
-  // Empty results are never cached so that after an admin adds a subject in
-  // Catalog Management the next modal open always gets fresh data.
   const fetchSubjectsForType = useCallback(async (typeId) => {
     if (!typeId) return [];
 
-    // Serve from cache only if we have real subjects stored
     if (_subjectCache[typeId] && _subjectCache[typeId].length > 0) {
       setSubjectCache(c => ({ ...c, [typeId]: _subjectCache[typeId] }));
       return _subjectCache[typeId];
     }
 
-    // Deduplicate concurrent calls for the same typeId
     if (_inFlight.has(typeId)) return [];
 
     _inFlight.add(typeId);
     if (mounted.current) setLoadingSubject(true);
 
     try {
-      const res      = await api.get(`/catalog/types/${typeId}/subjects`);
+      const res = await api.get(`/catalog/types/${typeId}/subjects`);
       const subjects = res?.success ? (res.data || []) : [];
 
-      // Only cache non-empty results
       if (subjects.length > 0) {
         _subjectCache[typeId] = subjects;
-        if (mounted.current) setSubjectCache(c => ({ ...c, [typeId]: subjects }));
+        if (mounted.current) {
+          setSubjectCache(c => ({ ...c, [typeId]: subjects }));
+        }
       }
 
       return subjects;
@@ -101,9 +95,6 @@ export function useCatalog() {
     }
   }, []);
 
-  // ── Invalidate cache ───────────────────────────────────────────────────────
-  // invalidateCache(typeId)  — bust one type's subject cache
-  // invalidateCache()        — full reset (exam types + all subjects)
   const invalidateCache = useCallback((typeId) => {
     if (typeId !== undefined) {
       delete _subjectCache[typeId];
@@ -121,15 +112,19 @@ export function useCatalog() {
     }
   }, []);
 
-  // ── Force re-fetch exam types (for manual Refresh button) ─────────────────
   const refreshExamTypes = useCallback(async () => {
     _examTypesCache = null;
     if (mounted.current) setLoadingTypes(true);
+
     try {
       const res  = await api.get('/catalog/types');
       const list = res?.success ? (res.data || []) : [];
       _examTypesCache = list;
-      if (mounted.current) { setExamTypes(list); setLoadingTypes(false); }
+
+      if (mounted.current) {
+        setExamTypes(list);
+        setLoadingTypes(false);
+      }
     } catch {
       _examTypesCache = [];
       if (mounted.current) setLoadingTypes(false);
