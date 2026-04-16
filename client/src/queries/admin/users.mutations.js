@@ -1,18 +1,11 @@
 // client/src/queries/admin/users.mutations.js
-// ─────────────────────────────────────────────────────────────
-// ADMIN USERS MUTATIONS (React Query v5)
-// Mirrors backend:
-// PUT    /admin/users/:id/role
-// PUT    /admin/users/:id/deactivate
-// DELETE /admin/users/:id
-// ─────────────────────────────────────────────────────────────
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminUsersApi } from '../../api/admin/adminUsers.api';
 import { adminUsersQueryKeys } from './users.queries';
 
 /* ─────────────────────────────────────────────
-   ROLE UPDATE MUTATION
+   UPDATE ROLE
 ───────────────────────────────────────────── */
 
 export const useUpdateUserRole = () => {
@@ -23,7 +16,6 @@ export const useUpdateUserRole = () => {
       adminUsersApi.updateRole({ userId, role }),
 
     onSuccess: () => {
-      // Invalidate ALL user-related queries
       queryClient.invalidateQueries({
         queryKey: adminUsersQueryKeys.all,
       });
@@ -36,7 +28,7 @@ export const useUpdateUserRole = () => {
 };
 
 /* ─────────────────────────────────────────────
-   TOGGLE ACTIVE USER
+   TOGGLE ACTIVE
 ───────────────────────────────────────────── */
 
 export const useToggleUserActive = () => {
@@ -59,7 +51,7 @@ export const useToggleUserActive = () => {
 };
 
 /* ─────────────────────────────────────────────
-   DELETE USER (soft delete backend)
+   DELETE USER
 ───────────────────────────────────────────── */
 
 export const useDeleteUser = () => {
