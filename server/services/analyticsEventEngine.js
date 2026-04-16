@@ -1,12 +1,10 @@
 'use strict';
 
 const eventBus = require('./eventBus');
+const sequelize = require('../config/database');
+const { QueryTypes } = require('sequelize');
 
-/**
- * AnalyticsEngine
- * Listens to system events and aggregates metrics
- */
-class AnalyticsEngine {
+class AnalyticsEventEngine {
   constructor() {
     this.registerListeners();
   }
@@ -18,17 +16,49 @@ class AnalyticsEngine {
   }
 
   async onProgressUpdated(payload) {
-    // Example: update learning completion stats
-    // Keep logic lightweight (NO heavy DB operations here ideally)
+    await sequelize.query(
+      `
+      INSERT INTO event_store (event_type, payload, created_at)
+      VALUES ('progress.updated', :payload, NOW())
+      `,
+      {
+        replacements: {
+          payload: JSON.stringify(payload),
+        },
+        type: QueryTypes.INSERT,
+      }
+    );
   }
 
   async onQuizCompleted(payload) {
-    // Example: store quiz analytics, difficulty performance
+    await sequelize.query(
+      `
+      INSERT INTO event_store (event_type, payload, created_at)
+      VALUES ('quiz.completed', :payload, NOW())
+      `,
+      {
+        replacements: {
+          payload: JSON.stringify(payload),
+        },
+        type: QueryTypes.INSERT,
+      }
+    );
   }
 
   async onResourceViewed(payload) {
-    // Example: track engagement
+    await sequelize.query(
+      `
+      INSERT INTO event_store (event_type, payload, created_at)
+      VALUES ('resource.viewed', :payload, NOW())
+      `,
+      {
+        replacements: {
+          payload: JSON.stringify(payload),
+        },
+        type: QueryTypes.INSERT,
+      }
+    );
   }
 }
 
-module.exports = new AnalyticsEngine();
+module.exports = new AnalyticsEventEngine();
