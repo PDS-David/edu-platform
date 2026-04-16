@@ -1,4 +1,6 @@
-import api from './axios';
+import httpClient from './httpClient';
 
-export const getRecommendations = () =>
-  api.get('/recommendations');
+export const recommendationApi = {
+  getRecommendations: () =>
+    httpClient.get('/api/recommendations'),
+};
