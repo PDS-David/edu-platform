@@ -16,7 +16,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import api from '../services/api';
+import api from '../api/axios';
 
 // ── Module-level store (survives re-renders and re-mounts) ────────────────────
 let _examTypesCache = null;       // null = not yet fetched; [] = fetched but empty
