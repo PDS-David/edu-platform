@@ -1,26 +1,15 @@
-import React from 'react';
-import { useProgress } from '../hooks/useProgress';
-import { useAnalyticsSummary } from '../hooks/useAnalytics';
-
-export default function ProgressSummary() {
-  const { data: progress, isLoading: pLoading } = useProgress();
-  const { data: analytics, isLoading: aLoading } = useAnalyticsSummary();
-
-  if (pLoading || aLoading) {
-    return <div>Loading progress...</div>;
+export default function ProgressSummary({ data }) {
+  if (!data) {
+    return <div className="p-4">No progress data available</div>;
   }
 
   return (
-    <div className="p-4 rounded-xl border">
-      <h2 className="text-lg font-semibold">Progress Summary</h2>
+    <div className="p-4 border rounded">
+      <h2>Progress Summary</h2>
 
-      <div className="mt-3 space-y-2">
-        <p>Total Attempts: {analytics?.total_attempts}</p>
-        <p>Accuracy: {analytics?.accuracy_pct}%</p>
-        <p>XP Points: {analytics?.xp_points}</p>
-        <p>Study Streak: {analytics?.study_streak_days} days</p>
-        <p>Quizzes Completed: {analytics?.quizzes_completed}</p>
-      </div>
+      <div>Total Attempts: {data.total_attempts ?? 0}</div>
+      <div>Accuracy: {data.accuracy_pct ?? 0}%</div>
+      <div>XP Points: {data.xp_points ?? 0}</div>
     </div>
   );
 }
