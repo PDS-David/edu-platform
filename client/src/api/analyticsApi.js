@@ -1,4 +1,8 @@
-import api from './axios';
+import httpClient from './httpClient';
 
-export const getAnalytics = () =>
-  api.get('/analytics');
+export const analyticsApi = {
+  getSummary: () => httpClient.get('/api/analytics/summary'),
+  getWeakTopics: () => httpClient.get('/api/analytics/weak-topics'),
+  getScoreTrend: () => httpClient.get('/api/analytics/score-trend'),
+  getSubjectBreakdown: () => httpClient.get('/api/analytics/subject-breakdown'),
+};
