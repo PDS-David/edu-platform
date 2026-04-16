@@ -1,7 +1,7 @@
-import api from './axios';
+import httpClient from './httpClient';
 
-export const getSubtopics = (params) =>
-  api.get('/subtopics', { params });
-
-export const updateProgress = (data) =>
-  api.post('/progress/update', data);
+export const progressApi = {
+  getProgress: () => httpClient.get('/api/subtopics'),
+  updateProgress: (data) =>
+    httpClient.post('/api/subtopics/progress', data),
+};
