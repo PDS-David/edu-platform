@@ -1,7 +1,7 @@
-import httpClient from './httpClient';
+import api from '../services/api';
 
 export const sessionApi = {
-  getSessions: () => httpClient.get('/api/sessions'),
-  startSession: (data) => httpClient.post('/api/sessions/start', data),
-  endSession: (data) => httpClient.post('/api/sessions/end', data),
+  getSessions: () => api.get('/sessions'),
+  startSession: (data) => api.post('/sessions/start', data),
+  endSession: (data) => api.post('/sessions/end', data),
 };
