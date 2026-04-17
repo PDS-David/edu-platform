@@ -5,22 +5,25 @@
 
 const jwt = require('jsonwebtoken');
 
-if (!process.env.JWT_SECRET) {
-  throw new Error('Missing JWT_SECRET in environment variables');
-}
-
-const SECRET = process.env.JWT_SECRET;
 const ISSUER = 'edu-platform';
 
+// Resolved lazily at call-time so safeRequire() in server.js can load this
+// module without crashing when env vars haven't been injected yet.
+const getSecret = () => {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) throw new Error('Missing JWT_SECRET in environment variables');
+  return secret;
+};
+
 const generateToken = (payload) => {
-  return jwt.sign(payload, SECRET, {
+  return jwt.sign(payload, getSecret(), {
     expiresIn: '7d',
     issuer:    ISSUER,
   });
 };
 
 const verifyToken = (token) => {
-  return jwt.verify(token, SECRET, { issuer: ISSUER });
+  return jwt.verify(token, getSecret(), { issuer: ISSUER });
 };
 
 const extractToken = (req) => {
