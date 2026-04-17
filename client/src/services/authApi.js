@@ -1,10 +1,10 @@
-import api from "./api";
+import apiClient from "./apiClient";
 
 export const login = (email, password) =>
-  api.post("/api/auth/login", { email, password });
+  apiClient.post("/auth/login", { email, password });
 
 export const register = (payload) =>
-  api.post("/api/auth/register", payload);
+  apiClient.post("/auth/register", payload);
 
 export const getMe = () =>
-  api.get("/api/users/me");
+  apiClient.get("/auth/me");
