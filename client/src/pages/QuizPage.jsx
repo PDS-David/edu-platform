@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { ChevronLeft, Loader2, CheckCircle, XCircle, Sparkles } from 'lucide-react';
 import { UpgradeWall } from './PricingPage';
-import api from '../services/api';
+import api from '../services/apiClient';
 
 const LABELS = ['01', '02', '03', '04', '05'];
 

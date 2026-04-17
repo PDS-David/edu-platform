@@ -3,7 +3,7 @@
 //   <GamificationBar />
 
 import { useState, useEffect } from 'react';
-import api from '../services/api';
+import api from '../services/apiClient';
 import { Flame, Zap } from 'lucide-react';
 
 const BADGE_META = {

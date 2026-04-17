@@ -18,7 +18,7 @@
 //   GET  /api/users?role=student
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import api from '../services/api';
+import api from '../services/apiClient';
 import {
   Upload, FileText, Video, Music, Image, File,
   CheckCircle, AlertTriangle, X, Loader2,

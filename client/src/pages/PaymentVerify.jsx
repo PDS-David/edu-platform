@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import api from '../services/api';
+import api from '../services/apiClient';
 import {
   CheckCircle2, XCircle, Loader2, ChevronRight, RefreshCw
 } from 'lucide-react';

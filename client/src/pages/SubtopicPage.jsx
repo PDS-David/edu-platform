@@ -21,7 +21,7 @@ import {
 import TopNav from '../components/TopNav';
 import AIChatWidget from '../components/AIChatWidget';
 import QuizTab from '../components/QuizTab';
-import api from '../services/api';
+import api from '../services/apiClient';
 
 const LABELS = ['01', '02', '03', '04', '05'];
 

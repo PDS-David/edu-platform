@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import api from '../services/api';
+import api from '../services/apiClient';
 import { ChevronLeft, Loader2, CheckCircle, XCircle, Clock } from 'lucide-react';
 
 const LABELS     = ['01', '02', '03', '04', '05'];

@@ -9,7 +9,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import api from '../services/api';
+import api from '../services/apiClient';
 import { FileText, Download, Filter, Loader2, BookOpen } from 'lucide-react';
 import PublicNav from '../components/PublicNav';
 

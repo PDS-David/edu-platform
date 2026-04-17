@@ -4,7 +4,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import api from '../services/api';
+import api from '../services/apiClient';
 import {
   ArrowLeft, Pencil, Clock, ChevronLeft, ChevronRight,
   X, Flag, Upload, Sigma, Lightbulb, Sparkles,

@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import api from '../services/api';
+import api from '../services/apiClient';
 import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import PublicNav from '../components/PublicNav';
 

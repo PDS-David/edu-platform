@@ -16,7 +16,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, Loader2, ChevronRight, ChevronLeft } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import api from '../services/api';
+import api from '../services/apiClient';
 
 const GOALS = [
   { value: 5,   label: '5 questions',   note: 'Free plan',   color: 'border-gray-200' },

@@ -18,7 +18,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useRef } from 'react';
-import api from '../services/api';
+import api from '../services/apiClient';
 import {
   Plus, Pencil, Trash2, Loader2, Save, X,
   ChevronDown, ChevronUp, BookMarked, Lock,

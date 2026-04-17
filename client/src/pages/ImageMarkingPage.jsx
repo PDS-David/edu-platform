@@ -13,7 +13,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../services/api';
+import api from '../services/apiClient';
 
 // ── Grade colour helper ───────────────────────────────────────────────────────
 function gradeColor(grade) {

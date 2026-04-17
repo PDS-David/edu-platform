@@ -10,7 +10,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Link }                        from 'react-router-dom';
-import api                             from '../services/api';
+import api                             from '../services/apiClient';
 import TopNav                          from '../components/TopNav';
 import ConceptList                     from '../components/ConceptList';
 import {

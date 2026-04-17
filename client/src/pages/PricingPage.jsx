@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import api from '../services/api';
+import api from '../services/apiClient';
 import {
   Check, RotateCcw, ArrowLeft, Loader2, X,
   Trophy, Clock, Target
