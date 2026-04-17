@@ -1,6 +1,4 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { Mail, AlertCircle, CheckCircle, ArrowLeft } from "lucide-react";
 import PublicNav from "../components/PublicNav";
 import api from "../services/apiClient";
 
@@ -20,7 +18,7 @@ const ForgotPassword = () => {
 
       setSubmitted(true);
     } catch {
-      setSubmitted(true);
+      setSubmitted(true); // security-safe behavior
     } finally {
       setLoading(false);
     }
@@ -32,13 +30,16 @@ const ForgotPassword = () => {
 
       <div className="flex-1 flex items-center justify-center">
         {!submitted ? (
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} className="space-y-3">
             <input
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Email"
+              className="border p-2"
             />
-            <button disabled={loading}>Send Reset</button>
+            <button disabled={loading} className="bg-blue-600 text-white px-4 py-2">
+              Send Reset
+            </button>
           </form>
         ) : (
           <p>Check your email</p>
