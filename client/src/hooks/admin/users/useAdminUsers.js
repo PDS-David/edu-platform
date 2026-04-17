@@ -1,5 +1,5 @@
-import { useEffect, useCallback, useState } from 'react';
-import api from '../../../services/apiClient'; // ✅ FIX
+import { useState, useEffect, useCallback } from 'react';
+import api from '../../../services/apiClient';
 import { users as usersApi } from '../../../services/admin/adminApi';
 
 import useAdminToast from '../core/useAdminToast';
@@ -31,7 +31,7 @@ const useAdminUsers = () => {
 
   const loadStats = useCallback(async () => {
     const res = await request(() => usersApi.getStats(api));
-    if (res.ok) setStats(res.data); // ✅ FIX
+    if (res.ok) setStats(res.data);
   }, [request]);
 
   const loadUsers = useCallback(async () => {
@@ -45,8 +45,8 @@ const useAdminUsers = () => {
     );
 
     if (res.ok) {
-      setUsers(res.data || []);     // ✅ FIX
-      setTotal(res.meta?.total || 0); // ⚠️ depends on backend (see note below)
+      setUsers(res.data || []);
+      setTotal(res.meta?.total || 0);
     } else {
       setUsers([]);
     }
@@ -65,11 +65,9 @@ const useAdminUsers = () => {
     const res = await request(() =>
       usersApi.updateRole(api, userId, role)
     );
-
     res.ok
       ? showToast(`Role updated to ${role}`)
       : showToast(res.error, 'error');
-
     loadUsers();
   };
 
@@ -77,16 +75,14 @@ const useAdminUsers = () => {
     const res = await request(() =>
       usersApi.toggleActive(api, userId, !current)
     );
-
     res.ok
       ? showToast(current ? 'User deactivated' : 'User activated')
       : showToast(res.error, 'error');
-
     loadUsers();
   };
 
   const deleteUser = async (userId, email) => {
-    if (!window.confirm(`Delete ${email}? This cannot be undone.`)) return;
+    if (!window.confirm(`Delete ${email}?`)) return;
 
     const res = await request(() =>
       usersApi.deleteUser(api, userId)
@@ -122,8 +118,6 @@ const useAdminUsers = () => {
     roleFilter: filters.role,
     setSearch,
     setRoleFilter,
-
-    loading: false,
 
     changeRole,
     toggleActive,
