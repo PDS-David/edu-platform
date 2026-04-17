@@ -1,18 +1,64 @@
-// client/src/services/apiClient.js
 import axios from "axios";
 
+/**
+ * Unified Axios Client
+ * - Enforces /api prefix
+ * - Handles auth token
+ * - Normalizes responses
+ */
+
+const RAW_BASE =
+  import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+// ✅ ALWAYS append /api safely
+const API_BASE_URL = RAW_BASE.replace(/\/$/, "") + "/api";
+
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/api",
-  withCredentials: true,
+  baseURL: API_BASE_URL,
+  timeout: 30000,
 });
 
-// attach token automatically
-apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+// ─────────────────────────────────────────────
+// Request Interceptor → Attach Auth Token
+// ─────────────────────────────────────────────
+apiClient.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("token");
+
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// ─────────────────────────────────────────────
+// Response Interceptor → Normalize Responses
+// ─────────────────────────────────────────────
+apiClient.interceptors.response.use(
+  (response) => {
+    return {
+      data: response.data?.data ?? response.data,
+      meta: response.data?.meta ?? null,
+      status: response.status,
+    };
+  },
+  (error) => {
+    const normalizedError = {
+      message:
+        error?.response?.data?.error ||
+        error?.response?.data?.message ||
+        error.message ||
+        "Request failed",
+
+      status: error?.response?.status || 0,
+      raw: error,
+    };
+
+    return Promise.reject(normalizedError);
   }
-  return config;
-});
+);
 
 export default apiClient;

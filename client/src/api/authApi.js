@@ -1,29 +1,16 @@
-import api from './axios';
+import apiClient from '../services/apiClient';
 
-/**
- * LOGIN
- */
 export const login = async (email, password) => {
-  const res = await api.post('/auth/login', {
-    email,
-    password,
-  });
-
+  const res = await apiClient.post('/auth/login', { email, password });
   return res.data;
 };
 
-/**
- * REGISTER
- */
 export const register = async (payload) => {
-  const res = await api.post('/auth/register', payload);
+  const res = await apiClient.post('/auth/register', payload);
   return res.data;
 };
 
-/**
- * GET CURRENT USER
- */
 export const getMe = async () => {
-  const res = await api.get('/users/me');
+  const res = await apiClient.get('/auth/me');
   return res.data;
 };

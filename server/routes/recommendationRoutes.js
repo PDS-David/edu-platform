@@ -5,28 +5,15 @@ const router = express.Router();
 
 const { protect } = require('../middleware/auth');
 const recommendationService = require('../services/recommendationService');
+const { success, error } = require('../utils/response');
 
-// ─────────────────────────────────────────────
-// GET /api/recommendations
-// ─────────────────────────────────────────────
 router.get('/', protect, async (req, res) => {
   try {
-    const studentId = req.user.id;
-
-    const data = await recommendationService.getRecommendations(studentId);
-
-    return res.json({
-      success: true,
-      data,
-    });
+    const data = await recommendationService.getRecommendations(req.user.id);
+    return success(res, data);
 
   } catch (err) {
-    console.error('[RECOMMENDATIONS ERROR]', err.message);
-
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to generate recommendations',
-    });
+    return error(res, 'Failed to generate recommendations');
   }
 });
 

@@ -1,9 +1,8 @@
-import { createContext, useContext, useEffect, useState } from 'react';
-import * as authApi from '../api/authApi';
-import { setToken, getToken, clearToken } from '../utils/token';
+import { createContext, useContext, useEffect, useState } from "react";
+import * as authApi from "../api/authApi";
+import { setToken, getToken, clearToken } from "../utils/token";
 
 export const AuthContext = createContext(null);
-
 export const useAuth = () => useContext(AuthContext);
 
 export default function AuthProvider({ children }) {
@@ -13,39 +12,41 @@ export default function AuthProvider({ children }) {
   useEffect(() => {
     const init = async () => {
       const token = getToken();
-      if (!token) {
-        setLoading(false);
-        return;
-      }
+      if (!token) return setLoading(false);
+
       try {
         const res = await authApi.getMe();
-        const userData = res?.data?.user || res?.data || null;
-        setUser(userData);
-      } catch (err) {
+        setUser(res.user);
+      } catch {
         clearToken();
         setUser(null);
       } finally {
         setLoading(false);
       }
     };
+
     init();
   }, []);
 
   const login = async (email, password) => {
     const res = await authApi.login(email, password);
-    const token = res?.token;
-    const userData = res?.user;
-    if (token) setToken(token);
+
+    if (res.token) setToken(res.token);
+
+    const userData = res.user;
     setUser(userData);
+
     return userData;
   };
 
   const register = async (payload) => {
     const res = await authApi.register(payload);
-    const token = res?.token;
-    const userData = res?.user;
-    if (token) setToken(token);
+
+    if (res.token) setToken(res.token);
+
+    const userData = res.user;
     setUser(userData);
+
     return userData;
   };
 
