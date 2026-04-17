@@ -29,12 +29,11 @@ const SubjectCatalog = () => {
     setError(null);
 
     try {
-      const res = await api.get(
-        `/exam-boards/${selectedBoard}/subjects`
-      );
+      const res = await api.get(`/exam-boards/${selectedBoard}/subjects`);
 
-      setSubjects(res?.data || []);
-    } catch (err) {
+      const data = res?.data ?? [];
+      setSubjects(Array.isArray(data) ? data : []);
+    } catch {
       setError("Unable to load subjects. Please try again.");
       setSubjects([]);
     } finally {
@@ -53,7 +52,7 @@ const SubjectCatalog = () => {
 
       <main className="pt-6 pb-20 px-4">
         <div className="max-w-7xl mx-auto">
-          {/* header unchanged */}
+
           <div className="text-center mb-12">
             <h1 className="text-4xl font-extrabold text-gray-900 mb-4">
               Examinations
@@ -85,6 +84,7 @@ const SubjectCatalog = () => {
               ))}
             </div>
           )}
+
         </div>
       </main>
 
