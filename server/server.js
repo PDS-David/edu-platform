@@ -19,6 +19,18 @@ if (process.env.NODE_ENV !== 'production') {
   require('dotenv').config({ path: path.join(__dirname, '.env') });
 }
 
+// ─────────────────────────────────────────────
+// SAFE REQUIRE (FIX FOR YOUR CRASH)
+// ─────────────────────────────────────────────
+const safeRequire = (modulePath) => {
+  try {
+    return require(modulePath);
+  } catch (err) {
+    logger.warn(`Optional module missing: ${modulePath}`);
+    return null;
+  }
+};
+
 // APP
 const app = express();
 app.set('trust proxy', 1);
@@ -57,9 +69,9 @@ require('./config/database');
 // AUTH
 const { protect } = require('./middleware/auth');
 
-// ROUTES
+// ROUTES (SAFE LOADING)
 const authRoutes = safeRequire('./routes/authRoutes');
-const userRoutes = safeRequire('./routes/users'); // ✅ NEW
+const userRoutes = safeRequire('./routes/users');
 const subjectRoutes = safeRequire('./routes/subjectsRoutes');
 const topicsRoutes = safeRequire('./routes/topicsRoutes');
 const subtopicRoutes = safeRequire('./routes/subtopicRoutes');
@@ -70,7 +82,7 @@ const sessionRoutes = safeRequire('./routes/sessionRoutes');
 // MOUNT
 if (authRoutes) app.use('/api/auth', authRoutes);
 
-if (userRoutes) app.use('/api/users', userRoutes); // ✅ CENTRALIZED USERS
+if (userRoutes) app.use('/api/users', userRoutes);
 
 if (subjectRoutes) app.use('/api/subjects', protect, subjectRoutes);
 if (topicsRoutes) app.use('/api/topics', protect, topicsRoutes);
@@ -79,6 +91,7 @@ if (subtopicRoutes) app.use('/api/subtopics', protect, subtopicRoutes);
 if (weakTopicRoutes) app.use('/api/weak-topics', protect, weakTopicRoutes);
 if (recommendationRoutes) app.use('/api/recommendations', protect, recommendationRoutes);
 if (sessionRoutes) app.use('/api/sessions', protect, sessionRoutes);
+
 // HEALTH
 app.get('/health', (_req, res) => {
   return success(res, { data: { status: 'ok' } });
