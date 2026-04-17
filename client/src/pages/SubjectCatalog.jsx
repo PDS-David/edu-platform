@@ -1,14 +1,11 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Menu, X, BookOpen, Search, AlertCircle, RefreshCw } from "lucide-react";
 import ExamBoardSelector from "../components/ExamBoardSelector";
 import SubjectCard from "../components/SubjectCard";
-import branding from "../config/branding";
 import PublicNav from "../components/PublicNav";
 import api from "../services/apiClient";
 
 const SubjectCatalog = () => {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [selectedBoard, setSelectedBoard] = useState("");
   const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -16,12 +13,13 @@ const SubjectCatalog = () => {
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
-    if (selectedBoard) fetchSubjects();
-    else {
+    if (!selectedBoard) {
       setSubjects([]);
-      setLoading(false);
       setError(null);
+      return;
     }
+
+    fetchSubjects();
   }, [selectedBoard]);
 
   const fetchSubjects = async () => {
@@ -30,69 +28,50 @@ const SubjectCatalog = () => {
 
     try {
       const res = await api.get(`/exam-boards/${selectedBoard}/subjects`);
-
-      const data = res?.data ?? [];
-      setSubjects(Array.isArray(data) ? data : []);
-    } catch {
-      setError("Unable to load subjects. Please try again.");
+      setSubjects(res?.data || []);
+    } catch (err) {
+      setError(err?.message || "Unable to load subjects");
       setSubjects([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredSubjects = subjects.filter((subject) =>
-    subject.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    subject.description?.toLowerCase().includes(searchQuery.toLowerCase())
+  const filtered = subjects.filter((s) =>
+    s.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    s.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       <PublicNav />
 
-      <main className="pt-6 pb-20 px-4">
-        <div className="max-w-7xl mx-auto">
+      <main className="pt-6 pb-20 px-4 max-w-7xl mx-auto">
+        <h1 className="text-4xl font-bold mb-6">Examinations</h1>
 
-          <div className="text-center mb-12">
-            <h1 className="text-4xl font-extrabold text-gray-900 mb-4">
-              Examinations
-            </h1>
+        <ExamBoardSelector
+          selectedBoard={selectedBoard}
+          onBoardChange={(v) => {
+            setSelectedBoard(v);
+            setSearchQuery("");
+          }}
+        />
+
+        {loading && <p>Loading...</p>}
+        {error && <p className="text-red-500">{error}</p>}
+
+        {!loading && filtered.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+            {filtered.map((subject) => (
+              <SubjectCard
+                key={subject.id}
+                subject={subject}
+                examBoard={selectedBoard}
+              />
+            ))}
           </div>
-
-          <div className="bg-white rounded-2xl shadow-md p-6 mb-10">
-            <ExamBoardSelector
-              selectedBoard={selectedBoard}
-              onBoardChange={(v) => {
-                setSelectedBoard(v);
-                setSearchQuery("");
-              }}
-            />
-          </div>
-
-          {!loading && error && (
-            <div className="text-center text-red-500">{error}</div>
-          )}
-
-          {!loading && filteredSubjects.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-              {filteredSubjects.map((subject) => (
-                <SubjectCard
-                  key={subject.id}
-                  subject={subject}
-                  examBoard={selectedBoard}
-                />
-              ))}
-            </div>
-          )}
-
-        </div>
+        )}
       </main>
-
-      <footer className="bg-gray-900 text-gray-300 py-10 px-4">
-        <div className="max-w-7xl mx-auto flex justify-between">
-          <p>© 2026 AISchoolonair</p>
-        </div>
-      </footer>
     </div>
   );
 };
