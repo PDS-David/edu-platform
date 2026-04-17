@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, ChevronDown, ArrowRight, CheckCircle, Circle } from 'lucide-react';
-import api from '../../services/api';
+import api from '../../services/apiClient';
 
 
 

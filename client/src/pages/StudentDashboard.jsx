@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate, Outlet, useLocation } from "react-router-dom";
 import TopNav from "../components/TopNav";
-import api from "../services/api";
+import api from "../services/apiClient";
 
 export default function StudentDashboard() {
   const { user } = useAuth();

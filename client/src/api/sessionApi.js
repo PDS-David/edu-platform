@@ -1,4 +1,4 @@
-import api from '../services/api';
+import api from '../services/apiClient';
 
 export const sessionApi = {
   getSessions: () => api.get('/sessions'),
