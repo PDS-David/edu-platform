@@ -2,37 +2,34 @@
  * useCatalog.js  (src/hooks/useCatalog.js)
  * ─────────────────────────────────────────────────────────────────────────────
  * Shared hook providing:
- *   • examTypes            – all active exam types from /catalog/types
- *   • fetchSubjectsForType – fetches subjects per type (caches NON-EMPTY results only)
- *   • subjectCache         – { [typeId]: Subject[] }
+ *   • examTypes
+ *   • fetchSubjectsForType
+ *   • subjectCache
  *   • loadingTypes / loadingSubject
- *   • invalidateCache      – call after adding/editing subjects in CatalogPanel
- *
- * Cache rules:
- *   - Exam types: cached for the browser session (set once, never stale)
- *   - Subjects:   cached ONLY when the API returns ≥1 subjects.
- *                 Empty results are NOT cached — adding a subject and then
- *                 re-selecting the same exam type always triggers a fresh fetch.
+ *   • invalidateCache
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import api from '../api/axios';
+import http from '../services/api';
 
-// ── Module-level store (survives re-renders and re-mounts) ────────────────────
+// ── Module-level store ───────────────────────────────────────────────────────
 let _examTypesCache = null;
-let _subjectCache   = {};
-const _inFlight     = new Set();
+let _subjectCache = {};
+const _inFlight = new Set();
 
 export function useCatalog() {
-  const [examTypes,      setExamTypes]      = useState(_examTypesCache || []);
-  const [loadingTypes,   setLoadingTypes]   = useState(_examTypesCache === null);
-  const [subjectCache,   setSubjectCache]   = useState({ ..._subjectCache });
+  const [examTypes, setExamTypes] = useState(_examTypesCache || []);
+  const [loadingTypes, setLoadingTypes] = useState(_examTypesCache === null);
+  const [subjectCache, setSubjectCache] = useState({ ..._subjectCache });
   const [loadingSubject, setLoadingSubject] = useState(false);
+
   const mounted = useRef(true);
 
   useEffect(() => {
     mounted.current = true;
-    return () => { mounted.current = false; };
+    return () => {
+      mounted.current = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -43,14 +40,15 @@ export function useCatalog() {
     }
 
     let cancelled = false;
+
     (async () => {
       try {
-        const res  = await api.get('/catalog/types');
-        const list = res?.success ? (res.data || []) : [];
-        _examTypesCache = list;
+        const list = await http.get('/catalog/types');
+
+        _examTypesCache = list || [];
 
         if (!cancelled && mounted.current) {
-          setExamTypes(list);
+          setExamTypes(_examTypesCache);
           setLoadingTypes(false);
         }
       } catch {
@@ -59,14 +57,16 @@ export function useCatalog() {
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const fetchSubjectsForType = useCallback(async (typeId) => {
     if (!typeId) return [];
 
-    if (_subjectCache[typeId] && _subjectCache[typeId].length > 0) {
-      setSubjectCache(c => ({ ...c, [typeId]: _subjectCache[typeId] }));
+    if (_subjectCache[typeId]?.length > 0) {
+      setSubjectCache((c) => ({ ...c, [typeId]: _subjectCache[typeId] }));
       return _subjectCache[typeId];
     }
 
@@ -76,17 +76,19 @@ export function useCatalog() {
     if (mounted.current) setLoadingSubject(true);
 
     try {
-      const res = await api.get(`/catalog/types/${typeId}/subjects`);
-      const subjects = res?.success ? (res.data || []) : [];
+      const subjects = await http.get(
+        `/catalog/types/${typeId}/subjects`
+      );
 
-      if (subjects.length > 0) {
+      if (subjects?.length > 0) {
         _subjectCache[typeId] = subjects;
+
         if (mounted.current) {
-          setSubjectCache(c => ({ ...c, [typeId]: subjects }));
+          setSubjectCache((c) => ({ ...c, [typeId]: subjects }));
         }
       }
 
-      return subjects;
+      return subjects || [];
     } catch {
       return [];
     } finally {
@@ -98,14 +100,16 @@ export function useCatalog() {
   const invalidateCache = useCallback((typeId) => {
     if (typeId !== undefined) {
       delete _subjectCache[typeId];
-      setSubjectCache(c => {
+
+      setSubjectCache((c) => {
         const next = { ...c };
         delete next[typeId];
         return next;
       });
     } else {
       _examTypesCache = null;
-      _subjectCache   = {};
+      _subjectCache = {};
+
       setExamTypes([]);
       setSubjectCache({});
       setLoadingTypes(true);
@@ -117,12 +121,12 @@ export function useCatalog() {
     if (mounted.current) setLoadingTypes(true);
 
     try {
-      const res  = await api.get('/catalog/types');
-      const list = res?.success ? (res.data || []) : [];
-      _examTypesCache = list;
+      const list = await http.get('/catalog/types');
+
+      _examTypesCache = list || [];
 
       if (mounted.current) {
-        setExamTypes(list);
+        setExamTypes(_examTypesCache);
         setLoadingTypes(false);
       }
     } catch {
