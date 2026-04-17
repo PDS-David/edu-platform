@@ -1,10 +1,15 @@
 'use strict';
+// server/routes/resourceRoutes.js
+// Aligned to real DB schema (migration_003.sql):
+//   resources(id UUID, title, resource_type VARCHAR(50), file_url, file_size_bytes,
+//             topic_id, subject_id, subtopic_id, uploaded_by, is_free, created_at)
+// Extra columns added idempotently: is_staged, is_active, original_filename, mime_type, updated_at
 
-const express = require('express');
-const router = express.Router();
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
+const express  = require('express');
+const router   = express.Router();
+const multer   = require('multer');
+const path     = require('path');
+const fs       = require('fs');
 const { QueryTypes } = require('sequelize');
 const sequelize = require('../config/database');
 const { protect, authorize } = require('../middleware/auth');
@@ -27,30 +32,22 @@ const upload = multer({ storage, limits: { fileSize: 500 * 1024 * 1024 } }); // 
 
 /* ================================
    ENSURE EXTRA COLUMNS
-   Runs once per request that needs it; IF NOT EXISTS makes it idempotent.
+   Adds columns that exist in our code but weren't in the original migration.
+   IF NOT EXISTS makes every ALTER idempotent — safe to call on every request.
 ================================ */
 
+let columnsEnsured = false; // module-level flag — only run once per process startup
 async function ensureExtraColumns() {
+  if (columnsEnsured) return;
   const alters = [
-    `ALTER TABLE resources ADD COLUMN IF NOT EXISTS is_staged         BOOLEAN       DEFAULT false`,
-    `ALTER TABLE resources ADD COLUMN IF NOT EXISTS is_active         BOOLEAN       DEFAULT true`,
-    `ALTER TABLE resources ADD COLUMN IF NOT EXISTS is_free           BOOLEAN       DEFAULT true`,
+    `ALTER TABLE resources ADD COLUMN IF NOT EXISTS is_staged         BOOLEAN      DEFAULT false`,
+    `ALTER TABLE resources ADD COLUMN IF NOT EXISTS is_active         BOOLEAN      DEFAULT true`,
     `ALTER TABLE resources ADD COLUMN IF NOT EXISTS original_filename VARCHAR(255)`,
-    // file_size_bytes is the canonical name used by the frontend
-    `ALTER TABLE resources ADD COLUMN IF NOT EXISTS file_size_bytes   BIGINT`,
     `ALTER TABLE resources ADD COLUMN IF NOT EXISTS mime_type         VARCHAR(120)`,
-    `ALTER TABLE resources ADD COLUMN IF NOT EXISTS uploaded_by       UUID`,
-    `ALTER TABLE resources ADD COLUMN IF NOT EXISTS updated_at        TIMESTAMPTZ   DEFAULT NOW()`,
-    `ALTER TABLE resources ADD COLUMN IF NOT EXISTS subject_id        UUID`,
-    // resource_type mirrors type so legacy queries still work
-    `ALTER TABLE resources ADD COLUMN IF NOT EXISTS resource_type     VARCHAR(50)`,
+    `ALTER TABLE resources ADD COLUMN IF NOT EXISTS updated_at        TIMESTAMPTZ  DEFAULT NOW()`,
   ];
   for (const sql of alters) await sequelize.query(sql).catch(() => {});
-
-  // Back-fill resource_type from type for any existing rows
-  await sequelize.query(
-    `UPDATE resources SET resource_type = type WHERE resource_type IS NULL AND type IS NOT NULL`
-  ).catch(() => {});
+  columnsEnsured = true;
 }
 
 async function ensureAssignmentsTable() {
@@ -63,6 +60,21 @@ async function ensureAssignmentsTable() {
       UNIQUE(resource_id, user_id)
     )
   `).catch(() => {});
+}
+
+/* ================================
+   HELPER — map file extension → resource_type value
+   Only values that are safe for a VARCHAR(50) column (no enum constraint).
+================================ */
+function guessResourceType(originalname) {
+  const ext = path.extname(originalname).toLowerCase();
+  if (['.mp4', '.mov', '.webm', '.avi'].includes(ext))           return 'video';
+  if (['.mp3', '.wav', '.ogg', '.m4a', '.aac'].includes(ext))   return 'audio';
+  if (ext === '.pdf')                                             return 'pdf';
+  if (['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(ext)) return 'image';
+  if (['.doc', '.docx'].includes(ext))                           return 'document';
+  if (['.ppt', '.pptx'].includes(ext))                           return 'presentation';
+  return 'document'; // safe default — resource_type has DEFAULT 'document' in schema
 }
 
 /* ================================
@@ -86,35 +98,31 @@ router.post(
 
     for (const file of req.files) {
       try {
-        const ext  = path.extname(file.originalname).toLowerCase();
-        const type = ['.mp4', '.mov', '.webm'].includes(ext)             ? 'video'
-                   : ['.mp3', '.wav', '.ogg', '.m4a'].includes(ext)      ? 'audio'
-                   : ext === '.pdf'                                        ? 'pdf'
-                   : ['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(ext) ? 'image'
-                   : 'document';
-
-        // url is the canonical column; resource_type mirrors type for backward-compat
-        const fileUrl = `/uploads/resources/${file.filename}`;
+        const resourceType = guessResourceType(file.originalname);
+        const fileUrl      = `/uploads/resources/${file.filename}`;
+        const ext          = path.extname(file.originalname);
 
         const rows = await sequelize.query(`
           INSERT INTO resources
-            (title, url, type, resource_type, original_filename,
-             file_size_bytes, mime_type, is_staged, is_active, is_free,
+            (title, resource_type, file_url, file_size_bytes,
+             original_filename, mime_type,
+             is_staged, is_active, is_free,
              uploaded_by, created_at, updated_at)
           VALUES
-            (:title, :url, :type, :type, :original_filename,
-             :file_size_bytes, :mime_type, true, true, true,
+            (:title, :resource_type, :file_url, :file_size_bytes,
+             :original_filename, :mime_type,
+             true, true, true,
              :uploaded_by, NOW(), NOW())
           RETURNING
-            id, title, url, type, resource_type,
-            is_staged, original_filename, file_size_bytes, created_at
+            id, title, resource_type, file_url,
+            file_size_bytes, original_filename, is_staged, created_at
         `, {
           replacements: {
             title:             path.basename(file.originalname, ext),
-            url:               fileUrl,
-            type,
-            original_filename: file.originalname,
+            resource_type:     resourceType,
+            file_url:          fileUrl,
             file_size_bytes:   file.size,
+            original_filename: file.originalname,
             mime_type:         file.mimetype,
             uploaded_by:       req.user.id,
           },
@@ -123,12 +131,13 @@ router.post(
 
         uploaded.push(rows[0]);
       } catch (err) {
+        console.error('[bulk-upload] file error:', file.originalname, err.message);
         failed.push({ filename: file.originalname, error: err.message });
       }
     }
 
     return res.json({
-      success:  true,
+      success:  uploaded.length > 0,
       uploaded: uploaded.length,
       failed:   failed.length,
       failures: failed,
@@ -149,17 +158,18 @@ router.get('/staged', protect, authorize('admin', 'teacher'), async (req, res) =
       SELECT
         r.id,
         r.title,
-        r.url,
-        COALESCE(r.resource_type, r.type) AS type,
+        r.file_url,
+        r.resource_type                              AS type,
         r.original_filename,
         r.file_size_bytes,
         r.is_staged,
         r.created_at,
-        t.name  AS topic_name,
-        s.name  AS subject_name
+        t.name                                       AS topic_name,
+        COALESCE(s2.name, s1.name)                  AS subject_name
       FROM resources r
-      LEFT JOIN topics   t ON r.topic_id   = t.id
-      LEFT JOIN subjects s ON s.id         = COALESCE(r.subject_id, t.subject_id)
+      LEFT JOIN topics   t  ON t.id  = r.topic_id
+      LEFT JOIN subjects s1 ON s1.id = t.subject_id
+      LEFT JOIN subjects s2 ON s2.id = r.subject_id
       WHERE COALESCE(r.is_staged, false) = true
         AND COALESCE(r.is_active, true)  = true
       ORDER BY r.created_at DESC
@@ -167,6 +177,7 @@ router.get('/staged', protect, authorize('admin', 'teacher'), async (req, res) =
 
     return res.json({ success: true, count: rows.length, data: rows });
   } catch (err) {
+    console.error('[GET /resources/staged]', err.message);
     return res.json({ success: true, count: 0, data: [], _error: err.message });
   }
 });
@@ -194,7 +205,7 @@ router.put('/:id/assign-meta', protect, authorize('admin', 'teacher'), async (re
     `, {
       replacements: {
         id,
-        title:       title || null,
+        title:       title       || null,
         topic_id:    topic_id    || null,
         subtopic_id: subtopic_id || null,
         subject_id:  subject_id  || null,
@@ -204,6 +215,7 @@ router.put('/:id/assign-meta', protect, authorize('admin', 'teacher'), async (re
 
     return res.json({ success: true, message: 'Resource metadata updated' });
   } catch (err) {
+    console.error('[PUT /resources/:id/assign-meta]', err.message);
     return res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -222,8 +234,9 @@ router.put('/:id/assign-users', protect, authorize('admin', 'teacher'), async (r
     if (assign_all) {
       await sequelize.query(`
         INSERT INTO resource_user_assignments (resource_id, user_id)
-        SELECT :resource_id, id FROM users
-        WHERE role = 'student' AND COALESCE(is_active, true) = true
+        SELECT :resource_id, u.id FROM users u
+        WHERE u.role = 'student'
+          AND COALESCE(u.is_active, true) = true
         ON CONFLICT (resource_id, user_id) DO NOTHING
       `, { replacements: { resource_id: id }, type: QueryTypes.INSERT });
     } else {
@@ -235,12 +248,14 @@ router.put('/:id/assign-users', protect, authorize('admin', 'teacher'), async (r
           INSERT INTO resource_user_assignments (resource_id, user_id)
           VALUES (:resource_id, :user_id)
           ON CONFLICT (resource_id, user_id) DO NOTHING
-        `, { replacements: { resource_id: id, user_id: uid }, type: QueryTypes.INSERT }).catch(() => {});
+        `, { replacements: { resource_id: id, user_id: uid }, type: QueryTypes.INSERT })
+          .catch(() => {}); // skip individual FK failures gracefully
       }
     }
 
     return res.json({ success: true, message: 'Resource assigned to users' });
   } catch (err) {
+    console.error('[PUT /resources/:id/assign-users]', err.message);
     return res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -278,24 +293,25 @@ router.get('/', protect, async (req, res) => {
       SELECT
         r.id,
         r.title,
-        r.url,
-        COALESCE(r.resource_type, r.type) AS type,
+        r.file_url,
+        r.resource_type                              AS type,
         r.topic_id,
         r.subtopic_id,
         r.subject_id,
         r.is_staged,
         r.file_size_bytes,
-        s.name AS subject_name
+        COALESCE(s2.name, s1.name)                  AS subject_name
       FROM resources r
-      LEFT JOIN topics   t ON r.topic_id   = t.id
-      LEFT JOIN subjects s ON s.id         = COALESCE(r.subject_id, t.subject_id)
+      LEFT JOIN topics   t  ON t.id  = r.topic_id
+      LEFT JOIN subjects s1 ON s1.id = t.subject_id
+      LEFT JOIN subjects s2 ON s2.id = r.subject_id
       WHERE ${filters.join(' AND ')}
       ORDER BY r.created_at DESC
     `, { replacements, type: QueryTypes.SELECT });
 
     return res.json({ success: true, count: rows.length, data: rows });
   } catch (err) {
-    console.error('[resourceRoutes GET /]', err.message);
+    console.error('[GET /resources]', err.message);
     return res.json({ success: true, count: 0, data: [] });
   }
 });
