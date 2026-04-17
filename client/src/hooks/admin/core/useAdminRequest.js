@@ -2,8 +2,8 @@ import { useState, useCallback } from 'react';
 
 /**
  * Standard request wrapper:
- * - normalizes backend { success, data, error }
- * - prevents duplicated try/catch in domain hooks
+ * - works with apiClient normalized response
+ * - returns ONLY payload in data
  */
 const useAdminRequest = () => {
   const [loading, setLoading] = useState(false);
@@ -12,11 +12,16 @@ const useAdminRequest = () => {
     setLoading(true);
     try {
       const res = await fn();
-      return { ok: true, data: res };
+
+      return {
+        ok: true,
+        data: res.data,   // ✅ FIX: extract ONCE here
+        meta: res.meta || null,
+      };
     } catch (err) {
       return {
         ok: false,
-        error: err?.error || err?.message || 'Request failed',
+        error: err?.message || 'Request failed', // ✅ FIX
       };
     } finally {
       setLoading(false);
