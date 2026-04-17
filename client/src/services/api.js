@@ -1,59 +1,47 @@
 import axios from "axios";
 
-const API_BASE =
-  (import.meta.env.VITE_API_URL || "http://localhost:5000")
-    .replace(/\/$/, "");
+const API_BASE_URL =
+  (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/$/, "");
 
-/**
- * IMPORTANT:
- * backend already uses /api prefix in Express routes
- */
 const api = axios.create({
-  baseURL: API_BASE,
-  withCredentials: true,
+  baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },
+  withCredentials: true,
 });
 
 /**
- * REQUEST INTERCEPTOR
+ * REQUEST: attach token
  */
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
-
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-
+  if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
 /**
- * RESPONSE INTERCEPTOR
- * DO NOT unwrap data aggressively (prevents hidden bugs)
+ * RESPONSE: DO NOT over-transform (prevents hidden bugs)
  */
 api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    const normalizedError = {
+  (res) => res.data,
+  (err) => {
+    const error = {
       message:
-        error?.response?.data?.message ||
-        error?.response?.data?.error ||
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err.message ||
         "Network error",
-      status: error?.response?.status,
-      data: error?.response?.data,
+      status: err?.response?.status,
+      data: err?.response?.data,
     };
 
-    if (error?.response?.status === 401) {
+    if (error.status === 401) {
       localStorage.removeItem("token");
     }
 
-    return Promise.reject(normalizedError);
+    return Promise.reject(error);
   }
 );
 
-/**
- * SINGLE EXPORT (SOURCE OF TRUTH)
- */
 export default api;
