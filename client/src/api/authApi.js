@@ -1,29 +1,12 @@
-import api from '../services/api'; // ✅ FIXED PATH
+// client/src/api/authApi.js
 
-/**
- * LOGIN
- */
-export const login = async (email, password) => {
-  const res = await api.post('/api/auth/login', {
-    email,
-    password,
-  });
+import api from '../services/api';
 
-  return res.data;
-};
+export const login = (email, password) =>
+  api.post('/auth/login', { email, password });
 
-/**
- * REGISTER
- */
-export const register = async (payload) => {
-  const res = await api.post('/api/auth/register', payload);
-  return res.data;
-};
+export const register = (payload) =>
+  api.post('/auth/register', payload);
 
-/**
- * GET CURRENT USER
- */
-export const getMe = async () => {
-  const res = await api.get('/api/users/me');
-  return res.data;
-};
+export const getMe = () =>
+  api.get('/users/me');
