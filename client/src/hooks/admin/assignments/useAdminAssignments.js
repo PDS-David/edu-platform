@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import api from '../../../services/api';
+import api from '../../../services/apiClient'; // ✅ FIX
+
 import { assignments as assignmentsApi } from '../../../services/admin/adminApi';
 
 import useAdminToast from '../core/useAdminToast';
@@ -32,15 +33,12 @@ const useAdminAssignments = () => {
   const [loadingSubjects, setLoadingSubjects] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // ─────────────────────────────────────────────
-  // LOAD CORE DATA (backend-driven)
-  // ─────────────────────────────────────────────
   const loadCore = useCallback(async () => {
     const res = await request(() =>
       assignmentsApi.getAll(api)
     );
 
-    if (res.ok) setAssignments(res.data?.data ?? []);
+    if (res.ok) setAssignments(res.data || []); // ✅ FIX
   }, [request]);
 
   const loadTeachers = useCallback(async () => {
@@ -48,7 +46,7 @@ const useAdminAssignments = () => {
       assignmentsApi.getTeachers(api)
     );
 
-    if (res.ok) setTeachers(res.data?.data ?? []);
+    if (res.ok) setTeachers(res.data || []); // ✅ FIX
   }, [request]);
 
   const loadExamTypes = useCallback(async () => {
@@ -56,7 +54,7 @@ const useAdminAssignments = () => {
       assignmentsApi.getExamTypes(api)
     );
 
-    if (res.ok) setExamTypes(res.data?.data ?? []);
+    if (res.ok) setExamTypes(res.data || []); // ✅ FIX
   }, [request]);
 
   useEffect(() => {
@@ -65,9 +63,6 @@ const useAdminAssignments = () => {
     loadExamTypes();
   }, []);
 
-  // ─────────────────────────────────────────────
-  // SUBJECT LOADING (backend contract aligned)
-  // ─────────────────────────────────────────────
   const loadSubjectsByExamType = useCallback(async (examTypeId) => {
     if (!examTypeId) return;
 
@@ -78,7 +73,7 @@ const useAdminAssignments = () => {
     );
 
     if (res.ok) {
-      setSubjects(res.data?.data ?? []);
+      setSubjects(res.data || []); // ✅ FIX
     } else {
       showToast(res.error, 'error');
     }
@@ -86,9 +81,6 @@ const useAdminAssignments = () => {
     setLoadingSubjects(false);
   }, [request, showToast]);
 
-  // ─────────────────────────────────────────────
-  // FORM HANDLERS
-  // ─────────────────────────────────────────────
   const openModal = () => {
     setForm(INITIAL_FORM);
     setSelectedSubjectIds([]);
@@ -116,9 +108,6 @@ const useAdminAssignments = () => {
     );
   };
 
-  // ─────────────────────────────────────────────
-  // SAVE (bulk assignment creation)
-  // ─────────────────────────────────────────────
   const handleSave = async () => {
     const { teacher_id, exam_type_id } = form;
 
@@ -148,9 +137,6 @@ const useAdminAssignments = () => {
     setSaving(false);
   };
 
-  // ─────────────────────────────────────────────
-  // REMOVE
-  // ─────────────────────────────────────────────
   const handleRemove = async (id) => {
     if (!window.confirm('Remove assignment?')) return;
 
@@ -167,20 +153,17 @@ const useAdminAssignments = () => {
   };
 
   return {
-    // data
     assignments,
     teachers,
     examTypes,
     subjects,
 
-    // UI state
     showModal,
     form,
     selectedSubjectIds,
     loadingSubjects,
     saving,
 
-    // actions
     openModal,
     closeModal,
     setFormField,
@@ -191,7 +174,6 @@ const useAdminAssignments = () => {
 
     refetch: loadCore,
 
-    // toast
     toast,
     clearToast,
   };
