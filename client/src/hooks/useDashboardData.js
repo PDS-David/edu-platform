@@ -3,7 +3,7 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
-import api from "../services/api";
+import api from "../services/apiClient";
 
 export default function useDashboardData() {
   const summary = useQuery({

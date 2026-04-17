@@ -1,6 +1,6 @@
 // client/src/api/analyticsApi.js
 
-import api from '../services/api';
+import api from '../services/apiClient';
 
 export const analyticsApi = {
   getSummary: () => api.get('/analytics/summary'),

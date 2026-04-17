@@ -10,7 +10,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import api from '../../services/api';
+import api from '../../services/apiClient';
 import { users as usersApi } from '../../services/admin/adminApi';
 
 const PAGE_LIMIT = 20;

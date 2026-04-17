@@ -1,6 +1,6 @@
 // client/src/api/admin/adminUsers.api.js
 
-import api from '../../services/api';
+import api from '../../services/apiClient';
 
 export const adminUsersApi = {
   getUsers: async ({ page = 1, limit = 20, search = '', role = '' }) => {

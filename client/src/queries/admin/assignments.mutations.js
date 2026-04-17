@@ -3,7 +3,7 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '../../services/api';
+import api from '../../services/apiClient';
 import { assignments as assignmentsApi } from '../../services/admin/adminApi';
 import { adminKeys } from './admin.queryKeys';
 
