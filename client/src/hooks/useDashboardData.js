@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import api from "../api/axios";
+import api from "../services/api";
 
 export default function useDashboardData() {
   const summary = useQuery({
