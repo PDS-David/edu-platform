@@ -1,22 +1,23 @@
-/**
- * client/src/services/api.js
- * ─────────────────────────────────────────────────────────────
- * SINGLE SOURCE OF TRUTH HTTP CLIENT (DO NOT DUPLICATE)
- */
+// client/src/services/api.js
 
 import axios from "axios";
 
-const BASE_URL =
-  (import.meta.env.VITE_API_URL || "http://localhost:5000") // NOTE: no /api here
-    .replace(/\/$/, "");
-
 /**
- * IMPORTANT:
- * Backend already mounts /api in Express routes.
- * So we append /api here centrally.
+ * SINGLE SOURCE OF TRUTH HTTP CLIENT
+ * ALL requests MUST go through here
  */
+
+const BASE_URL =
+  (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/$/, "");
+
+// IMPORTANT:
+// Ensure we NEVER double-append /api
+const API_BASE = BASE_URL.endsWith("/api")
+  ? BASE_URL
+  : `${BASE_URL}/api`;
+
 const api = axios.create({
-  baseURL: `${BASE_URL}/api`,
+  baseURL: API_BASE,
   withCredentials: true,
   headers: {
     "Content-Type": "application/json",
@@ -24,45 +25,28 @@ const api = axios.create({
 });
 
 /**
- * REQUEST INTERCEPTOR
+ * Attach token
  */
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
-
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-
+  if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
 /**
- * RESPONSE INTERCEPTOR
- * Normalize shape consistently:
- * return { data, status }
+ * Normalize response
  */
 api.interceptors.response.use(
-  (response) => {
-    return {
-      data: response.data?.data ?? response.data,
-      status: response.status,
-    };
-  },
+  (response) => response.data,
   (error) => {
-    const normalizedError = {
+    return Promise.reject({
       message:
         error?.response?.data?.message ||
         error?.response?.data?.error ||
         "Network error",
       status: error?.response?.status,
-      raw: error,
-    };
-
-    if (error?.response?.status === 401) {
-      localStorage.removeItem("token");
-    }
-
-    return Promise.reject(normalizedError);
+      data: error?.response?.data,
+    });
   }
 );
 
