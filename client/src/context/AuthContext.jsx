@@ -1,9 +1,8 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import * as authApi from "../services/authApi";
+import * as authApi from "../api/authApi";
 import { setToken, getToken, clearToken } from "../utils/token";
 
 export const AuthContext = createContext(null);
-
 export const useAuth = () => useContext(AuthContext);
 
 export default function AuthProvider({ children }) {
@@ -16,8 +15,8 @@ export default function AuthProvider({ children }) {
       if (!token) return setLoading(false);
 
       try {
-        const user = await authApi.getMe();
-        setUser(user);
+        const res = await authApi.getMe();
+        setUser(res.user);
       } catch {
         clearToken();
         setUser(null);
@@ -32,19 +31,23 @@ export default function AuthProvider({ children }) {
   const login = async (email, password) => {
     const res = await authApi.login(email, password);
 
-    if (res?.token) setToken(res.token);
-    setUser(res?.user);
+    if (res.token) setToken(res.token);
 
-    return res?.user;
+    const userData = res.user;
+    setUser(userData);
+
+    return userData;
   };
 
   const register = async (payload) => {
     const res = await authApi.register(payload);
 
-    if (res?.token) setToken(res.token);
-    setUser(res?.user);
+    if (res.token) setToken(res.token);
 
-    return res?.user;
+    const userData = res.user;
+    setUser(userData);
+
+    return userData;
   };
 
   const logout = () => {
