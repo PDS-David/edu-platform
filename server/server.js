@@ -58,18 +58,27 @@ require('./config/database');
 const { protect } = require('./middleware/auth');
 
 // ROUTES
-app.use('/api/auth', require('./routes/authRoutes'));
-app.use('/api/users', protect, require('./routes/users'));
-app.use('/api/admin', protect, require('./routes/adminRoutes'));
+const authRoutes = safeRequire('./routes/authRoutes');
+const userRoutes = safeRequire('./routes/users'); // ✅ NEW
+const subjectRoutes = safeRequire('./routes/subjectsRoutes');
+const topicsRoutes = safeRequire('./routes/topicsRoutes');
+const subtopicRoutes = safeRequire('./routes/subtopicRoutes');
+const weakTopicRoutes = safeRequire('./routes/weakTopicRoutes');
+const recommendationRoutes = safeRequire('./routes/recommendationRoutes');
+const sessionRoutes = safeRequire('./routes/sessionRoutes');
 
-app.use('/api/subjects', protect, require('./routes/subjectsRoutes'));
-app.use('/api/topics', protect, require('./routes/topicsRoutes'));
-app.use('/api/subtopics', protect, require('./routes/subtopicRoutes'));
+// MOUNT
+if (authRoutes) app.use('/api/auth', authRoutes);
 
-app.use('/api/weak-topics', protect, require('./routes/weakTopicRoutes'));
-app.use('/api/recommendations', protect, require('./routes/recommendationRoutes'));
-app.use('/api/sessions', protect, require('./routes/sessionRoutes'));
+if (userRoutes) app.use('/api/users', userRoutes); // ✅ CENTRALIZED USERS
 
+if (subjectRoutes) app.use('/api/subjects', protect, subjectRoutes);
+if (topicsRoutes) app.use('/api/topics', protect, topicsRoutes);
+if (subtopicRoutes) app.use('/api/subtopics', protect, subtopicRoutes);
+
+if (weakTopicRoutes) app.use('/api/weak-topics', protect, weakTopicRoutes);
+if (recommendationRoutes) app.use('/api/recommendations', protect, recommendationRoutes);
+if (sessionRoutes) app.use('/api/sessions', protect, sessionRoutes);
 // HEALTH
 app.get('/health', (_req, res) => {
   return success(res, { data: { status: 'ok' } });
