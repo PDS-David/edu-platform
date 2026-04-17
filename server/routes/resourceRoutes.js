@@ -44,18 +44,6 @@ async function ensureExtraColumns() {
   columnsEnsured = true;
 }
 
-async function ensureAssignmentsTable() {
-  await sequelize.query(`
-    CREATE TABLE IF NOT EXISTS resource_user_assignments (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      resource_id UUID NOT NULL,
-      user_id UUID NOT NULL,
-      assigned_at TIMESTAMPTZ DEFAULT NOW(),
-      UNIQUE(resource_id, user_id)
-    )
-  `).catch(() => {});
-}
-
 /* ================================
    HELPER
 ================================ */
@@ -198,23 +186,284 @@ router.post(
 );
 
 /* ================================
-   GET RESOURCES
+   ENSURE resource_assignments TABLE
+   (uses INTEGER resource_id to match resources.id SERIAL)
+================================ */
+
+let raEnsured = false;
+async function ensureResourceAssignments() {
+  if (raEnsured) return;
+  await sequelize.query(`
+    CREATE TABLE IF NOT EXISTS resource_assignments (
+      id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+      resource_id  INTEGER     NOT NULL REFERENCES resources(id) ON DELETE CASCADE,
+      assigned_by  UUID        NOT NULL REFERENCES users(id),
+      student_id   UUID        REFERENCES users(id)  ON DELETE CASCADE,
+      class_id     UUID        REFERENCES classes(id) ON DELETE CASCADE,
+      push_type    VARCHAR(50) NOT NULL DEFAULT 'learning_material',
+      assigned_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      CONSTRAINT ra_must_have_target CHECK (student_id IS NOT NULL OR class_id IS NOT NULL)
+    )
+  `).catch(() => {});
+  await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_ra_student ON resource_assignments(student_id)`).catch(() => {});
+  await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_ra_class   ON resource_assignments(class_id)`).catch(() => {});
+  raEnsured = true;
+}
+
+/* ================================
+   GET RESOURCES  (teacher — own uploads only)
 ================================ */
 
 router.get('/', protect, async (req, res) => {
   await ensureExtraColumns();
-
   try {
+    // Teachers see only their own; admins see all
+    const isAdmin = req.user.role === 'admin';
     const rows = await sequelize.query(`
-      SELECT r.id, r.title, r.file_url
+      SELECT r.id, r.title, r.file_url, r.resource_type AS type, r.resource_type,
+             r.file_size_bytes, r.original_filename, r.is_staged, r.push_type,
+             r.created_at, r.uploaded_by,
+             s.name  AS subject_name,
+             st.name AS subtopic_name
       FROM resources r
+      LEFT JOIN subtopics st ON st.id = r.subtopic_id
+      LEFT JOIN topics     t  ON t.id  = st.topic_id
+      LEFT JOIN subjects   s  ON s.id  = t.subject_id
       WHERE COALESCE(r.is_active, true) = true
+        AND (:isAdmin OR r.uploaded_by = :userId)
       ORDER BY r.created_at DESC
-    `, { type: QueryTypes.SELECT });
-
+    `, {
+      replacements: { isAdmin, userId: req.user.id },
+      type: QueryTypes.SELECT,
+    });
     return res.json({ success: true, data: rows });
   } catch (err) {
     return res.json({ success: true, data: [] });
+  }
+});
+
+/* ================================
+   GET /staged  — staged files awaiting metadata assignment
+================================ */
+
+router.get('/staged', protect, authorize('admin', 'teacher'), async (req, res) => {
+  await ensureExtraColumns();
+  try {
+    const isAdmin = req.user.role === 'admin';
+    const rows = await sequelize.query(`
+      SELECT r.id, r.title, r.resource_type AS type, r.resource_type,
+             r.file_url, r.file_size_bytes, r.original_filename,
+             r.is_staged, r.push_type, r.created_at
+      FROM resources r
+      WHERE COALESCE(r.is_staged, false) = true
+        AND COALESCE(r.is_active, true) = true
+        AND (:isAdmin OR r.uploaded_by = :userId)
+      ORDER BY r.created_at DESC
+    `, {
+      replacements: { isAdmin, userId: req.user.id },
+      type: QueryTypes.SELECT,
+    });
+    return res.json({ success: true, data: rows });
+  } catch (err) {
+    return res.json({ success: true, data: [] });
+  }
+});
+
+/* ================================
+   GET /my-assignments  — student: resources pushed to them
+================================ */
+
+router.get('/my-assignments', protect, async (req, res) => {
+  await ensureExtraColumns();
+  await ensureResourceAssignments();
+  try {
+    const studentId = req.user.id;
+
+    // Direct student assignments + class-based assignments
+    const rows = await sequelize.query(`
+      SELECT DISTINCT ON (r.id, ra.push_type)
+             r.id, r.title, r.file_url, r.resource_type AS type, r.resource_type,
+             r.file_size_bytes, r.original_filename,
+             ra.push_type, ra.assigned_at,
+             u.first_name || ' ' || u.last_name AS assigned_by_name,
+             s.name AS subject_name
+      FROM resource_assignments ra
+      JOIN resources r ON r.id = ra.resource_id
+      JOIN users    u ON u.id = ra.assigned_by
+      LEFT JOIN subtopics st ON st.id = r.subtopic_id
+      LEFT JOIN topics     t  ON t.id  = st.topic_id
+      LEFT JOIN subjects   s  ON s.id  = t.subject_id
+      WHERE COALESCE(r.is_active, true) = true
+        AND (
+          ra.student_id = :studentId
+          OR ra.class_id IN (
+            SELECT class_id FROM class_memberships WHERE student_id = :studentId
+          )
+        )
+      ORDER BY r.id, ra.push_type, ra.assigned_at DESC
+    `, {
+      replacements: { studentId },
+      type: QueryTypes.SELECT,
+    });
+    return res.json({ success: true, data: rows });
+  } catch (err) {
+    console.error('[GET /resources/my-assignments]', err.message);
+    return res.json({ success: true, data: [] });
+  }
+});
+
+/* ================================
+   PUT /:id/assign-meta
+   Update title / topic / subtopic / subject, mark is_staged = false
+================================ */
+
+router.put('/:id/assign-meta', protect, authorize('admin', 'teacher'), async (req, res) => {
+  await ensureExtraColumns();
+  const resourceId = parseInt(req.params.id);
+  if (!resourceId) return res.status(400).json({ success: false, error: 'Invalid resource id' });
+
+  const { title, topic_id, subtopic_id, subject_id, push_type } = req.body;
+
+  try {
+    // Only owner or admin may update
+    const existing = await sequelize.query(
+      `SELECT id, uploaded_by FROM resources WHERE id = :id`,
+      { replacements: { id: resourceId }, type: QueryTypes.SELECT }
+    );
+    if (!existing.length) return res.status(404).json({ success: false, error: 'Resource not found' });
+    if (req.user.role !== 'admin' && existing[0].uploaded_by !== req.user.id) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+
+    await sequelize.query(`
+      UPDATE resources SET
+        title       = COALESCE(NULLIF(:title, ''), title),
+        topic_id    = COALESCE(:topicId::integer,    topic_id),
+        subtopic_id = COALESCE(:subtopicId::integer, subtopic_id),
+        push_type   = COALESCE(NULLIF(:pushType, ''), push_type),
+        is_staged   = false,
+        updated_at  = NOW()
+      WHERE id = :id
+    `, {
+      replacements: {
+        id:         resourceId,
+        title:      title        || '',
+        topicId:    topic_id     ? parseInt(topic_id)    : null,
+        subtopicId: subtopic_id  ? parseInt(subtopic_id) : null,
+        pushType:   push_type    || '',
+      },
+      type: QueryTypes.UPDATE,
+    });
+
+    return res.json({ success: true, message: 'Metadata saved.' });
+  } catch (err) {
+    console.error('[PUT /resources/:id/assign-meta]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/* ================================
+   PUT /:id/assign-users
+   Push resource to students and/or classes with a push_type
+================================ */
+
+router.put('/:id/assign-users', protect, authorize('admin', 'teacher'), async (req, res) => {
+  await ensureResourceAssignments();
+  const resourceId = parseInt(req.params.id);
+  if (!resourceId) return res.status(400).json({ success: false, error: 'Invalid resource id' });
+
+  const {
+    user_ids    = [],
+    assign_all  = false,
+    class_ids   = [],
+    push_type   = 'learning_material',
+  } = req.body;
+
+  try {
+    let targetStudentIds = user_ids;
+
+    // Expand assign_all → every active student
+    if (assign_all) {
+      const students = await sequelize.query(
+        `SELECT id FROM users WHERE role = 'student' AND is_active = true`,
+        { type: QueryTypes.SELECT }
+      );
+      targetStudentIds = students.map(s => s.id);
+    }
+
+    // Expand class_ids → their member student ids
+    if (class_ids.length > 0) {
+      const classMembers = await sequelize.query(
+        `SELECT student_id FROM class_memberships WHERE class_id = ANY(:classIds::uuid[])`,
+        { replacements: { classIds: class_ids }, type: QueryTypes.SELECT }
+      );
+      const memberIds = classMembers.map(m => m.student_id);
+      targetStudentIds = [...new Set([...targetStudentIds, ...memberIds])];
+    }
+
+    let studentRows = 0;
+    // Insert per-student rows
+    for (const sid of targetStudentIds) {
+      await sequelize.query(`
+        INSERT INTO resource_assignments (resource_id, assigned_by, student_id, push_type)
+        VALUES (:rid, :by, :sid, :pt)
+        ON CONFLICT DO NOTHING
+      `, {
+        replacements: { rid: resourceId, by: req.user.id, sid, pt: push_type },
+        type: QueryTypes.INSERT,
+      }).catch(() => {});
+      studentRows++;
+    }
+
+    // Insert per-class rows (for class-wide visibility)
+    let classRows = 0;
+    for (const cid of class_ids) {
+      await sequelize.query(`
+        INSERT INTO resource_assignments (resource_id, assigned_by, class_id, push_type)
+        VALUES (:rid, :by, :cid, :pt)
+        ON CONFLICT DO NOTHING
+      `, {
+        replacements: { rid: resourceId, by: req.user.id, cid, pt: push_type },
+        type: QueryTypes.INSERT,
+      }).catch(() => {});
+      classRows++;
+    }
+
+    return res.json({
+      success: true,
+      message: `Pushed to ${studentRows} student(s) and ${classRows} class(es).`,
+      student_count: studentRows,
+      class_count:   classRows,
+    });
+  } catch (err) {
+    console.error('[PUT /resources/:id/assign-users]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/* ================================
+   DELETE /:id  — soft delete
+================================ */
+
+router.delete('/:id', protect, authorize('admin', 'teacher'), async (req, res) => {
+  const resourceId = parseInt(req.params.id);
+  if (!resourceId) return res.status(400).json({ success: false, error: 'Invalid resource id' });
+  try {
+    const existing = await sequelize.query(
+      `SELECT id, uploaded_by FROM resources WHERE id = :id`,
+      { replacements: { id: resourceId }, type: QueryTypes.SELECT }
+    );
+    if (!existing.length) return res.status(404).json({ success: false, error: 'Not found' });
+    if (req.user.role !== 'admin' && existing[0].uploaded_by !== req.user.id) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+    await sequelize.query(
+      `UPDATE resources SET is_active = false, updated_at = NOW() WHERE id = :id`,
+      { replacements: { id: resourceId }, type: QueryTypes.UPDATE }
+    );
+    return res.json({ success: true, message: 'Resource deleted.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 

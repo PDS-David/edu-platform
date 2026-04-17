@@ -333,9 +333,15 @@ function UploadTab({ showToast }) {
 // TAB 2 — My Resources
 // ══════════════════════════════════════════════════════════════════════════════
 function ResourcesTab({ showToast }) {
-  const [resources, setResources] = useState([]);
-  const [loading,   setLoading]   = useState(true);
-  const [deleting,  setDeleting]  = useState(null);
+  const [resources,   setResources]   = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [deleting,    setDeleting]    = useState(null);
+  const [pushing,     setPushing]     = useState(null); // resource id being pushed
+  const [students,    setStudents]    = useState([]);
+  const [classes,     setClasses]     = useState([]);
+  const [pushForm,    setPushForm]    = useState({ push_type: 'learning_material', student_ids: [], class_ids: [], assign_all: false });
+  const [pushSearch,  setPushSearch]  = useState('');
+  const [pushSaving,  setPushSaving]  = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -346,6 +352,19 @@ function ResourcesTab({ showToast }) {
   }, []);
 
   useEffect(load, [load]);
+
+  // Lazy-load students & classes when push panel opens
+  const openPush = (id) => {
+    setPushing(id);
+    setPushForm({ push_type: 'learning_material', student_ids: [], class_ids: [], assign_all: false });
+    setPushSearch('');
+    if (students.length === 0) {
+      api.get('/users', { params: { role: 'student' } }).then(r => setStudents(extractList(r))).catch(() => {});
+    }
+    if (classes.length === 0) {
+      api.get('/teacher/classes').then(r => setClasses(extractList(r))).catch(() => {});
+    }
+  };
 
   const handleDelete = async (id, title) => {
     if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
@@ -360,6 +379,43 @@ function ResourcesTab({ showToast }) {
       setDeleting(null);
     }
   };
+
+  const handlePush = async () => {
+    const hasTarget = pushForm.assign_all || pushForm.student_ids.length > 0 || pushForm.class_ids.length > 0;
+    if (!hasTarget) { showToast('Select at least one student or class.', 'error'); return; }
+    setPushSaving(true);
+    try {
+      const res = await api.put(`/resources/${pushing}/assign-users`, {
+        assign_all: pushForm.assign_all,
+        user_ids:   pushForm.assign_all ? [] : pushForm.student_ids,
+        class_ids:  pushForm.class_ids,
+        push_type:  pushForm.push_type,
+      });
+      showToast(res?.message || 'Resource pushed successfully!');
+      setPushing(null);
+    } catch (err) {
+      showToast(err?.error || 'Push failed.', 'error');
+    } finally {
+      setPushSaving(false);
+    }
+  };
+
+  const toggleStudent = (id) => setPushForm(f => ({
+    ...f, student_ids: f.student_ids.includes(id) ? f.student_ids.filter(x => x !== id) : [...f.student_ids, id],
+  }));
+  const toggleClass = (id) => setPushForm(f => ({
+    ...f, class_ids: f.class_ids.includes(id) ? f.class_ids.filter(x => x !== id) : [...f.class_ids, id],
+  }));
+
+  const filteredStudents = students.filter(s =>
+    `${s.first_name} ${s.last_name} ${s.email}`.toLowerCase().includes(pushSearch.toLowerCase())
+  );
+
+  const PUSH_TYPES = [
+    { value: 'learning_material', label: '📚 Learning Material' },
+    { value: 'practice_test',     label: '📝 Practice Test'     },
+    { value: 'quiz',              label: '⚡ Quiz'               },
+  ];
 
   if (loading) return (
     <div className="flex justify-center py-16">
@@ -378,45 +434,121 @@ function ResourcesTab({ showToast }) {
   return (
     <div className="space-y-3 max-w-3xl">
       {resources.map(r => (
-        <div key={r.id} className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center gap-4">
-          <FileTypeIcon type={r.type || r.resource_type || 'other'} size={22} />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-gray-800 truncate">{r.title}</p>
-            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-              <span className="text-xs text-gray-400 capitalize">{r.type || r.resource_type || 'file'}</span>
-              {(r.file_size_bytes || r.file_size) && (
-                <><span className="text-xs text-gray-300">·</span>
-                <span className="text-xs text-gray-400">{fmtSize(r.file_size_bytes || r.file_size)}</span></>
-              )}
-              {r.subject_name && (
-                <><span className="text-xs text-gray-300">·</span>
-                <span className="text-xs text-teal-600">{r.subject_name}</span></>
-              )}
-              {r.subtopic_name && (
-                <><span className="text-xs text-gray-300">·</span>
-                <span className="text-xs text-gray-400">{r.subtopic_name}</span></>
-              )}
+        <div key={r.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+          {/* Resource row */}
+          <div className="p-4 flex items-center gap-4">
+            <FileTypeIcon type={r.type || r.resource_type || 'other'} size={22} />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-gray-800 truncate">{r.title}</p>
+              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                <span className="text-xs text-gray-400 capitalize">{r.type || r.resource_type || 'file'}</span>
+                {(r.file_size_bytes || r.file_size) && (
+                  <><span className="text-xs text-gray-300">·</span>
+                  <span className="text-xs text-gray-400">{fmtSize(r.file_size_bytes || r.file_size)}</span></>
+                )}
+                {r.subject_name && (
+                  <><span className="text-xs text-gray-300">·</span>
+                  <span className="text-xs text-teal-600">{r.subject_name}</span></>
+                )}
+                {r.push_type && r.push_type !== 'learning_material' && (
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    r.push_type === 'quiz' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
+                  }`}>
+                    {r.push_type === 'quiz' ? '⚡ Quiz' : '📝 Practice Test'}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <a href={r.url || r.file_url} target="_blank" rel="noreferrer"
+                className="text-xs text-teal-600 hover:text-teal-800 font-medium px-3 py-1.5 border border-teal-200 rounded-lg transition-colors">
+                View
+              </a>
+              <button
+                onClick={() => pushing === r.id ? setPushing(null) : openPush(r.id)}
+                className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
+                  pushing === r.id
+                    ? 'bg-indigo-600 text-white border-indigo-600'
+                    : 'border-indigo-200 text-indigo-600 hover:bg-indigo-50'
+                }`}>
+                {pushing === r.id ? 'Cancel' : '↑ Push'}
+              </button>
+              <button onClick={() => handleDelete(r.id, r.title)} disabled={deleting === r.id}
+                className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50">
+                {deleting === r.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+              </button>
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <a
-              href={r.url || r.file_url}
-              target="_blank"
-              rel="noreferrer"
-              className="text-xs text-teal-600 hover:text-teal-800 font-medium px-3 py-1.5 border border-teal-200 rounded-lg transition-colors"
-            >
-              View
-            </a>
-            <button
-              onClick={() => handleDelete(r.id, r.title)}
-              disabled={deleting === r.id}
-              className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
-            >
-              {deleting === r.id
-                ? <Loader2 size={14} className="animate-spin" />
-                : <Trash2 size={14} />}
-            </button>
-          </div>
+
+          {/* Push panel */}
+          {pushing === r.id && (
+            <div className="border-t border-gray-100 bg-indigo-50 px-4 py-4 space-y-3">
+              <p className="text-xs font-semibold text-gray-700">Push "{r.title}" to students or classes</p>
+
+              {/* Push type */}
+              <div className="flex gap-2 flex-wrap">
+                {PUSH_TYPES.map(pt => (
+                  <button key={pt.value} type="button"
+                    onClick={() => setPushForm(f => ({ ...f, push_type: pt.value }))}
+                    className={`px-2.5 py-1 text-xs font-medium rounded-lg border transition-colors ${
+                      pushForm.push_type === pt.value
+                        ? 'bg-indigo-600 border-indigo-600 text-white'
+                        : 'bg-white border-gray-200 text-gray-600 hover:border-indigo-300'
+                    }`}>
+                    {pt.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* All students */}
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={pushForm.assign_all}
+                  onChange={e => setPushForm(f => ({ ...f, assign_all: e.target.checked }))}
+                  className="rounded text-indigo-500" />
+                <span className="text-xs text-gray-700 font-medium">All students ({students.length})</span>
+              </label>
+
+              {!pushForm.assign_all && (
+                <>
+                  <input value={pushSearch} onChange={e => setPushSearch(e.target.value)}
+                    placeholder="Search student…"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                  {filteredStudents.length > 0 && (
+                    <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg bg-white">
+                      {filteredStudents.map(s => (
+                        <label key={s.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0">
+                          <input type="checkbox" checked={pushForm.student_ids.includes(s.id)} onChange={() => toggleStudent(s.id)} className="rounded" />
+                          <span className="text-xs">{s.first_name} {s.last_name}</span>
+                          <span className="text-xs text-gray-400 ml-auto">{s.email}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Classes */}
+                  {classes.length > 0 && (
+                    <>
+                      <p className="text-[10px] font-semibold text-gray-500 uppercase">Or push to class</p>
+                      <div className="max-h-28 overflow-y-auto border border-gray-200 rounded-lg bg-white">
+                        {classes.map(c => (
+                          <label key={c.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0">
+                            <input type="checkbox" checked={pushForm.class_ids.includes(c.id)} onChange={() => toggleClass(c.id)} className="rounded" />
+                            <span className="text-xs">{c.name}</span>
+                            <span className="text-xs text-gray-400 ml-auto">{c.student_count ?? 0} students</span>
+                          </label>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+
+              <button onClick={handlePush} disabled={pushSaving}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold py-2 rounded-lg flex items-center justify-center gap-1.5">
+                {pushSaving ? <Loader2 size={12} className="animate-spin" /> : '↑ Push Resource'}
+              </button>
+            </div>
+          )}
         </div>
       ))}
     </div>
