@@ -1,16 +1,15 @@
-import api from './axios';
+// client/src/api/dashboardApi.js
+
+import api from '../services/api';
 
 export const getDashboardData = async () => {
-  const res = await api.get('/recommendations');
-  return res.data;
+  return api.get('/recommendations');
 };
 
 export const getSessionStats = async () => {
-  const res = await api.get('/sessions/stats');
-  return res.data;
+  return api.get('/sessions/stats');
 };
 
 export const getActiveSession = async () => {
-  const res = await api.get('/sessions/active');
-  return res.data;
+  return api.get('/sessions/active');
 };

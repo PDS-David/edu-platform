@@ -5,74 +5,56 @@ const router = express.Router();
 
 const { protect } = require('../middleware/auth');
 const sessionService = require('../services/sessionService');
+const { success, error } = require('../utils/response');
 
-// ─────────────────────────────────────────────
-// START SESSION
-// POST /api/sessions/start
-// ─────────────────────────────────────────────
+// START
 router.post('/start', protect, async (req, res) => {
   try {
-    const studentId = req.user.id;
-    const { subtopicId } = req.body;
-
     const session = await sessionService.startSession({
-      studentId,
-      subtopicId,
+      studentId: req.user.id,
+      subtopicId: req.body.subtopicId,
     });
 
-    res.json({ success: true, data: session });
+    return success(res, session);
 
   } catch (err) {
-    console.error('[START SESSION ERROR]', err.message);
-    res.status(500).json({ success: false, error: 'Failed to start session' });
+    return error(res, 'Failed to start session');
   }
 });
 
-// ─────────────────────────────────────────────
-// END SESSION
-// POST /api/sessions/end
-// ─────────────────────────────────────────────
+// END
 router.post('/end', protect, async (req, res) => {
   try {
-    const { sessionId } = req.body;
+    const session = await sessionService.endSession({
+      sessionId: req.body.sessionId,
+    });
 
-    const session = await sessionService.endSession({ sessionId });
-
-    res.json({ success: true, data: session });
+    return success(res, session);
 
   } catch (err) {
-    console.error('[END SESSION ERROR]', err.message);
-    res.status(500).json({ success: false, error: 'Failed to end session' });
+    return error(res, 'Failed to end session');
   }
 });
 
-// ─────────────────────────────────────────────
-// ACTIVE SESSION
-// GET /api/sessions/active
-// ─────────────────────────────────────────────
+// ACTIVE
 router.get('/active', protect, async (req, res) => {
   try {
     const session = await sessionService.getActiveSession(req.user.id);
-
-    res.json({ success: true, data: session });
+    return success(res, session);
 
   } catch (err) {
-    res.status(500).json({ success: false });
+    return error(res, 'Failed to fetch active session');
   }
 });
 
-// ─────────────────────────────────────────────
-// SESSION STATS
-// GET /api/sessions/stats
-// ─────────────────────────────────────────────
+// STATS
 router.get('/stats', protect, async (req, res) => {
   try {
     const stats = await sessionService.getSessionStats(req.user.id);
-
-    res.json({ success: true, data: stats });
+    return success(res, stats);
 
   } catch (err) {
-    res.status(500).json({ success: false });
+    return error(res, 'Failed to fetch session stats');
   }
 });
 

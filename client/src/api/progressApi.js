@@ -1,7 +1,8 @@
-import httpClient from './httpClient';
+// client/src/api/progressApi.js
+
+import api from '../services/api';
 
 export const progressApi = {
-  getProgress: () => httpClient.get('/api/subtopics'),
-  updateProgress: (data) =>
-    httpClient.post('/api/subtopics/progress', data),
+  getProgress: () => api.get('/subtopics'),
+  updateProgress: (data) => api.post('/subtopics/progress', data),
 };
