@@ -1,5 +1,5 @@
-import { useEffect, useCallback } from 'react';
-import api from '../../../services/api';
+import { useEffect, useCallback, useState } from 'react';
+import api from '../../../services/apiClient'; // ✅ FIX
 import { users as usersApi } from '../../../services/admin/adminApi';
 
 import useAdminToast from '../core/useAdminToast';
@@ -29,13 +29,11 @@ const useAdminUsers = () => {
   const [users, setUsers] = useState([]);
   const [stats, setStats] = useState(null);
 
-  // ── Load stats (backend aggregate endpoint) ───────────────────────────────
   const loadStats = useCallback(async () => {
     const res = await request(() => usersApi.getStats(api));
-    if (res.ok) setStats(res.data);
+    if (res.ok) setStats(res.data); // ✅ FIX
   }, [request]);
 
-  // ── Load paginated users (Sequelize-backed endpoint) ──────────────────────
   const loadUsers = useCallback(async () => {
     const res = await request(() =>
       usersApi.getUsers(api, {
@@ -47,31 +45,31 @@ const useAdminUsers = () => {
     );
 
     if (res.ok) {
-      setUsers(res.data?.data ?? []);
-      setTotal(res.data?.total ?? 0);
+      setUsers(res.data || []);     // ✅ FIX
+      setTotal(res.meta?.total || 0); // ⚠️ depends on backend (see note below)
     } else {
       setUsers([]);
     }
   }, [request, filters, page, limit, setTotal]);
 
-  // ── Initial load ───────────────────────────────────────────────────────────
   useEffect(() => {
     loadStats();
   }, [loadStats]);
 
   useEffect(() => {
-    const timer = setTimeout(loadUsers, 250); // lightweight debounce
+    const timer = setTimeout(loadUsers, 250);
     return () => clearTimeout(timer);
   }, [loadUsers]);
 
-  // ── Mutations (backend-aligned) ────────────────────────────────────────────
   const changeRole = async (userId, role) => {
     const res = await request(() =>
       usersApi.updateRole(api, userId, role)
     );
+
     res.ok
       ? showToast(`Role updated to ${role}`)
       : showToast(res.error, 'error');
+
     loadUsers();
   };
 
@@ -79,17 +77,16 @@ const useAdminUsers = () => {
     const res = await request(() =>
       usersApi.toggleActive(api, userId, !current)
     );
+
     res.ok
       ? showToast(current ? 'User deactivated' : 'User activated')
       : showToast(res.error, 'error');
+
     loadUsers();
   };
 
   const deleteUser = async (userId, email) => {
-    const confirmed = window.confirm(
-      `Delete ${email}? This cannot be undone.`
-    );
-    if (!confirmed) return;
+    if (!window.confirm(`Delete ${email}? This cannot be undone.`)) return;
 
     const res = await request(() =>
       usersApi.deleteUser(api, userId)
@@ -102,7 +99,6 @@ const useAdminUsers = () => {
     loadUsers();
   };
 
-  // ── Filter handlers (RESET PAGINATION = important backend alignment) ──────
   const setSearch = (v) => {
     setFilter('search', v);
     resetPage();
@@ -127,7 +123,7 @@ const useAdminUsers = () => {
     setSearch,
     setRoleFilter,
 
-    loading: false, // derived in UI or extend request hook if needed
+    loading: false,
 
     changeRole,
     toggleActive,
