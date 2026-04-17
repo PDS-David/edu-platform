@@ -11,15 +11,24 @@ const ResetPassword = () => {
 
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError(null);
+
+    if (!token || !userId) {
+      setError("Invalid reset link");
+      return;
+    }
 
     if (newPassword !== confirmPassword) {
       setError("Passwords do not match");
       return;
     }
+
+    setLoading(true);
 
     try {
       await api.post("/auth/reset-password", {
@@ -31,13 +40,13 @@ const ResetPassword = () => {
       navigate("/login");
     } catch (err) {
       setError(err?.message || "Reset failed");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-2">
-      {error && <p className="text-red-500">{error}</p>}
-
+    <form onSubmit={handleSubmit}>
       <input
         type="password"
         value={newPassword}
@@ -52,9 +61,11 @@ const ResetPassword = () => {
         placeholder="Confirm password"
       />
 
-      <button className="bg-green-600 text-white px-4 py-2">
-        Reset
+      <button disabled={loading}>
+        {loading ? "Resetting..." : "Reset"}
       </button>
+
+      {error && <p className="text-red-500">{error}</p>}
     </form>
   );
 };
