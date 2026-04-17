@@ -41,6 +41,7 @@ apiClient.interceptors.response.use(
   (response) => {
     return {
       data: response.data?.data ?? response.data,
+      success: response.data?.success,
       meta: response.data?.meta ?? null,
       status: response.status,
     };

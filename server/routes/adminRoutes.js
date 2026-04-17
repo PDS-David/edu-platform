@@ -272,4 +272,56 @@ router.delete('/teacher-assignments/:id', protect, adminOnly, async (req, res) =
   }
 });
 
+// ─────────────────────────────────────────────
+// TEACHER-SUBJECTS ALIASES
+// TeacherAssignmentPage calls /admin/teacher-subjects — alias to same handlers
+// ─────────────────────────────────────────────
+router.get('/teacher-subjects', protect, adminOnly, async (req, res) => {
+  try {
+    const rows = await sequelize.query(
+      `SELECT ts.id, u.email, u.first_name, u.last_name, s.name AS subject
+       FROM teacher_subjects ts
+       JOIN users    u ON u.id = ts.teacher_id
+       JOIN subjects s ON s.id = ts.subject_id
+       WHERE ts.is_active = true
+       ORDER BY u.email, s.name`,
+      { type: QueryTypes.SELECT }
+    );
+    return success(res, rows);
+  } catch (err) {
+    console.error('[GET /admin/teacher-subjects]', err.message);
+    return error(res, 'Failed to fetch assignments');
+  }
+});
+
+router.post('/teacher-subjects', protect, adminOnly, async (req, res) => {
+  const { teacher_id, subject_id, exam_board_id } = req.body;
+  if (!teacher_id || !subject_id) return error(res, 'teacher_id and subject_id required', 400);
+  try {
+    await sequelize.query(
+      `INSERT INTO teacher_subjects (teacher_id, subject_id, is_active)
+       VALUES (:t, :s, true)
+       ON CONFLICT (teacher_id, subject_id) DO UPDATE SET is_active = true`,
+      { replacements: { t: teacher_id, s: subject_id }, type: QueryTypes.INSERT }
+    );
+    return success(res, { message: 'Assignment saved' });
+  } catch (err) {
+    console.error('[POST /admin/teacher-subjects]', err.message);
+    return error(res, 'Failed to save assignment');
+  }
+});
+
+router.delete('/teacher-subjects/:id', protect, adminOnly, async (req, res) => {
+  try {
+    await sequelize.query(
+      `UPDATE teacher_subjects SET is_active = false WHERE id = :id`,
+      { replacements: { id: req.params.id }, type: QueryTypes.UPDATE }
+    );
+    return success(res, { message: 'Assignment removed' });
+  } catch (err) {
+    console.error('[DELETE /admin/teacher-subjects/:id]', err.message);
+    return error(res, 'Failed to delete assignment');
+  }
+});
+
 module.exports = router;
