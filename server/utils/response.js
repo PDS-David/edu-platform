@@ -2,43 +2,43 @@
 
 /**
  * Standard API Response Helpers
- * Enforces consistent contract across backend
+ * Ensures ALL endpoints return:
+ * {
+ *   success: boolean,
+ *   data: any,
+ *   meta?: { total, page, limit },
+ *   error?: string
+ * }
  */
 
-function success(res, data = null, meta = null, status = 200) {
-  const response = {
-    success: true,
-    data,
-  };
+function success(res, { data = null, meta = null, status = 200 }) {
+  const response = { success: true };
 
-  if (meta) {
-    response.meta = meta;
-  }
+  if (data !== null) response.data = data;
+  if (meta !== null) response.meta = meta;
 
   return res.status(status).json(response);
 }
 
-function error(res, message = 'Something went wrong', status = 500, extra = null) {
-  const response = {
+function error(res, { message = 'Something went wrong', status = 500 }) {
+  return res.status(status).json({
     success: false,
     error: message,
-  };
-
-  if (extra) {
-    response.details = extra;
-  }
-
-  return res.status(status).json(response);
+  });
 }
 
 /**
  * Pagination helper
  */
-function paginated(res, data, total, page = 1, limit = 20) {
-  return success(res, data, {
-    total,
-    page,
-    limit,
+function paginated(res, { data = [], total = 0, page = 1, limit = 20 }) {
+  return res.status(200).json({
+    success: true,
+    data,
+    meta: {
+      total,
+      page,
+      limit,
+    },
   });
 }
 
