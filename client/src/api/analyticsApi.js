@@ -1,8 +1,10 @@
-import httpClient from './httpClient';
+// client/src/api/analyticsApi.js
+
+import api from '../services/api';
 
 export const analyticsApi = {
-  getSummary: () => httpClient.get('/api/analytics/summary'),
-  getWeakTopics: () => httpClient.get('/api/analytics/weak-topics'),
-  getScoreTrend: () => httpClient.get('/api/analytics/score-trend'),
-  getSubjectBreakdown: () => httpClient.get('/api/analytics/subject-breakdown'),
+  getSummary: () => api.get('/analytics/summary'),
+  getWeakTopics: () => api.get('/analytics/weak-topics'),
+  getScoreTrend: () => api.get('/analytics/score-trend'),
+  getSubjectBreakdown: () => api.get('/analytics/subject-breakdown'),
 };
