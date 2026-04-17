@@ -85,6 +85,7 @@ function MetaForm({ file, onSave, onDismiss }) {
     subjectId:  '',
     topicId:    '',
     subtopicId: '',
+    pushType:   'learning_material',
   });
   const [saving, setSaving] = useState(false);
   const [msg,    setMsg]    = useState('');
@@ -109,6 +110,7 @@ function MetaForm({ file, onSave, onDismiss }) {
         topic_id:   form.topicId   || null,
         subtopic_id:form.subtopicId || null,
         subject_id: form.subjectId  || null,
+        push_type:  form.pushType   || 'learning_material',
       });
       onSave(file.id);
     } catch (err) {
@@ -155,6 +157,27 @@ function MetaForm({ file, onSave, onDismiss }) {
         {subtopics.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
       </select>
 
+      {/* Push type */}
+      <div>
+        <p className="text-[10px] font-semibold text-gray-500 uppercase mb-1.5">Push as</p>
+        <div className="flex gap-2 flex-wrap">
+          {[
+            { value: 'learning_material', label: '📚 Learning Material' },
+            { value: 'practice_test',     label: '📝 Practice Test'     },
+            { value: 'quiz',              label: '⚡ Quiz'               },
+          ].map(pt => (
+            <button key={pt.value} type="button" onClick={() => set('pushType', pt.value)}
+              className={`px-2.5 py-1 text-xs font-medium rounded-lg border transition-colors ${
+                form.pushType === pt.value
+                  ? 'bg-teal-500 border-teal-500 text-white'
+                  : 'bg-white border-gray-200 text-gray-600 hover:border-teal-300'
+              }`}>
+              {pt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {msg && <p className="text-xs text-red-600">{msg}</p>}
 
       <div className="flex gap-2">
@@ -173,33 +196,47 @@ function MetaForm({ file, onSave, onDismiss }) {
 }
 
 // ── Per-file assign-users form ────────────────────────────────────────────────
+const PUSH_TYPES = [
+  { value: 'learning_material', label: '📚 Learning Material' },
+  { value: 'practice_test',     label: '📝 Practice Test'     },
+  { value: 'quiz',              label: '⚡ Quiz'               },
+];
+
 function AssignUsersForm({ file, onDone, onDismiss }) {
-  const [students,   setStudents]   = useState([]);
-  const [selected,   setSelected]   = useState([]);
-  const [assignAll,  setAssignAll]  = useState(false);
-  const [search,     setSearch]     = useState('');
-  const [saving,     setSaving]     = useState(false);
-  const [msg,        setMsg]        = useState('');
+  const [students,      setStudents]      = useState([]);
+  const [classes,       setClasses]       = useState([]);
+  const [selected,      setSelected]      = useState([]);
+  const [selectedClass, setSelectedClass] = useState([]);
+  const [assignAll,     setAssignAll]     = useState(false);
+  const [pushType,      setPushType]      = useState('learning_material');
+  const [search,        setSearch]        = useState('');
+  const [saving,        setSaving]        = useState(false);
+  const [msg,           setMsg]           = useState('');
+  const [tab,           setTab]           = useState('students'); // 'students' | 'classes'
 
   useEffect(() => {
-    api.get('/users', { params: { role: 'student' } })
-      .then(r => setStudents(extract(r)))
-      .catch(() => {});
+    api.get('/users', { params: { role: 'student' } }).then(r => setStudents(extract(r))).catch(() => {});
+    api.get('/teacher/classes').then(r => setClasses(extract(r))).catch(() => {});
   }, []);
 
   const filtered = students.filter(s =>
     `${s.first_name} ${s.last_name} ${s.email}`.toLowerCase().includes(search.toLowerCase())
   );
 
-  const toggle = (id) => setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  const toggleStudent = (id) => setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  const toggleClass   = (id) => setSelectedClass(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
   const handleAssign = async () => {
-    if (!assignAll && selected.length === 0) { setMsg('Select at least one student or choose "All students".'); return; }
+    const hasTarget = assignAll || selected.length > 0 || selectedClass.length > 0;
+    if (!hasTarget) { setMsg('Select at least one student, class, or choose "All students".'); return; }
     setSaving(true); setMsg('');
     try {
-      await api.put(`/resources/${file.id}/assign-users`,
-        assignAll ? { assign_all: true } : { user_ids: selected }
-      );
+      await api.put(`/resources/${file.id}/assign-users`, {
+        assign_all: assignAll,
+        user_ids:   assignAll ? [] : selected,
+        class_ids:  selectedClass,
+        push_type:  pushType,
+      });
       onDone(file.id);
     } catch (err) {
       setMsg(err?.error || 'Assignment failed.');
@@ -207,38 +244,78 @@ function AssignUsersForm({ file, onDone, onDismiss }) {
     }
   };
 
+  const tabCls = (t) => `px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+    tab === t ? 'bg-blue-600 text-white' : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-50'
+  }`;
+
   return (
     <div className="border-t border-gray-100 bg-blue-50 px-4 py-4 space-y-3">
-      <p className="text-xs font-semibold text-gray-700">Assign to students</p>
+      <p className="text-xs font-semibold text-gray-700">Push resource to students / classes</p>
 
-      {/* All students toggle */}
-      <label className="flex items-center gap-2 cursor-pointer">
-        <input type="checkbox" checked={assignAll} onChange={e => setAssignAll(e.target.checked)}
-          className="rounded text-teal-500" />
-        <span className="text-xs text-gray-700 font-medium">All active students ({students.length})</span>
-      </label>
+      {/* Push type selector */}
+      <div>
+        <p className="text-[10px] font-semibold text-gray-500 uppercase mb-1.5">Push as</p>
+        <div className="flex gap-2 flex-wrap">
+          {PUSH_TYPES.map(pt => (
+            <button key={pt.value} onClick={() => setPushType(pt.value)}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${
+                pushType === pt.value
+                  ? 'bg-blue-600 border-blue-600 text-white'
+                  : 'bg-white border-gray-200 text-gray-600 hover:border-blue-300'
+              }`}>
+              {pt.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
-      {!assignAll && (
+      {/* Students / Classes tab switcher */}
+      <div className="flex gap-2">
+        <button onClick={() => setTab('students')} className={tabCls('students')}>👤 Students</button>
+        <button onClick={() => setTab('classes')}  className={tabCls('classes')}>🏫 Classes</button>
+      </div>
+
+      {tab === 'students' && (
         <>
-          <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search student by name or email…"
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-300" />
-          <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg bg-white">
-            {filtered.length === 0
-              ? <p className="text-xs text-gray-400 text-center py-4">No students found.</p>
-              : filtered.map(s => (
-                <label key={s.id} className="flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0">
-                  <input type="checkbox" checked={selected.includes(s.id)} onChange={() => toggle(s.id)}
-                    className="rounded text-blue-500" />
-                  <span className="text-xs text-gray-800">{s.first_name} {s.last_name}</span>
-                  <span className="text-xs text-gray-400 ml-auto truncate max-w-[120px]">{s.email}</span>
-                </label>
-              ))}
-          </div>
-          {selected.length > 0 && (
-            <p className="text-xs text-blue-600 font-medium">{selected.length} student(s) selected</p>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={assignAll} onChange={e => setAssignAll(e.target.checked)} className="rounded text-teal-500" />
+            <span className="text-xs text-gray-700 font-medium">All active students ({students.length})</span>
+          </label>
+
+          {!assignAll && (
+            <>
+              <input value={search} onChange={e => setSearch(e.target.value)}
+                placeholder="Search student by name or email…"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-300" />
+              <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg bg-white">
+                {filtered.length === 0
+                  ? <p className="text-xs text-gray-400 text-center py-4">No students found.</p>
+                  : filtered.map(s => (
+                    <label key={s.id} className="flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0">
+                      <input type="checkbox" checked={selected.includes(s.id)} onChange={() => toggleStudent(s.id)} className="rounded text-blue-500" />
+                      <span className="text-xs text-gray-800">{s.first_name} {s.last_name}</span>
+                      <span className="text-xs text-gray-400 ml-auto truncate max-w-[120px]">{s.email}</span>
+                    </label>
+                  ))}
+              </div>
+              {selected.length > 0 && <p className="text-xs text-blue-600 font-medium">{selected.length} student(s) selected</p>}
+            </>
           )}
         </>
+      )}
+
+      {tab === 'classes' && (
+        <div className="max-h-44 overflow-y-auto border border-gray-200 rounded-lg bg-white">
+          {classes.length === 0
+            ? <p className="text-xs text-gray-400 text-center py-4">No classes found.</p>
+            : classes.map(c => (
+              <label key={c.id} className="flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0">
+                <input type="checkbox" checked={selectedClass.includes(c.id)} onChange={() => toggleClass(c.id)} className="rounded text-blue-500" />
+                <span className="text-xs text-gray-800">{c.name}</span>
+                <span className="text-xs text-gray-400 ml-auto">{c.student_count ?? 0} students</span>
+              </label>
+            ))}
+        </div>
       )}
 
       {msg && <p className="text-xs text-red-600">{msg}</p>}
@@ -247,7 +324,7 @@ function AssignUsersForm({ file, onDone, onDismiss }) {
         <button onClick={handleAssign} disabled={saving}
           className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-semibold py-2 rounded-lg flex items-center justify-center gap-1.5">
           {saving ? <Loader2 size={12} className="animate-spin" /> : <Users size={12} />}
-          Assign to Students
+          Push Resource
         </button>
         <button onClick={onDismiss} className="px-3 py-2 border border-gray-200 text-gray-500 text-xs rounded-lg hover:bg-gray-100">
           Cancel
