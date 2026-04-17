@@ -7,14 +7,15 @@ const FALLBACK_EXAM_TYPES = [
   { id: null, code: "JAMB", name: "JAMB / UTME" },
   { id: null, code: "WAEC", name: "WAEC" },
   { id: null, code: "NECO", name: "NECO" },
-  { id: null, code: "SAT", name: "SAT" },
 ];
 
 function Toast({ msg, type, onClose }) {
   return (
-    <div className={`fixed bottom-4 right-4 p-3 text-white rounded ${type === "error" ? "bg-red-600" : "bg-black"}`}>
+    <div className={`fixed bottom-6 right-4 px-4 py-3 rounded-xl text-white ${
+      type === "error" ? "bg-red-600" : "bg-gray-900"
+    }`}>
       {msg}
-      <button onClick={onClose} className="ml-2">
+      <button onClick={onClose} className="ml-3">
         <X size={14} />
       </button>
     </div>
@@ -26,71 +27,88 @@ function AddAssignmentDialog({ teachers, onClose, onSaved }) {
   const [subjects, setSubjects] = useState([]);
 
   const [teacherId, setTeacherId] = useState("");
-  const [examCode, setExamCode] = useState("");
+  const [examTypeCode, setExamTypeCode] = useState("");
+  const [examTypeId, setExamTypeId] = useState("");
   const [subjectId, setSubjectId] = useState("");
+
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     api.get("/exam-boards")
-      .then(res => setExamTypes(res?.data || FALLBACK_EXAM_TYPES))
+      .then((res) => setExamTypes(res.data || []))
       .catch(() => {});
   }, []);
 
   useEffect(() => {
-    if (!examCode) return;
+    if (!examTypeCode) return;
 
-    setSubjects([]);
-    setSubjectId("");
+    const found = examTypes.find((e) => e.code === examTypeCode);
+    setExamTypeId(found?.id || "");
 
-    api.get(`/exam-boards/${examCode}/subjects`)
-      .then(res => setSubjects(res?.data || []))
+    api.get(`/exam-boards/${examTypeCode}/subjects`)
+      .then((res) => setSubjects(res.data || []))
       .catch(() => setSubjects([]));
-  }, [examCode]);
+  }, [examTypeCode]);
 
-  const save = async () => {
-    await api.post("/admin/teacher-subjects", {
-      teacher_id: teacherId,
-      subject_id: subjectId,
-      exam_board_code: examCode,
-    });
+  const handleSave = async () => {
+    if (!teacherId || !examTypeCode || !subjectId) {
+      setError("All fields are required.");
+      return;
+    }
 
-    onSaved();
-    onClose();
+    setSaving(true);
+
+    try {
+      await api.post("/admin/teacher-subjects", {
+        teacher_id: teacherId,
+        subject_id: subjectId,
+        exam_board_id: examTypeId || null,
+      });
+
+      onSaved();
+      onClose();
+    } catch (err) {
+      setError(err.message || "Failed to save assignment");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
-      <div className="bg-white p-4 rounded w-96">
-        <h2 className="font-bold mb-3">Assign Subject</h2>
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4">
+      <div className="bg-white w-full max-w-md p-6 rounded-2xl">
+        <h2 className="font-semibold mb-4">Assign Subject</h2>
 
-        <select onChange={(e) => setTeacherId(e.target.value)}>
-          <option>Select Teacher</option>
-          {teachers.map(t => (
+        <select value={teacherId} onChange={(e) => setTeacherId(e.target.value)}>
+          <option value="">Select Teacher</option>
+          {teachers.map((t) => (
             <option key={t.id} value={t.id}>
               {t.first_name} {t.last_name}
             </option>
           ))}
         </select>
 
-        <select onChange={(e) => setExamCode(e.target.value)}>
-          <option>Select Exam</option>
-          {examTypes.map(e => (
+        <select value={examTypeCode} onChange={(e) => setExamTypeCode(e.target.value)}>
+          <option value="">Select Exam Type</option>
+          {examTypes.map((e) => (
             <option key={e.code} value={e.code}>
               {e.name}
             </option>
           ))}
         </select>
 
-        <select onChange={(e) => setSubjectId(e.target.value)}>
-          <option>Select Subject</option>
-          {subjects.map(s => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
+        <select value={subjectId} onChange={(e) => setSubjectId(e.target.value)}>
+          <option value="">Select Subject</option>
+          {subjects.map((s) => (
+            <option key={s.id} value={s.id}>{s.name}</option>
           ))}
         </select>
 
-        <button onClick={save} className="bg-blue-600 text-white px-3 py-2 mt-3">
-          Save
+        {error && <p className="text-red-600 text-xs">{error}</p>}
+
+        <button onClick={handleSave} disabled={saving}>
+          {saving ? "Saving..." : "Assign"}
         </button>
       </div>
     </div>
@@ -100,18 +118,17 @@ function AddAssignmentDialog({ teachers, onClose, onSaved }) {
 export default function TeacherAssignmentPage() {
   const [assignments, setAssignments] = useState([]);
   const [teachers, setTeachers] = useState([]);
-  const [show, setShow] = useState(false);
+  const [showDialog, setShowDialog] = useState(false);
   const [toast, setToast] = useState(null);
 
   const load = () => {
     Promise.all([
-      api.get("/admin/teacher-subjects"),
-      api.get("/admin/users?role=teacher"),
-    ])
-      .then(([a, t]) => {
-        setAssignments(a?.data || []);
-        setTeachers(t?.data || []);
-      });
+      api.get("/admin/teacher-subjects").catch(() => ({ data: [] })),
+      api.get("/admin/users?role=teacher").catch(() => ({ data: [] })),
+    ]).then(([a, t]) => {
+      setAssignments(a.data || []);
+      setTeachers(t.data || []);
+    });
   };
 
   useEffect(load, []);
@@ -119,41 +136,42 @@ export default function TeacherAssignmentPage() {
   const remove = async (id) => {
     try {
       await api.delete(`/admin/teacher-subjects/${id}`);
-      setAssignments(p => p.filter(x => x.id !== id));
+      setAssignments((p) => p.filter((x) => x.id !== id));
+      setToast({ msg: "Deleted", type: "success" });
     } catch {
-      setToast({ msg: "Delete failed", type: "error" });
+      setToast({ msg: "Failed to delete", type: "error" });
     }
   };
 
   return (
-    <div className="p-4">
+    <div className="min-h-screen bg-gray-50">
       <TopNav />
 
-      <button onClick={() => setShow(true)} className="bg-green-600 text-white px-3 py-2">
-        <Plus size={14} /> Add
+      <button onClick={() => setShowDialog(true)}>
+        <Plus size={14} /> Add Assignment
       </button>
 
-      {assignments.map(a => (
-        <div key={a.id} className="flex justify-between p-2 bg-white mt-2">
-          <div>
-            <p>{a.teacher_name}</p>
-            <p className="text-sm">{a.subject_name}</p>
-          </div>
+      {assignments.map((a) => (
+        <div key={a.id}>
+          <p>{a.teacher_name}</p>
+          <p>{a.subject_name}</p>
           <button onClick={() => remove(a.id)}>
             <Trash2 size={14} />
           </button>
         </div>
       ))}
 
-      {show && (
+      {showDialog && (
         <AddAssignmentDialog
           teachers={teachers}
-          onClose={() => setShow(false)}
+          onClose={() => setShowDialog(false)}
           onSaved={load}
         />
       )}
 
-      {toast && <Toast {...toast} onClose={() => setToast(null)} />}
+      {toast && (
+        <Toast {...toast} onClose={() => setToast(null)} />
+      )}
     </div>
   );
 }
