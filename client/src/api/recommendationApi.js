@@ -1,6 +1,5 @@
-import httpClient from './httpClient';
+import api from '../services/api';
 
 export const recommendationApi = {
-  getRecommendations: () =>
-    httpClient.get('/api/recommendations'),
+  getRecommendations: () => api.get('/recommendations'),
 };
