@@ -6,10 +6,12 @@ const ForgotPassword = () => {
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
 
     try {
       await api.post("/auth/forgot-password", {
@@ -17,8 +19,8 @@ const ForgotPassword = () => {
       });
 
       setSubmitted(true);
-    } catch {
-      setSubmitted(true); // security-safe behavior
+    } catch (err) {
+      setError(err?.message || "Request failed");
     } finally {
       setLoading(false);
     }
@@ -30,16 +32,19 @@ const ForgotPassword = () => {
 
       <div className="flex-1 flex items-center justify-center">
         {!submitted ? (
-          <form onSubmit={handleSubmit} className="space-y-3">
+          <form onSubmit={handleSubmit}>
             <input
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Email"
               className="border p-2"
             />
-            <button disabled={loading} className="bg-blue-600 text-white px-4 py-2">
-              Send Reset
+
+            <button disabled={loading}>
+              {loading ? "Sending..." : "Send Reset"}
             </button>
+
+            {error && <p className="text-red-500">{error}</p>}
           </form>
         ) : (
           <p>Check your email</p>
