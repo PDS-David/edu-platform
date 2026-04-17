@@ -1,42 +1,40 @@
 /**
- * useDashboardData.js  (src/hooks/useDashboardData.js)
- * ─────────────────────────────────────────────────────────────────────────────
- * Central dashboard data aggregator using React Query
+ * client/src/hooks/useDashboardData.js
  */
 
 import { useQuery } from "@tanstack/react-query";
-import http from "../services/api";
+import api from "../services/api";
 
 export default function useDashboardData() {
   const summary = useQuery({
     queryKey: ["dashboard", "summary"],
     queryFn: async () => {
-      const res = await http.get("/dashboard/summary");
-      return res || null;
+      const res = await api.get("/dashboard/summary");
+      return res?.data || null;
     },
   });
 
   const weakTopics = useQuery({
     queryKey: ["dashboard", "weakTopics"],
     queryFn: async () => {
-      const res = await http.get("/dashboard/weak-topics");
-      return res || [];
+      const res = await api.get("/dashboard/weak-topics");
+      return res?.data || [];
     },
   });
 
   const recommendations = useQuery({
     queryKey: ["dashboard", "recommendations"],
     queryFn: async () => {
-      const res = await http.get("/dashboard/recommendations");
-      return res || [];
+      const res = await api.get("/dashboard/recommendations");
+      return res?.data || [];
     },
   });
 
   const sessions = useQuery({
     queryKey: ["dashboard", "sessions"],
     queryFn: async () => {
-      const res = await http.get("/dashboard/sessions");
-      return res || [];
+      const res = await api.get("/dashboard/sessions");
+      return res?.data || [];
     },
   });
 
