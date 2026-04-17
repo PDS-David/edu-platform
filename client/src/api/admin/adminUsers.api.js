@@ -1,34 +1,29 @@
 // client/src/api/admin/adminUsers.api.js
 
-import api from '../api';
+import api from '../../services/api';
 
 export const adminUsersApi = {
   getUsers: async ({ page = 1, limit = 20, search = '', role = '' }) => {
-    const { data } = await api.get('/admin/users', {
+    return await api.get('/admin/users', {
       params: { page, limit, search, role },
     });
-    return data;
   },
 
   getStats: async () => {
-    const { data } = await api.get('/admin/users/stats');
-    return data;
+    return await api.get('/admin/users/stats');
   },
 
   updateRole: async ({ userId, role }) => {
-    const { data } = await api.put(`/admin/users/${userId}/role`, { role });
-    return data;
+    return await api.put(`/admin/users/${userId}/role`, { role });
   },
 
   toggleActive: async ({ userId, isActive }) => {
-    const { data } = await api.put(`/admin/users/${userId}/deactivate`, {
+    return await api.put(`/admin/users/${userId}/deactivate`, {
       is_active: isActive,
     });
-    return data;
   },
 
   deleteUser: async ({ userId }) => {
-    const { data } = await api.delete(`/admin/users/${userId}`);
-    return data;
+    return await api.delete(`/admin/users/${userId}`);
   },
 };
