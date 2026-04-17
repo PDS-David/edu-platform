@@ -1,14 +1,8 @@
 // client/src/pages/TeacherAssignmentPage.jsx
 
 import { useState, useEffect } from "react";
-import api from "../services/api";
-import {
-  Plus,
-  Trash2,
-  Loader2,
-  X,
-} from "lucide-react";
-
+import api from "../services/apiClient";
+import { Plus, Trash2, Loader2, X } from "lucide-react";
 import TopNav from "../components/TopNav";
 
 // ─────────────────────────────────────────────────────────────
@@ -26,15 +20,6 @@ const FALLBACK_EXAM_TYPES = [
   { id: null, code: "JUPEB", name: "JUPEB", icon_emoji: "" },
 ];
 
-// ─────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────
-const getBaseUrl = () =>
-  (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/$/, "");
-
-// ─────────────────────────────────────────────────────────────
-// Toast
-// ─────────────────────────────────────────────────────────────
 function Toast({ msg, type, onClose }) {
   return (
     <div
@@ -50,9 +35,6 @@ function Toast({ msg, type, onClose }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// Dialog
-// ─────────────────────────────────────────────────────────────
 function AddAssignmentDialog({ teachers, onClose, onSaved }) {
   const [examTypes, setExamTypes] = useState(FALLBACK_EXAM_TYPES);
   const [subjects, setSubjects] = useState([]);
@@ -66,18 +48,18 @@ function AddAssignmentDialog({ teachers, onClose, onSaved }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  // Load exam types
+  // Load exam types (backend optional)
   useEffect(() => {
-    fetch(`${getBaseUrl()}/api/exam-boards`)
-      .then((r) => r.json())
+    api
+      .get("/exam-boards")
       .then((res) => {
-        const list = Array.isArray(res) ? res : res?.data || [];
+        const list = res?.data || [];
         if (list.length) setExamTypes(list);
       })
       .catch(() => {});
   }, []);
 
-  // Load subjects when exam changes
+  // Load subjects
   useEffect(() => {
     setSubjects([]);
     setSubjectId("");
@@ -89,11 +71,10 @@ function AddAssignmentDialog({ teachers, onClose, onSaved }) {
 
     setLoadingSubjects(true);
 
-    fetch(`${getBaseUrl()}/api/exam-boards/${examTypeCode}/subjects`)
-      .then((r) => r.json())
+    api
+      .get(`/exam-boards/${examTypeCode}/subjects`)
       .then((res) => {
-        const list = Array.isArray(res) ? res : res?.data || [];
-        setSubjects(list);
+        setSubjects(res?.data || []);
       })
       .catch(() => setSubjects([]))
       .finally(() => setLoadingSubjects(false));
@@ -118,11 +99,7 @@ function AddAssignmentDialog({ teachers, onClose, onSaved }) {
       onSaved();
       onClose();
     } catch (err) {
-      setError(
-        err?.response?.data?.message ||
-          err?.message ||
-          "Failed to save assignment"
-      );
+      setError(err?.message || "Failed to save assignment");
     } finally {
       setSaving(false);
     }
@@ -192,9 +169,6 @@ function AddAssignmentDialog({ teachers, onClose, onSaved }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// Main Page
-// ─────────────────────────────────────────────────────────────
 export default function TeacherAssignmentPage() {
   const [assignments, setAssignments] = useState([]);
   const [teachers, setTeachers] = useState([]);
@@ -243,10 +217,7 @@ export default function TeacherAssignmentPage() {
 
         <div className="mt-4 space-y-2">
           {assignments.map((a) => (
-            <div
-              key={a.id}
-              className="bg-white p-3 rounded flex justify-between"
-            >
+            <div key={a.id} className="bg-white p-3 rounded flex justify-between">
               <div>
                 <p className="font-medium">{a.teacher_name}</p>
                 <p className="text-xs text-gray-500">{a.subject_name}</p>
@@ -269,11 +240,7 @@ export default function TeacherAssignmentPage() {
       )}
 
       {toast && (
-        <Toast
-          msg={toast.msg}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
+        <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />
       )}
     </div>
   );
