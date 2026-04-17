@@ -2,11 +2,14 @@
 
 import api from '../services/api';
 
-export const getDashboardData = () =>
-  api.get('/recommendations');
+export const getDashboardData = async () => {
+  return api.get('/recommendations');
+};
 
-export const getSessionStats = () =>
-  api.get('/sessions/stats');
+export const getSessionStats = async () => {
+  return api.get('/sessions/stats');
+};
 
-export const getActiveSession = () =>
-  api.get('/sessions/active');
+export const getActiveSession = async () => {
+  return api.get('/sessions/active');
+};
