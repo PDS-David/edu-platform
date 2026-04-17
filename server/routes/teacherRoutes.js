@@ -198,8 +198,38 @@ router.delete('/subtopics/:id', protect, teacherOnly, async (req, res) => {
   } catch (err) { return res.status(500).json({ success: false, error: err.message }); }
 });
 
+// ── ensureClassTables — idempotent, runs once per process ────────────────────
+let classTablesEnsured = false;
+async function ensureClassTables() {
+  if (classTablesEnsured) return;
+  try {
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS classes (
+        id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        teacher_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name       VARCHAR(255) NOT NULL,
+        join_code  VARCHAR(20)  NOT NULL UNIQUE,
+        created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      )
+    `);
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS class_memberships (
+        id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        class_id   UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+        student_id UUID NOT NULL REFERENCES users(id)   ON DELETE CASCADE,
+        joined_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE(class_id, student_id)
+      )
+    `);
+    classTablesEnsured = true;
+  } catch (e) {
+    console.warn('[teacherRoutes] ensureClassTables failed:', e.message.slice(0, 80));
+  }
+}
+
 // ── GET /api/teacher/classes ──────────────────────────────────────────────────
 router.get('/classes', protect, teacherOnly, async (req, res) => {
+  await ensureClassTables();
   try {
     if (!(await safeQuery(`SELECT 1 FROM classes LIMIT 1`, {}).then(r => r.length >= 0).catch(() => false))) {
       return res.json({ success: true, data: [] });
@@ -222,6 +252,7 @@ router.get('/classes', protect, teacherOnly, async (req, res) => {
 
 // ── POST /api/teacher/classes ─────────────────────────────────────────────────
 router.post('/classes', protect, teacherOnly, async (req, res) => {
+  await ensureClassTables();
   const { name } = req.body;
   if (!name) return res.status(400).json({ success: false, error: 'name is required' });
   const joinCode = crypto.randomBytes(3).toString('hex').toUpperCase();

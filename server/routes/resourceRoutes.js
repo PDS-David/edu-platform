@@ -295,16 +295,19 @@ router.get('/', protect, async (req, res) => {
         r.title,
         r.file_url,
         r.resource_type                              AS type,
+        r.resource_type                              AS resource_type,
         r.topic_id,
         r.subtopic_id,
         r.subject_id,
         r.is_staged,
         r.file_size_bytes,
-        COALESCE(s2.name, s1.name)                  AS subject_name
+        COALESCE(s2.name, s1.name)                  AS subject_name,
+        st2.name                                     AS subtopic_name
       FROM resources r
-      LEFT JOIN topics   t  ON t.id  = r.topic_id
-      LEFT JOIN subjects s1 ON s1.id = t.subject_id
-      LEFT JOIN subjects s2 ON s2.id = r.subject_id
+      LEFT JOIN topics     t   ON t.id   = r.topic_id
+      LEFT JOIN subjects   s1  ON s1.id  = t.subject_id
+      LEFT JOIN subjects   s2  ON s2.id  = r.subject_id
+      LEFT JOIN subtopics  st2 ON st2.id = r.subtopic_id
       WHERE ${filters.join(' AND ')}
       ORDER BY r.created_at DESC
     `, { replacements, type: QueryTypes.SELECT });
@@ -313,6 +316,91 @@ router.get('/', protect, async (req, res) => {
   } catch (err) {
     console.error('[GET /resources]', err.message);
     return res.json({ success: true, count: 0, data: [] });
+  }
+});
+
+/* ================================
+   POST /api/resources/upload
+   Single-file upload (used by TeacherResourcesPage Tab 1 via XHR)
+================================ */
+
+router.post(
+  '/upload',
+  protect,
+  authorize('admin', 'teacher'),
+  upload.single('file'),
+  async (req, res) => {
+    await ensureExtraColumns();
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No file received' });
+    }
+
+    const { title, topic_id, subtopic_id } = req.body;
+    const resourceType = guessResourceType(req.file.originalname);
+    const fileUrl      = `/uploads/resources/${req.file.filename}`;
+    const ext          = path.extname(req.file.originalname);
+
+    try {
+      const rows = await sequelize.query(`
+        INSERT INTO resources
+          (title, resource_type, file_url, file_size_bytes,
+           original_filename, mime_type,
+           topic_id, subtopic_id,
+           is_staged, is_active, is_free,
+           uploaded_by, created_at, updated_at)
+        VALUES
+          (:title, :resource_type, :file_url, :file_size_bytes,
+           :original_filename, :mime_type,
+           :topic_id, :subtopic_id,
+           false, true, true,
+           :uploaded_by, NOW(), NOW())
+        RETURNING
+          id, title, resource_type, file_url,
+          file_size_bytes, original_filename, is_staged, created_at
+      `, {
+        replacements: {
+          title:             (title || path.basename(req.file.originalname, ext)).trim(),
+          resource_type:     resourceType,
+          file_url:          fileUrl,
+          file_size_bytes:   req.file.size,
+          original_filename: req.file.originalname,
+          mime_type:         req.file.mimetype,
+          topic_id:          topic_id    || null,
+          subtopic_id:       subtopic_id || null,
+          uploaded_by:       req.user.id,
+        },
+        type: QueryTypes.SELECT,
+      });
+
+      return res.json({
+        success:  true,
+        data:     rows[0],
+        message:  'Resource uploaded successfully.',
+      });
+    } catch (err) {
+      console.error('[POST /resources/upload]', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+);
+
+/* ================================
+   DELETE /api/resources/:id
+   Soft-delete — marks is_active=false (used by TeacherResourcesPage Tab 2)
+================================ */
+
+router.delete('/:id', protect, authorize('admin', 'teacher'), async (req, res) => {
+  await ensureExtraColumns();
+  try {
+    await sequelize.query(
+      `UPDATE resources SET is_active = false, updated_at = NOW() WHERE id = :id`,
+      { replacements: { id: req.params.id }, type: QueryTypes.UPDATE }
+    );
+    return res.json({ success: true, message: 'Resource deleted' });
+  } catch (err) {
+    console.error('[DELETE /resources/:id]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 

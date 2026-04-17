@@ -101,8 +101,133 @@ router.get('/', protect, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────
-// GET /api/subtopics/:id
+// GET /api/subtopics/progress-summary
+// Called by SubjectPage — returns aggregated progress for a subject.
+// MUST be registered before /:id to avoid 'progress-summary' being treated as an id.
+// Response shape (flat — no .data wrapper so apiClient passes .success through):
+//   { success, completed_subtopics, total_subtopics, completion_pct }
 // ─────────────────────────────────────────────────────────────
+router.get('/progress-summary', protect, async (req, res) => {
+  const { subject_id } = req.query;
+  const studentId = req.user.id;
+
+  if (!subject_id) {
+    return res.status(400).json({ success: false, error: 'subject_id is required' });
+  }
+
+  try {
+    const rows = await sequelize.query(`
+      SELECT
+        st.id,
+        COALESCE(sp.resources_completed, false) AS resources_completed,
+        COALESCE(sp.practice_completed,  false) AS practice_completed,
+        COALESCE(sp.quiz_completed,      false) AS quiz_completed
+      FROM subtopics st
+      JOIN topics t ON t.id = st.topic_id
+      LEFT JOIN subtopic_progress sp
+        ON sp.subtopic_id = st.id AND sp.student_id = :studentId
+      WHERE t.subject_id = :subjectId
+        AND COALESCE(st.is_active, true) = true
+    `, { replacements: { studentId, subjectId: subject_id }, type: QueryTypes.SELECT });
+
+    const total     = rows.length;
+    const completed = rows.filter(r =>
+      r.resources_completed && r.practice_completed && r.quiz_completed
+    ).length;
+    const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+    // Flat response so apiClient exposes .success on the normalized object
+    return res.json({
+      success:             true,
+      completed_subtopics: completed,
+      total_subtopics:     total,
+      completion_pct:      pct,
+    });
+  } catch (err) {
+    console.error('[GET /subtopics/progress-summary]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/subtopics/:id/progress
+// Called by SubtopicPage on mount to restore progress state.
+// Returns flat object so apiClient exposes .success correctly.
+// ─────────────────────────────────────────────────────────────
+router.get('/:id/progress', protect, async (req, res) => {
+  const subtopicId = Number(req.params.id);
+  const studentId  = req.user.id;
+
+  if (!Number.isInteger(subtopicId) || subtopicId <= 0) {
+    return res.status(400).json({ success: false, error: 'Invalid subtopic ID' });
+  }
+
+  try {
+    const [row] = await sequelize.query(`
+      SELECT resources_completed, practice_completed, quiz_completed
+      FROM subtopic_progress
+      WHERE subtopic_id = :subtopicId AND student_id = :studentId
+    `, { replacements: { subtopicId, studentId }, type: QueryTypes.SELECT });
+
+    // Flat response — apiClient: r = { data: { success, resources_completed, ... }, status }
+    // SubtopicPage: if (r.success) setProgress(r.data) → r.data has all fields needed
+    return res.json({
+      success:             true,
+      resources_completed: row?.resources_completed ?? false,
+      practice_completed:  row?.practice_completed  ?? false,
+      quiz_completed:      row?.quiz_completed       ?? false,
+    });
+  } catch (err) {
+    console.error('[GET /subtopics/:id/progress]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+// POST /api/subtopics/:id/progress
+// Called by SubtopicPage when a tab is completed.
+// Body: { task: 'resources' | 'practice' | 'quiz' }
+// Maps task name → boolean column and upserts subtopic_progress row.
+// ─────────────────────────────────────────────────────────────
+router.post('/:id/progress', protect, async (req, res) => {
+  const subtopicId = Number(req.params.id);
+  const studentId  = req.user.id;
+  const { task }   = req.body;
+
+  if (!Number.isInteger(subtopicId) || subtopicId <= 0) {
+    return res.status(400).json({ success: false, error: 'Invalid subtopic ID' });
+  }
+
+  const TASK_MAP = {
+    resources: 'resources_completed',
+    practice:  'practice_completed',
+    quiz:      'quiz_completed',
+  };
+
+  const column = TASK_MAP[task];
+  if (!column) {
+    return res.status(400).json({ success: false, error: `Invalid task: must be one of ${Object.keys(TASK_MAP).join(', ')}` });
+  }
+
+  try {
+    await sequelize.query(`
+      INSERT INTO subtopic_progress
+        (student_id, subtopic_id, ${column}, last_accessed)
+      VALUES
+        (:studentId, :subtopicId, true, NOW())
+      ON CONFLICT (student_id, subtopic_id) DO UPDATE SET
+        ${column}    = true,
+        last_accessed = NOW()
+    `, { replacements: { studentId, subtopicId }, type: QueryTypes.INSERT });
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('[POST /subtopics/:id/progress]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+
 router.get('/:id', protect, async (req, res) => {
   const id = Number(req.params.id);
 
