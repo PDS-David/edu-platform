@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import api from '../services/api';
+import api from '../services/apiClient';
 import TopNav from '../components/TopNav';
 import {
   Upload, FileText, Video, Music, Trash2, Loader2,

@@ -16,7 +16,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Hls from 'hls.js';
-import api from '../services/api';
+import api from '../services/apiClient';
 import {
   Play, Pause, Volume2, VolumeX, Maximize, Minimize,
   RotateCcw, Loader2, AlertTriangle, CheckCircle2, Lock

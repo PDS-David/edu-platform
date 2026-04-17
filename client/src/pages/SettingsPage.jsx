@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import TopNav from '../components/TopNav';
-import api from '../services/api';
+import api from '../services/apiClient';
 import {
   User, Lock, Bell, Eye, EyeOff, Check, AlertTriangle,
   X, Loader2, Shield, Mail, Phone, Globe, Calendar,

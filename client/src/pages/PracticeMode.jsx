@@ -15,7 +15,7 @@ import {
   ChevronLeft, ChevronRight, Lightbulb, CheckCircle,
   XCircle, RotateCcw, ArrowRight, Loader2, BookOpen, Sparkles,
 } from 'lucide-react';
-import api from '../services/api';
+import api from '../services/apiClient';
 
 const LABELS = ['A', 'B', 'C', 'D', 'E', 'F'];
 

@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../services/api';
+import api from '../services/apiClient';
 import {
   CheckCircle, XCircle, Clock, ChevronLeft, ChevronRight,
   User, Calendar, BookOpen, Tag, Loader, RefreshCw, AlertCircle,

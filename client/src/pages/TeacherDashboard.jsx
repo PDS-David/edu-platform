@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link, Outlet } from 'react-router-dom';
-import api from '../services/api';
+import api from '../services/apiClient';
 import {
   Users, Plus, Copy, CheckCircle, Loader2, AlertTriangle,
   BarChart2, Zap, X, ChevronRight, Send, PenTool,

@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import api from '../services/api';
+import api from '../services/apiClient';
 import { ChevronLeft, Loader2 } from 'lucide-react';
 import { UpgradeWall } from './PricingPage';
 

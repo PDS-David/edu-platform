@@ -7,7 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
-import api from '../services/api';
+import api from '../services/apiClient';
 import {
   ChevronDown, ChevronUp, CheckCircle, XCircle,
   Loader2, RotateCcw, ArrowLeft, Trophy, Clock, Target,

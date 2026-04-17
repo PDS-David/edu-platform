@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Eye, EyeOff, ChevronDown, ChevronUp, AlertCircle, RefreshCw } from 'lucide-react';
 import PublicNav from '../components/PublicNav';
-import api from '../services/api';
+import api from '../services/apiClient';
 
 // ── Country codes ─────────────────────────────────────────────────────────────
 const COUNTRY_CODES = [

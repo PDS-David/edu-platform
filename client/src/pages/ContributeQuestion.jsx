@@ -17,7 +17,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect } from 'react';
-import api from '../services/api';
+import api from '../services/apiClient';
 import {
   Send, CheckCircle, PlusCircle, Trash2, Lightbulb,
   Loader, BookOpen, ArrowLeft, FileText, Eye,

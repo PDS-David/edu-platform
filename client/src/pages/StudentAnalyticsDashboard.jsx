@@ -13,7 +13,7 @@
 
 import { useState, useEffect }    from 'react';
 import { Link, useNavigate }      from 'react-router-dom';
-import api                        from '../services/api';
+import api                        from '../services/apiClient';
 import {
   LineChart, Line, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip,

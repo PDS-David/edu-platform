@@ -5,7 +5,7 @@
 // Chat history persisted per session via /api/ai/chat/session + session_id.
 
 import { useState, useRef, useEffect } from 'react';
-import api from '../services/api';
+import api from '../services/apiClient';
 import { X, Send, Loader2, Sparkles } from 'lucide-react';
 import { UpgradeWall } from '../pages/PricingPage';
 
