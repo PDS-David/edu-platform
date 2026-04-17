@@ -1,10 +1,10 @@
-import api from "../services/apiClient";
+import api from './axios';
 
 /**
  * LOGIN
  */
 export const login = async (email, password) => {
-  const res = await api.post("/auth/login", {
+  const res = await api.post('/api/auth/login', {
     email,
     password,
   });
@@ -16,7 +16,7 @@ export const login = async (email, password) => {
  * REGISTER
  */
 export const register = async (payload) => {
-  const res = await api.post("/auth/register", payload);
+  const res = await api.post('/api/auth/register', payload);
   return res.data;
 };
 
@@ -24,6 +24,6 @@ export const register = async (payload) => {
  * GET CURRENT USER
  */
 export const getMe = async () => {
-  const res = await api.get("/auth/me");
+  const res = await api.get('/api/users/me');
   return res.data;
 };
