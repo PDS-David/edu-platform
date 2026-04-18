@@ -133,7 +133,11 @@ function MetaForm({ file, onSave, onDismiss }) {
       {/* Exam Type */}
       <select value={form.examTypeId} onChange={e => set('examTypeId', e.target.value)} className={sel}>
         <option value="">Select Exam Type (optional)…</option>
-        {examTypes.map(t => <option key={t.id} value={t.id}>{t.name || t.code}</option>)}
+        {examTypes.map(t => {
+          const emoji = t.icon_emoji?.trim();
+          const safeIcon = (!emoji || emoji === '?' || emoji === '\uFFFD') ? '' : emoji;
+          return <option key={t.id} value={t.id}>{safeIcon ? safeIcon + ' ' : ''}{t.name || t.code}</option>;
+        })}
       </select>
 
       {/* Subject */}

@@ -18,6 +18,16 @@ import {
 } from 'recharts';
 
 
+// ─── Safe emoji helper — strips question-mark artifacts from missing/broken emoji ──
+// icon_emoji in the DB can be an empty string, null, or a misencoded char that renders as '?'
+const safeEmoji = (raw) => {
+  if (!raw) return '';
+  const s = String(raw).trim();
+  // A lone ASCII '?' or replacement char (U+FFFD) is not a real emoji — discard it
+  if (s === '?' || s === '\uFFFD') return '';
+  return s;
+};
+
 // ─── Reusable Modal ───────────────────────────────────────────────────────────
 const Modal = ({ title, onClose, children }) => (
   <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -886,7 +896,7 @@ const TeacherAssignmentPanel = () => {
                     ? <option disabled>Loading…</option>
                     : examTypes.filter(et => et.is_active !== false).map(et => (
                         <option key={et.id} value={et.id}>
-                          {et.icon_emoji || ''} {et.name} ({et.code})
+                          {safeEmoji(et.icon_emoji) ? safeEmoji(et.icon_emoji) + ' ' : ''}{et.name} ({et.code})
                         </option>
                       ))
                   }
@@ -1090,7 +1100,7 @@ const AIGeneratePanel = () => {
                     .filter(et => et.is_active !== false)
                     .map(et => (
                       <option key={et.code} value={et.code}>
-                        {et.icon_emoji || ''} {et.name}
+                        {safeEmoji(et.icon_emoji) ? safeEmoji(et.icon_emoji) + ' ' : ''}{et.name}
                       </option>
                     ))
               }

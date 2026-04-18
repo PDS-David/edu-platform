@@ -73,11 +73,15 @@ const ExamBoardSelector = ({
         >
           {showAll && <option value=""> All Types</option>}
 
-          {visibleTypes.map(board => (
-            <option key={board.id} value={board.code}>
-              {board.icon_emoji || ''} {board.name}
-            </option>
-          ))}
+          {visibleTypes.map(board => {
+            const emoji = board.icon_emoji?.trim();
+            const safeIcon = (!emoji || emoji === '?' || emoji === '\uFFFD') ? '' : emoji;
+            return (
+              <option key={board.id} value={board.code}>
+                {safeIcon ? safeIcon + ' ' : ''}{board.name}
+              </option>
+            );
+          })}
         </select>
 
         {/* Custom dropdown arrow */}
