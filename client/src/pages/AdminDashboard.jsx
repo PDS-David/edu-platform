@@ -995,44 +995,67 @@ const TeacherAssignmentPanel = () => {
 // ─── AI Generate Panel ────────────────────────────────────────────────────────
 const AIGeneratePanel = () => {
   const [subjects,      setSubjects]      = useState([]);
-  const [subjectsLoad,  setSubjectsLoad]  = useState(true);
+  const [subjectsLoad,  setSubjectsLoad]  = useState(false);
   const [pendingCount,  setPendingCount]  = useState(null);
   const [form, setForm] = useState({
-    subject_id: '', topic: '', exam_board: 'JAMB',
-    count: 10, difficulty: 'medium',
+    exam_type_id: '', subject_id: '', topic: '',
+    exam_board: '', count: 10, difficulty: 'medium',
   });
   const [generating,       setGenerating]       = useState(false);
   const [result,           setResult]           = useState(null);
   const [error,            setError]            = useState('');
   const [previewQuestions, setPreviewQuestions] = useState([]);
 
-  // ── Use shared catalog hook for exam types ──────────────────────────────────
-  const { examTypes, loadingTypes: examTypesLoad } = useCatalog();
+  // ── Shared catalog hook for exam types ─────────────────────────────────────
+  const { examTypes, loadingTypes: examTypesLoad, fetchSubjectsForType } = useCatalog();
 
   useEffect(() => {
-    api.get('/admin/subjects')
-      .then(r => setSubjects(r.data || r || []))
-      .catch(() => {})
-      .finally(() => setSubjectsLoad(false));
-
     api.get('/admin/questions/pending-count')
       .then(r => setPendingCount(r.count))
       .catch(() => {});
   }, []); // eslint-disable-line
 
+  // When exam type changes → load its subjects and update exam_board code
+  const handleExamTypeChange = async (typeId) => {
+    const chosen = examTypes.find(et => String(et.id) === String(typeId));
+    setForm(f => ({ ...f, exam_type_id: typeId, subject_id: '', exam_board: chosen?.code || '' }));
+    setSubjects([]);
+    if (!typeId) return;
+    setSubjectsLoad(true);
+    try {
+      const raw = await fetchSubjectsForType(typeId);
+      // Deduplicate subjects by id (C)
+      const unique = [...new Map(raw.map(s => [s.id, s])).values()];
+      setSubjects(unique);
+    } catch {
+      setError('Failed to load subjects for this exam type.');
+    } finally {
+      setSubjectsLoad(false);
+    }
+  };
+
   const handleGenerate = async (e) => {
     e.preventDefault();
-    if (!form.subject_id || !form.topic.trim()) {
-      setError('Subject and topic are required.'); return;
-    }
+    if (!form.exam_type_id) { setError('Please select an exam type first.'); return; }
+    if (!form.subject_id)   { setError('Please select a subject.'); return; }
+    if (!form.topic.trim()) { setError('Please enter a topic.'); return; }
     setError(''); setResult(null); setPreviewQuestions([]); setGenerating(true);
     try {
-      const res = await api.post('/admin/generate-questions', form);
+      const res = await api.post('/admin/generate-questions', {
+        subject_id: form.subject_id,
+        topic:      form.topic,
+        exam_board: form.exam_board,
+        count:      form.count,
+        difficulty: form.difficulty,
+      });
       setResult(res);
-      if (Array.isArray(res.questions)) setPreviewQuestions(res.questions);
-      setPendingCount(c => (c || 0) + (res.inserted || 0));
+      // The generated questions may be nested under res.data or res directly
+      const qs = res?.data?.questions ?? res?.questions ?? [];
+      if (Array.isArray(qs)) setPreviewQuestions(qs);
+      const inserted = res?.data?.inserted ?? res?.inserted ?? 0;
+      setPendingCount(c => (c || 0) + inserted);
     } catch (err) {
-      setError(err?.error || 'Generation failed.');
+      setError(err?.message || err?.error || 'Generation failed.');
     } finally {
       setGenerating(false);
     }
@@ -1057,26 +1080,66 @@ const AIGeneratePanel = () => {
       </div>
 
       <form onSubmit={handleGenerate} className="space-y-4 max-w-lg">
+
+        {/* Step 1: Exam Type — must be selected first */}
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Subject</label>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">
+            Exam Type <span className="text-red-500">*</span>
+          </label>
           <select
-            value={form.subject_id}
-            onChange={e => setForm(f => ({ ...f, subject_id: e.target.value }))}
+            value={form.exam_type_id}
+            onChange={e => handleExamTypeChange(e.target.value)}
             className={inputCls}
             required
           >
-            <option value="">Select subject…</option>
-            {subjectsLoad
+            <option value="">Select exam type first…</option>
+            {examTypesLoad
               ? <option disabled>Loading…</option>
-              : subjects.map(s => (
-                  <option key={s.id} value={s.id}>{s.name} ({s.exam_board_code})</option>
-                ))
+              : examTypes
+                  .filter(et => et.is_active !== false)
+                  .map(et => (
+                    <option key={et.id} value={et.id}>
+                      {safeEmoji(et.icon_emoji) ? safeEmoji(et.icon_emoji) + ' ' : ''}{et.name} ({et.code})
+                    </option>
+                  ))
             }
           </select>
         </div>
 
+        {/* Step 2: Subject — loads after exam type is chosen */}
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Topic</label>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">
+            Subject <span className="text-red-500">*</span>
+          </label>
+          {!form.exam_type_id ? (
+            <div className="border-2 border-dashed border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-400">
+              Select an exam type above to see its subjects
+            </div>
+          ) : (
+            <select
+              value={form.subject_id}
+              onChange={e => setForm(f => ({ ...f, subject_id: e.target.value }))}
+              className={inputCls}
+              required
+            >
+              <option value="">Select subject…</option>
+              {subjectsLoad
+                ? <option disabled>Loading subjects…</option>
+                : subjects.length === 0
+                  ? <option disabled>No subjects found — add them in Catalog Management</option>
+                  : subjects.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))
+              }
+            </select>
+          )}
+        </div>
+
+        {/* Step 3: Topic */}
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">
+            Topic <span className="text-red-500">*</span>
+          </label>
           <input
             type="text"
             value={form.topic}
@@ -1087,28 +1150,10 @@ const AIGeneratePanel = () => {
           />
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
+        {/* Step 4: Difficulty + Count */}
+        <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Exam Type</label>
-            <select
-              value={form.exam_board}
-              onChange={e => setForm(f => ({ ...f, exam_board: e.target.value }))}
-              className={inputCls}
-            >
-              {examTypesLoad
-                ? <option disabled>Loading…</option>
-                : examTypes
-                    .filter(et => et.is_active !== false)
-                    .map(et => (
-                      <option key={et.code} value={et.code}>
-                        {safeEmoji(et.icon_emoji) ? safeEmoji(et.icon_emoji) + ' ' : ''}{et.name}
-                      </option>
-                    ))
-              }
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Difficulty</label>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Difficulty</label>
             <select value={form.difficulty} onChange={e => setForm(f => ({ ...f, difficulty: e.target.value }))} className={inputCls}>
               <option value="easy">Easy</option>
               <option value="medium">Medium</option>
@@ -1116,7 +1161,7 @@ const AIGeneratePanel = () => {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Count</label>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Count</label>
             <select value={form.count} onChange={e => setForm(f => ({ ...f, count: Number(e.target.value) }))} className={inputCls}>
               <option value={10}>10</option>
               <option value={20}>20</option>
@@ -1133,7 +1178,7 @@ const AIGeneratePanel = () => {
 
         {result && (
           <div className="flex items-center gap-2 text-green-700 bg-green-50 border border-green-100 rounded-xl px-4 py-3 text-sm">
-            <Check size={14} /> {result.message}
+            <Check size={14} /> {result.message || result?.data?.message || 'Questions generated successfully!'}
           </div>
         )}
 
