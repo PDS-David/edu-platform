@@ -48,6 +48,7 @@ import TeacherPendingQuestions from "./pages/TeacherPendingQuestions";
 import TeacherResourcesPage from "./pages/TeacherResourcesPage";
 import ContributeQuestion from "./pages/ContributeQuestion";
 import QuestionReview from "./pages/QuestionReview";
+import TeacherAddQuestionPage from "./pages/TeacherAddQuestionPage";
 
 // Admin
 import AdminDashboard from "./pages/AdminDashboard";
@@ -107,6 +108,7 @@ export default function App() {
             <Route path="resources" element={<TeacherResourcesPage />} />
             <Route path="review" element={<QuestionReview />} />
             <Route path="contribute" element={<ContributeQuestion />} />
+            <Route path="questions/add" element={<TeacherAddQuestionPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
         </Route>
