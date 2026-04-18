@@ -52,8 +52,14 @@ const getSubjects = async (req, res) => {
     }
 
     // ── Normal mode (all other callers) ───────────────────────────────────────
+    // When no exam_board filter is applied we deduplicate by name so the same
+    // subject that exists under multiple exam boards only appears once in any
+    // dropdown.  When an exam_board filter IS supplied we return all rows for
+    // that board (the caller needs the board-specific id).
     const params = [];
     let pIdx = 1;
+
+    const hasExamBoardFilter = !!(exam_board_id || exam_board_code);
 
     const join =
       `LEFT JOIN exam_boards eb
@@ -82,8 +88,11 @@ const getSubjects = async (req, res) => {
       where += ` AND UPPER(eb.code) = $${pIdx++}`;
     }
 
+    // Deduplicate by name when no board filter — pick one representative row
+    const distinctClause = hasExamBoardFilter ? '' : 'DISTINCT ON (s.name)';
+
     const query = `
-      SELECT
+      SELECT ${distinctClause}
         s.*,
         eb.code AS exam_board_code,
         eb.name AS exam_board_name
