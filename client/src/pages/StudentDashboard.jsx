@@ -25,7 +25,7 @@ export default function StudentDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const firstName = user?.firstName || "Student";
+  const firstName = user?.first_name || user?.firstName || user?.name?.split(' ')[0] || user?.email?.split('@')[0] || 'there';
 
   const [subjects,          setSubjects]          = useState([]);
   const [loadingSubjects,   setLoadingSubjects]   = useState(true);
