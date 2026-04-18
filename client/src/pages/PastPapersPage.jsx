@@ -51,7 +51,7 @@ export default function PastPapersPage() {
 
   // Load subjects for filter
   useEffect(() => {
-    api.get('/subjects')
+    api.get('/subjects?for_test_builder=true')
       .then(r => setSubjects(r.data || []))
       .catch(() => {});
   }, []);

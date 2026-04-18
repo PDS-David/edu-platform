@@ -103,9 +103,9 @@ export default function OnboardingPage() {
           }
         }
 
-        // Priority 3: fall back to all subjects
+        // Priority 3: fall back to all subjects (deduplicated by name via server)
         if (subs.length === 0) {
-          const allRes = await api.get('/subjects').catch(() => ({ data: [] }));
+          const allRes = await api.get('/subjects?for_test_builder=true').catch(() => ({ data: [] }));
           subs = extractList(allRes);
         }
 
