@@ -301,7 +301,91 @@ router.get('/class/:classId/analytics', protect, teacherOnly, async (req, res) =
 
 // ── GET /api/teacher/tests ────────────────────────────────────────────────────
 router.get('/tests', protect, teacherOnly, async (req, res) => {
-  return res.json({ success: true, data: [], message: 'Test builder coming soon' });
+  try {
+    const rows = await safeQuery(
+      `SELECT ct.id, ct.title, ct.duration_minutes, ct.total_marks, ct.is_published, ct.created_at,
+              COUNT(tq.id)::INTEGER AS question_count
+       FROM custom_tests ct
+       LEFT JOIN test_questions tq ON tq.test_id = ct.id
+       WHERE ct.teacher_id = :teacherId
+       GROUP BY ct.id
+       ORDER BY ct.created_at DESC`,
+      { teacherId: req.user.id }
+    );
+    return res.json({ success: true, data: rows });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── POST /api/teacher/tests ───────────────────────────────────────────────────
+router.post('/tests', protect, teacherOnly, async (req, res) => {
+  const { title, duration_minutes = 60, total_marks = 100 } = req.body;
+  if (!title?.trim()) return res.status(400).json({ success: false, error: 'title is required' });
+  try {
+    const rows = await sequelize.query(
+      `INSERT INTO custom_tests (teacher_id, title, duration_minutes, total_marks, is_published, created_at)
+       VALUES (:teacherId, :title, :dur, :marks, false, NOW())
+       RETURNING id, title, duration_minutes, total_marks, is_published, created_at`,
+      {
+        replacements: { teacherId: req.user.id, title: title.trim(), dur: duration_minutes, marks: total_marks },
+        type: QueryTypes.SELECT,
+      }
+    );
+    return res.status(201).json({ success: true, data: { ...rows[0], question_count: 0 } });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── PUT /api/teacher/tests/:id/publish ────────────────────────────────────────
+router.put('/tests/:id/publish', protect, teacherOnly, async (req, res) => {
+  try {
+    await sequelize.query(
+      `UPDATE custom_tests SET is_published = true WHERE id = :id AND teacher_id = :teacherId`,
+      { replacements: { id: req.params.id, teacherId: req.user.id }, type: QueryTypes.UPDATE }
+    );
+    return res.json({ success: true, message: 'Test published.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── POST /api/teacher/tests/:id/assign ───────────────────────────────────────
+// Assigns a test to all students in a class by creating test_assignments rows.
+router.post('/tests/:id/assign', protect, teacherOnly, async (req, res) => {
+  const { class_id } = req.body;
+  if (!class_id) return res.status(400).json({ success: false, error: 'class_id is required' });
+  try {
+    // Verify teacher owns test
+    const test = await safeQuery(
+      `SELECT id FROM custom_tests WHERE id = :id AND teacher_id = :teacherId`,
+      { id: req.params.id, teacherId: req.user.id }
+    );
+    if (!test.length) return res.status(404).json({ success: false, error: 'Test not found' });
+
+    // Get all students in the class
+    const members = await safeQuery(
+      `SELECT student_id FROM class_memberships WHERE class_id = :classId`,
+      { classId: class_id }
+    );
+    let count = 0;
+    for (const m of members) {
+      await sequelize.query(
+        `INSERT INTO test_assignments (test_id, student_id, class_id, assigned_at)
+         VALUES (:testId, :studentId, :classId, NOW())
+         ON CONFLICT (test_id, student_id) DO NOTHING`,
+        {
+          replacements: { testId: req.params.id, studentId: m.student_id, classId: class_id },
+          type: QueryTypes.INSERT,
+        }
+      ).catch(() => {});
+      count++;
+    }
+    return res.json({ success: true, message: `Test assigned to ${count} student(s).`, count });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // ── POST /api/teacher/nudge/:userId ──────────────────────────────────────────
