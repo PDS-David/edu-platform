@@ -1313,14 +1313,24 @@ const UserManagementPanel = () => {
         </div>
       )}
 
-      <div className="flex gap-3 mb-4">
-        <input
-          type="text"
-          placeholder="Search by name or email…"
-          value={search}
-          onChange={e => { setSearch(e.target.value); setPage(1); }}
-          className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-        />
+      <div className="flex gap-3 mb-4 flex-wrap">
+        <div className="relative flex-1 min-w-[200px]">
+          <input
+            type="text"
+            placeholder="Search by name or email…"
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1); }}
+            className="w-full border border-gray-200 rounded-xl pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+          />
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+          </svg>
+          {search && (
+            <button onClick={() => { setSearch(''); setPage(1); }} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+              <X size={13} />
+            </button>
+          )}
+        </div>
         <select
           value={roleFilter}
           onChange={e => { setRoleFilter(e.target.value); setPage(1); }}
@@ -1332,6 +1342,12 @@ const UserManagementPanel = () => {
           <option value="admin">Admins</option>
         </select>
       </div>
+      {search && (
+        <p className="text-xs text-gray-400 mb-3">
+          Searching across name and email for <span className="font-semibold text-gray-600">"{search}"</span>
+          {' '}— {total} result{total !== 1 ? 's' : ''} found
+        </p>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 text-blue-400 animate-spin" /></div>

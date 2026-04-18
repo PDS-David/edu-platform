@@ -40,10 +40,13 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => {
     return {
-      data: response.data?.data ?? response.data,
+      data:    response.data?.data    ?? response.data,
       success: response.data?.success,
-      meta: response.data?.meta ?? null,
-      status: response.status,
+      meta:    response.data?.meta    ?? null,
+      total:   response.data?.total   ?? null,
+      count:   response.data?.count   ?? null,
+      message: response.data?.message ?? null,
+      status:  response.status,
     };
   },
   (error) => {
