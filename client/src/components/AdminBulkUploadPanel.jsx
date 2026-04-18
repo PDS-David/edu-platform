@@ -85,7 +85,7 @@ function MetaForm({ file, onSave, onDismiss }) {
     subjectId:  '',
     topicId:    '',
     subtopicId: '',
-    pushType:   'learning_material',
+    pushType:   'lecture_material',
   });
   const [saving, setSaving] = useState(false);
   const [msg,    setMsg]    = useState('');
@@ -163,12 +163,11 @@ function MetaForm({ file, onSave, onDismiss }) {
 
       {/* Push type */}
       <div>
-        <p className="text-[10px] font-semibold text-gray-500 uppercase mb-1.5">Push as</p>
+        <p className="text-[10px] font-semibold text-gray-500 uppercase mb-1.5">Resource Type</p>
         <div className="flex gap-2 flex-wrap">
           {[
-            { value: 'learning_material', label: '📚 Learning Material' },
-            { value: 'practice_test',     label: '📝 Practice Test'     },
-            { value: 'quiz',              label: '⚡ Quiz'               },
+            { value: 'lecture_material',  label: '📖 Lecture Material'  },
+            { value: 'question_material', label: '❓ Question Material' },
           ].map(pt => (
             <button key={pt.value} type="button" onClick={() => set('pushType', pt.value)}
               className={`px-2.5 py-1 text-xs font-medium rounded-lg border transition-colors ${
@@ -199,29 +198,39 @@ function MetaForm({ file, onSave, onDismiss }) {
   );
 }
 
-// ── Per-file assign-users form ────────────────────────────────────────────────
+// ── Push-type options (A) ─────────────────────────────────────────────────────
+// Two canonical resource types: lecture material or question/practice material.
 const PUSH_TYPES = [
-  { value: 'learning_material', label: '📚 Learning Material' },
-  { value: 'practice_test',     label: '📝 Practice Test'     },
-  { value: 'quiz',              label: '⚡ Quiz'               },
+  { value: 'lecture_material',  label: '📖 Lecture Material'  },
+  { value: 'question_material', label: '❓ Question Material' },
 ];
 
+// ── Per-file assign-users form ────────────────────────────────────────────────
 function AssignUsersForm({ file, onDone, onDismiss }) {
   const [students,      setStudents]      = useState([]);
   const [classes,       setClasses]       = useState([]);
   const [selected,      setSelected]      = useState([]);
   const [selectedClass, setSelectedClass] = useState([]);
   const [assignAll,     setAssignAll]     = useState(false);
-  const [pushType,      setPushType]      = useState('learning_material');
+  const [pushType,      setPushType]      = useState('lecture_material');
   const [search,        setSearch]        = useState('');
   const [saving,        setSaving]        = useState(false);
   const [msg,           setMsg]           = useState('');
-  const [tab,           setTab]           = useState('students'); // 'students' | 'classes'
+  // assignTarget: 'students' | 'class'  — mutually exclusive (A)
+  const [assignTarget,  setAssignTarget]  = useState('students');
 
   useEffect(() => {
     api.get('/users', { params: { role: 'student' } }).then(r => setStudents(extract(r))).catch(() => {});
     api.get('/teacher/classes').then(r => setClasses(extract(r))).catch(() => {});
   }, []);
+
+  // When target switches, clear the other selection (A — prevent broken assignments)
+  const switchTarget = (t) => {
+    setAssignTarget(t);
+    setMsg('');
+    if (t === 'students') { setSelectedClass([]); }
+    if (t === 'class')    { setSelected([]); setAssignAll(false); }
+  };
 
   const filtered = students.filter(s =>
     `${s.first_name} ${s.last_name} ${s.email}`.toLowerCase().includes(search.toLowerCase())
@@ -231,37 +240,42 @@ function AssignUsersForm({ file, onDone, onDismiss }) {
   const toggleClass   = (id) => setSelectedClass(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
   const handleAssign = async () => {
-    const hasTarget = assignAll || selected.length > 0 || selectedClass.length > 0;
-    if (!hasTarget) { setMsg('Select at least one student, class, or choose "All students".'); return; }
+    // Guard: must have a target (A — no broken assignments)
+    if (assignTarget === 'students' && !assignAll && selected.length === 0) {
+      setMsg('Select at least one student, or tick "All active students".'); return;
+    }
+    if (assignTarget === 'class' && selectedClass.length === 0) {
+      setMsg('Select at least one class.'); return;
+    }
     setSaving(true); setMsg('');
     try {
       await api.put(`/resources/${file.id}/assign-users`, {
-        assign_all: assignAll,
-        user_ids:   assignAll ? [] : selected,
-        class_ids:  selectedClass,
+        assign_all: assignTarget === 'students' && assignAll,
+        user_ids:   assignTarget === 'students' && !assignAll ? selected : [],
+        class_ids:  assignTarget === 'class' ? selectedClass : [],
         push_type:  pushType,
       });
       onDone(file.id);
     } catch (err) {
-      setMsg(err?.error || 'Assignment failed.');
+      setMsg(err?.message || err?.error || 'Assignment failed.');
       setSaving(false);
     }
   };
 
   const tabCls = (t) => `px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-    tab === t ? 'bg-blue-600 text-white' : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-50'
+    assignTarget === t ? 'bg-blue-600 text-white' : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-50'
   }`;
 
   return (
     <div className="border-t border-gray-100 bg-blue-50 px-4 py-4 space-y-3">
       <p className="text-xs font-semibold text-gray-700">Push resource to students / classes</p>
 
-      {/* Push type selector */}
+      {/* Resource type — lecture or question (A) */}
       <div>
-        <p className="text-[10px] font-semibold text-gray-500 uppercase mb-1.5">Push as</p>
+        <p className="text-[10px] font-semibold text-gray-500 uppercase mb-1.5">Resource Type</p>
         <div className="flex gap-2 flex-wrap">
           {PUSH_TYPES.map(pt => (
-            <button key={pt.value} onClick={() => setPushType(pt.value)}
+            <button key={pt.value} type="button" onClick={() => setPushType(pt.value)}
               className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${
                 pushType === pt.value
                   ? 'bg-blue-600 border-blue-600 text-white'
@@ -273,19 +287,23 @@ function AssignUsersForm({ file, onDone, onDismiss }) {
         </div>
       </div>
 
-      {/* Students / Classes tab switcher */}
-      <div className="flex gap-2">
-        <button onClick={() => setTab('students')} className={tabCls('students')}>👤 Students</button>
-        <button onClick={() => setTab('classes')}  className={tabCls('classes')}>🏫 Classes</button>
+      {/* Target: Students OR Class — mutually exclusive (A) */}
+      <div>
+        <p className="text-[10px] font-semibold text-gray-500 uppercase mb-1.5">Assign To</p>
+        <div className="flex gap-2">
+          <button type="button" onClick={() => switchTarget('students')} className={tabCls('students')}>👤 Individual Students</button>
+          <button type="button" onClick={() => switchTarget('class')}    className={tabCls('class')}>🏫 A Class</button>
+        </div>
+        <p className="text-[10px] text-gray-400 mt-1">Assign to students OR a class — not both at once.</p>
       </div>
 
-      {tab === 'students' && (
+      {/* Students pane */}
+      {assignTarget === 'students' && (
         <>
           <label className="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" checked={assignAll} onChange={e => setAssignAll(e.target.checked)} className="rounded text-teal-500" />
             <span className="text-xs text-gray-700 font-medium">All active students ({students.length})</span>
           </label>
-
           {!assignAll && (
             <>
               <input value={search} onChange={e => setSearch(e.target.value)}
@@ -308,7 +326,8 @@ function AssignUsersForm({ file, onDone, onDismiss }) {
         </>
       )}
 
-      {tab === 'classes' && (
+      {/* Classes pane */}
+      {assignTarget === 'class' && (
         <div className="max-h-44 overflow-y-auto border border-gray-200 rounded-lg bg-white">
           {classes.length === 0
             ? <p className="text-xs text-gray-400 text-center py-4">No classes found.</p>
@@ -322,7 +341,7 @@ function AssignUsersForm({ file, onDone, onDismiss }) {
         </div>
       )}
 
-      {msg && <p className="text-xs text-red-600">{msg}</p>}
+      {msg && <p className="text-xs text-red-600 font-medium">{msg}</p>}
 
       <div className="flex gap-2">
         <button onClick={handleAssign} disabled={saving}
