@@ -152,6 +152,94 @@ router.get('/questions/pending-count', protect, adminOnly, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// QUESTION REVIEW ROUTES
+// ─────────────────────────────────────────────
+
+// GET /api/admin/questions/pending  — list questions awaiting review
+router.get('/questions/pending', protect, adminOnly, async (req, res) => {
+  try {
+    const limit  = Math.min(parseInt(req.query.limit  || '10', 10), 100);
+    const offset = parseInt(req.query.offset || '0', 10);
+
+    const rows = await sequelize.query(
+      `SELECT
+         q.id, q.question_text, q.options, q.correct_answer,
+         q.difficulty, q.explanation, q.status, q.is_ai_generated,
+         q.created_at,
+         u.first_name, u.last_name, u.email AS submitted_by_email,
+         s.name AS subject_name, st.name AS subtopic_name
+       FROM questions q
+       LEFT JOIN users      u  ON q.submitted_by  = u.id
+       LEFT JOIN subtopics  st ON q.subtopic_id   = st.id
+       LEFT JOIN subjects   s  ON st.subject_id   = s.id
+       WHERE COALESCE(q.status, 'pending') NOT IN ('approved', 'active', 'rejected')
+          OR (q.is_ai_generated = true AND COALESCE(q.status, 'pending') NOT IN ('approved', 'active', 'rejected'))
+       ORDER BY q.created_at DESC
+       LIMIT :limit OFFSET :offset`,
+      { replacements: { limit, offset }, type: QueryTypes.SELECT }
+    );
+
+    const [countRow] = await sequelize.query(
+      `SELECT COUNT(*)::INTEGER AS count
+       FROM questions
+       WHERE COALESCE(status, 'pending') NOT IN ('approved', 'active', 'rejected')`,
+      { type: QueryTypes.SELECT }
+    );
+
+    return res.json({ success: true, data: rows, total: countRow?.count || 0 });
+  } catch (err) {
+    console.error('[GET /admin/questions/pending]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// PUT /api/admin/questions/:id/review  — approve or reject a question
+router.put('/questions/:id/review', protect, adminOnly, async (req, res) => {
+  try {
+    const { action, feedback } = req.body;
+    if (!['approve', 'reject'].includes(action)) {
+      return res.status(400).json({ success: false, error: 'action must be "approve" or "reject"' });
+    }
+    const newStatus = action === 'approve' ? 'approved' : 'rejected';
+
+    await sequelize.query(
+      `UPDATE questions
+       SET status = :status,
+           review_feedback = :feedback,
+           reviewed_by = :reviewer,
+           reviewed_at = NOW(),
+           updated_at  = NOW()
+       WHERE id = :id`,
+      {
+        replacements: {
+          status:   newStatus,
+          feedback: feedback?.trim() || null,
+          reviewer: req.user.id,
+          id:       req.params.id,
+        },
+        type: QueryTypes.UPDATE,
+      }
+    );
+
+    return res.json({ success: true, status: newStatus });
+  } catch (err) {
+    console.error('[PUT /admin/questions/:id/review]', err.message);
+    // Column might not exist yet — try without the optional columns
+    try {
+      const newStatus = req.body.action === 'approve' ? 'approved' : 'rejected';
+      await sequelize.query(
+        `UPDATE questions SET status = :status, updated_at = NOW() WHERE id = :id`,
+        { replacements: { status: newStatus, id: req.params.id }, type: QueryTypes.UPDATE }
+      );
+      return res.json({ success: true, status: newStatus });
+    } catch (err2) {
+      return res.status(500).json({ success: false, error: err2.message });
+    }
+  }
+});
+
+// ─────────────────────────────────────────────
 // POST /api/admin/send-weekly-digest
 // Queues (or sends) a weekly activity digest email to all students.
 // Stub implementation — replace body with real job queue when ready.
