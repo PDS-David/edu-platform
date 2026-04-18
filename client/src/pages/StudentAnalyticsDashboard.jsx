@@ -90,6 +90,31 @@ export default function StudentAnalyticsDashboard() {
   const [predLoading,       setPredLoading]         = useState(false);
   const [predError,         setPredError]           = useState('');
 
+  // Learning path state
+  const [learningPath,      setLearningPath]        = useState(null);
+  const [pathLoading,       setPathLoading]          = useState(false);
+  const [pathError,         setPathError]            = useState('');
+
+  // ── Fetch learning path ────────────────────────────────────────────────────
+  const fetchLearningPath = async () => {
+    if (!user?.id) return;
+    setPathLoading(true);
+    setPathError('');
+    setLearningPath(null);
+    try {
+      const res = await api.get(`/ai/learning-path/${user.id}`);
+      if (res.success !== false && res.data?.steps) {
+        setLearningPath(res.data);
+      } else {
+        setPathError('Could not generate your learning path. Try again later.');
+      }
+    } catch {
+      setPathError('Could not generate your learning path. Try again later.');
+    } finally {
+      setPathLoading(false);
+    }
+  };
+
   // ── Fetch prediction ──────────────────────────────────────────────────────
   const fetchPrediction = async (subjectId) => {
     if (!subjectId || !user?.id) return;
@@ -398,8 +423,16 @@ export default function StudentAnalyticsDashboard() {
               {/* Study advice */}
               {prediction.studyAdvice && (
                 <div className="bg-purple-50 rounded-xl p-3">
-                  <p className="text-xs font-semibold text-purple-700 mb-1"> Study advice</p>
+                  <p className="text-xs font-semibold text-purple-700 mb-1">✦ Study advice</p>
                   <p className="text-sm text-gray-600 leading-relaxed">{prediction.studyAdvice}</p>
+                </div>
+              )}
+
+              {/* Weekly target */}
+              {prediction.weeklyTarget && (
+                <div className="bg-teal-50 rounded-xl p-3">
+                  <p className="text-xs font-semibold text-teal-700 mb-1">🎯 This week's target</p>
+                  <p className="text-sm text-gray-600 leading-relaxed">{prediction.weeklyTarget}</p>
                 </div>
               )}
             </div>
@@ -413,6 +446,115 @@ export default function StudentAnalyticsDashboard() {
             </div>
           )}
         </div>
+
+        {/* ── AI Learning Path ───────────────────────────────────────────── */}
+        <div className="bg-white rounded-2xl border border-gray-100 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Sparkles size={15} className="text-teal-500" />
+              <p className="text-sm font-semibold text-gray-700">AI Learning Path</p>
+            </div>
+            {!learningPath && !pathLoading && (
+              <button
+                onClick={fetchLearningPath}
+                className="flex items-center gap-1.5 text-xs font-semibold text-teal-600 border border-teal-200 px-3 py-1.5 rounded-lg hover:bg-teal-50 transition-colors"
+              >
+                <Sparkles size={11} /> Generate My Plan
+              </button>
+            )}
+            {learningPath && (
+              <button
+                onClick={fetchLearningPath}
+                className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                Regenerate
+              </button>
+            )}
+          </div>
+
+          {!pathLoading && !learningPath && !pathError && (
+            <div className="text-center py-8 text-gray-400">
+              <div className="w-12 h-12 rounded-full bg-teal-50 flex items-center justify-center mx-auto mb-3">
+                <Sparkles size={20} className="text-teal-400" />
+              </div>
+              <p className="text-sm font-medium">Your personalised study roadmap</p>
+              <p className="text-xs mt-1 text-gray-300">Click "Generate My Plan" to get a prioritised 5-step study plan based on your weak areas.</p>
+            </div>
+          )}
+
+          {pathLoading && (
+            <div className="flex flex-col items-center py-10 gap-3">
+              <Loader2 size={24} className="text-teal-400 animate-spin" />
+              <p className="text-xs text-gray-400">Analysing your performance…</p>
+            </div>
+          )}
+
+          {pathError && !pathLoading && (
+            <div className="text-center py-6">
+              <p className="text-sm text-red-400">{pathError}</p>
+              <button onClick={fetchLearningPath} className="mt-3 text-xs text-teal-600 underline">Try again</button>
+            </div>
+          )}
+
+          {!pathLoading && learningPath?.steps?.length > 0 && (
+            <div className="space-y-3">
+              {learningPath.ai_generated && (
+                <p className="text-xs text-teal-600 font-medium flex items-center gap-1">
+                  <Sparkles size={10} /> AI-personalised plan · based on your recent performance
+                </p>
+              )}
+              {learningPath.steps.map((step, i) => {
+                const priorityColour = step.priority === 'High'
+                  ? 'border-red-200 bg-red-50'
+                  : step.priority === 'Medium'
+                  ? 'border-amber-200 bg-amber-50'
+                  : 'border-gray-100 bg-gray-50';
+                const badgeColour = step.priority === 'High'
+                  ? 'bg-red-100 text-red-600'
+                  : step.priority === 'Medium'
+                  ? 'bg-amber-100 text-amber-600'
+                  : 'bg-gray-100 text-gray-500';
+                return (
+                  <div key={i} className={`border rounded-xl p-4 ${priorityColour}`}>
+                    <div className="flex items-start gap-3">
+                      <div className="w-7 h-7 rounded-full bg-white border border-gray-200 flex items-center justify-center text-xs font-bold text-gray-600 shrink-0">
+                        {step.step}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <p className="text-sm font-semibold text-gray-800 truncate">{step.subtopic}</p>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${badgeColour}`}>
+                            {step.priority}
+                          </span>
+                          {step.type === 'remediation' && (
+                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-white border border-red-200 text-red-500 shrink-0">Needs Work</span>
+                          )}
+                          {step.type === 'new_topic' && (
+                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-white border border-teal-200 text-teal-500 shrink-0">New Topic</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 mb-1">{step.subject} → {step.topic}</p>
+                        <p className="text-xs text-gray-600 mb-2 leading-relaxed">{step.reason}</p>
+                        <p className="text-xs text-gray-700 font-medium leading-relaxed">{step.action}</p>
+                      </div>
+                    </div>
+                    {step.subtopic_id && (
+                      <div className="mt-3 pl-10">
+                        <Link
+                          to={`/student/subtopic/${step.subtopic_id}?tab=practice`}
+                          className="inline-flex items-center gap-1.5 text-xs font-semibold text-teal-600 hover:text-teal-800 bg-white border border-teal-200 px-3 py-1.5 rounded-lg transition-colors"
+                        >
+                          Start Practising <ArrowRight size={11} />
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
   );
