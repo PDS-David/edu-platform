@@ -86,7 +86,7 @@ export default function StudentDashboard() {
   }, [resources]);
 
   const totalResources = resources.length;
-  const isRootDashboard = location.pathname === "/student";
+  const isRootDashboard = location.pathname === "/student" || location.pathname === "/student/dashboard";
 
   return (
     <div className="min-h-screen bg-gray-50">
