@@ -1647,6 +1647,289 @@ const PlatformAnalyticsPanel = () => {
   );
 };
 
+// ─── Past Papers Panel (Admin) ────────────────────────────────────────────────
+// F: Admin view of the past papers question bank — list, upload, delete.
+const AdminPastPapersPanel = () => {
+  const navigate = useNavigate();
+  const [papers,  setPapers]  = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState(null);
+  const [toast,   setToast]   = useState(null);
+  const [filters, setFilters] = useState({ exam_board: '', year_from: '', year_to: '' });
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3500);
+  };
+
+  const fetchPapers = async () => {
+    setLoading(true); setError(null);
+    try {
+      const params = {};
+      if (filters.exam_board) params.exam_board = filters.exam_board;
+      if (filters.year_from)  params.year_from  = filters.year_from;
+      if (filters.year_to)    params.year_to    = filters.year_to;
+      const r = await api.get('/past-papers', { params });
+      setPapers(r.data || []);
+    } catch (err) {
+      setError(err?.message || 'Failed to load past papers');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchPapers(); }, []); // eslint-disable-line
+
+  const handleDelete = async (id, title) => {
+    if (!window.confirm(`Delete "${title}"? This cannot be undone.`)) return;
+    try {
+      await api.delete(`/past-papers/${id}`);
+      showToast('Paper deleted');
+      setPapers(p => p.filter(x => x.id !== id));
+    } catch (err) {
+      showToast(err?.message || 'Failed to delete', 'error');
+    }
+  };
+
+  const fmtSize = (b) => !b ? '' : b < 1048576 ? `${Math.round(b / 1024)} KB` : `${(b / 1048576).toFixed(1)} MB`;
+
+  return (
+    <div>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">Past Papers</h2>
+          <p className="text-sm text-gray-400 mt-0.5">
+            Students pull from these when practising with past exam questions.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={fetchPapers} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 px-3 py-2 border border-gray-200 rounded-xl">
+            <RefreshCw size={14} /> Refresh
+          </button>
+          <button
+            onClick={() => navigate('/past-papers')}
+            className="flex items-center gap-2 text-sm border border-blue-300 text-blue-700 hover:bg-blue-50 font-semibold px-4 py-2 rounded-xl transition-colors"
+          >
+            <BookOpen size={14} /> Student View
+          </button>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex gap-3 mb-5 flex-wrap">
+        <select
+          value={filters.exam_board}
+          onChange={e => setFilters(f => ({ ...f, exam_board: e.target.value }))}
+          className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+        >
+          <option value="">All Exam Types</option>
+          {['JAMB','WAEC','NECO','GCE_OL','GCE_AL','IELTS','TOEFL','SAT','JUPEB'].map(c => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+        <input
+          type="number" placeholder="Year from"
+          value={filters.year_from}
+          onChange={e => setFilters(f => ({ ...f, year_from: e.target.value }))}
+          className="w-28 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+        />
+        <input
+          type="number" placeholder="Year to"
+          value={filters.year_to}
+          onChange={e => setFilters(f => ({ ...f, year_to: e.target.value }))}
+          className="w-28 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+        />
+        <button
+          onClick={fetchPapers}
+          className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-xl transition-colors"
+        >
+          Filter
+        </button>
+      </div>
+
+      {error && (
+        <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm mb-4">
+          <AlertTriangle size={14} /> {error}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 text-green-500 animate-spin" /></div>
+      ) : papers.length === 0 ? (
+        <div className="text-center py-16 text-gray-400">
+          <BookOpen className="w-10 h-10 mx-auto mb-3 opacity-30" />
+          <p className="text-sm font-medium">No past papers found.</p>
+          <p className="text-xs mt-1">Upload past papers via the Bulk Upload panel, or adjust your filters.</p>
+          <button
+            onClick={() => {}}
+            className="mt-4 text-sm text-green-600 hover:underline font-semibold"
+          >
+            Go to Bulk Upload →
+          </button>
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-gray-100">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-xs text-gray-400 font-medium">
+              <tr>
+                <th className="text-left px-4 py-3">Title</th>
+                <th className="text-left px-4 py-3">Subject</th>
+                <th className="text-left px-4 py-3">Exam Type</th>
+                <th className="text-left px-4 py-3">Year</th>
+                <th className="text-left px-4 py-3">Size</th>
+                <th className="text-left px-4 py-3">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {papers.map(p => (
+                <tr key={p.id} className="bg-white hover:bg-gray-50 transition-colors">
+                  <td className="px-4 py-3 font-medium text-gray-800 max-w-xs truncate">{p.title}</td>
+                  <td className="px-4 py-3 text-gray-500">{p.subject_name || '—'}</td>
+                  <td className="px-4 py-3">
+                    <span className="text-xs font-mono bg-gray-100 text-gray-500 px-2 py-0.5 rounded">{p.exam_board}</span>
+                  </td>
+                  <td className="px-4 py-3 text-gray-500">{p.year || '—'}</td>
+                  <td className="px-4 py-3 text-gray-400 text-xs">{fmtSize(p.file_size_bytes)}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      {p.file_url && (
+                        <a
+                          href={p.file_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-blue-600 hover:text-blue-800 font-semibold"
+                        >
+                          View
+                        </a>
+                      )}
+                      <button
+                        onClick={() => handleDelete(p.id, p.title)}
+                        className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1"
+                      >
+                        <Trash2 size={12} /> Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="text-xs text-gray-400 px-4 py-3">{papers.length} paper{papers.length !== 1 ? 's' : ''} shown</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Admin Settings Panel ─────────────────────────────────────────────────────
+// J: Platform settings — links and config the admin can control.
+const AdminSettingsPanel = () => {
+  const navigate = useNavigate();
+  const [flags,      setFlags]      = useState({});
+  const [flagsLoad,  setFlagsLoad]  = useState(true);
+  const [toast,      setToast]      = useState(null);
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  useEffect(() => {
+    // Try to load feature flags — graceful if endpoint doesn't exist yet
+    api.get('/admin/feature-flags')
+      .then(r => setFlags(r.data || {}))
+      .catch(() => setFlags({}))
+      .finally(() => setFlagsLoad(false));
+  }, []);
+
+  const sections = [
+    {
+      title: 'Account & Access',
+      color: 'blue',
+      items: [
+        { label: 'User Management',      desc: 'Manage roles, deactivate or delete users',       action: () => {}, panel: 'users'   },
+        { label: 'Teacher Assignments',  desc: 'Assign teachers to subjects and exam types',      action: () => {}, panel: 'teachers'},
+      ],
+    },
+    {
+      title: 'Content',
+      color: 'green',
+      items: [
+        { label: 'Catalog Management',   desc: 'Add or edit exam types and subjects',             action: () => {}, panel: 'catalog'    },
+        { label: 'Past Papers',          desc: 'Manage past exam papers for students',            action: () => {}, panel: 'pastpapers' },
+        { label: 'Question Review',      desc: 'Approve or reject AI-generated questions',        action: () => navigate('/admin/questions/review') },
+      ],
+    },
+    {
+      title: 'Platform Links',
+      color: 'purple',
+      items: [
+        { label: 'Student Dashboard',   desc: 'View the platform as a student would see it',     action: () => navigate('/dashboard')       },
+        { label: 'Past Papers (public)',desc: 'See the public past papers page',                  action: () => navigate('/past-papers')     },
+        { label: 'My Account Settings', desc: 'Update your admin profile and preferences',        action: () => navigate('/settings')        },
+      ],
+    },
+  ];
+
+  const colorMap = { blue: 'text-blue-600 bg-blue-50 border-blue-100', green: 'text-green-600 bg-green-50 border-green-100', purple: 'text-purple-600 bg-purple-50 border-purple-100' };
+
+  return (
+    <div>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+
+      <div className="mb-6">
+        <h2 className="text-xl font-bold text-gray-900">Settings</h2>
+        <p className="text-sm text-gray-400 mt-0.5">Platform configuration and quick links</p>
+      </div>
+
+      <div className="space-y-6">
+        {sections.map(sec => (
+          <div key={sec.title}>
+            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">{sec.title}</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {sec.items.map(item => (
+                <button
+                  key={item.label}
+                  onClick={item.action}
+                  className="text-left border border-gray-200 rounded-xl p-4 hover:border-gray-300 hover:bg-gray-50 transition-colors group"
+                >
+                  <p className="font-semibold text-gray-800 text-sm group-hover:text-gray-900">{item.label}</p>
+                  <p className="text-xs text-gray-400 mt-1 leading-relaxed">{item.desc}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+
+        {/* Feature flags section — shows if the endpoint responds */}
+        {!flagsLoad && Object.keys(flags).length > 0 && (
+          <div>
+            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Feature Flags</h3>
+            <div className="border border-gray-200 rounded-xl overflow-hidden">
+              {Object.entries(flags).map(([key, val], i, arr) => (
+                <div key={key} className={`flex items-center justify-between px-4 py-3 ${i < arr.length - 1 ? 'border-b border-gray-100' : ''}`}>
+                  <span className="text-sm text-gray-700 font-medium">{key.replace(/_/g, ' ')}</span>
+                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${val ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                    {val ? 'Enabled' : 'Disabled'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="border-t border-gray-100 pt-4">
+          <p className="text-xs text-gray-400">
+            For server-level configuration (database, email, API keys), edit the <code className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">.env</code> file on the server.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── Admin Dashboard ──────────────────────────────────────────────────────────
 const AdminDashboard = () => {
   const { user, logout } = useAuth();
@@ -1711,6 +1994,8 @@ const AdminDashboard = () => {
               { key: 'teachers',     icon: UserCheck,    color: 'purple', label: 'Teacher Assignment', desc: 'Assign subjects to teachers'           },
               { key: 'aigenerate',   icon: Sparkles,     color: 'teal',   label: 'AI Generate',        desc: 'Generate questions with Gemini'        },
               { key: 'bulkupload',   icon: Upload,       color: 'blue',   label: 'Bulk Upload',        desc: 'Upload files in bulk, assign later'    },
+              { key: 'pastpapers',   icon: BookOpen,     color: 'green',  label: 'Past Papers',        desc: 'Manage past papers students can access' },
+              { key: 'settings',     icon: Settings,     color: 'purple', label: 'Settings',           desc: 'Platform configuration & feature flags' },
             ].map(({ key, icon: Icon, color, label, desc }) => {
               const active = activePanel === key;
               const borderMap = { teal: 'border-teal-500', blue: 'border-blue-500', purple: 'border-purple-500', green: 'border-green-500', orange: 'border-green-500' };
@@ -1803,6 +2088,18 @@ const AdminDashboard = () => {
         {activePanel === 'bulkupload' && (
           <div className="bg-white rounded-xl shadow p-6">
             <AdminBulkUploadPanel />
+          </div>
+        )}
+
+        {activePanel === 'pastpapers' && (
+          <div className="bg-white rounded-xl shadow p-6 mt-6">
+            <AdminPastPapersPanel />
+          </div>
+        )}
+
+        {activePanel === 'settings' && (
+          <div className="bg-white rounded-xl shadow p-6 mt-6">
+            <AdminSettingsPanel />
           </div>
         )}
       </main>
