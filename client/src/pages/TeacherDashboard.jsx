@@ -163,7 +163,16 @@ export default function TeacherDashboard() {
 
   useEffect(() => {
     api.get('/teacher/my-subjects')
-      .then(r => setAssignedSubjects(r.data ?? []))
+      .then(r => {
+        const raw = r.data ?? [];
+        const seen = new Set();
+        const unique = raw.filter(s => {
+          if (seen.has(s.id)) return false;
+          seen.add(s.id);
+          return true;
+        });
+        setAssignedSubjects(unique);
+      })
       .catch(() => setAssignedSubjects([]));
   }, []);
 
@@ -203,11 +212,20 @@ export default function TeacherDashboard() {
 
       {/* SUBJECT BANNER */}
       {!subjectsLoading && (
-        <div className="px-4 py-3 border-b">
+        <div className="px-4 py-3 border-b bg-white">
           {hasSubjects ? (
-            <p className="text-sm text-teal-700">
-              Subjects assigned: {assignedSubjects.map(s => s.name).join(', ')}
-            </p>
+            <div className="flex flex-wrap gap-2">
+              {assignedSubjects.map(s => (
+                <span key={s.id} className="inline-flex items-center gap-1.5 text-sm bg-teal-50 border border-teal-200 text-teal-700 rounded-full px-3 py-1">
+                  <span className="font-medium">{s.name}</span>
+                  {(s.exam_board_name || s.exam_board_code || s.level) && (
+                    <span className="text-teal-500 text-xs">
+                      · {s.exam_board_name || s.exam_board_code}{s.level ? ` (${s.level})` : ''}
+                    </span>
+                  )}
+                </span>
+              ))}
+            </div>
           ) : (
             <p className="text-sm text-amber-700">
               Awaiting subject assignment
@@ -224,7 +242,7 @@ export default function TeacherDashboard() {
               key={t.id}
               onClick={() => setActiveTab(t.id)}
               className={`px-4 py-3 text-sm ${
-                activeTab === t.id ? 'text-teal-600' : 'text-gray-400'
+                activeTab === t.id ? 'text-teal-600 border-b-2 border-teal-500 font-medium' : 'text-gray-400'
               }`}
             >
               {t.label}
@@ -236,16 +254,25 @@ export default function TeacherDashboard() {
       {/* CONTENT */}
       <div className="max-w-4xl mx-auto px-4 py-6">
 
-        {/* ✅ NEW: ROUTER OUTLET */}
+        {/* ROUTER OUTLET — for sub-routes like /teacher/questions/add */}
         <Outlet />
 
-        {/* ✅ FALLBACK: EXISTING UI */}
-        {!window.location.pathname.startsWith('/teacher/') && (
-          <>
-            {activeTab === 'classes' && (
-              <ClassesTab onViewAnalytics={setSelectedClass} />
-            )}
-          </>
+        {/* TAB CONTENT — always show on /teacher/dashboard */}
+        {activeTab === 'classes' && (
+          <ClassesTab onViewAnalytics={setSelectedClass} />
+        )}
+
+        {activeTab === 'analytics' && (
+          <div className="text-sm text-gray-400 text-center py-12">Analytics coming soon.</div>
+        )}
+
+        {activeTab === 'testbuilder' && (
+          <div className="text-sm text-gray-400 text-center py-12">
+            <p className="mb-3">Build a test by adding questions.</p>
+            <Link to="/teacher/questions/add" className="inline-block bg-teal-500 text-white px-5 py-2 rounded-xl text-sm font-semibold hover:bg-teal-600">
+              + Add Question
+            </Link>
+          </div>
         )}
 
       </div>
