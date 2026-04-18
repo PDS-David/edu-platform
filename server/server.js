@@ -35,7 +35,14 @@ const safeRequire = (modulePath) => {
 const app = express();
 app.set('trust proxy', 1);
 
+// STATIC — uploaded files (resources, past-papers, videos)
+// In production Docker: nginx serves /uploads directly from the shared volume.
+// In development (npm run dev): Node serves them here.
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 // STATIC CLIENT BUILD
+// In production Docker: nginx serves the React app — this block is skipped.
+// In development / single-container mode: Node serves the built React app.
 const clientDist = path.join(__dirname, '..', 'client', 'dist');
 if (fs.existsSync(clientDist)) {
   app.use(express.static(clientDist));
@@ -145,8 +152,19 @@ if (replayRoutes)           app.use('/api/replay',            protect, replayRou
 
 // HEALTH
 app.get('/health', (_req, res) => {
-  return success(res, { data: { status: 'ok' } });
+  return success(res, { data: { status: 'ok', timestamp: new Date().toISOString() } });
 });
+
+// SPA FALLBACK — serve index.html for any non-API route when running without nginx
+// (development, single-container, or direct Node access)
+if (fs.existsSync(clientDist)) {
+  app.get('*', (req, res) => {
+    // Only fall back if the request isn't an API or upload call
+    if (!req.path.startsWith('/api') && !req.path.startsWith('/uploads')) {
+      res.sendFile(path.join(clientDist, 'index.html'));
+    }
+  });
+}
 
 // ERROR HANDLER
 app.use((err, _req, res, _next) => {
