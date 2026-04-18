@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Component } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../services/apiClient';
@@ -17,6 +17,31 @@ import {
   Tooltip, ResponsiveContainer, Cell,
 } from 'recharts';
 
+// ─── Panel Error Boundary ─────────────────────────────────────────────────────
+// Wraps each dashboard panel so one crash doesn't break the entire admin UI.
+class PanelErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { hasError: false, message: '' }; }
+  static getDerivedStateFromError(err) { return { hasError: true, message: err?.message || 'Unknown error' }; }
+  componentDidCatch(err, info) { console.error('[PanelErrorBoundary]', err, info); }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <AlertTriangle className="w-8 h-8 text-red-400 mb-3" />
+          <p className="text-sm font-semibold text-gray-700">Something went wrong in this panel</p>
+          <p className="text-xs text-gray-400 mt-1 mb-4 max-w-xs">{this.state.message}</p>
+          <button
+            onClick={() => this.setState({ hasError: false, message: '' })}
+            className="text-sm text-teal-600 hover:underline"
+          >
+            Try again
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // ─── Safe emoji helper — strips question-mark artifacts from missing/broken emoji ──
 // icon_emoji in the DB can be an empty string, null, or a misencoded char that renders as '?'
@@ -1325,7 +1350,7 @@ const UserManagementPanel = () => {
     return `text-xs px-2 py-0.5 rounded-full ${map[status] || 'bg-gray-100 text-gray-500'}`;
   };
 
-  const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-NG', { day: '2-digit', month: 'short', year: '2-digit' }) : '—';
+  const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-NG', { day: '2-digit', month: 'short', year: '2-digit', timeZone: 'UTC' }) : '—';
   const totalPages = Math.ceil(total / LIMIT);
 
   return (
@@ -2140,49 +2165,49 @@ const AdminDashboard = () => {
 
         {activePanel === 'analytics' && (
           <div className="bg-white rounded-xl shadow p-6 mt-6">
-            <PlatformAnalyticsPanel />
+            <PanelErrorBoundary><PlatformAnalyticsPanel /></PanelErrorBoundary>
           </div>
         )}
 
         {activePanel === 'users' && (
           <div className="bg-white rounded-xl shadow p-6 mt-6">
-            <UserManagementPanel />
+            <PanelErrorBoundary><UserManagementPanel /></PanelErrorBoundary>
           </div>
         )}
 
         {activePanel === 'catalog' && (
           <div className="bg-white rounded-xl shadow p-6">
-            <CatalogPanel />
+            <PanelErrorBoundary><CatalogPanel /></PanelErrorBoundary>
           </div>
         )}
 
         {activePanel === 'teachers' && (
           <div className="bg-white rounded-xl shadow p-6">
-            <TeacherAssignmentPanel />
+            <PanelErrorBoundary><TeacherAssignmentPanel /></PanelErrorBoundary>
           </div>
         )}
 
         {activePanel === 'aigenerate' && (
           <div className="bg-white rounded-xl shadow p-6">
-            <AIGeneratePanel />
+            <PanelErrorBoundary><AIGeneratePanel /></PanelErrorBoundary>
           </div>
         )}
 
         {activePanel === 'bulkupload' && (
           <div className="bg-white rounded-xl shadow p-6">
-            <AdminBulkUploadPanel />
+            <PanelErrorBoundary><AdminBulkUploadPanel /></PanelErrorBoundary>
           </div>
         )}
 
         {activePanel === 'pastpapers' && (
           <div className="bg-white rounded-xl shadow p-6 mt-6">
-            <AdminPastPapersPanel />
+            <PanelErrorBoundary><AdminPastPapersPanel /></PanelErrorBoundary>
           </div>
         )}
 
         {activePanel === 'settings' && (
           <div className="bg-white rounded-xl shadow p-6 mt-6">
-            <AdminSettingsPanel />
+            <PanelErrorBoundary><AdminSettingsPanel /></PanelErrorBoundary>
           </div>
         )}
       </main>
