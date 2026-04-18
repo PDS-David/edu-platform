@@ -119,7 +119,7 @@ export default function TopNav() {
         </div>
 
         {/* User */}
-        <div ref={dropRef}>
+        <div ref={dropRef} className="relative">
           <button onClick={() => setDropOpen(o => !o)} className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs">
               {initials || fullName[0]}
@@ -128,14 +128,24 @@ export default function TopNav() {
           </button>
 
           {dropOpen && (
-            <div className="absolute right-0 mt-2 w-48 bg-white shadow rounded-xl border">
-              <button onClick={() => navigate(dashboardPath)} className="w-full px-4 py-2 text-left">
+            <div className="absolute right-0 top-full mt-2 w-48 bg-white shadow-lg rounded-xl border z-50">
+              <button onClick={() => navigate(dashboardPath)} className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50">
                 Dashboard
               </button>
-              <button onClick={() => navigate('/settings')} className="w-full px-4 py-2 text-left">
+              <button
+                onClick={() => {
+                  const settingsPath =
+                    role === "admin"   ? "/admin/settings"
+                    : role === "teacher" ? "/teacher/settings"
+                    : "/student/settings";
+                  navigate(settingsPath);
+                  setDropOpen(false);
+                }}
+                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50"
+              >
                 Settings
               </button>
-              <button onClick={handleLogout} className="w-full px-4 py-2 text-left text-red-500">
+              <button onClick={handleLogout} className="w-full px-4 py-2 text-left text-sm text-red-500 hover:bg-gray-50">
                 Sign Out
               </button>
             </div>
