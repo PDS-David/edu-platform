@@ -1,235 +1,81 @@
-import { useState, useEffect, useCallback } from "react";
-import { useNavigate, Link, Outlet, useLocation } from "react-router-dom";
-import api from "../services/apiClient";
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate, Link, Outlet } from 'react-router-dom';
+import api from '../services/apiClient';
 import {
-  Users, Plus, CheckCircle, Loader2, AlertTriangle,
-  BarChart2, X, PenTool, Copy, BookOpen, Bell,
-  TrendingDown, UserCheck, Target,
-} from "lucide-react";
-import TopNav from "../components/TopNav";
-import { useAuth } from "../context/AuthContext";
+  Users, Plus, Copy, CheckCircle, Loader2, AlertTriangle,
+  BarChart2, Zap, X, ChevronRight, Send, PenTool,
+  BookOpen, Upload, AlertCircle, TrendingUp, TrendingDown,
+  Clock, Target, ChevronDown,
+} from 'lucide-react';
+import TopNav from '../components/TopNav';
+import { useAuth } from '../context/AuthContext';
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+/* ================= HELPERS ================= */
+
+const accColor = (pct) => {
+  if (!pct && pct !== 0) return 'text-gray-400';
+  if (pct >= 70) return 'text-green-600';
+  if (pct >= 40) return 'text-amber-600';
+  return 'text-red-500';
+};
+
 function getDisplayName(user) {
-  if (!user) return "Teacher";
+  if (!user) return 'Teacher';
   const first = user.firstName || user.first_name;
-  if (first?.trim()) return first.trim();
-  const full = user.lastName || user.last_name || user.name || "";
-  if (full.trim()) return full.trim().split(" ")[0];
-  if (user.email) return user.email.split("@")[0];
-  return "Teacher";
+  if (first && first.trim()) return first.trim();
+  const full = user.lastName || user.last_name || user.name || '';
+  if (full.trim()) return full.trim().split(' ')[0];
+  if (user.email) return user.email.split('@')[0];
+  return 'Teacher';
 }
 
 function Toast({ msg, type, onClose }) {
   return (
     <div className={`fixed bottom-6 right-4 z-50 flex items-center gap-2.5 px-5 py-3 rounded-2xl shadow-xl text-sm font-semibold text-white
-      ${type === "success" ? "bg-gray-900" : "bg-red-600"}`}>
-      {type === "success" ? <CheckCircle size={14} className="text-teal-400" /> : <AlertTriangle size={14} />}
+      ${type === 'success' ? 'bg-gray-900' : 'bg-red-600'}`}>
+      {type === 'success'
+        ? <CheckCircle size={14} className="text-teal-400" />
+        : <AlertTriangle size={14} />}
       {msg}
-      <button onClick={onClose}><X size={13} className="opacity-60" /></button>
+      <button onClick={onClose}>
+        <X size={13} className="opacity-60" />
+      </button>
     </div>
   );
 }
 
-// G — Cohort stat pills
-function CohortStatPills({ students }) {
-  if (!students?.length) return null;
-  const withAttempts = students.filter(s => s.attempts > 0);
-  const avgAcc = withAttempts.length
-    ? Math.round(withAttempts.reduce((s, r) => s + parseFloat(r.accuracy_pct || 0), 0) / withAttempts.length)
-    : null;
-  const totalAttempts = students.reduce((s, r) => s + (r.attempts || 0), 0);
-  // Find most struggled: lowest accuracy student's last active
-  const weakest = [...withAttempts].sort((a, b) => (a.accuracy_pct || 0) - (b.accuracy_pct || 0))[0];
+/* ================= CLASSES TAB ================= */
 
-  const pills = [
-    { label: "Avg Accuracy", value: avgAcc !== null ? `${avgAcc}%` : "—", color: avgAcc >= 70 ? "text-green-600" : avgAcc >= 40 ? "text-amber-600" : "text-red-500", bg: "bg-green-50" },
-    { label: "Total Attempts", value: totalAttempts.toLocaleString(), color: "text-blue-600", bg: "bg-blue-50" },
-    { label: "Needs Help", value: weakest ? weakest.name.split(" ")[0] : "—", color: "text-rose-600", bg: "bg-rose-50" },
-  ];
-
-  return (
-    <div className="grid grid-cols-3 gap-2 mb-4">
-      {pills.map(p => (
-        <div key={p.label} className={`${p.bg} rounded-xl p-2.5 text-center`}>
-          <p className={`text-sm font-bold ${p.color}`}>{p.value}</p>
-          <p className="text-[10px] text-gray-500 mt-0.5">{p.label}</p>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// E — Cohort heatmap (topic strength grid)
-function CohortHeatmap({ students }) {
-  if (!students?.length) return null;
-  // We don't have per-topic data from the analytics endpoint, so we visualise
-  // student accuracy as a strength grid — each cell = one student
-  const sorted = [...students].sort((a, b) => (b.accuracy_pct || 0) - (a.accuracy_pct || 0));
-  const getColor = (pct) => {
-    if (!pct && pct !== 0) return "bg-gray-100";
-    if (pct >= 70) return "bg-green-400";
-    if (pct >= 40) return "bg-amber-400";
-    return "bg-red-400";
-  };
-  return (
-    <div className="mb-4">
-      <div className="flex items-center gap-2 mb-2">
-        <Target size={13} className="text-gray-400" />
-        <p className="text-xs font-semibold text-gray-600">Class Performance Grid</p>
-        <div className="ml-auto flex items-center gap-2 text-[10px] text-gray-400">
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-green-400 inline-block" /> Strong</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-amber-400 inline-block" /> Mid</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-red-400 inline-block" /> Weak</span>
-        </div>
-      </div>
-      <div className="flex flex-wrap gap-1.5">
-        {sorted.map(s => (
-          <div
-            key={s.id}
-            title={`${s.name}: ${s.accuracy_pct ?? 0}% accuracy, ${s.attempts} attempts`}
-            className={`w-7 h-7 rounded-md ${getColor(s.accuracy_pct)} cursor-default transition-transform hover:scale-110`}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// Class analytics panel with E, F, G
-function ClassAnalyticsPanel({ cls, onClose }) {
-  const [data,    setData]    = useState(null);
+function ClassesTab({ onViewAnalytics }) {
+  const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [nudging, setNudging] = useState({}); // userId → true/false
-  const [toast,   setToast]   = useState(null);
-
-  useEffect(() => {
-    api.get(`/teacher/class/${cls.id}/analytics`)
-      .then(r => setData(r.data))
-      .catch(() => setData({ students: [] }))
-      .finally(() => setLoading(false));
-  }, [cls.id]);
-
-  // F — Nudge handler
-  const handleNudge = async (student) => {
-    setNudging(n => ({ ...n, [student.id]: true }));
-    try {
-      await api.post(`/teacher/nudge/${student.id}`);
-      setToast({ type: "success", msg: `Nudge sent to ${student.name.split(" ")[0]}!` });
-    } catch {
-      setToast({ type: "error", msg: "Nudge failed. Try again." });
-    } finally {
-      setNudging(n => ({ ...n, [student.id]: false }));
-      setTimeout(() => setToast(null), 3000);
-    }
-  };
-
-  return (
-    <div className="bg-gray-50 rounded-xl border p-4 mt-3">
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-sm font-semibold text-gray-700">{cls.name} — Analytics</p>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={15} /></button>
-      </div>
-
-      {loading ? (
-        <div className="flex justify-center py-8"><Loader2 size={20} className="animate-spin text-teal-400" /></div>
-      ) : !data?.students?.length ? (
-        <p className="text-sm text-gray-400 text-center py-6">No students yet.</p>
-      ) : (
-        <>
-          {/* G — Stat pills */}
-          <CohortStatPills students={data.students} />
-
-          {/* E — Heatmap */}
-          <CohortHeatmap students={data.students} />
-
-          {/* Student table */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-left text-gray-400 border-b">
-                  <th className="pb-2 font-medium">Student</th>
-                  <th className="pb-2 font-medium text-right">Attempts</th>
-                  <th className="pb-2 font-medium text-right">Accuracy</th>
-                  <th className="pb-2 font-medium text-right">Streak</th>
-                  <th className="pb-2 font-medium text-right">Nudge</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {[...data.students]
-                  .sort((a, b) => (a.accuracy_pct || 0) - (b.accuracy_pct || 0))
-                  .map(s => {
-                    const pct = parseFloat(s.accuracy_pct) || 0;
-                    const color = pct >= 70 ? "text-green-600" : pct >= 40 ? "text-amber-600" : "text-red-500";
-                    return (
-                      <tr key={s.id} className="hover:bg-white">
-                        <td className="py-2 pr-2">
-                          <p className="font-medium text-gray-800">{s.name}</p>
-                        </td>
-                        <td className="py-2 text-right text-gray-500">{s.attempts}</td>
-                        <td className={`py-2 text-right font-bold ${color}`}>
-                          {s.attempts > 0 ? `${pct}%` : "—"}
-                        </td>
-                        <td className="py-2 text-right text-gray-400">
-                          {s.streak > 0 ? `🔥${s.streak}d` : "—"}
-                        </td>
-                        {/* F — Nudge button */}
-                        <td className="py-2 text-right">
-                          <button
-                            onClick={() => handleNudge(s)}
-                            disabled={nudging[s.id]}
-                            title={`Nudge ${s.name.split(" ")[0]}`}
-                            className="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-500 disabled:opacity-40 transition-colors"
-                          >
-                            {nudging[s.id]
-                              ? <Loader2 size={12} className="animate-spin" />
-                              : <Bell size={12} />}
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
-      {toast && <Toast {...toast} onClose={() => setToast(null)} />}
-    </div>
-  );
-}
-
-// ── Classes Tab ───────────────────────────────────────────────────────────────
-function ClassesTab() {
-  const [classes,    setClasses]    = useState([]);
-  const [loading,    setLoading]    = useState(true);
   const [showCreate, setShowCreate] = useState(false);
-  const [newName,    setNewName]    = useState("");
-  const [creating,   setCreating]   = useState(false);
-  const [copied,     setCopied]     = useState(null);
-  const [toast,      setToast]      = useState(null);
-  const [expanded,   setExpanded]   = useState(null);
+  const [newName, setNewName] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [copied, setCopied] = useState(null);
+  const [toast, setToast] = useState(null);
 
-  const load = useCallback(() => {
+  const load = () => {
     setLoading(true);
-    api.get("/teacher/classes")
+    api.get('/teacher/classes')
       .then(r => setClasses(r.data || []))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  };
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(load, []);
 
   const createClass = async () => {
     if (!newName.trim()) return;
     setCreating(true);
     try {
-      await api.post("/teacher/classes", { name: newName.trim() });
-      setNewName(""); setShowCreate(false);
-      setToast({ type: "success", msg: "Class created!" });
+      await api.post('/teacher/classes', { name: newName });
+      setNewName('');
+      setShowCreate(false);
+      setToast({ type: 'success', msg: 'Class created!' });
       load();
     } catch {
-      setToast({ type: "error", msg: "Failed to create class." });
+      setToast({ type: 'error', msg: 'Failed to create class.' });
     } finally {
       setCreating(false);
       setTimeout(() => setToast(null), 3000);
@@ -243,86 +89,59 @@ function ClassesTab() {
     });
   };
 
-  if (loading) return (
-    <div className="flex justify-center py-16"><Loader2 size={24} className="text-teal-400 animate-spin" /></div>
-  );
+  if (loading) {
+    return (
+      <div className="flex justify-center py-12">
+        <Loader2 size={24} className="text-teal-400 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-500">{classes.length} class{classes.length !== 1 ? "es" : ""}</p>
+        <p className="text-sm text-gray-500">
+          {classes.length} class{classes.length !== 1 ? 'es' : ''}
+        </p>
+
         <button
-          onClick={() => setShowCreate(v => !v)}
-          className="flex items-center gap-1.5 bg-teal-500 hover:bg-teal-600 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
+          onClick={() => setShowCreate(true)}
+          className="flex items-center gap-1.5 bg-teal-500 hover:bg-teal-600 text-white text-sm font-semibold px-4 py-2 rounded-xl"
         >
           <Plus size={14} /> New Class
         </button>
       </div>
 
       {showCreate && (
-        <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4 flex gap-3 items-center">
+        <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4 flex gap-3">
           <input
             value={newName}
             onChange={e => setNewName(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && createClass()}
-            placeholder="e.g. Year 12 Biology"
-            className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
-            autoFocus
+            placeholder="Class name"
+            className="flex-1 border rounded-xl px-3 py-2 text-sm"
           />
-          <button
-            onClick={createClass}
-            disabled={creating || !newName.trim()}
-            className="bg-teal-500 hover:bg-teal-600 disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-xl"
-          >
-            {creating ? <Loader2 size={14} className="animate-spin" /> : "Create"}
-          </button>
-          <button onClick={() => { setShowCreate(false); setNewName(""); }} className="text-gray-400 hover:text-gray-600">
-            <X size={18} />
-          </button>
-        </div>
-      )}
 
-      {classes.length === 0 && !showCreate && (
-        <div className="text-center py-16 bg-white rounded-2xl border">
-          <Users size={36} className="text-gray-200 mx-auto mb-3" />
-          <p className="text-gray-500 font-medium">No classes yet</p>
-          <p className="text-sm text-gray-400 mt-1">Create a class and share the join code with students.</p>
+          <button onClick={createClass} disabled={creating}>
+            {creating ? <Loader2 size={14} /> : 'Create'}
+          </button>
+
+          <button onClick={() => setShowCreate(false)}>
+            <X size={16} />
+          </button>
         </div>
       )}
 
       {classes.map(cls => (
         <div key={cls.id} className="bg-white rounded-2xl border p-5">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <p className="font-semibold text-gray-800">{cls.name}</p>
-              <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
-                <UserCheck size={11} />
-                {cls.student_count ?? 0} student{cls.student_count !== 1 ? "s" : ""}
-              </p>
-            </div>
-            <button
-              onClick={() => copyCode(cls.join_code)}
-              className="flex items-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-mono font-semibold px-3 py-1.5 rounded-lg transition-colors"
-            >
-              {copied === cls.join_code
-                ? <><CheckCircle size={11} className="text-green-500" /> Copied!</>
-                : <><Copy size={11} /> {cls.join_code}</>}
-            </button>
-          </div>
+          <p className="font-semibold">{cls.name}</p>
 
-          <div className="flex gap-2 mt-3">
-            <button
-              onClick={() => setExpanded(expanded === cls.id ? null : cls.id)}
-              className="flex items-center gap-1.5 text-xs text-teal-600 hover:text-teal-800 font-medium border border-teal-200 px-3 py-1.5 rounded-lg hover:bg-teal-50 transition-colors"
-            >
-              <BarChart2 size={12} />
-              {expanded === cls.id ? "Hide Analytics" : "View Analytics"}
-            </button>
-          </div>
+          <button onClick={() => onViewAnalytics(cls)}>
+            View Analytics
+          </button>
 
-          {expanded === cls.id && (
-            <ClassAnalyticsPanel cls={cls} onClose={() => setExpanded(null)} />
-          )}
+          <button onClick={() => copyCode(cls.join_code)}>
+            {copied === cls.join_code ? 'Copied!' : 'Copy Code'}
+          </button>
         </div>
       ))}
 
@@ -331,158 +150,427 @@ function ClassesTab() {
   );
 }
 
-// ── Test Builder Tab ──────────────────────────────────────────────────────────
-function TestBuilderTab({ subjects }) {
-  const navigate = useNavigate();
+/* ================= ANALYTICS TAB ================= */
+
+function AnalyticsTab() {
+  const [classes,       setClasses]       = useState([]);
+  const [selectedClass, setSelectedClass] = useState(null);
+  const [analytics,     setAnalytics]     = useState(null);
+  const [loading,       setLoading]       = useState(false);
+  const [loadingClasses,setLoadingClasses]= useState(true);
+
+  useEffect(() => {
+    api.get('/teacher/classes')
+      .then(r => {
+        const cls = Array.isArray(r?.data) ? r.data : [];
+        setClasses(cls);
+        if (cls.length > 0) setSelectedClass(cls[0].id);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingClasses(false));
+  }, []);
+
+  useEffect(() => {
+    if (!selectedClass) return;
+    setLoading(true);
+    api.get(`/teacher/class/${selectedClass}/analytics`)
+      .then(r => setAnalytics(r?.data || null))
+      .catch(() => setAnalytics(null))
+      .finally(() => setLoading(false));
+  }, [selectedClass]);
+
+  const accColor = (pct) => {
+    if (!pct && pct !== 0) return 'text-gray-400';
+    if (pct >= 70) return 'text-green-600';
+    if (pct >= 40) return 'text-amber-600';
+    return 'text-red-500';
+  };
+
+  if (loadingClasses) return <div className="flex justify-center py-12"><Loader2 size={24} className="animate-spin text-teal-400" /></div>;
+
+  if (classes.length === 0) return (
+    <div className="text-center py-16 text-gray-400">
+      <BarChart2 size={36} className="mx-auto mb-3 opacity-30" />
+      <p className="text-sm font-medium">No classes yet.</p>
+      <p className="text-xs mt-1">Create a class first to see analytics.</p>
+    </div>
+  );
+
   return (
-    <div className="space-y-4">
-      <div className="bg-white rounded-2xl border p-6 text-center">
-        <PenTool size={36} className="text-teal-300 mx-auto mb-3" />
-        <p className="font-semibold text-gray-800 mb-1">Build Your Question Bank</p>
-        <p className="text-sm text-gray-400 mb-4">Questions are instantly available for practice and tests.</p>
-        <button
-          onClick={() => navigate("/teacher/questions/add")}
-          className="bg-teal-500 hover:bg-teal-600 text-white text-sm font-semibold px-6 py-2.5 rounded-xl transition-colors"
-        >
-          + Add Question
-        </button>
+    <div className="space-y-5">
+      {/* Class selector */}
+      <div className="flex items-center gap-3">
+        <label className="text-sm font-medium text-gray-600">Class:</label>
+        <div className="relative">
+          <select
+            value={selectedClass || ''}
+            onChange={e => setSelectedClass(e.target.value)}
+            className="appearance-none border border-gray-200 rounded-xl px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 bg-white"
+          >
+            {classes.map(c => <option key={c.id} value={c.id}>{c.name} ({c.student_count ?? 0} students)</option>)}
+          </select>
+          <ChevronDown size={14} className="absolute right-2 top-3 text-gray-400 pointer-events-none" />
+        </div>
       </div>
-      {subjects.length > 0 && (
-        <div className="bg-white rounded-2xl border p-5">
-          <p className="text-sm font-semibold text-gray-700 mb-3">Your Subjects</p>
-          <div className="space-y-2">
-            {subjects.map(s => (
-              <div key={s.id} className="flex items-center gap-2 text-sm text-gray-600">
-                <BookOpen size={13} className="text-teal-400 shrink-0" />
-                <span>{s.name}</span>
-                {(s.exam_board_name || s.exam_board_code) && (
-                  <span className="text-gray-400 text-xs">
-                    · {s.exam_board_name || s.exam_board_code}{s.level ? ` (${s.level})` : ""}
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
+
+      {loading ? (
+        <div className="flex justify-center py-8"><Loader2 size={20} className="animate-spin text-teal-400" /></div>
+      ) : !analytics ? (
+        <div className="text-center py-8 text-gray-400 text-sm">No analytics data available yet.</div>
+      ) : analytics.students?.length === 0 ? (
+        <div className="text-center py-8 text-gray-400 text-sm">No students in this class yet.</div>
+      ) : (
+        <div className="overflow-x-auto rounded-2xl border border-gray-100">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-xs text-gray-400 font-semibold uppercase">
+              <tr>
+                <th className="text-left px-4 py-3">Student</th>
+                <th className="text-center px-4 py-3">Accuracy</th>
+                <th className="text-center px-4 py-3">Attempts</th>
+                <th className="text-center px-4 py-3">Streak</th>
+                <th className="text-left px-4 py-3 hidden sm:table-cell">Last Active</th>
+                <th className="text-center px-4 py-3">Nudge</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {analytics.students.map(s => (
+                <tr key={s.id} className="bg-white hover:bg-gray-50 transition-colors">
+                  <td className="px-4 py-3">
+                    <p className="font-semibold text-gray-800">{s.name}</p>
+                    <p className="text-xs text-gray-400 truncate max-w-[140px]">{s.email}</p>
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <span className={`font-bold text-base ${accColor(s.accuracy_pct)}`}>
+                      {s.accuracy_pct != null ? `${s.accuracy_pct}%` : '—'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-center text-gray-600">{s.attempts ?? 0}</td>
+                  <td className="px-4 py-3 text-center">
+                    <span className="text-amber-500 font-semibold">{s.streak ?? 0}🔥</span>
+                  </td>
+                  <td className="px-4 py-3 hidden sm:table-cell text-xs text-gray-400">
+                    {s.last_active ? new Date(s.last_active).toLocaleDateString('en-NG', { day:'2-digit', month:'short' }) : '—'}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <NudgeButton studentId={s.id} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
   );
 }
 
-// ── Main Dashboard ────────────────────────────────────────────────────────────
-export default function TeacherDashboard() {
-  const { user }   = useAuth();
-  const navigate   = useNavigate();
-  const location   = useLocation();
+function NudgeButton({ studentId }) {
+  const [sent, setSent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const nudge = async () => {
+    setBusy(true);
+    try {
+      await api.post(`/teacher/nudge/${studentId}`);
+      setSent(true);
+      setTimeout(() => setSent(false), 3000);
+    } catch {}
+    finally { setBusy(false); }
+  };
+  return (
+    <button onClick={nudge} disabled={busy || sent}
+      title="Send nudge"
+      className={`text-xs px-2.5 py-1 rounded-lg font-semibold transition-colors ${
+        sent ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500 hover:bg-teal-50 hover:text-teal-600'
+      }`}>
+      {busy ? <Loader2 size={10} className="animate-spin" /> : sent ? '✓ Sent' : <Send size={10} />}
+    </button>
+  );
+}
 
-  const [activeTab,        setActiveTab]        = useState("classes");
+/* ================= TEST BUILDER TAB ================= */
+
+function TestBuilderTab() {
+  const [tests,       setTests]       = useState([]);
+  const [classes,     setClasses]     = useState([]);
+  const [subjects,    setSubjects]    = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [creating,    setCreating]    = useState(false);
+  const [publishing,  setPublishing]  = useState(null);
+  const [assigning,   setAssigning]   = useState(null);  // test id being assigned
+  const [assignClass, setAssignClass] = useState('');
+  const [toast,       setToast]       = useState(null);
+  const [showCreate,  setShowCreate]  = useState(false);
+  const [form,        setForm]        = useState({ title: '', duration_minutes: 60, total_marks: 100 });
+
+  const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3500); };
+
+  const load = useCallback(() => {
+    setLoading(true);
+    Promise.all([
+      api.get('/teacher/tests').catch(() => ({ data: [] })),
+      api.get('/teacher/classes').catch(() => ({ data: [] })),
+      api.get('/teacher/my-subjects').catch(() => ({ data: [] })),
+    ]).then(([t, c, s]) => {
+      setTests(Array.isArray(t?.data) ? t.data : []);
+      setClasses(Array.isArray(c?.data) ? c.data : []);
+      setSubjects(Array.isArray(s?.data) ? s.data : []);
+    }).finally(() => setLoading(false));
+  }, []);
+
+  useEffect(load, [load]);
+
+  const createTest = async () => {
+    if (!form.title.trim()) { showToast('Title is required.', 'error'); return; }
+    setCreating(true);
+    try {
+      await api.post('/teacher/tests', form);
+      showToast('Test created!');
+      setForm({ title: '', duration_minutes: 60, total_marks: 100 });
+      setShowCreate(false);
+      load();
+    } catch (err) {
+      showToast(err?.error || 'Failed to create test.', 'error');
+    } finally { setCreating(false); }
+  };
+
+  const publishTest = async (id) => {
+    setPublishing(id);
+    try {
+      await api.put(`/teacher/tests/${id}/publish`);
+      showToast('Test published — students can now take it.');
+      load();
+    } catch (err) {
+      showToast(err?.error || 'Publish failed.', 'error');
+    } finally { setPublishing(null); }
+  };
+
+  const assignTest = async (testId) => {
+    if (!assignClass) { showToast('Select a class first.', 'error'); return; }
+    try {
+      await api.post(`/teacher/tests/${testId}/assign`, { class_id: assignClass });
+      showToast('Test assigned to class!');
+      setAssigning(null);
+      setAssignClass('');
+    } catch (err) {
+      showToast(err?.error || 'Assignment failed.', 'error');
+    }
+  };
+
+  const inp = 'w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300';
+
+  if (loading) return <div className="flex justify-center py-12"><Loader2 size={24} className="animate-spin text-teal-400" /></div>;
+
+  return (
+    <div className="space-y-5">
+      {toast && (
+        <div className={`fixed bottom-6 right-4 z-50 flex items-center gap-2.5 px-5 py-3 rounded-2xl shadow-xl text-sm font-semibold text-white
+          ${toast.type === 'success' ? 'bg-gray-900' : 'bg-red-600'}`}>
+          {toast.type === 'success' ? <CheckCircle size={14} className="text-teal-400" /> : <AlertTriangle size={14} />}
+          {toast.msg}
+          <button onClick={() => setToast(null)}><X size={13} className="opacity-60" /></button>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="font-semibold text-gray-900">Test Builder</h3>
+          <p className="text-xs text-gray-400 mt-0.5">Create tests and assign them to your classes</p>
+        </div>
+        <button onClick={() => setShowCreate(v => !v)}
+          className="flex items-center gap-1.5 bg-teal-500 hover:bg-teal-600 text-white text-sm font-semibold px-4 py-2 rounded-xl">
+          <Plus size={14} /> New Test
+        </button>
+      </div>
+
+      {/* Create form */}
+      {showCreate && (
+        <div className="bg-teal-50 border border-teal-200 rounded-2xl p-5 space-y-3">
+          <p className="text-sm font-semibold text-teal-800">New Test</p>
+          <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+            placeholder="Test title *" className={inp} />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Duration (minutes)</label>
+              <input type="number" min={5} value={form.duration_minutes}
+                onChange={e => setForm(f => ({ ...f, duration_minutes: parseInt(e.target.value) || 60 }))}
+                className={inp} />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Total Marks</label>
+              <input type="number" min={1} value={form.total_marks}
+                onChange={e => setForm(f => ({ ...f, total_marks: parseInt(e.target.value) || 100 }))}
+                className={inp} />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={createTest} disabled={creating}
+              className="flex-1 bg-teal-500 hover:bg-teal-600 disabled:opacity-50 text-white text-sm font-semibold py-2 rounded-xl flex items-center justify-center gap-2">
+              {creating ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+              Create Test
+            </button>
+            <button onClick={() => setShowCreate(false)} className="px-4 py-2 border border-gray-200 rounded-xl text-sm text-gray-500 hover:bg-gray-50">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Tests list */}
+      {tests.length === 0 ? (
+        <div className="text-center py-12 border-2 border-dashed border-gray-100 rounded-2xl text-gray-400">
+          <PenTool size={32} className="mx-auto mb-2 opacity-30" />
+          <p className="text-sm">No tests yet. Click "New Test" to get started.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {tests.map(t => (
+            <div key={t.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+              <div className="p-4 flex items-center gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-gray-800">{t.title}</p>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      t.is_published ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                    }`}>
+                      {t.is_published ? 'Published' : 'Draft'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {t.duration_minutes}min · {t.total_marks} marks · {t.question_count ?? 0} questions
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {!t.is_published && (
+                    <button onClick={() => publishTest(t.id)} disabled={publishing === t.id}
+                      className="text-xs px-3 py-1.5 bg-green-50 text-green-600 hover:bg-green-100 font-semibold rounded-lg border border-green-200 transition-colors">
+                      {publishing === t.id ? <Loader2 size={12} className="animate-spin" /> : 'Publish'}
+                    </button>
+                  )}
+                  <button onClick={() => setAssigning(assigning === t.id ? null : t.id)}
+                    className={`text-xs px-3 py-1.5 font-semibold rounded-lg border transition-colors ${
+                      assigning === t.id ? 'bg-indigo-600 text-white border-indigo-600' : 'border-indigo-200 text-indigo-600 hover:bg-indigo-50'
+                    }`}>
+                    Assign
+                  </button>
+                </div>
+              </div>
+
+              {/* Assign to class panel */}
+              {assigning === t.id && (
+                <div className="border-t border-gray-100 bg-indigo-50 px-4 py-3 flex items-center gap-3">
+                  <select value={assignClass} onChange={e => setAssignClass(e.target.value)}
+                    className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white">
+                    <option value="">Select class…</option>
+                    {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                  <button onClick={() => assignTest(t.id)}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-3 py-2 rounded-lg">
+                    Assign
+                  </button>
+                  <button onClick={() => setAssigning(null)} className="text-gray-400 hover:text-gray-600">
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function TeacherDashboard() {
+
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  const [activeTab, setActiveTab] = useState('classes');
+  const [selectedClass, setSelectedClass] = useState(null);
+
   const [assignedSubjects, setAssignedSubjects] = useState(null);
 
   useEffect(() => {
-    api.get("/teacher/my-subjects")
-      .then(r => {
-        const raw  = r.data ?? [];
-        const seen = new Set();
-        const unique = raw.filter(s => { if (seen.has(s.id)) return false; seen.add(s.id); return true; });
-        setAssignedSubjects(unique);
-      })
+    api.get('/teacher/my-subjects')
+      .then(r => setAssignedSubjects(r.data ?? []))
       .catch(() => setAssignedSubjects([]));
   }, []);
 
   const subjectsLoading = assignedSubjects === null;
-  const hasSubjects     = (assignedSubjects?.length ?? 0) > 0;
-  const displayName     = getDisplayName(user);
+  const hasSubjects = assignedSubjects?.length > 0;
 
-  const isDashboard =
-    location.pathname === "/teacher" ||
-    location.pathname === "/teacher/" ||
-    location.pathname === "/teacher/dashboard";
+  const displayName = getDisplayName(user);
 
   const tabs = [
-    { id: "classes",     label: "My Classes",  icon: Users     },
-    { id: "analytics",   label: "Analytics",   icon: BarChart2 },
-    { id: "testbuilder", label: "Test Builder", icon: PenTool   },
+    { id: 'classes', label: 'My Classes', icon: Users },
+    { id: 'analytics', label: 'Analytics', icon: BarChart2 },
+    { id: 'testbuilder', label: 'Test Builder', icon: PenTool },
   ];
 
   return (
     <div className="min-h-screen bg-gray-50">
+
       <TopNav />
 
       {/* HEADER */}
       <div className="bg-[#0a4a3f] px-4 py-5">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
+        <div className="max-w-4xl mx-auto flex justify-between">
           <div>
             <p className="text-white/50 text-xs">Teacher Dashboard</p>
-            <h1 className="text-white text-xl font-bold">Welcome back, {displayName} 👋</h1>
+            <h1 className="text-white text-xl font-bold">
+              Welcome back, {displayName} 👋
+            </h1>
           </div>
+
           {hasSubjects && (
-            <Link to="/teacher/resources" className="bg-teal-500 hover:bg-teal-400 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors">
+            <Link to="/teacher/resources" className="bg-teal-500 text-white px-4 py-2 rounded-xl">
               Upload Resources
             </Link>
           )}
         </div>
       </div>
 
-      {/* SUBJECT PILLS */}
+      {/* SUBJECT BANNER */}
       {!subjectsLoading && (
-        <div className="px-4 py-3 border-b bg-white">
+        <div className="px-4 py-3 border-b">
           {hasSubjects ? (
-            <div className="max-w-4xl mx-auto flex flex-wrap gap-2">
-              {assignedSubjects.map(s => (
-                <span key={s.id} className="inline-flex items-center gap-1.5 text-sm bg-teal-50 border border-teal-200 text-teal-700 rounded-full px-3 py-1">
-                  <span className="font-medium">{s.name}</span>
-                  {(s.exam_board_name || s.exam_board_code || s.level) && (
-                    <span className="text-teal-500 text-xs">
-                      · {s.exam_board_name || s.exam_board_code}{s.level ? ` (${s.level})` : ""}
-                    </span>
-                  )}
-                </span>
-              ))}
-            </div>
+            <p className="text-sm text-teal-700">
+              Subjects assigned: {assignedSubjects.map(s => s.name).join(', ')}
+            </p>
           ) : (
-            <p className="text-sm text-amber-700 max-w-4xl mx-auto">⚠️ No subjects assigned yet — contact your admin.</p>
+            <p className="text-sm text-amber-700">
+              Awaiting subject assignment
+            </p>
           )}
         </div>
       )}
 
       {/* TABS */}
-      {isDashboard && (
-        <div className="bg-white border-b sticky top-14 z-10">
-          <div className="max-w-4xl mx-auto flex px-4">
-            {tabs.map(t => (
-              <button
-                key={t.id}
-                onClick={() => setActiveTab(t.id)}
-                className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === t.id
-                    ? "text-teal-600 border-teal-500"
-                    : "text-gray-400 border-transparent hover:text-gray-600"
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
+      <div className="bg-white border-b sticky top-14">
+        <div className="max-w-4xl mx-auto flex gap-2 px-4">
+          {tabs.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              className={`px-4 py-3 text-sm ${
+                activeTab === t.id ? 'text-teal-600' : 'text-gray-400'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
-      )}
+      </div>
 
       {/* CONTENT */}
       <div className="max-w-4xl mx-auto px-4 py-6">
-        {isDashboard ? (
-          <>
-            {activeTab === "classes"     && <ClassesTab />}
-            {activeTab === "analytics"   && (
-              <div className="bg-white rounded-2xl border p-8 text-center">
-                <BarChart2 size={36} className="text-gray-200 mx-auto mb-3" />
-                <p className="text-gray-500 font-medium">Full analytics coming soon</p>
-                <p className="text-sm text-gray-400 mt-1">Per-student performance is in the My Classes tab.</p>
-              </div>
-            )}
-            {activeTab === "testbuilder" && <TestBuilderTab subjects={assignedSubjects ?? []} />}
-          </>
-        ) : (
-          <Outlet />
-        )}
+
+        <Outlet />
+
+        {activeTab === 'classes'     && <ClassesTab onViewAnalytics={setSelectedClass} />}
+        {activeTab === 'analytics'   && <AnalyticsTab />}
+        {activeTab === 'testbuilder' && <TestBuilderTab />}
+
       </div>
     </div>
   );
