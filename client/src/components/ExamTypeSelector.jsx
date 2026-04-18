@@ -95,11 +95,15 @@ const ExamTypeSelector = ({
           `}
         >
           {includeAll && <option value=""> All Exam Types</option>}
-          {types.map(t => (
-            <option key={t.id} value={t.code}>
-              {t.icon_emoji || ''} {t.name}
-            </option>
-          ))}
+          {types.map(t => {
+            const emoji = t.icon_emoji?.trim();
+            const safeIcon = (!emoji || emoji === '?' || emoji === '\uFFFD') ? '' : emoji;
+            return (
+              <option key={t.id} value={t.code}>
+                {safeIcon ? safeIcon + ' ' : ''}{t.name}
+              </option>
+            );
+          })}
         </select>
 
         {/* Dropdown arrow */}
