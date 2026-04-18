@@ -257,6 +257,54 @@ router.post('/send-weekly-digest', protect, adminOnly, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────
+// POST /api/admin/send-notification
+// Sends an in-app notification to all users, students only, or teachers only.
+// Body: { target: 'all'|'students'|'teachers', title: string, message: string }
+// ─────────────────────────────────────────────
+router.post('/send-notification', protect, adminOnly, async (req, res) => {
+  try {
+    const { target = 'all', title, message } = req.body;
+    if (!title || !message) {
+      return res.status(400).json({ success: false, error: 'title and message are required' });
+    }
+
+    const roleMap = { students: 'student', teachers: 'teacher' };
+    const roleFilter = roleMap[target] ? ` AND role = '${roleMap[target]}'` : '';
+
+    const users = await sequelize.query(
+      `SELECT id FROM users WHERE is_active = true${roleFilter}`,
+      { type: QueryTypes.SELECT }
+    );
+
+    if (users.length === 0) {
+      return res.json({ success: true, sent: 0, message: 'No matching users found' });
+    }
+
+    // Check if notifications table has updated_at column
+    const cols = await sequelize.query(
+      `SELECT column_name FROM information_schema.columns WHERE table_name='notifications' AND column_name='updated_at'`,
+      { type: QueryTypes.SELECT }
+    );
+    const hasUpdatedAt = cols.length > 0;
+
+    await Promise.all(users.map(u =>
+      sequelize.query(
+        hasUpdatedAt
+          ? `INSERT INTO notifications (user_id, title, message, type, created_at, updated_at) VALUES (:uid, :title, :msg, 'info', NOW(), NOW())`
+          : `INSERT INTO notifications (user_id, title, message, type, created_at) VALUES (:uid, :title, :msg, 'info', NOW())`,
+        { replacements: { uid: u.id, title, msg: message }, type: QueryTypes.INSERT }
+      )
+    ));
+
+    console.log(`[admin] Notification sent to ${users.length} users by admin ${req.user.id}`);
+    return res.json({ success: true, sent: users.length });
+  } catch (err) {
+    console.error('[POST /admin/send-notification]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────
 // AI QUESTION GENERATION
 // ─────────────────────────────────────────────
 router.post('/generate-questions', protect, adminOnly, async (req, res) => {

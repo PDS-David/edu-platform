@@ -1495,6 +1495,37 @@ const PlatformAnalyticsPanel = () => {
   const [stats,   setStats]   = useState(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState(null);
+  const [toast,   setToast]   = useState(null);
+
+  // Notification modal state
+  const [notifModal,   setNotifModal]   = useState(false);
+  const [notifTarget,  setNotifTarget]  = useState('all');
+  const [notifTitle,   setNotifTitle]   = useState('');
+  const [notifMessage, setNotifMessage] = useState('');
+  const [notifSending, setNotifSending] = useState(false);
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3500);
+  };
+
+  const sendNotification = async () => {
+    if (!notifTitle.trim() || !notifMessage.trim()) {
+      showToast('Title and message are required', 'error'); return;
+    }
+    setNotifSending(true);
+    try {
+      const res = await api.post('/admin/send-notification', {
+        target: notifTarget, title: notifTitle.trim(), message: notifMessage.trim()
+      });
+      showToast(`Notification sent to ${res.sent ?? 0} user(s)`);
+      setNotifModal(false); setNotifTitle(''); setNotifMessage(''); setNotifTarget('all');
+    } catch (err) {
+      showToast(err?.error || 'Failed to send notification', 'error');
+    } finally {
+      setNotifSending(false);
+    }
+  };
 
   const fetchStats = async () => {
     setLoading(true);
@@ -1541,6 +1572,7 @@ const PlatformAnalyticsPanel = () => {
 
   return (
     <div className="space-y-6">
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-gray-900">Platform Analytics</h2>
@@ -1623,17 +1655,10 @@ const PlatformAnalyticsPanel = () => {
         <p className="text-sm font-semibold text-gray-700 mb-3">Quick Actions</p>
         <div className="flex flex-wrap gap-3">
           <button
-            onClick={async () => {
-              try {
-                await api.post('/admin/send-weekly-digest');
-                alert('Weekly digest queued successfully.');
-              } catch {
-                alert('Failed to queue digest. Check server logs.');
-              }
-            }}
+            onClick={() => setNotifModal(true)}
             className="flex items-center gap-2 text-sm bg-teal-600 hover:bg-teal-700 text-white font-semibold px-4 py-2 rounded-xl transition-colors"
           >
-            <Zap size={14} /> Run Weekly Digest Now
+            <Zap size={14} /> Send Notification
           </button>
           <button
             onClick={() => navigate('/admin/questions/review')}
@@ -1643,6 +1668,64 @@ const PlatformAnalyticsPanel = () => {
           </button>
         </div>
       </div>
+
+      {/* Notification Modal */}
+      {notifModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-4">Send Notification</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-gray-500 mb-1 block">Send To</label>
+                <select
+                  value={notifTarget}
+                  onChange={e => setNotifTarget(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
+                >
+                  <option value="all">All Users</option>
+                  <option value="students">Students Only</option>
+                  <option value="teachers">Teachers Only</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500 mb-1 block">Title</label>
+                <input
+                  type="text"
+                  value={notifTitle}
+                  onChange={e => setNotifTitle(e.target.value)}
+                  placeholder="Notification title…"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500 mb-1 block">Message</label>
+                <textarea
+                  value={notifMessage}
+                  onChange={e => setNotifMessage(e.target.value)}
+                  rows={4}
+                  placeholder="Your message…"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 resize-none"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button
+                onClick={() => { setNotifModal(false); setNotifTitle(''); setNotifMessage(''); }}
+                className="flex-1 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={sendNotification}
+                disabled={notifSending}
+                className="flex-1 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold disabled:opacity-60"
+              >
+                {notifSending ? 'Sending…' : 'Send'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
