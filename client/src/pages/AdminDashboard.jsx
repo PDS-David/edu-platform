@@ -875,7 +875,8 @@ const TeacherAssignmentPanel = () => {
                   className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-purple-400"
                 >
                   <option value="">Select a teacher…</option>
-                  {teachers.map(t => (
+                  {/* Deduplicate teachers by id before rendering */}
+                  {[...new Map(teachers.map(t => [t.id, t])).values()].map(t => (
                     <option key={t.id} value={t.id}>{t.first_name} {t.last_name} — {t.email}</option>
                   ))}
                 </select>
