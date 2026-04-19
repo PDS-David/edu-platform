@@ -24,8 +24,8 @@ COPY --from=deps /app/node_modules ./node_modules
 # Copy all server source files
 COPY . .
 
-# Create upload dirs so the process doesn't crash on first file write
-RUN mkdir -p uploads/resources uploads/past-papers uploads/videos/raw uploads/videos/hls
+# Create upload dirs and logs dir so the process doesn't crash on first file write
+RUN mkdir -p uploads/resources uploads/past-papers uploads/videos/raw uploads/videos/hls logs
 
 # Non-root user for security
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
