@@ -7,9 +7,13 @@ const { Sequelize } = require('sequelize');
 const isProduction = process.env.NODE_ENV === 'production';
 
 // ── SSL ───────────────────────────────────────────────────────────────────────
-// Render (and most managed PG hosts) require SSL.
-// rejectUnauthorized: false is required because managed hosts use self-signed certs.
-const dialectOptions = isProduction
+// Render (and managed PG hosts) require SSL.
+// Local Docker postgres does NOT use SSL — detect via DB_SSL env var or
+// by checking if DATABASE_URL contains sslmode=disable.
+const dbUrl = process.env.DATABASE_URL || '';
+const sslDisabled = process.env.DB_SSL === 'false' || dbUrl.includes('sslmode=disable');
+
+const dialectOptions = (isProduction && !sslDisabled)
   ? {
       ssl: {
         require: true,
