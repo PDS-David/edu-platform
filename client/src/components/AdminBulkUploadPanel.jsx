@@ -22,7 +22,7 @@ import api from '../services/apiClient';
 import {
   Upload, FileText, Video, Music, Image, File,
   CheckCircle, AlertTriangle, X, Loader2,
-  ChevronDown, Users, Tag, RefreshCw, Inbox,
+  ChevronDown, Users, Tag, RefreshCw, Inbox, BookOpen,
 } from 'lucide-react';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -358,6 +358,111 @@ function AssignUsersForm({ file, onDone, onDismiss }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// RESOURCE LIBRARY — lets admin re-push any published resource (#9)
+// ══════════════════════════════════════════════════════════════════════════════
+function ResourceLibrarySection() {
+  const [resources,  setResources]  = useState([]);
+  const [loading,    setLoading]    = useState(false);
+  const [open,       setOpen]       = useState(false);
+  const [pushing,    setPushing]    = useState(null); // resource id
+  const [search,     setSearch]     = useState('');
+
+  const load = useCallback(() => {
+    setLoading(true);
+    api.get('/resources')
+      .then(r => setResources(extract(r)))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { if (open) load(); }, [open, load]);
+
+  const filtered = resources.filter(r =>
+    !r.is_staged &&
+    `${r.title} ${r.subject_name || ''} ${r.resource_type || ''}`.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <BookOpen size={16} className="text-indigo-500" />
+          <h3 className="text-sm font-bold text-gray-900">Resource Library</h3>
+          <span className="text-xs text-gray-400">— re-push any published resource</span>
+        </div>
+        <button
+          onClick={() => setOpen(v => !v)}
+          className="text-xs font-semibold text-indigo-600 border border-indigo-200 px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors"
+        >
+          {open ? 'Collapse ▲' : 'Browse Library ▼'}
+        </button>
+      </div>
+
+      {open && (
+        <div className="space-y-3">
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search by title, subject or type…"
+            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+          />
+
+          {loading ? (
+            <div className="flex justify-center py-6"><Loader2 size={20} className="animate-spin text-gray-300" /></div>
+          ) : filtered.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-4">No published resources found.</p>
+          ) : (
+            <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+              {filtered.map(file => (
+                <div key={file.id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+                  <div className="flex items-center gap-3 px-4 py-3">
+                    <FileIcon type={file.resource_type} size={16} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-800 truncate">{file.title}</p>
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        <span className="text-xs text-gray-400 capitalize">{file.resource_type || 'file'}</span>
+                        {file.subject_name && (
+                          <><span className="text-xs text-gray-300">·</span>
+                          <span className="text-xs text-teal-600">{file.subject_name}</span></>
+                        )}
+                        {file.push_type && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-600">
+                            {file.push_type}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setPushing(pushing === file.id ? null : file.id)}
+                      className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
+                        pushing === file.id
+                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          : 'border-indigo-200 text-indigo-600 hover:bg-indigo-50'
+                      }`}
+                    >
+                      <Users size={11} />
+                      {pushing === file.id ? 'Cancel' : 'Push'}
+                    </button>
+                  </div>
+
+                  {pushing === file.id && (
+                    <AssignUsersForm
+                      file={file}
+                      onDone={() => setPushing(null)}
+                      onDismiss={() => setPushing(null)}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // MAIN PANEL
 // ══════════════════════════════════════════════════════════════════════════════
 export default function AdminBulkUploadPanel() {
@@ -658,6 +763,9 @@ export default function AdminBulkUploadPanel() {
           </div>
         )}
       </div>
+
+      {/* ══ RESOURCE LIBRARY — push any published resource ═════════════════ */}
+      <ResourceLibrarySection />
     </div>
   );
 }

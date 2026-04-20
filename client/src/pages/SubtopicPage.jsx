@@ -150,7 +150,14 @@ function ResourcesTab({ subtopicId, subtopic, subtopicName, onComplete }) {
           <div className="flex items-center gap-3 mb-3">
             <span className="text-2xl">{typeIcon(res.resource_type)}</span>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-gray-800 truncate">{res.title}</p>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <p className="text-sm font-semibold text-gray-800 truncate">{res.title}</p>
+                {res._assigned && (
+                  <span className="text-[10px] font-semibold bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-full shrink-0">
+                    From teacher
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-gray-400">
                 {res.resource_type}
                 {res.duration_seconds ? ` · ${formatDuration(res.duration_seconds)}` : ''}

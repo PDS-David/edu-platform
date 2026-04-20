@@ -49,12 +49,33 @@ export default function PastPapersPage() {
   const [yearFrom,  setYearFrom]  = useState(YEAR_MIN);
   const [yearTo,    setYearTo]    = useState(YEAR_MAX);
 
-  // Load subjects for filter
+  const [examTypes, setExamTypes] = useState([]); // full catalog/types list for id lookup
+  const [subjects,  setSubjects]  = useState([]);
+
+  // Load exam board catalog once (for id→code mapping)
   useEffect(() => {
-    api.get('/subjects?for_test_builder=true')
-      .then(r => setSubjects(r.data || []))
+    api.get('/catalog/types')
+      .then(r => setExamTypes(r.data || []))
       .catch(() => {});
   }, []);
+
+  // Cascade: when board changes, reload subjects for that board only (#4)
+  useEffect(() => {
+    setSubjectId('');          // reset subject when board changes
+    if (!board) {
+      // No board selected → load all subjects flat
+      api.get('/subjects?for_test_builder=true')
+        .then(r => setSubjects(r.data || []))
+        .catch(() => setSubjects([]));
+      return;
+    }
+    // Find the UUID id for this board code
+    const found = examTypes.find(t => t.code === board);
+    if (!found) { setSubjects([]); return; }
+    api.get(`/catalog/types/${found.id}/subjects`)
+      .then(r => setSubjects(r.data || []))
+      .catch(() => setSubjects([]));
+  }, [board, examTypes]); // eslint-disable-line
 
   // Load papers whenever filters change
   useEffect(() => {
