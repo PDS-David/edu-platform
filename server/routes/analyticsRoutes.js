@@ -45,7 +45,8 @@ router.get('/summary', protect, async (req, res) => {
            COALESCE(ROUND(AVG(CASE WHEN pa.is_correct THEN 100 ELSE 0 END))::INTEGER, 0) AS accuracy_pct,
            COUNT(DISTINCT t.subject_id)::INTEGER AS subjects_practiced,
            COUNT(DISTINCT DATE(pa.attempted_at))::INTEGER AS active_days,
-           COALESCE(SUM(pa.time_taken_seconds), 0)::BIGINT AS total_time_seconds
+           COALESCE(SUM(pa.time_taken_seconds), 0)::BIGINT AS total_time_seconds,
+           COUNT(*) FILTER (WHERE pa.attempted_at >= CURRENT_DATE)::INTEGER AS today_attempts
          FROM practice_attempts pa
          JOIN questions  q  ON q.id  = pa.question_id
          JOIN subtopics  st ON st.id = q.subtopic_id
@@ -64,6 +65,7 @@ router.get('/summary', protect, async (req, res) => {
       subjects_practiced: a.subjects_practiced || 0,
       active_days:        a.active_days        || 0,
       total_time_seconds: a.total_time_seconds || 0,
+      today_attempts:     a.today_attempts     || 0,
     }});
   } catch (err) {
     console.error('[GET /analytics/summary]', err.message);

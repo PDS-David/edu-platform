@@ -73,11 +73,27 @@ function ResourcesTab({ subtopicId, subtopic, subtopicName, onComplete }) {
     } catch {} finally { setNotesLoading(false); }
   };
 
+  // #7 — Fetch both topic-linked resources AND assigned lecture materials,
+  // deduplicate by id, prioritise assigned ones (they have richer metadata).
   useEffect(() => {
-    api.get('/resources', { params: { subtopic_id: subtopicId } })
-      .then(r => setResources(r.data || []))
-      .catch(() => setResources([]))
-      .finally(() => setLoading(false));
+    const LECTURE_TYPES = new Set([
+      'learning_material', 'lecture_material', 'lecture', 'material', 'resource',
+    ]);
+    Promise.all([
+      api.get('/resources', { params: { subtopic_id: subtopicId } }).then(r => r.data || []).catch(() => []),
+      api.get('/resources/my-assignments').then(r => r.data || []).catch(() => []),
+    ]).then(([linked, assigned]) => {
+      // Filter assigned to only lecture-type materials relevant to this subtopic (or subject)
+      const relevant = assigned.filter(a =>
+        LECTURE_TYPES.has(a.push_type?.toLowerCase() || '') &&
+        (a.subtopic_id == subtopicId || !a.subtopic_id)      // include if linked to subtopic or unlinked
+      );
+      // Merge: deduplicate by id, linked resources take base, assigned override if dupe
+      const map = new Map();
+      for (const r of linked)    map.set(r.id, r);
+      for (const r of relevant)  if (!map.has(r.id)) map.set(r.id, { ...r, _assigned: true });
+      setResources([...map.values()]);
+    }).finally(() => setLoading(false));
   }, [subtopicId]);
 
   const handleOpen = async (res) => {
@@ -253,9 +269,31 @@ function PracticeTab({ subtopicId, subjectId, onComplete }) {
       {loading ? (
         <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-teal-400" /></div>
       ) : questions.length === 0 ? (
-        <div className="text-center py-12 text-gray-400">
-          <div className="text-4xl mb-3"></div>
-          <p className="text-sm">No {subTab} questions available yet for this subtopic.</p>
+        <div className="bg-white rounded-2xl border border-gray-100 p-6 text-center shadow-sm">
+          <div className="text-4xl mb-3">📭</div>
+          <p className="text-sm font-semibold text-gray-700 mb-1">
+            No {subTab === "mcq" ? "MCQ" : subTab === "smart" ? "smart answer" : "structured"} questions yet
+          </p>
+          <p className="text-xs text-gray-400 mb-4 leading-relaxed">
+            Questions for this subtopic haven't been added yet.<br />
+            {subTab !== "mcq" && "Try switching to MCQ Questions — they're updated more frequently."}
+          </p>
+          <div className="flex flex-col gap-2 max-w-xs mx-auto">
+            {subTab !== "mcq" && (
+              <button
+                onClick={() => setSubTab("mcq")}
+                className="w-full py-2 text-sm font-semibold text-white bg-teal-500 hover:bg-teal-600 rounded-xl transition-colors"
+              >
+                Try MCQ Questions instead
+              </button>
+            )}
+            <button
+              onClick={() => window.history.back()}
+              className="w-full py-2 text-sm font-medium text-gray-500 border border-gray-200 hover:bg-gray-50 rounded-xl transition-colors"
+            >
+              ← Go back to topic
+            </button>
+          </div>
         </div>
       ) : phase === 'done' ? (
         <CompletionCard score={score} total={questions.length} onRetry={() => loadQuestions(subTab)} onTakeQuiz={() => {}} />
