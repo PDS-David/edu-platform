@@ -10,12 +10,36 @@ import {
 } from "lucide-react";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const PUSH_TYPE_META = {
-  quiz:              { label: "⚡ Quizzes",             color: "bg-amber-50 border-amber-200"  },
-  practice_test:     { label: "📝 Practice Tests",     color: "bg-blue-50 border-blue-200"    },
-  learning_material: { label: "📚 Learning Materials", color: "bg-teal-50 border-teal-200"    },
+// Canonical push_type definitions — covers all values past, present, and future.
+// Aliases map legacy / alternate strings onto a canonical bucket.
+const PUSH_TYPE_ALIAS = {
+  // canonical → canonical (identity)
+  quiz:              "quiz",
+  practice_test:     "practice_test",
+  learning_material: "learning_material",
+  // admin panel new values → canonical
+  lecture_material:  "learning_material",
+  question_material: "practice_test",
+  // extra synonyms for safety
+  lecture:           "learning_material",
+  material:          "learning_material",
+  resource:          "learning_material",
+  test:              "practice_test",
+  exam:              "practice_test",
 };
-const PUSH_ORDER = ["quiz", "practice_test", "learning_material"];
+
+const PUSH_TYPE_META = {
+  quiz:              { label: "⚡ Quizzes",             color: "bg-amber-50 border-amber-200",  badge: "bg-amber-100 text-amber-700"  },
+  practice_test:     { label: "📝 Practice Tests",      color: "bg-blue-50 border-blue-200",    badge: "bg-blue-100 text-blue-700"    },
+  learning_material: { label: "📚 Learning Materials",  color: "bg-teal-50 border-teal-200",    badge: "bg-teal-100 text-teal-700"    },
+  unknown:           { label: "📁 Other Files",          color: "bg-gray-50 border-gray-200",    badge: "bg-gray-100 text-gray-600"    },
+};
+
+// Resolve any push_type string to a canonical key
+const resolvePushType = (raw) =>
+  PUSH_TYPE_ALIAS[raw?.toLowerCase?.() ?? ""] ?? "unknown";
+
+const PUSH_ORDER = ["quiz", "practice_test", "learning_material", "unknown"];
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 function FileIcon({ type, size = 16 }) {
@@ -219,6 +243,162 @@ function SubjectCard({ subject, pct, onClick }) {
   );
 }
 
+// ── InlineViewer ──────────────────────────────────────────────────────────────
+// Renders PDF in iframe, video/audio inline, images directly.
+function InlineViewer({ file, base }) {
+  const url  = file.file_url?.startsWith("http") ? file.file_url : `${base}${file.file_url}`;
+  const type = (file.type || file.resource_type || "").toLowerCase();
+
+  if (type === "video" || /\.(mp4|webm|mov)$/i.test(url)) {
+    return (
+      <div className="mt-2 rounded-xl overflow-hidden bg-black">
+        <video src={url} controls className="w-full max-h-56 rounded-xl" />
+      </div>
+    );
+  }
+  if (type === "audio" || /\.(mp3|wav|ogg|m4a)$/i.test(url)) {
+    return <audio src={url} controls className="w-full mt-2" />;
+  }
+  if (type === "image" || /\.(jpg|jpeg|png|gif|webp)$/i.test(url)) {
+    return <img src={url} alt={file.title} className="mt-2 rounded-xl w-full max-h-48 object-contain bg-gray-100" />;
+  }
+  // PDF / document — iframe embed
+  return (
+    <div className="mt-2 rounded-xl overflow-hidden border border-gray-200">
+      <iframe
+        src={`${url}#toolbar=0`}
+        title={file.title}
+        className="w-full"
+        style={{ height: 340 }}
+      />
+    </div>
+  );
+}
+
+// ── AssignedFilesSection ──────────────────────────────────────────────────────
+// Groups resources by subject, then by push_type. Shows inline viewer per file.
+function AssignedFilesSection({ resources, loading, groupedByType, totalResources, navigate }) {
+  const [openFile, setOpenFile] = useState(null); // id of file with viewer open
+  const BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/api$/, "");
+
+  // Group by subject_name for contextual display
+  const bySubject = useMemo(() => {
+    const map = {};
+    for (const r of resources) {
+      const subj = r.subject_name || "Other";
+      if (!map[subj]) map[subj] = [];
+      map[subj].push(r);
+    }
+    return map;
+  }, [resources]);
+
+  const subjects = Object.keys(bySubject).sort();
+
+  return (
+    <div className="bg-white p-4 rounded-xl shadow-sm">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="font-semibold text-gray-800">Assigned Files</h2>
+        {totalResources > 0 && (
+          <span className="text-xs text-gray-400">{totalResources} file{totalResources !== 1 ? "s" : ""}</span>
+        )}
+      </div>
+
+      {loading ? (
+        <p className="text-sm text-gray-400">Loading…</p>
+      ) : totalResources === 0 ? (
+        <div className="text-center py-6 text-gray-400">
+          <File size={28} className="mx-auto mb-2 opacity-30" />
+          <p className="text-sm">No files assigned yet.</p>
+          <p className="text-xs mt-1">Files sent by your teacher will appear here.</p>
+        </div>
+      ) : (
+        <div className="space-y-5">
+          {subjects.map(subject => {
+            const files = bySubject[subject];
+            // Within each subject, group by resolved push_type
+            const byType = {};
+            for (const f of files) {
+              const pt = resolvePushType(f.push_type);
+              if (!byType[pt]) byType[pt] = [];
+              byType[pt].push(f);
+            }
+
+            return (
+              <div key={subject}>
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                  <BookOpen size={11} /> {subject}
+                </p>
+                {PUSH_ORDER.filter(pt => byType[pt]?.length > 0).map(pt => {
+                  const meta = PUSH_TYPE_META[pt];
+                  return (
+                    <div key={pt} className="mb-3">
+                      <p className="text-[10px] font-semibold text-gray-400 mb-1.5 ml-0.5">{meta.label}</p>
+                      <div className="space-y-2">
+                        {byType[pt].map(file => {
+                          const fileType = (file.type || file.resource_type || "").toLowerCase();
+                          const isOpen   = openFile === `${file.id}-${pt}`;
+                          const isPractice = pt === "practice_test" || pt === "quiz";
+
+                          return (
+                            <div key={`${file.id}-${pt}`} className={`border rounded-xl overflow-hidden ${meta.color}`}>
+                              <div className="p-3 flex items-center gap-3">
+                                <FileIcon type={fileType} size={16} />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-gray-800 truncate">{file.title}</p>
+                                  {file.assigned_by_name && (
+                                    <p className="text-[10px] text-gray-400">From: {file.assigned_by_name}</p>
+                                  )}
+                                </div>
+                                <div className="flex gap-1.5 shrink-0 flex-wrap justify-end">
+                                  {/* Open inline button */}
+                                  <button
+                                    onClick={() => setOpenFile(isOpen ? null : `${file.id}-${pt}`)}
+                                    className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-colors ${
+                                      isOpen
+                                        ? "bg-gray-700 text-white border-gray-700"
+                                        : "border-gray-300 text-gray-600 hover:bg-gray-50"
+                                    }`}
+                                  >
+                                    {isOpen ? "Close" : "Open"}
+                                  </button>
+                                  {/* Practice button for question materials */}
+                                  {isPractice && file.subtopic_id && (
+                                    <button
+                                      onClick={() => navigate(`/student/subtopic/${file.subtopic_id}?tab=practice`)}
+                                      className="text-xs font-semibold px-2.5 py-1 rounded-lg border border-indigo-200 text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                    >
+                                      Practice
+                                    </button>
+                                  )}
+                                  <a href={file.file_url?.startsWith("http") ? file.file_url : `${BASE}${file.file_url}`}
+                                    download title="Download"
+                                    className="p-1.5 rounded-lg text-green-600 hover:bg-green-50 transition-colors border border-green-200">
+                                    <Download size={13} />
+                                  </a>
+                                </div>
+                              </div>
+                              {/* Inline viewer */}
+                              {isOpen && (
+                                <div className="px-3 pb-3">
+                                  <InlineViewer file={file} base={BASE} />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main Dashboard ────────────────────────────────────────────────────────────
 export default function StudentDashboard() {
   const { user } = useAuth();
@@ -291,7 +471,7 @@ export default function StudentDashboard() {
   const groupedByType = useMemo(() => {
     const groups = {};
     for (const r of resources) {
-      const pt = r.push_type || "learning_material";
+      const pt = resolvePushType(r.push_type);   // normalise ALL push_type values
       if (!groups[pt]) groups[pt] = [];
       groups[pt].push(r);
     }
@@ -301,16 +481,24 @@ export default function StudentDashboard() {
   const totalResources = resources.length;
   const firstSubjectId = subjects[0]?.id;
 
+  // #6 — Mock exam subject picker state
+  const [showMockPicker, setShowMockPicker] = useState(false);
+
+  // #8 — Daily target: aim for 20 questions/day; show progress toward it
+  const dailyTarget = 20;
+  const todayAttempts = summary.today_attempts ?? 0;
+  const dailyPct = Math.min(100, Math.round((todayAttempts / dailyTarget) * 100));
+
   const isRootDashboard =
     location.pathname === "/student" ||
     location.pathname === "/student/" ||
     location.pathname === "/student/dashboard";
 
   const quickLinks = [
-    { label: "Past Papers",   icon: <FileText size={18} className="text-blue-500" />,      path: "/past-papers",                                         bg: "bg-blue-50 border-blue-100"   },
-    { label: "Practice",      icon: <Zap size={18} className="text-amber-500" />,           path: "/student/practice",                                    bg: "bg-amber-50 border-amber-100" },
-    { label: "Mock Exam",     icon: <ClipboardList size={18} className="text-rose-500" />,  path: firstSubjectId ? `/student/mock/${firstSubjectId}` : "/student/practice", bg: "bg-rose-50 border-rose-100" },
-    { label: "Analytics",     icon: <BarChart2 size={18} className="text-green-500" />,     path: "/student/analytics",                                   bg: "bg-green-50 border-green-100" },
+    { label: "Past Papers",   icon: <FileText size={18} className="text-blue-500" />,      path: "/past-papers",          bg: "bg-blue-50 border-blue-100"   },
+    { label: "Practice",      icon: <Zap size={18} className="text-amber-500" />,           path: "/student/practice",     bg: "bg-amber-50 border-amber-100" },
+    { label: "Mock Exam",     icon: <ClipboardList size={18} className="text-rose-500" />,  path: null,                    bg: "bg-rose-50 border-rose-100",  onClick: () => setShowMockPicker(true) },
+    { label: "Analytics",     icon: <BarChart2 size={18} className="text-green-500" />,     path: "/student/analytics",    bg: "bg-green-50 border-green-100" },
   ];
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -370,10 +558,10 @@ export default function StudentDashboard() {
             <div className="mb-4">
               <h2 className="font-semibold mb-3 text-gray-800">Quick Links</h2>
               <div className="grid grid-cols-4 gap-2">
-                {quickLinks.map(({ label, icon, path, bg }) => (
+                {quickLinks.map(({ label, icon, path, bg, onClick: qlClick }) => (
                   <button
                     key={label}
-                    onClick={() => navigate(path)}
+                    onClick={() => qlClick ? qlClick() : navigate(path)}
                     className={`border ${bg} p-3 rounded-xl flex flex-col items-center gap-1.5 hover:opacity-80 transition-opacity shadow-sm`}
                   >
                     {icon}
@@ -381,6 +569,66 @@ export default function StudentDashboard() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* #6 — Mock Exam Subject Picker Modal */}
+            {showMockPicker && (
+              <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-4">
+                <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
+                  <div className="bg-rose-500 px-5 py-4">
+                    <p className="text-white font-bold text-base">Start Mock Exam</p>
+                    <p className="text-white/70 text-xs mt-0.5">Choose a subject to begin your 45-minute timed exam</p>
+                  </div>
+                  <div className="p-4 space-y-2 max-h-64 overflow-y-auto">
+                    {subjects.length === 0 ? (
+                      <p className="text-sm text-gray-400 text-center py-4">No subjects enrolled yet.</p>
+                    ) : subjects.map(s => (
+                      <button key={s.id}
+                        onClick={() => { setShowMockPicker(false); navigate(`/student/mock/${s.id}`); }}
+                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-gray-100 hover:bg-rose-50 hover:border-rose-200 transition-colors text-left">
+                        <span className="text-xl">{s.icon_emoji || "📚"}</span>
+                        <div>
+                          <p className="text-sm font-semibold text-gray-800">{s.name}</p>
+                          {s.exam_board_code && <p className="text-xs text-gray-400">{s.exam_board_code}</p>}
+                        </div>
+                        <ClipboardList size={14} className="text-rose-300 ml-auto shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                  <div className="px-4 pb-4">
+                    <button onClick={() => setShowMockPicker(false)}
+                      className="w-full py-2 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-xl">
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* #8 — Daily Target */}
+            <div className="bg-white rounded-xl p-4 mb-4 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Target size={15} className="text-indigo-500" />
+                  <span className="text-sm font-semibold text-gray-800">Today's Target</span>
+                </div>
+                <span className={`text-xs font-bold ${dailyPct >= 100 ? "text-green-600" : "text-indigo-600"}`}>
+                  {todayAttempts} / {dailyTarget} questions
+                </span>
+              </div>
+              <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-700 ${dailyPct >= 100 ? "bg-green-500" : "bg-indigo-500"}`}
+                  style={{ width: `${dailyPct}%` }}
+                />
+              </div>
+              {dailyPct >= 100
+                ? <p className="text-xs text-green-600 font-medium mt-1.5">✅ Daily goal complete — great work!</p>
+                : <p className="text-xs text-gray-400 mt-1.5">
+                    {dailyTarget - todayAttempts} more to hit your daily goal
+                    {weakTopics.length > 0 && ` · try ${weakTopics[0]?.topic || weakTopics[0]?.subject_name || "your weak topics"}`}
+                  </p>
+              }
             </div>
 
             {/* RECENT QUIZ ACTIVITY */}
@@ -420,48 +668,14 @@ export default function StudentDashboard() {
               )}
             </div>
 
-            {/* ASSIGNED FILES */}
-            <div className="bg-white p-4 rounded-xl shadow-sm">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="font-semibold text-gray-800">Assigned Files</h2>
-                {totalResources > 0 && (
-                  <span className="text-xs text-gray-400">{totalResources} file{totalResources !== 1 ? "s" : ""}</span>
-                )}
-              </div>
-              {loadingResources ? (
-                <p className="text-sm text-gray-400">Loading…</p>
-              ) : totalResources === 0 ? (
-                <p className="text-sm text-gray-400">No files assigned yet.</p>
-              ) : (
-                <div className="space-y-4">
-                  {PUSH_ORDER.filter(pt => groupedByType[pt]?.length > 0).map(pt => {
-                    const meta  = PUSH_TYPE_META[pt];
-                    const files = groupedByType[pt];
-                    return (
-                      <div key={pt}>
-                        <h3 className="text-[10px] font-bold text-gray-500 uppercase mb-2">{meta.label}</h3>
-                        <div className="space-y-2">
-                          {files.map(file => (
-                            <div key={`${file.id}-${file.push_type}`} className={`border rounded-xl p-3 flex items-center gap-3 ${meta.color}`}>
-                              <FileIcon type={file.type || file.resource_type} size={16} />
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-gray-800 truncate">{file.title}</p>
-                                {file.subject_name && <p className="text-xs text-gray-500">{file.subject_name}</p>}
-                                {file.assigned_by_name && <p className="text-xs text-gray-400">From: {file.assigned_by_name}</p>}
-                              </div>
-                              <div className="flex gap-2 shrink-0">
-                                <a href={file.file_url} target="_blank" rel="noreferrer" className="text-blue-500 hover:text-blue-700" title="View"><ExternalLink size={14} /></a>
-                                <a href={file.file_url} download className="text-green-500 hover:text-green-700" title="Download"><Download size={14} /></a>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+            {/* #3 — ASSIGNED FILES: grouped by subject, then push type, with inline viewer */}
+            <AssignedFilesSection
+              resources={resources}
+              loading={loadingResources}
+              groupedByType={groupedByType}
+              totalResources={totalResources}
+              navigate={navigate}
+            />
           </>
         )}
       </div>
