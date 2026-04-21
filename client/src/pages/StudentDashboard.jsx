@@ -282,7 +282,7 @@ export default function StudentDashboard() {
   // ── Sidebar items — all wired ─────────────────────────────────────────────
   const sidebarItems = [
     { label: "Dashboard",   icon: BarChart2,    path: "/student/dashboard" },
-    { label: "Subjects",    icon: BookOpen,     path: "/subjects"          },
+    { label: "Resources",   icon: BookOpen,     path: "/subjects"          },
     { label: "Practice",    icon: Zap,          path: "/student/practice"  },
     { label: "Past Papers", icon: FileText,     path: "/past-papers"       },
     { label: "Mock Exam",   icon: ClipboardList,path: null, onClick: () => setShowMockPicker(true) },
@@ -466,7 +466,7 @@ export default function StudentDashboard() {
 
                 {/* Right column */}
                 <div className="space-y-4">
-                  {/* Focus areas */}
+                  {/* Focus areas — show when student has quiz history */}
                   {weakTopics.length > 0 && (
                     <div className="bg-white border border-rose-100 rounded-xl overflow-hidden shadow-sm">
                       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
@@ -489,6 +489,55 @@ export default function StudentDashboard() {
                             </button>
                           </div>
                         ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Discover what to study — shown to new students with no quiz history */}
+                  {weakTopics.length === 0 && !loadingSubjects && subjects.length > 0 && (
+                    <div className="bg-white border border-blue-100 rounded-xl overflow-hidden shadow-sm">
+                      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                        <p className="text-xs font-semibold text-blue-600 uppercase tracking-wider flex items-center gap-1.5">
+                          <BookOpen size={11} /> Discover What to Study
+                        </p>
+                        <span className="text-xs text-gray-400">{subjects.length} subject{subjects.length !== 1 ? "s" : ""}</span>
+                      </div>
+                      <div className="p-3 space-y-1.5">
+                        <p className="text-[11px] text-gray-400 px-2 pb-1">You haven't taken any quizzes yet. Pick a subject and start now:</p>
+                        {subjects.slice(0, 4).map((s) => (
+                          <button key={s.id} onClick={() => navigate(`/student/subject/${s.id}`)}
+                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-blue-50 transition-colors text-left group border border-transparent hover:border-blue-100">
+                            <span className="text-base shrink-0">{s.icon_emoji || "📚"}</span>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-semibold text-gray-800 group-hover:text-blue-700 truncate">{s.name}</p>
+                              {s.exam_board_code && <p className="text-[10px] text-gray-400">{s.exam_board_code}</p>}
+                            </div>
+                            <span className="text-[10px] text-blue-500 font-semibold shrink-0 group-hover:underline">Start →</span>
+                          </button>
+                        ))}
+                        {subjects.length > 4 && (
+                          <button onClick={() => navigate("/subjects")} className="w-full text-center text-[10px] text-blue-500 hover:underline pt-1">
+                            Browse all {subjects.length} subjects →
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* New student with no subjects enrolled yet */}
+                  {weakTopics.length === 0 && !loadingSubjects && subjects.length === 0 && (
+                    <div className="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm">
+                      <div className="px-4 py-3 border-b border-gray-100">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Get Started</p>
+                      </div>
+                      <div className="p-5 text-center">
+                        <BookOpen size={28} className="mx-auto mb-2 text-blue-200" />
+                        <p className="text-sm font-semibold text-gray-700 mb-1">No subjects enrolled yet</p>
+                        <p className="text-xs text-gray-400 mb-3">Browse the catalog and enroll in your exam subjects to begin studying.</p>
+                        <button onClick={() => navigate("/subjects")}
+                          className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors">
+                          Browse Subjects
+                        </button>
                       </div>
                     </div>
                   )}
