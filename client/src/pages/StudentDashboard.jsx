@@ -26,7 +26,7 @@ const PUSH_TYPE_ALIAS = {
 const PUSH_TYPE_META = {
   quiz:              { label: "⚡ Quizzes",            badge: "bg-amber-100 text-amber-700"  },
   practice_test:     { label: "📝 Practice Tests",     badge: "bg-blue-100 text-blue-700"    },
-  learning_material: { label: "📚 Learning Materials", badge: "bg-violet-100 text-violet-700" },
+  learning_material: { label: "📚 Learning Materials", badge: "bg-blue-100 text-blue-700" },
   unknown:           { label: "📁 Other Files",         badge: "bg-gray-100 text-gray-600"    },
 };
 
@@ -63,7 +63,7 @@ function InlineViewer({ file, base }) {
     <div className="mt-2 rounded-xl overflow-hidden border border-purple-100 bg-purple-50">
       <iframe src={viewerUrl} title={file.title} className="w-full" style={{ height: 380 }} allow="fullscreen" />
       <div className="flex items-center justify-center py-1.5 bg-purple-50 border-t border-purple-100">
-        <a href={url} target="_blank" rel="noreferrer" className="text-xs text-violet-600 hover:underline">
+        <a href={url} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline">
           Open in new tab if preview doesn't load
         </a>
       </div>
@@ -108,7 +108,7 @@ function AssignedFilesSection({ resources, loading, totalResources, navigate }) 
         }
         return (
           <div key={subject}>
-            <p className="text-xs font-semibold text-violet-600 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+            <p className="text-xs font-semibold text-blue-600 uppercase tracking-widest mb-2 flex items-center gap-1.5">
               <BookOpen size={10} /> {subject}
             </p>
             {PUSH_ORDER.filter(pt => byType[pt]?.length > 0).map(pt => {
@@ -123,7 +123,7 @@ function AssignedFilesSection({ resources, loading, totalResources, navigate }) 
                       const isPractice = pt === "practice_test" || pt === "quiz";
                       const rawUrl = file.file_url?.startsWith("http") ? file.file_url : `${BASE}${file.file_url}`;
                       return (
-                        <div key={`${file.id}-${pt}`} className="border border-gray-100 rounded-xl overflow-hidden bg-white hover:border-violet-200 transition-colors">
+                        <div key={`${file.id}-${pt}`} className="border border-gray-100 rounded-xl overflow-hidden bg-white hover:border-blue-200 transition-colors">
                           <div className="p-3 flex items-center gap-3">
                             <FileIcon type={fileType} size={15} />
                             <div className="flex-1 min-w-0">
@@ -137,8 +137,8 @@ function AssignedFilesSection({ resources, loading, totalResources, navigate }) 
                                 onClick={() => setOpenFile(isOpen ? null : `${file.id}-${pt}`)}
                                 className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-colors ${
                                   isOpen
-                                    ? "bg-violet-600 text-white border-violet-600"
-                                    : "border-violet-200 text-violet-600 hover:bg-violet-50"
+                                    ? "bg-blue-500 text-white border-violet-600"
+                                    : "border-blue-200 text-blue-600 hover:bg-blue-50"
                                 }`}
                               >
                                 {isOpen ? "Close" : "Open"}
@@ -152,7 +152,7 @@ function AssignedFilesSection({ resources, loading, totalResources, navigate }) 
                                 </button>
                               )}
                               <a href={rawUrl} download
-                                className="p-1.5 rounded-lg border border-gray-200 text-gray-400 hover:text-violet-600 hover:border-violet-200 transition-colors">
+                                className="p-1.5 rounded-lg border border-gray-200 text-gray-400 hover:text-blue-600 hover:border-blue-200 transition-colors">
                                 <Download size={13} />
                               </a>
                             </div>
@@ -179,7 +179,7 @@ function AssignedFilesSection({ resources, loading, totalResources, navigate }) 
 // ── Grade prediction ──────────────────────────────────────────────────────────
 function predictGrade(pct) {
   if (pct === null || pct === undefined) return null;
-  if (pct >= 90) return { grade: "A*", color: "text-violet-700 bg-violet-100" };
+  if (pct >= 90) return { grade: "A*", color: "text-blue-700 bg-blue-100" };
   if (pct >= 80) return { grade: "A",  color: "text-green-700 bg-green-100"  };
   if (pct >= 70) return { grade: "B",  color: "text-blue-700 bg-blue-100"    };
   if (pct >= 60) return { grade: "C",  color: "text-teal-700 bg-teal-100"    };
@@ -254,6 +254,7 @@ export default function StudentDashboard() {
 
   const isActive = (item) => {
     if (!item.path) return false;
+    if (item.scrollTo) return false;  // Files: scroll-to items never get active highlight
     if (item.label === "Dashboard") return location.pathname === item.path || location.pathname === "/student" || location.pathname === "/student/";
     return location.pathname.startsWith(item.path);
   };
@@ -276,7 +277,7 @@ export default function StudentDashboard() {
         <aside className="w-52 shrink-0 min-h-[calc(100vh-48px)] bg-white border-r border-gray-100 sticky top-12 self-start hidden md:block shadow-sm">
           <div className="px-3 py-5">
             <div className="px-3 py-2 mb-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-violet-400">Student</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-blue-400">Student</p>
               <p className="text-xs font-semibold text-gray-700 mt-0.5 truncate">{firstName}</p>
             </div>
 
@@ -297,7 +298,7 @@ export default function StudentDashboard() {
                     onClick={() => handleSidebarClick(item)}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all text-left ${
                       active
-                        ? "bg-violet-600 text-white font-semibold shadow-sm shadow-violet-200"
+                        ? "bg-blue-500 text-white font-semibold shadow-sm shadow-blue-200"
                         : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
                     }`}
                   >
@@ -316,7 +317,7 @@ export default function StudentDashboard() {
           <div className="border-b border-gray-100 px-4 md:px-8 py-5 bg-white">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-violet-500 text-xs uppercase tracking-widest mb-0.5 font-medium">
+                <p className="text-blue-500 text-xs uppercase tracking-widest mb-0.5 font-medium">
                   Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}
                 </p>
                 <h1 className="text-xl font-bold text-gray-900">{firstName}</h1>
@@ -327,7 +328,7 @@ export default function StudentDashboard() {
                   <Zap size={13} /> Practice
                 </button>
                 <button onClick={() => setShowMockPicker(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 text-white text-xs font-semibold">
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500 text-white text-xs font-semibold">
                   <ClipboardList size={13} /> Mock
                 </button>
               </div>
@@ -344,10 +345,10 @@ export default function StudentDashboard() {
                 {loadingSummary
                   ? [0,1,2,3].map(i => <div key={i} className="h-20 rounded-xl bg-gray-100 animate-pulse" />)
                   : [
-                      { label: "Questions Done", value: (summary.total_attempts ?? 0).toLocaleString(), sub: "all time",       color: "text-violet-600" },
+                      { label: "Questions Done", value: (summary.total_attempts ?? 0).toLocaleString(), sub: "all time",       color: "text-blue-600" },
                       { label: "Accuracy",        value: `${summary.accuracy_pct ?? 0}%`,               sub: "overall",        color: "text-emerald-600" },
                       { label: "Day Streak",      value: summary.study_streak_days ?? 0,                sub: "consecutive",    color: "text-amber-600"  },
-                      { label: "Today's Goal",    value: `${todayAttempts}/${dailyTarget}`,              sub: `${dailyPct}% done`, color: dailyPct >= 100 ? "text-emerald-600" : "text-violet-600" },
+                      { label: "Today's Goal",    value: `${todayAttempts}/${dailyTarget}`,              sub: `${dailyPct}% done`, color: dailyPct >= 100 ? "text-emerald-600" : "text-blue-600" },
                     ].map(m => (
                       <div key={m.label} className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
                         <p className="text-gray-400 text-xs mb-2">{m.label}</p>
@@ -367,7 +368,7 @@ export default function StudentDashboard() {
                   </span>
                 </div>
                 <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                  <div className={`h-full rounded-full transition-all duration-700 ${dailyPct >= 100 ? "bg-emerald-500" : "bg-violet-600"}`}
+                  <div className={`h-full rounded-full transition-all duration-700 ${dailyPct >= 100 ? "bg-emerald-500" : "bg-blue-500"}`}
                     style={{ width: `${dailyPct}%` }} />
                 </div>
                 {dailyPct >= 100
@@ -392,7 +393,7 @@ export default function StudentDashboard() {
                           <div className="py-8 text-center">
                             <BookOpen size={24} className="text-gray-200 mx-auto mb-2" />
                             <p className="text-xs text-gray-400">No subjects enrolled yet</p>
-                            <button onClick={() => navigate("/subjects")} className="mt-2 text-xs text-violet-600 hover:underline font-medium">Browse subjects →</button>
+                            <button onClick={() => navigate("/subjects")} className="mt-2 text-xs text-blue-600 hover:underline font-medium">Browse subjects →</button>
                           </div>
                         )
                         : subjects.map(subject => {
@@ -400,8 +401,8 @@ export default function StudentDashboard() {
                           const grade = predictGrade(pct);
                           return (
                             <button key={subject.id} onClick={() => navigate(`/student/subject/${subject.id}`)}
-                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-violet-50 border border-transparent hover:border-violet-100 transition-all text-left group">
-                              <div className="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center text-sm shrink-0">
+                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-blue-50 border border-transparent hover:border-blue-100 transition-all text-left group">
+                              <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-sm shrink-0">
                                 {subject.icon_emoji || "📚"}
                               </div>
                               <div className="flex-1 min-w-0">
@@ -409,7 +410,7 @@ export default function StudentDashboard() {
                                 {pct !== null && (
                                   <div className="flex items-center gap-2 mt-0.5">
                                     <div className="flex-1 h-1 bg-gray-100 rounded-full overflow-hidden">
-                                      <div className="h-full bg-violet-500 rounded-full" style={{ width: `${pct}%` }} />
+                                      <div className="h-full bg-blue-500 rounded-full" style={{ width: `${pct}%` }} />
                                     </div>
                                     <span className="text-[10px] text-gray-400 font-mono">{pct}%</span>
                                   </div>
@@ -467,7 +468,7 @@ export default function StudentDashboard() {
                           ? (
                             <div className="py-6 text-center">
                               <p className="text-xs text-gray-400">No quiz activity yet</p>
-                              <button onClick={() => navigate("/student/practice")} className="mt-1 text-xs text-violet-600 hover:underline font-medium">Start practising →</button>
+                              <button onClick={() => navigate("/student/practice")} className="mt-1 text-xs text-blue-600 hover:underline font-medium">Start practising →</button>
                             </div>
                           )
                           : (
@@ -520,7 +521,7 @@ export default function StudentDashboard() {
       {showMockPicker && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white border border-gray-100 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-100 bg-gradient-to-r from-violet-600 to-purple-600">
+            <div className="px-5 py-4 border-b border-gray-100 bg-gradient-to-r from-blue-500 to-blue-600">
               <p className="text-white font-bold">Start Mock Exam</p>
               <p className="text-white/70 text-xs mt-0.5">Choose a subject — 45-minute timed exam</p>
             </div>
@@ -530,7 +531,7 @@ export default function StudentDashboard() {
                 : subjects.map(s => (
                   <button key={s.id}
                     onClick={() => { setShowMockPicker(false); navigate(`/student/mock/${s.id}`); }}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-violet-50 transition-colors text-left">
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-blue-50 transition-colors text-left">
                     <span className="text-lg">{s.icon_emoji || "📚"}</span>
                     <div>
                       <p className="text-sm font-medium text-gray-800">{s.name}</p>
