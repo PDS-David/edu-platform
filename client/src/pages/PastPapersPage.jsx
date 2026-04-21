@@ -8,10 +8,10 @@
 //   Now:      href={`${BASE_URL}${p.file_url}`}
 
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/apiClient';
 import useAuth from '../hooks/useAuth';
-import { FileText, Download, Filter, Loader2, BookOpen } from 'lucide-react';
+import { FileText, Download, Filter, Loader2, BookOpen, ArrowLeft } from 'lucide-react';
 import PublicNav from '../components/PublicNav';
 
 // ── BUG 1 FIX: derive base URL from env var (strip /api suffix) ────────────────
@@ -42,6 +42,7 @@ function formatSize(bytes) {
 
 export default function PastPapersPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [papers,   setPapers]   = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [loading,  setLoading]  = useState(true);
@@ -112,7 +113,7 @@ export default function PastPapersPage() {
               to={user.role === 'teacher' ? '/teacher/dashboard' : user.role === 'admin' ? '/admin/dashboard' : '/student/dashboard'}
               className="text-sm text-gray-500 hover:text-gray-900 flex items-center gap-1.5 font-medium"
             >
-              ← Dashboard
+              <ArrowLeft size={14} /> Dashboard
             </Link>
           )
         }
@@ -171,9 +172,27 @@ export default function PastPapersPage() {
             <Loader2 size={28} className="text-blue-400 animate-spin" />
           </div>
         ) : papers.length === 0 ? (
-          <div className="text-center py-16 text-gray-400">
-            <BookOpen size={40} className="mx-auto mb-3 opacity-40" />
-            <p className="text-sm">No papers found for the selected filters.</p>
+          <div className="text-center py-16">
+            <BookOpen size={40} className="mx-auto mb-3 text-gray-200" />
+            <p className="text-sm font-semibold text-gray-600 mb-1">No past papers found</p>
+            <p className="text-xs text-gray-400 mb-4">
+              {board || subjectId
+                ? 'Try a different filter combination, or clear all filters.'
+                : 'No past papers have been uploaded yet.'}
+            </p>
+            {user?.role && ['admin','teacher'].includes(user.role) && (
+              <p className="text-xs text-blue-600">
+                Upload past papers from your dashboard under Past Papers management.
+              </p>
+            )}
+            {(board || subjectId) && (
+              <button
+                onClick={() => { setBoard(''); setSubjectId(''); setYearFrom(YEAR_MIN); setYearTo(YEAR_MAX); }}
+                className="mt-3 text-xs text-blue-600 hover:underline font-semibold"
+              >
+                Clear all filters
+              </button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -17,7 +17,7 @@ import {
   CheckCircle, XCircle, Lightbulb, Sparkles,
   BookOpen, FileText, HelpCircle,
   Upload, Sigma,
-} from 'lucide-react';
+, ArrowLeft } from 'lucide-react';
 import TopNav from '../components/TopNav';
 import AIChatWidget from '../components/AIChatWidget';
 import QuizTab from '../components/QuizTab';
@@ -649,6 +649,12 @@ export default function SubtopicPage() {
   return (
     <div className={`min-h-screen ${isQuizTab ? 'bg-[#0a4a3f]' : 'bg-gray-50'}`}>
       <TopNav />
+      <div className="max-w-3xl mx-auto px-4 pt-3 pb-0">
+        <button onClick={() => navigate(-1)}
+          className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 mb-2 transition-colors">
+          <ArrowLeft size={13} /> Back
+        </button>
+      </div>
 
       <div className={`sticky top-14 z-40 border-b ${isQuizTab ? 'bg-[#0a4a3f] border-white/10' : 'bg-white border-gray-100'}`}>
         <div className="max-w-3xl mx-auto px-4 py-2.5 flex items-center gap-4">

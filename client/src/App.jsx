@@ -28,6 +28,8 @@ import SubjectCatalog from "./pages/SubjectCatalog";
 
 // Student
 import StudentDashboard from "./pages/StudentDashboard";
+import StudentSubjectsPage from "./pages/StudentSubjectsPage";
+import StudentFilesPage from "./pages/StudentFilesPage";
 import StudentAnalyticsDashboard from "./pages/StudentAnalyticsDashboard";
 import StudentTestPage from "./pages/StudentTestPage";
 import SubjectPage from "./pages/SubjectPage";
@@ -95,6 +97,8 @@ export default function App() {
             <Route path="mark-image" element={<ImageMarkingPage />} />
             <Route path="test/:testId" element={<StudentTestPage />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="subjects" element={<StudentSubjectsPage />} />
+            <Route path="files"    element={<StudentFilesPage />} />
           </Route>
         </Route>
 

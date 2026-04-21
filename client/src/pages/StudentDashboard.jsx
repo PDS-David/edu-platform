@@ -283,28 +283,25 @@ export default function StudentDashboard() {
 
   // ── Sidebar items — all wired ─────────────────────────────────────────────
   const sidebarItems = [
-    { label: "Dashboard",   icon: BarChart2,    path: "/student/dashboard" },
-    { label: "Resources",   icon: BookOpen,     path: "/subjects"          },
-    { label: "Practice",    icon: Zap,          path: "/student/practice"  },
-    { label: "Past Papers", icon: FileText,     path: "/past-papers"       },
+    { label: "Dashboard",   icon: BarChart2,    path: "/student/dashboard"  },
+    { label: "Resources",   icon: BookOpen,     path: "/student/subjects"   },
+    { label: "Practice",    icon: Zap,          path: "/student/practice"   },
+    { label: "Past Papers", icon: FileText,     path: "/past-papers"        },
     { label: "Mock Exam",   icon: ClipboardList,path: null, onClick: () => setShowMockPicker(true) },
-    { label: "Analytics",   icon: TrendingUp,   path: "/student/analytics" },
-    { label: "Files",       icon: Download,     path: "/student/dashboard", scrollTo: "assigned-files" },
+    { label: "Analytics",   icon: TrendingUp,   path: "/student/analytics"  },
+    { label: "Files",       icon: Download,     path: "/student/files"      },
+    { label: "Exam Types",  icon: BookOpen,     path: "/subjects"           },
   ];
 
   const isActive = (item) => {
     if (!item.path) return false;
-    if (item.scrollTo) return false;  // Files: scroll-to items never get active highlight
     if (item.label === "Dashboard") return location.pathname === item.path || location.pathname === "/student" || location.pathname === "/student/";
+    if (item.label === "Resources") return location.pathname.startsWith("/student/subjects") || location.pathname.startsWith("/student/subject");
     return location.pathname.startsWith(item.path);
   };
 
   const handleSidebarClick = (item) => {
     if (item.onClick) { item.onClick(); return; }
-    if (item.scrollTo && location.pathname.includes("/student/dashboard")) {
-      document.getElementById(item.scrollTo)?.scrollIntoView({ behavior: "smooth" });
-      return;
-    }
     navigate(item.path);
   };
 
@@ -585,21 +582,7 @@ export default function StudentDashboard() {
                 </div>
               </div>
 
-              {/* Assigned Files */}
-              <div id="assigned-files" className="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Assigned Files</p>
-                  {totalResources > 0 && <span className="text-xs text-gray-400">{totalResources} file{totalResources !== 1 ? "s" : ""}</span>}
-                </div>
-                <div className="p-3">
-                  <AssignedFilesSection
-                    resources={resources}
-                    loading={loadingResources}
-                    totalResources={totalResources}
-                    navigate={navigate}
-                  />
-                </div>
-              </div>
+              {/* Files are on the dedicated /student/files page */}
 
             </div>
           )}
