@@ -45,13 +45,15 @@ function FileIcon({ type, size = 16 }) {
 
 // ── URL resolver — rewrites old eacbuddy-api URLs to current API base ─────────
 function resolveFileUrl(rawUrl) {
-  const apiBase = (import.meta.env.VITE_API_URL || window.location.origin)
+  // VITE_API_URL e.g. "https://aischoolonair-api.onrender.com/api" or "/api"
+  // Strip /api suffix to get the server root where /uploads is served
+  const apiBase = (import.meta.env.VITE_API_URL || "")
     .replace(/\/api$/, "")
-    .replace(/\/$/, "");
+    .replace(/\/$/, "") || window.location.origin;
 
   if (!rawUrl) return "";
 
-  // Already a relative path → prepend current API base
+  // Relative path (e.g. /uploads/resources/file.pdf) → prepend API base
   if (!rawUrl.startsWith("http")) return `${apiBase}${rawUrl}`;
 
   // Old dead server → rewrite to current API
