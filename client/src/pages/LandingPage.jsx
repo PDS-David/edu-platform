@@ -477,11 +477,9 @@ export default function LandingPage() {
           {/* Brand */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <div className="grid grid-cols-2 gap-0.5 w-5 h-5">
-                {[...Array(4)].map((_, i) => <div key={i} className="w-2 h-2 rounded-sm bg-indigo-400" />)}
-              </div>
+              <img src="/logo.svg" alt="AISchoolonair" className="w-6 h-6" />
               <span className="font-bold text-white text-base">
-                <span className="text-indigo-400">EAC</span>buddy
+                AISchoolonair
               </span>
             </div>
             <p className="text-xs leading-relaxed">{branding.tagline}</p>
