@@ -207,6 +207,20 @@ async function ensureResourceAssignments() {
   `).catch(() => {});
   await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_ra_student ON resource_assignments(student_id)`).catch(() => {});
   await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_ra_class   ON resource_assignments(class_id)`).catch(() => {});
+  // Gap 4 & 6: UNIQUE constraints required for ON CONFLICT DO NOTHING to work.
+  // Without these, every push() call inserts a duplicate row and the conflict
+  // clause is a silent no-op. ALTER TABLE … ADD CONSTRAINT IF NOT EXISTS is
+  // idempotent — safe to run on every cold start against an existing table.
+  await sequelize.query(`
+    ALTER TABLE resource_assignments
+      ADD CONSTRAINT IF NOT EXISTS uq_ra_student
+      UNIQUE (resource_id, student_id, push_type)
+  `).catch(() => {});
+  await sequelize.query(`
+    ALTER TABLE resource_assignments
+      ADD CONSTRAINT IF NOT EXISTS uq_ra_class
+      UNIQUE (resource_id, class_id, push_type)
+  `).catch(() => {});
   raEnsured = true;
 }
 
