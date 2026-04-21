@@ -299,7 +299,43 @@ router.get('/class/:classId/analytics', protect, teacherOnly, async (req, res) =
   } catch (err) { return res.status(500).json({ success: false, error: err.message }); }
 });
 
-// ── GET /api/teacher/tests ────────────────────────────────────────────────────
+// ── GET /api/teacher/students ─────────────────────────────────────────────────
+// Returns students the teacher can push resources to:
+//   1. Students in any of the teacher's classes (preferred — scoped)
+//   2. Fallback: all active students (when teacher has no classes yet)
+router.get('/students', protect, teacherOnly, async (req, res) => {
+  try {
+    // Students from teacher's own classes
+    const classStudents = await safeQuery(
+      `SELECT DISTINCT u.id, u.first_name, u.last_name, u.email,
+              c.name AS class_name
+       FROM class_memberships cm
+       JOIN classes c ON c.id = cm.class_id AND c.teacher_id = :teacherId
+       JOIN users   u ON u.id = cm.student_id
+       WHERE u.is_active = true
+       ORDER BY u.first_name, u.last_name`,
+      { teacherId: req.user.id }
+    );
+
+    if (classStudents.length > 0) {
+      return res.json({ success: true, data: classStudents, source: 'classes' });
+    }
+
+    // Fallback: all active students (teacher has no classes yet)
+    const allStudents = await safeQuery(
+      `SELECT id, first_name, last_name, email
+       FROM users
+       WHERE role = 'student' AND is_active = true
+       ORDER BY first_name, last_name`,
+      {}
+    );
+    return res.json({ success: true, data: allStudents, source: 'all' });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+
 router.get('/tests', protect, teacherOnly, async (req, res) => {
   try {
     const rows = await safeQuery(
