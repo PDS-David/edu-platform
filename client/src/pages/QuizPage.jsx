@@ -68,10 +68,10 @@ function QuizQuestion({ question, questionNumber, submitRef, onAnswered }) {
   const diffBadge = { easy: 'bg-green-500', medium: 'bg-amber-500', hard: 'bg-red-500' };
 
   const optStyle = (optId) => {
-    if (!result) return selected === optId ? 'border-teal-400 bg-teal-50' : 'border-gray-200 hover:border-teal-300 cursor-pointer';
+    if (!result) return selected === optId ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-blue-300 cursor-pointer';
     const isCorrect  = result.correct_options?.some(c => c.id === optId);
     const isSelected = selected === optId;
-    if (isCorrect)                return 'border-teal-400 bg-teal-50';
+    if (isCorrect)                return 'border-blue-400 bg-blue-50';
     if (isSelected && !isCorrect) return 'border-red-300 bg-red-50';
     return 'border-gray-100 opacity-60';
   };
@@ -112,7 +112,7 @@ function QuizQuestion({ question, questionNumber, submitRef, onAnswered }) {
               </span>
               <span className="text-sm text-gray-800 flex-1">{opt.option_text}</span>
               {result && result.correct_options?.some(c => c.id === opt.id) && (
-                <CheckCircle size={14} className="text-teal-500 shrink-0" />
+                <CheckCircle size={14} className="text-blue-500 shrink-0" />
               )}
               {result && selected === opt.id && !result.correct_options?.some(c => c.id === opt.id) && (
                 <XCircle size={14} className="text-red-400 shrink-0" />
@@ -156,7 +156,7 @@ function MarkingScreen() {
       <div className="text-5xl animate-bounce"></div>
       <p className="text-white text-xl font-bold">Marking your quiz…</p>
       <p className="text-white/60 text-sm">Sit tight, the AI examiner is reviewing your answers.</p>
-      <Loader2 size={28} className="text-teal-400 animate-spin mt-2" />
+      <Loader2 size={28} className="text-blue-400 animate-spin mt-2" />
     </div>
   );
 }
@@ -262,7 +262,7 @@ export default function QuizPage() {
   );
   if (loading) return (
     <div className="min-h-screen bg-[#0a4a3f] flex items-center justify-center">
-      <Loader2 size={32} className="text-teal-400 animate-spin" />
+      <Loader2 size={32} className="text-blue-400 animate-spin" />
     </div>
   );
   if (!questions.length) return (
@@ -270,7 +270,7 @@ export default function QuizPage() {
       <p className="text-white font-semibold">No questions available for this quiz.</p>
       <button
         onClick={() => navigate(`/student/subtopic/${subtopicId}?tab=quiz`)}
-        className="text-teal-400 text-sm font-medium flex items-center gap-1"
+        className="text-blue-400 text-sm font-medium flex items-center gap-1"
       >
         <ChevronLeft size={14} /> Back
       </button>
@@ -296,7 +296,7 @@ export default function QuizPage() {
         {/* Progress bar */}
         <div className="h-1 bg-white/10">
           <div
-            className="h-full bg-teal-400 transition-all duration-300"
+            className="h-full bg-blue-400 transition-all duration-300"
             style={{ width: `${(current / questions.length) * 100}%` }}
           />
         </div>
@@ -320,7 +320,7 @@ export default function QuizPage() {
           {!currentAnswered ? (
             <button
               onClick={() => submitRef.current?.()}
-              className="bg-teal-500 hover:bg-teal-600 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-colors"
+              className="bg-blue-500 hover:bg-blue-600 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-colors"
             >
               Submit
             </button>
@@ -328,7 +328,7 @@ export default function QuizPage() {
             <button
               onClick={handleNext}
               disabled={submitting}
-              className="bg-teal-500 hover:bg-teal-600 disabled:opacity-50 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-colors"
+              className="bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-colors"
             >
               {current + 1 < questions.length ? 'Next Question' : 'Finish Quiz'}
             </button>

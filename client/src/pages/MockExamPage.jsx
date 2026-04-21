@@ -14,7 +14,7 @@ const EXAM_DURATION = 45 * 60; // seconds
 
 // ── Predicted grade from accuracy ────────────────────────────────────────────
 function predictGrade(pct) {
-  if (pct >= 90) return { grade: 'A*', color: 'text-teal-500',  bg: 'bg-teal-50'  };
+  if (pct >= 90) return { grade: 'A*', color: 'text-blue-500',  bg: 'bg-blue-50'  };
   if (pct >= 80) return { grade: 'A',  color: 'text-green-600', bg: 'bg-green-50' };
   if (pct >= 70) return { grade: 'B',  color: 'text-blue-600',  bg: 'bg-blue-50'  };
   if (pct >= 60) return { grade: 'C',  color: 'text-amber-600', bg: 'bg-amber-50' };
@@ -31,7 +31,7 @@ function Timer({ secondsLeft }) {
     ? 'bg-red-500 text-white'
     : secondsLeft <= 600
       ? 'bg-amber-500 text-white'
-      : 'bg-[#0a4a3f] text-teal-300 border border-teal-700';
+      : 'bg-[#0a4a3f] text-blue-300 border border-blue-700';
   return (
     <span className={`text-sm font-bold px-3 py-1.5 rounded-xl tabular-nums ${cls}`}>
       {str}
@@ -73,8 +73,8 @@ function ExamQuestion({ question, questionNumber, selected, onSelect }) {
               onClick={() => onSelect(opt.id)}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${
                 selected === opt.id
-                  ? 'border-teal-400 bg-teal-50'
-                  : 'border-gray-200 hover:border-teal-300 cursor-pointer'
+                  ? 'border-blue-400 bg-blue-50'
+                  : 'border-gray-200 hover:border-blue-300 cursor-pointer'
               }`}
             >
               <span className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 bg-gray-100 text-gray-500">
@@ -96,7 +96,7 @@ function MarkingScreen() {
       <div className="text-5xl animate-bounce"></div>
       <p className="text-white text-xl font-bold">Marking your exam…</p>
       <p className="text-white/60 text-sm">The AI examiner is reviewing all 40 answers.</p>
-      <Loader2 size={28} className="text-teal-400 animate-spin mt-2" />
+      <Loader2 size={28} className="text-blue-400 animate-spin mt-2" />
     </div>
   );
 }
@@ -189,14 +189,14 @@ export default function MockExamPage() {
 
   if (loading) return (
     <div className="min-h-screen bg-[#0a4a3f] flex items-center justify-center">
-      <Loader2 size={32} className="text-teal-400 animate-spin" />
+      <Loader2 size={32} className="text-blue-400 animate-spin" />
     </div>
   );
 
   if (questions.length === 0) return (
     <div className="min-h-screen bg-[#0a4a3f] flex flex-col items-center justify-center gap-4 px-6 text-center">
       <p className="text-white font-semibold">No questions available for this mock exam.</p>
-      <button onClick={() => navigate(-1)} className="text-teal-400 text-sm font-medium">Go back</button>
+      <button onClick={() => navigate(-1)} className="text-blue-400 text-sm font-medium">Go back</button>
     </div>
   );
 
@@ -226,7 +226,7 @@ export default function MockExamPage() {
 
         {/* Progress bar */}
         <div className="h-1 bg-white/10">
-          <div className="h-full bg-teal-400 transition-all duration-300"
+          <div className="h-full bg-blue-400 transition-all duration-300"
             style={{ width: `${((current) / questions.length) * 100}%` }} />
         </div>
       </div>
@@ -260,7 +260,7 @@ export default function MockExamPage() {
             {current + 1 < questions.length ? (
               <button
                 onClick={() => setCurrent(c => c + 1)}
-                className="bg-teal-500 hover:bg-teal-600 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-colors"
+                className="bg-blue-500 hover:bg-blue-600 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-colors"
               >
                 Next
               </button>
@@ -268,7 +268,7 @@ export default function MockExamPage() {
               <button
                 onClick={() => handleSubmit(false)}
                 disabled={answeredAll === 0}
-                className="bg-teal-500 hover:bg-teal-600 disabled:opacity-50 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-colors"
+                className="bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-colors"
               >
                 Submit Exam
               </button>

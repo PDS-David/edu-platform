@@ -27,7 +27,7 @@ function Toast({ msg, type, onClose }) {
       rounded-2xl shadow-xl text-sm font-semibold text-white
       ${type === 'success' ? 'bg-gray-900' : 'bg-red-600'}`}>
       {type === 'success'
-        ? <CheckCircle size={14} className="text-teal-400 shrink-0" />
+        ? <CheckCircle size={14} className="text-blue-400 shrink-0" />
         : <AlertTriangle size={14} className="shrink-0" />}
       <span>{msg}</span>
       <button onClick={onClose}><X size={13} className="opacity-60" /></button>
@@ -52,11 +52,11 @@ function InlineEdit({ value, onSave, onCancel, placeholder = 'Enter name…' }) 
         onChange={e => setVal(e.target.value)}
         onKeyDown={handleKey}
         placeholder={placeholder}
-        className="flex-1 border border-teal-300 rounded-lg px-3 py-1.5 text-sm
-          focus:outline-none focus:ring-2 focus:ring-teal-300 bg-white"
+        className="flex-1 border border-blue-300 rounded-lg px-3 py-1.5 text-sm
+          focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
       />
       <button onClick={() => onSave(val)}
-        className="p-1.5 rounded-lg bg-teal-500 hover:bg-teal-600 text-white transition-colors">
+        className="p-1.5 rounded-lg bg-blue-500 hover:bg-blue-600 text-white transition-colors">
         <Save size={13} />
       </button>
       <button onClick={onCancel}
@@ -105,7 +105,7 @@ function AddRow({ placeholder, onAdd, onCancel }) {
   };
 
   return (
-    <div className="bg-teal-50 border border-teal-200 rounded-xl p-3 space-y-2 mb-2">
+    <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-2 mb-2">
       <input
         ref={ref}
         value={name}
@@ -113,14 +113,14 @@ function AddRow({ placeholder, onAdd, onCancel }) {
         onKeyDown={e => { if (e.key === 'Enter') handle(); if (e.key === 'Escape') onCancel(); }}
         placeholder={placeholder}
         className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
-          focus:outline-none focus:ring-2 focus:ring-teal-300 bg-white"
+          focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
       />
       <input
         value={desc}
         onChange={e => setDesc(e.target.value)}
         placeholder="Description (optional)"
         className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
-          focus:outline-none focus:ring-2 focus:ring-teal-300 bg-white"
+          focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
       />
       <div className="flex gap-2 justify-end">
         <button onClick={onCancel}
@@ -128,7 +128,7 @@ function AddRow({ placeholder, onAdd, onCancel }) {
           Cancel
         </button>
         <button onClick={handle} disabled={saving || !name.trim()}
-          className="px-4 py-1.5 text-sm font-semibold bg-teal-500 hover:bg-teal-600
+          className="px-4 py-1.5 text-sm font-semibold bg-blue-500 hover:bg-blue-600
             disabled:opacity-50 text-white rounded-lg flex items-center gap-1.5">
           {saving ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
           {saving ? 'Saving…' : 'Add'}
@@ -201,7 +201,7 @@ function SubtopicList({ topic, subjectId, showToast }) {
 
   if (loading) return (
     <div className="py-4 flex justify-center">
-      <Loader2 size={16} className="animate-spin text-teal-400" />
+      <Loader2 size={16} className="animate-spin text-blue-400" />
     </div>
   );
 
@@ -216,7 +216,7 @@ function SubtopicList({ topic, subjectId, showToast }) {
         <div key={sub.id} className="border-b border-gray-50 last:border-0">
           {/* Subtopic row */}
           <div className="flex items-center gap-2 py-2 group">
-            <div className="w-1.5 h-1.5 rounded-full bg-teal-400 shrink-0" />
+            <div className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
 
             {editingId === sub.id && sub.created_by_me ? (
               <InlineEdit
@@ -231,7 +231,7 @@ function SubtopicList({ topic, subjectId, showToast }) {
                 {sub.created_by_me ? (
                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                     <button onClick={() => setEditingId(sub.id)}
-                      className="p-1 rounded text-gray-400 hover:text-teal-600 hover:bg-teal-50 transition-colors">
+                      className="p-1 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
                       <Pencil size={12} />
                     </button>
                     <button onClick={() => setConfirmDel(sub)}
@@ -259,8 +259,8 @@ function SubtopicList({ topic, subjectId, showToast }) {
         />
       ) : (
         <button onClick={() => setShowAdd(true)}
-          className="mt-2 flex items-center gap-1.5 text-xs text-teal-600 font-medium
-            hover:text-teal-800 transition-colors">
+          className="mt-2 flex items-center gap-1.5 text-xs text-blue-600 font-medium
+            hover:text-blue-800 transition-colors">
           <Plus size={12} /> Add subtopic
         </button>
       )}
@@ -310,7 +310,7 @@ function TopicCard({ topic, subjectId, showToast, onEdit, onDelete }) {
         {!editing && topic.created_by_me && (
           <div className="flex gap-1 shrink-0">
             <button onClick={() => setEditing(true)}
-              className="p-1.5 rounded-lg text-gray-400 hover:text-teal-600 hover:bg-teal-50 transition-colors">
+              className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
               <Pencil size={13} />
             </button>
             <button onClick={() => onDelete(topic)}
@@ -453,7 +453,7 @@ export default function TeacherContentPage() {
 
         {loadingSubj && (
           <div className="flex justify-center py-16">
-            <Loader2 size={24} className="animate-spin text-teal-400" />
+            <Loader2 size={24} className="animate-spin text-blue-400" />
           </div>
         )}
 
@@ -466,8 +466,8 @@ export default function TeacherContentPage() {
                   onClick={() => setActiveSubj(s)}
                   className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-colors border
                     ${activeSubj?.id === s.id
-                      ? 'bg-teal-500 text-white border-teal-500'
-                      : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300 hover:text-teal-600'}`}
+                      ? 'bg-blue-500 text-white border-blue-500'
+                      : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:text-blue-600'}`}
                 >
                   {s.icon_emoji && <span>{s.icon_emoji}</span>}
                   {s.name}
@@ -484,11 +484,11 @@ export default function TeacherContentPage() {
             {!loadingTop && activeSubj && (
               <div className="flex items-center gap-4 mb-4 text-xs text-gray-500">
                 <span className="flex items-center gap-1">
-                  <Layers size={12} className="text-teal-500" />
+                  <Layers size={12} className="text-blue-500" />
                   <strong className="text-gray-700">{topics.length}</strong> total topics
                 </span>
                 <span className="flex items-center gap-1">
-                  <FileText size={12} className="text-teal-500" />
+                  <FileText size={12} className="text-blue-500" />
                   <strong className="text-gray-700">{myTopicsCount}</strong> created by you
                 </span>
                 {adminTopicsCount > 0 && (
@@ -502,7 +502,7 @@ export default function TeacherContentPage() {
 
             {loadingTop ? (
               <div className="flex justify-center py-12">
-                <Loader2 size={20} className="animate-spin text-teal-400" />
+                <Loader2 size={20} className="animate-spin text-blue-400" />
               </div>
             ) : (
               <>
@@ -537,8 +537,8 @@ export default function TeacherContentPage() {
                   <button
                     onClick={() => setShowAddTopic(true)}
                     className="w-full flex items-center justify-center gap-2 border-2 border-dashed
-                      border-gray-200 rounded-2xl py-4 text-sm text-gray-400 hover:border-teal-300
-                      hover:text-teal-600 transition-colors"
+                      border-gray-200 rounded-2xl py-4 text-sm text-gray-400 hover:border-blue-300
+                      hover:text-blue-600 transition-colors"
                   >
                     <Plus size={15} /> Add a new topic
                   </button>

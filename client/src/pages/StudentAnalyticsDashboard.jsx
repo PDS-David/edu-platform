@@ -166,14 +166,14 @@ export default function StudentAnalyticsDashboard() {
     <div className="min-h-screen bg-gray-50">
       <TopNav />
       <div className="flex justify-center pt-24">
-        <Loader2 size={28} className="text-teal-400 animate-spin" />
+        <Loader2 size={28} className="text-blue-400 animate-spin" />
       </div>
     </div>
   );
 
   // ── Grade colour helper ────────────────────────────────────────────────────
   const gradeColour = (g = '') => {
-    if (g.startsWith('A'))  return 'bg-teal-500';
+    if (g.startsWith('A'))  return 'bg-blue-500';
     if (g.startsWith('B'))  return 'bg-green-500';
     if (g.startsWith('C'))  return 'bg-blue-500';
     if (g.startsWith('D'))  return 'bg-amber-500';
@@ -205,7 +205,7 @@ export default function StudentAnalyticsDashboard() {
           <p className="text-white/50 text-sm">Track your performance and find where to improve</p>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
-            <StatCard icon={Target} label="Total Attempts"   value={summary?.total_attempts ?? 0}           accent="bg-teal-600"   />
+            <StatCard icon={Target} label="Total Attempts"   value={summary?.total_attempts ?? 0}           accent="bg-blue-600"   />
             <StatCard icon={Trophy} label="Overall Accuracy" value={`${summary?.accuracy_pct ?? 0}%`}       accent="bg-purple-600" />
             <StatCard icon={Flame}  label="Day Streak"       value={`${summary?.study_streak_days ?? 0}d`}  accent="bg-amber-500"  />
             <StatCard icon={Clock}  label="Time Studied"     value={fmtTime(summary?.total_time_seconds)}   accent="bg-blue-600"   />
@@ -283,7 +283,7 @@ export default function StudentAnalyticsDashboard() {
                   {t.subtopic_id && (
                     <Link
                       to={`/student/subtopic/${t.subtopic_id}?tab=practice`}
-                      className="flex items-center gap-1 text-xs text-teal-600 font-semibold hover:text-teal-800 shrink-0"
+                      className="flex items-center gap-1 text-xs text-blue-600 font-semibold hover:text-blue-800 shrink-0"
                     >
                       Practice <ArrowRight size={11} />
                     </Link>
@@ -341,10 +341,10 @@ export default function StudentAnalyticsDashboard() {
               {leaderboard.map((entry, i) => (
                 <div
                   key={i}
-                  className={`flex items-center gap-3 rounded-xl px-3 py-2.5 ${entry.is_me ? 'bg-teal-50 border border-teal-100' : 'bg-gray-50'}`}
+                  className={`flex items-center gap-3 rounded-xl px-3 py-2.5 ${entry.is_me ? 'bg-blue-50 border border-blue-100' : 'bg-gray-50'}`}
                 >
                   <span className="text-sm font-bold text-gray-400 w-5 text-center shrink-0">{i + 1}</span>
-                  <span className={`flex-1 text-sm font-medium ${entry.is_me ? 'text-teal-700' : 'text-gray-700'}`}>
+                  <span className={`flex-1 text-sm font-medium ${entry.is_me ? 'text-blue-700' : 'text-gray-700'}`}>
                     {entry.is_me ? 'You' : entry.display_name}
                   </span>
                   <span className="text-xs text-gray-400">{entry.attempts} attempts</span>
@@ -430,8 +430,8 @@ export default function StudentAnalyticsDashboard() {
 
               {/* Weekly target */}
               {prediction.weeklyTarget && (
-                <div className="bg-teal-50 rounded-xl p-3">
-                  <p className="text-xs font-semibold text-teal-700 mb-1">🎯 This week's target</p>
+                <div className="bg-blue-50 rounded-xl p-3">
+                  <p className="text-xs font-semibold text-blue-700 mb-1">🎯 This week's target</p>
                   <p className="text-sm text-gray-600 leading-relaxed">{prediction.weeklyTarget}</p>
                 </div>
               )}
@@ -451,13 +451,13 @@ export default function StudentAnalyticsDashboard() {
         <div className="bg-white rounded-2xl border border-gray-100 p-5">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <Sparkles size={15} className="text-teal-500" />
+              <Sparkles size={15} className="text-blue-500" />
               <p className="text-sm font-semibold text-gray-700">AI Learning Path</p>
             </div>
             {!learningPath && !pathLoading && (
               <button
                 onClick={fetchLearningPath}
-                className="flex items-center gap-1.5 text-xs font-semibold text-teal-600 border border-teal-200 px-3 py-1.5 rounded-lg hover:bg-teal-50 transition-colors"
+                className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-colors"
               >
                 <Sparkles size={11} /> Generate My Plan
               </button>
@@ -474,8 +474,8 @@ export default function StudentAnalyticsDashboard() {
 
           {!pathLoading && !learningPath && !pathError && (
             <div className="text-center py-8 text-gray-400">
-              <div className="w-12 h-12 rounded-full bg-teal-50 flex items-center justify-center mx-auto mb-3">
-                <Sparkles size={20} className="text-teal-400" />
+              <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-3">
+                <Sparkles size={20} className="text-blue-400" />
               </div>
               <p className="text-sm font-medium">Your personalised study roadmap</p>
               <p className="text-xs mt-1 text-gray-300">Click "Generate My Plan" to get a prioritised 5-step study plan based on your weak areas.</p>
@@ -484,7 +484,7 @@ export default function StudentAnalyticsDashboard() {
 
           {pathLoading && (
             <div className="flex flex-col items-center py-10 gap-3">
-              <Loader2 size={24} className="text-teal-400 animate-spin" />
+              <Loader2 size={24} className="text-blue-400 animate-spin" />
               <p className="text-xs text-gray-400">Analysing your performance…</p>
             </div>
           )}
@@ -492,14 +492,14 @@ export default function StudentAnalyticsDashboard() {
           {pathError && !pathLoading && (
             <div className="text-center py-6">
               <p className="text-sm text-red-400">{pathError}</p>
-              <button onClick={fetchLearningPath} className="mt-3 text-xs text-teal-600 underline">Try again</button>
+              <button onClick={fetchLearningPath} className="mt-3 text-xs text-blue-600 underline">Try again</button>
             </div>
           )}
 
           {!pathLoading && learningPath?.steps?.length > 0 && (
             <div className="space-y-3">
               {learningPath.ai_generated && (
-                <p className="text-xs text-teal-600 font-medium flex items-center gap-1">
+                <p className="text-xs text-blue-600 font-medium flex items-center gap-1">
                   <Sparkles size={10} /> AI-personalised plan · based on your recent performance
                 </p>
               )}
@@ -530,7 +530,7 @@ export default function StudentAnalyticsDashboard() {
                             <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-white border border-red-200 text-red-500 shrink-0">Needs Work</span>
                           )}
                           {step.type === 'new_topic' && (
-                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-white border border-teal-200 text-teal-500 shrink-0">New Topic</span>
+                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-white border border-blue-200 text-blue-500 shrink-0">New Topic</span>
                           )}
                         </div>
                         <p className="text-xs text-gray-500 mb-1">{step.subject} → {step.topic}</p>
@@ -542,7 +542,7 @@ export default function StudentAnalyticsDashboard() {
                       <div className="mt-3 pl-10">
                         <Link
                           to={`/student/subtopic/${step.subtopic_id}?tab=practice`}
-                          className="inline-flex items-center gap-1.5 text-xs font-semibold text-teal-600 hover:text-teal-800 bg-white border border-teal-200 px-3 py-1.5 rounded-lg transition-colors"
+                          className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-800 bg-white border border-blue-200 px-3 py-1.5 rounded-lg transition-colors"
                         >
                           Start Practising <ArrowRight size={11} />
                         </Link>

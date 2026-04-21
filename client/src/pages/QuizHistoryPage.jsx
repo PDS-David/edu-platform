@@ -63,15 +63,15 @@ export default function QuizHistoryPage() {
         {attempts.length > 0 && (
           <div className="grid grid-cols-3 gap-3 mb-6">
             <div className="bg-white border border-gray-100 rounded-2xl p-4 text-center">
-              <p className="text-2xl font-bold text-teal-600">{attempts.length}</p>
+              <p className="text-2xl font-bold text-blue-600">{attempts.length}</p>
               <p className="text-xs text-gray-400 mt-0.5">Attempts</p>
             </div>
             <div className="bg-white border border-gray-100 rounded-2xl p-4 text-center">
-              <p className="text-2xl font-bold text-teal-600">{best}%</p>
+              <p className="text-2xl font-bold text-blue-600">{best}%</p>
               <p className="text-xs text-gray-400 mt-0.5">Best score</p>
             </div>
             <div className="bg-white border border-gray-100 rounded-2xl p-4 text-center">
-              <p className="text-2xl font-bold text-teal-600">
+              <p className="text-2xl font-bold text-blue-600">
                 {Math.round(attempts.reduce((s, a) => s + (a.accuracy_pct ?? 0), 0) / attempts.length)}%
               </p>
               <p className="text-xs text-gray-400 mt-0.5">Average</p>
@@ -81,7 +81,7 @@ export default function QuizHistoryPage() {
 
         {loading ? (
           <div className="flex justify-center py-16">
-            <Loader2 size={24} className="animate-spin text-teal-400" />
+            <Loader2 size={24} className="animate-spin text-blue-400" />
           </div>
         ) : attempts.length === 0 ? (
           <div className="text-center py-16 text-gray-400">
@@ -90,7 +90,7 @@ export default function QuizHistoryPage() {
             <p className="text-xs mt-1">Take a quiz to see your history here</p>
             <button
               onClick={() => navigate(`/student/subtopic/${subtopicId}?tab=quiz`)}
-              className="mt-4 flex items-center gap-2 mx-auto bg-teal-500 hover:bg-teal-600 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
+              className="mt-4 flex items-center gap-2 mx-auto bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
             >
               <RotateCcw size={13} /> Take a Quiz
             </button>
@@ -120,7 +120,7 @@ export default function QuizHistoryPage() {
                     <Link
                       to={`/student/quiz-results/${attempt.id}`}
                       state={{ subtopicId, subtopicName: subtopic?.name }}
-                      className="text-xs text-teal-600 hover:text-teal-800 font-medium px-3 py-1.5 border border-teal-200 rounded-lg transition-colors shrink-0"
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium px-3 py-1.5 border border-blue-200 rounded-lg transition-colors shrink-0"
                     >
                       Review
                     </Link>
@@ -135,7 +135,7 @@ export default function QuizHistoryPage() {
         {!loading && (
           <button
             onClick={() => navigate(`/student/subtopic/${subtopicId}?tab=quiz`)}
-            className="mt-6 w-full flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 hover:border-teal-300 hover:text-teal-600 text-gray-400 rounded-2xl py-4 text-sm transition-colors"
+            className="mt-6 w-full flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 hover:border-blue-300 hover:text-blue-600 text-gray-400 rounded-2xl py-4 text-sm transition-colors"
           >
             <RotateCcw size={14} /> Take another quiz
           </button>

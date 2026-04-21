@@ -64,7 +64,7 @@ function QuestionAccordion({ answer, index }) {
         className="w-full flex items-center gap-3 px-4 py-3.5 text-left"
       >
         {answer.is_correct
-          ? <CheckCircle size={16} className="text-teal-400 shrink-0" />
+          ? <CheckCircle size={16} className="text-blue-400 shrink-0" />
           : <XCircle    size={16} className="text-red-400  shrink-0" />}
         <span className="text-white/40 text-xs font-medium shrink-0">Q{index + 1}</span>
         <span className="text-white/80 text-sm flex-1 truncate">{answer.question_text}</span>
@@ -86,9 +86,9 @@ function QuestionAccordion({ answer, index }) {
               <p className="text-white/40 text-xs mb-1">Your answer</p>
               <p className="text-white/80 text-sm">{answer.selected_option_text || '—'}</p>
             </div>
-            <div className="bg-teal-500/10 border border-teal-500/20 rounded-xl p-3">
-              <p className="text-teal-400/70 text-xs mb-1">Correct answer</p>
-              <p className="text-teal-300 text-sm">
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3">
+              <p className="text-blue-400/70 text-xs mb-1">Correct answer</p>
+              <p className="text-blue-300 text-sm">
                 {answer.correct_options?.map(o => o.option_text).join(', ') || '—'}
               </p>
             </div>
@@ -170,7 +170,7 @@ export default function QuizResultsPage() {
 
   if (loading) return (
     <div className="min-h-screen bg-[#0a4a3f] flex flex-col items-center justify-center gap-4">
-      <Loader2 size={32} className="text-teal-400 animate-spin" />
+      <Loader2 size={32} className="text-blue-400 animate-spin" />
       <p className="text-white/60 text-sm">Loading your results…</p>
     </div>
   );
@@ -180,7 +180,7 @@ export default function QuizResultsPage() {
       <div className="text-4xl"></div>
       <p className="text-white font-semibold">{error || 'No results found.'}</p>
       <button onClick={() => navigate(-1)}
-        className="mt-2 text-teal-400 hover:text-teal-300 text-sm font-medium flex items-center gap-1">
+        className="mt-2 text-blue-400 hover:text-blue-300 text-sm font-medium flex items-center gap-1">
         <ArrowLeft size={14} /> Go back
       </button>
     </div>
@@ -241,7 +241,7 @@ export default function QuizResultsPage() {
           {/* Stat pills */}
           <div className="flex flex-wrap justify-center gap-3">
             <div className="flex items-center gap-2 bg-white/10 rounded-full px-4 py-1.5">
-              <Trophy size={13} className="text-teal-400" />
+              <Trophy size={13} className="text-blue-400" />
               <span className="text-white/80 text-xs font-medium">Score: {score}/{max}</span>
             </div>
             <div className="flex items-center gap-2 bg-white/10 rounded-full px-4 py-1.5">
@@ -268,7 +268,7 @@ export default function QuizResultsPage() {
               </div>
               <div className="flex justify-between text-white/70">
                 <span>Correct answers</span>
-                <span className="font-semibold text-teal-300">{correct}</span>
+                <span className="font-semibold text-blue-300">{correct}</span>
               </div>
             </div>
           )}
@@ -276,8 +276,8 @@ export default function QuizResultsPage() {
 
         {/* Examiner recommendation */}
         {examiner_recommendation && (
-          <div className="bg-teal-900/30 border border-teal-500/20 rounded-2xl p-4">
-            <p className="text-teal-400 text-xs font-semibold uppercase tracking-wide mb-2">
+          <div className="bg-blue-900/30 border border-blue-500/20 rounded-2xl p-4">
+            <p className="text-blue-400 text-xs font-semibold uppercase tracking-wide mb-2">
               Examiner's Recommendation
             </p>
             <p className="text-white/80 text-sm leading-relaxed">{examiner_recommendation}</p>
@@ -333,7 +333,7 @@ export default function QuizResultsPage() {
                   : `/student/quiz/${backSubtopicId}`,
                 { state: { subtopicName, subjectName, examBoardName } }
               )}
-              className="flex-1 flex items-center justify-center gap-2 bg-teal-500 hover:bg-teal-600 text-white font-semibold py-3 rounded-xl text-sm transition-colors"
+              className="flex-1 flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 rounded-xl text-sm transition-colors"
             >
               <RotateCcw size={14} /> Try Again
             </button>

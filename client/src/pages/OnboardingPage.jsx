@@ -20,8 +20,8 @@ import api from '../services/apiClient';
 
 const GOALS = [
   { value: 5,   label: '5 questions',   note: 'Free plan',   color: 'border-gray-200' },
-  { value: 20,  label: '20 questions',  note: 'Light study', color: 'border-teal-300' },
-  { value: 50,  label: '50 questions',  note: 'Recommended', color: 'border-teal-500', featured: true },
+  { value: 20,  label: '20 questions',  note: 'Light study', color: 'border-blue-300' },
+  { value: 50,  label: '50 questions',  note: 'Recommended', color: 'border-blue-500', featured: true },
   { value: 100, label: '100 questions', note: 'Intensive',   color: 'border-purple-400' },
 ];
 
@@ -166,8 +166,8 @@ export default function OnboardingPage() {
             <div
               key={s}
               className={`h-1.5 rounded-full transition-all ${
-                s === step ? 'w-8 bg-teal-400' :
-                s < step   ? 'w-4 bg-teal-600' :
+                s === step ? 'w-8 bg-blue-400' :
+                s < step   ? 'w-4 bg-blue-600' :
                              'w-4 bg-white/20'
               }`}
             />
@@ -181,11 +181,11 @@ export default function OnboardingPage() {
             <>
               <h2 className="text-xl font-bold text-gray-900 mb-1">Select your subjects</h2>
               <p className="text-sm text-gray-500 mb-1">Pick your subjects — 14-day free trial, full access</p>
-              <p className="text-xs text-teal-600 font-medium mb-4">{subjects.length} selected</p>
+              <p className="text-xs text-blue-600 font-medium mb-4">{subjects.length} selected</p>
 
               {loadingS ? (
                 <div className="flex justify-center py-8">
-                  <Loader2 size={20} className="text-teal-400 animate-spin" />
+                  <Loader2 size={20} className="text-blue-400 animate-spin" />
                 </div>
               ) : allSubs.length === 0 ? (
                 <p className="text-sm text-gray-400 text-center py-8">
@@ -202,13 +202,13 @@ export default function OnboardingPage() {
                         onClick={() => toggleSubject(s.id)}
                         disabled={locked}
                         className={`flex items-center gap-2 p-3 rounded-xl border-2 text-left transition-all ${
-                          sel    ? 'border-teal-500 bg-teal-50' :
+                          sel    ? 'border-blue-500 bg-blue-50' :
                           locked ? 'border-gray-100 opacity-40 cursor-not-allowed' :
-                                   'border-gray-200 hover:border-teal-300'
+                                   'border-gray-200 hover:border-blue-300'
                         }`}
                       >
                         <span className="text-lg">{s.icon_emoji || ''}</span>
-                        <p className={`text-xs font-semibold ${sel ? 'text-teal-700' : 'text-gray-700'}`}>
+                        <p className={`text-xs font-semibold ${sel ? 'text-blue-700' : 'text-gray-700'}`}>
                           {s.name}
                         </p>
                       </button>
@@ -236,11 +236,11 @@ export default function OnboardingPage() {
                     key={g.value}
                     onClick={() => setGoal(g.value)}
                     className={`w-full flex items-center gap-3 p-4 rounded-2xl border-2 transition-all text-left relative ${
-                      goal === g.value ? `${g.color} bg-teal-50` : `${g.color} hover:bg-gray-50`
-                    } ${g.featured ? 'ring-1 ring-teal-400' : ''}`}
+                      goal === g.value ? `${g.color} bg-blue-50` : `${g.color} hover:bg-gray-50`
+                    } ${g.featured ? 'ring-1 ring-blue-400' : ''}`}
                   >
                     {g.featured && (
-                      <span className="absolute -top-2 left-4 text-[10px] font-bold bg-teal-500 text-white px-2 py-0.5 rounded-full">
+                      <span className="absolute -top-2 left-4 text-[10px] font-bold bg-blue-500 text-white px-2 py-0.5 rounded-full">
                         Recommended
                       </span>
                     )}
@@ -248,7 +248,7 @@ export default function OnboardingPage() {
                       <p className="font-semibold text-sm text-gray-800">{g.label}/day</p>
                       <p className="text-xs text-gray-400">{g.note}</p>
                     </div>
-                    {goal === g.value && <Check size={16} className="text-teal-500 shrink-0" />}
+                    {goal === g.value && <Check size={16} className="text-blue-500 shrink-0" />}
                   </button>
                 ))}
               </div>
@@ -276,8 +276,8 @@ export default function OnboardingPage() {
                       }
                       className={`px-3 py-1.5 rounded-full text-sm font-semibold border-2 transition-all ${
                         sel
-                          ? 'border-teal-500 bg-teal-50 text-teal-700'
-                          : 'border-gray-200 text-gray-600 hover:border-teal-300'
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-200 text-gray-600 hover:border-blue-300'
                       }`}
                     >
                       {day}
@@ -292,15 +292,15 @@ export default function OnboardingPage() {
                     key={t.value}
                     onClick={() => setStudyTime(t.value)}
                     className={`w-full flex items-center gap-3 p-4 rounded-2xl border-2 transition-all text-left relative ${
-                      studyTime === t.value ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:border-teal-300'
-                    } ${t.featured ? 'ring-1 ring-teal-400' : ''}`}
+                      studyTime === t.value ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300'
+                    } ${t.featured ? 'ring-1 ring-blue-400' : ''}`}
                   >
                     <span className="text-xl">{t.emoji}</span>
                     <div className="flex-1">
                       <p className="font-semibold text-sm text-gray-800">{t.label}</p>
                       <p className="text-xs text-gray-400">{t.note}</p>
                     </div>
-                    {studyTime === t.value && <Check size={16} className="text-teal-500 shrink-0" />}
+                    {studyTime === t.value && <Check size={16} className="text-blue-500 shrink-0" />}
                   </button>
                 ))}
               </div>
@@ -320,7 +320,7 @@ export default function OnboardingPage() {
               <button
                 onClick={() => setStep(s => s + 1)}
                 disabled={!canNext}
-                className="flex items-center gap-1.5 bg-teal-500 hover:bg-teal-600 disabled:opacity-50 text-white font-semibold text-sm px-6 py-2.5 rounded-xl transition-colors"
+                className="flex items-center gap-1.5 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-semibold text-sm px-6 py-2.5 rounded-xl transition-colors"
               >
                 Next <ChevronRight size={14} />
               </button>
@@ -328,7 +328,7 @@ export default function OnboardingPage() {
               <button
                 onClick={finish}
                 disabled={saving}
-                className="flex items-center gap-2 bg-teal-500 hover:bg-teal-600 disabled:opacity-60 text-white font-semibold text-sm px-6 py-2.5 rounded-xl transition-colors"
+                className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-60 text-white font-semibold text-sm px-6 py-2.5 rounded-xl transition-colors"
               >
                 {saving
                   ? <><Loader2 size={13} className="animate-spin" /> Saving…</>

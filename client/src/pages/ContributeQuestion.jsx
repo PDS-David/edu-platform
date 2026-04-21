@@ -166,7 +166,7 @@ export default function ContributeQuestion() {
             {isTeacher && (
               <Link
                 to="/teacher/pending-questions"
-                className="flex items-center justify-center gap-2 border-2 border-teal-200 text-teal-700 hover:bg-teal-50 font-semibold py-3 rounded-xl transition-colors"
+                className="flex items-center justify-center gap-2 border-2 border-blue-200 text-blue-700 hover:bg-blue-50 font-semibold py-3 rounded-xl transition-colors"
               >
                 <Eye className="w-4 h-4" /> View My Pending Questions
               </Link>
@@ -221,7 +221,7 @@ export default function ContributeQuestion() {
           {isTeacher && (
             <Link
               to="/teacher/pending-questions"
-              className="flex items-center gap-1.5 text-xs text-teal-700 bg-teal-50 border border-teal-200 px-3 py-1.5 rounded-xl hover:bg-teal-100 transition-colors font-semibold"
+              className="flex items-center gap-1.5 text-xs text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl hover:bg-blue-100 transition-colors font-semibold"
             >
               <Eye className="w-3.5 h-3.5" /> My Pending
             </Link>

@@ -32,7 +32,7 @@ export default function TeacherPendingQuestions() {
             <p className="text-white/60 text-sm mt-0.5">Questions you have submitted</p>
           </div>
           <Link to="/teacher/resources?tab=questions"
-            className="flex items-center gap-2 bg-teal-500 hover:bg-teal-400 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors">
+            className="flex items-center gap-2 bg-blue-500 hover:bg-blue-400 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors">
             <Plus size={14} /> Add Question
           </Link>
         </div>
@@ -41,14 +41,14 @@ export default function TeacherPendingQuestions() {
       <div className="max-w-4xl mx-auto px-4 py-6">
         {loading ? (
           <div className="flex justify-center py-16">
-            <Loader2 size={24} className="animate-spin text-teal-400" />
+            <Loader2 size={24} className="animate-spin text-blue-400" />
           </div>
         ) : questions.length === 0 ? (
           <div className="text-center py-16 text-gray-400">
             <BookOpen size={36} className="mx-auto mb-3 opacity-30" />
             <p className="text-sm">You haven't submitted any questions yet.</p>
             <Link to="/teacher/resources"
-              className="mt-4 inline-flex items-center gap-2 bg-teal-500 hover:bg-teal-600 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors">
+              className="mt-4 inline-flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors">
               <Plus size={14} /> Add your first question
             </Link>
           </div>
@@ -78,7 +78,7 @@ export default function TeacherPendingQuestions() {
                       )}
                     </td>
                     <td className="px-5 py-3.5">
-                      <span className="flex items-center gap-1 text-xs font-semibold text-teal-600">
+                      <span className="flex items-center gap-1 text-xs font-semibold text-blue-600">
                         <CheckCircle size={12} /> Approved
                       </span>
                     </td>

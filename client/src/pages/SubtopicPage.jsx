@@ -36,7 +36,7 @@ function TickIcon() {
 function TabDot({ completed }) {
   return (
     <span className={`w-4 h-4 rounded-full border-2 inline-flex items-center justify-center shrink-0 ${
-      completed ? 'border-teal-500 bg-teal-500' : 'border-gray-300'
+      completed ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
     }`}>
       {completed && <TickIcon />}
     </span>
@@ -114,7 +114,7 @@ function ResourcesTab({ subtopicId, subtopic, subtopicName, onComplete }) {
     return `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
   };
 
-  if (loading) return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-teal-400" /></div>;
+  if (loading) return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-blue-400" /></div>;
 
   if (resources.length === 0) return (
     <div className="text-center py-12 text-gray-400">
@@ -127,13 +127,13 @@ function ResourcesTab({ subtopicId, subtopic, subtopicName, onComplete }) {
   return (
     <div className="space-y-3">
       {notesLoading && (
-        <div className="flex items-center gap-2 text-sm text-teal-600 py-2">
+        <div className="flex items-center gap-2 text-sm text-blue-600 py-2">
           <Loader2 size={14} className="animate-spin" /> Generating revision notes…
         </div>
       )}
       {!notes && !notesLoading && (
         <button onClick={handleGenerateNotes}
-          className="flex items-center gap-2 text-sm text-teal-600 border border-teal-300 px-4 py-2 rounded-xl hover:bg-teal-50 mb-4">
+          className="flex items-center gap-2 text-sm text-blue-600 border border-blue-300 px-4 py-2 rounded-xl hover:bg-blue-50 mb-4">
           <Sparkles size={14} /> Generate AI Revision Notes
         </button>
       )}
@@ -153,7 +153,7 @@ function ResourcesTab({ subtopicId, subtopic, subtopicName, onComplete }) {
               <div className="flex items-center gap-1.5 flex-wrap">
                 <p className="text-sm font-semibold text-gray-800 truncate">{res.title}</p>
                 {res._assigned && (
-                  <span className="text-[10px] font-semibold bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-full shrink-0">
+                  <span className="text-[10px] font-semibold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full shrink-0">
                     From teacher
                   </span>
                 )}
@@ -166,13 +166,13 @@ function ResourcesTab({ subtopicId, subtopic, subtopicName, onComplete }) {
             </div>
             {res.resource_type === 'video' && (
               <button onClick={() => handleOpen(res)}
-                className="bg-teal-500 hover:bg-teal-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+                className="bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
                 Play
               </button>
             )}
             {res.resource_type === 'audio' && (
               <button onClick={() => handleOpen(res)}
-                className="border border-teal-500 text-teal-600 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-teal-50 transition-colors">
+                className="border border-blue-500 text-blue-600 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-colors">
                 Listen
               </button>
             )}
@@ -268,13 +268,13 @@ function PracticeTab({ subtopicId, subjectId, onComplete }) {
               subTab === t.id ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-100'
             }`}>
             {t.label}
-            {t.ai && <span className="text-[9px] font-bold text-teal-400"></span>}
+            {t.ai && <span className="text-[9px] font-bold text-blue-400"></span>}
           </button>
         ))}
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-teal-400" /></div>
+        <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-blue-400" /></div>
       ) : questions.length === 0 ? (
         <div className="bg-white rounded-2xl border border-gray-100 p-6 text-center shadow-sm">
           <div className="text-4xl mb-3">📭</div>
@@ -289,7 +289,7 @@ function PracticeTab({ subtopicId, subjectId, onComplete }) {
             {subTab !== "mcq" && (
               <button
                 onClick={() => setSubTab("mcq")}
-                className="w-full py-2 text-sm font-semibold text-white bg-teal-500 hover:bg-teal-600 rounded-xl transition-colors"
+                className="w-full py-2 text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 rounded-xl transition-colors"
               >
                 Try MCQ Questions instead
               </button>
@@ -363,10 +363,10 @@ function MCQQuestion({ question, questionNumber, totalQuestions, onAnswer, onPre
   const diffBadge = { easy: 'bg-green-500', medium: 'bg-amber-500', hard: 'bg-red-500' };
 
   const optStyle = (optId) => {
-    if (!result) return selected === optId ? 'border-teal-400 bg-teal-50' : 'border-gray-200 hover:border-teal-300 cursor-pointer';
+    if (!result) return selected === optId ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-blue-300 cursor-pointer';
     const isCorrect  = result.correct_options?.some(c => c.id === optId);
     const isSelected = selected === optId;
-    if (isCorrect)                return 'border-teal-400 bg-teal-50';
+    if (isCorrect)                return 'border-blue-400 bg-blue-50';
     if (isSelected && !isCorrect) return 'border-red-300 bg-red-50';
     return 'border-gray-100 opacity-60';
   };
@@ -394,7 +394,7 @@ function MCQQuestion({ question, questionNumber, totalQuestions, onAnswer, onPre
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${optStyle(opt.id)}`}>
               <span className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 bg-gray-100 text-gray-500">{LABELS[i]}</span>
               <span className="text-sm text-gray-800 flex-1">{opt.option_text}</span>
-              {result && result.correct_options?.some(c => c.id === opt.id) && <CheckCircle size={14} className="text-teal-500 shrink-0" />}
+              {result && result.correct_options?.some(c => c.id === opt.id) && <CheckCircle size={14} className="text-blue-500 shrink-0" />}
               {result && selected === opt.id && !result.correct_options?.some(c => c.id === opt.id) && <XCircle size={14} className="text-red-400 shrink-0" />}
             </button>
           ))}
@@ -443,13 +443,13 @@ function MCQQuestion({ question, questionNumber, totalQuestions, onAnswer, onPre
           <div className="flex items-center gap-2">
             {!result ? (
               <button onClick={handleSubmit} disabled={!selected || submitting}
-                className="bg-teal-500 hover:bg-teal-600 disabled:bg-gray-200 disabled:text-gray-400 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-colors flex items-center gap-2">
+                className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-200 disabled:text-gray-400 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-colors flex items-center gap-2">
                 {submitting && <Loader2 size={14} className="animate-spin" />}
                 {submitting ? 'Checking…' : 'Submit'}
               </button>
             ) : (
               <button onClick={() => onAnswer(result.is_correct)}
-                className="bg-teal-500 hover:bg-teal-600 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-colors">
+                className="bg-blue-500 hover:bg-blue-600 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-colors">
                 {questionNumber < totalQuestions ? 'Next Question' : 'Finish'}
               </button>
             )}
@@ -501,7 +501,7 @@ function OpenAnswerQuestion({ question, questionNumber, totalQuestions, dismisse
       <div className="px-5 pb-4">
         <div className="relative">
           <textarea value={answer} onChange={e => setAnswer(e.target.value)} placeholder="Type your answer here"
-            className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm text-gray-800 resize-none focus:outline-none focus:border-teal-400 min-h-[120px]" />
+            className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm text-gray-800 resize-none focus:outline-none focus:border-blue-400 min-h-[120px]" />
           <div className="absolute bottom-3 right-3 flex gap-2">
             <button className="w-7 h-7 rounded-full bg-purple-500 flex items-center justify-center text-white hover:bg-purple-600"><Upload size={12} /></button>
             <button className="w-7 h-7 rounded-full bg-green-500 flex items-center justify-center text-white hover:bg-green-600"><Sigma size={12} /></button>
@@ -549,7 +549,7 @@ function StructuredQuestion({ question, questionNumber, totalQuestions, onNext, 
             </div>
             <div className="relative">
               <textarea value={answers[i] || ''} onChange={e => setAnswers(a => ({ ...a, [i]: e.target.value }))}
-                placeholder="Type your answer here ..." className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm resize-none focus:outline-none focus:border-teal-400 min-h-[100px]" />
+                placeholder="Type your answer here ..." className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm resize-none focus:outline-none focus:border-blue-400 min-h-[100px]" />
               <div className="absolute bottom-3 right-3 flex gap-2">
                 <button className="w-6 h-6 rounded-full bg-purple-500 flex items-center justify-center text-white"><Upload size={10} /></button>
                 <button className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white"><Sigma size={10} /></button>
@@ -560,7 +560,7 @@ function StructuredQuestion({ question, questionNumber, totalQuestions, onNext, 
       </div>
       <div className="px-5 pb-5 flex items-center gap-3">
         {onPrev && <button onClick={onPrev} className="border-2 border-gray-200 text-gray-600 font-semibold px-4 py-2.5 rounded-xl text-sm hover:bg-gray-50">← Prev</button>}
-        <button onClick={onNext} className="flex-1 bg-teal-500 hover:bg-teal-600 text-white font-semibold py-2.5 rounded-xl text-sm">Submit</button>
+        <button onClick={onNext} className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2.5 rounded-xl text-sm">Submit</button>
         <span className="text-xs text-gray-400 shrink-0">{questionNumber} of {totalQuestions}</span>
       </div>
     </div>
@@ -571,17 +571,17 @@ function StructuredQuestion({ question, questionNumber, totalQuestions, onNext, 
 function CompletionCard({ score, total, onTakeQuiz, onRetry }) {
   const pct = Math.round((score / total) * 100);
   return (
-    <div className="bg-teal-50 border border-teal-100 rounded-2xl p-8 text-center">
+    <div className="bg-blue-50 border border-blue-100 rounded-2xl p-8 text-center">
       <div className="text-4xl mb-3"></div>
-      <h3 className="text-lg font-bold teal-600 mb-2">Keep Going, You're Almost There!</h3>
+      <h3 className="text-lg font-bold blue-600 mb-2">Keep Going, You're Almost There!</h3>
       <p className="text-sm text-gray-600 mb-1">
         Nice job!  Now, take the quiz and get{' '}
-        <span className="text-teal-600 font-medium">detailed feedback</span> on every answer with our{' '}
-        <span className="text-teal-600 font-medium">AI-powered marking scheme</span>. Let's level up! 
+        <span className="text-blue-600 font-medium">detailed feedback</span> on every answer with our{' '}
+        <span className="text-blue-600 font-medium">AI-powered marking scheme</span>. Let's level up! 
       </p>
       <p className="text-xs text-gray-400 mb-6">Score: {score}/{total} ({pct}%)</p>
       <button onClick={onTakeQuiz}
-        className="bg-teal-500 hover:bg-teal-600 text-white font-semibold px-8 py-3 rounded-xl text-sm transition-colors">
+        className="bg-blue-500 hover:bg-blue-600 text-white font-semibold px-8 py-3 rounded-xl text-sm transition-colors">
         Take me to Quiz
       </button>
     </div>
@@ -636,7 +636,7 @@ export default function SubtopicPage() {
 
   if (loading) return (
     <div className="min-h-screen bg-gray-50"><TopNav />
-      <div className="flex justify-center pt-24"><Loader2 className="w-8 h-8 text-teal-400 animate-spin" /></div>
+      <div className="flex justify-center pt-24"><Loader2 className="w-8 h-8 text-blue-400 animate-spin" /></div>
     </div>
   );
 
@@ -708,11 +708,11 @@ export default function SubtopicPage() {
       {!isQuizTab && (
         <div className="max-w-3xl mx-auto px-4 pt-3">
           <nav className="flex items-center gap-1 text-xs text-gray-400 flex-wrap">
-            <Link to="/student/dashboard" className="hover:text-teal-600">Home</Link>
+            <Link to="/student/dashboard" className="hover:text-blue-600">Home</Link>
             <span>›</span><span>{examBoardName}</span>
             <span>›</span><span>{subjectName}</span>
             <span>›</span><span>{topicName}</span>
-            <span>›</span><span className="text-teal-600 font-medium">{subtopicName}</span>
+            <span>›</span><span className="text-blue-600 font-medium">{subtopicName}</span>
           </nav>
         </div>
       )}

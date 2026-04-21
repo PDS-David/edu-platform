@@ -119,7 +119,7 @@ function MetaForm({ file, onSave, onDismiss }) {
     }
   };
 
-  const sel = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-teal-300 disabled:bg-gray-50 disabled:text-gray-400';
+  const sel = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:bg-gray-50 disabled:text-gray-400';
 
   return (
     <div className="border-t border-gray-100 bg-gray-50 px-4 py-4 space-y-3">
@@ -172,8 +172,8 @@ function MetaForm({ file, onSave, onDismiss }) {
             <button key={pt.value} type="button" onClick={() => set('pushType', pt.value)}
               className={`px-2.5 py-1 text-xs font-medium rounded-lg border transition-colors ${
                 form.pushType === pt.value
-                  ? 'bg-teal-500 border-teal-500 text-white'
-                  : 'bg-white border-gray-200 text-gray-600 hover:border-teal-300'
+                  ? 'bg-blue-500 border-blue-500 text-white'
+                  : 'bg-white border-gray-200 text-gray-600 hover:border-blue-300'
               }`}>
               {pt.label}
             </button>
@@ -185,7 +185,7 @@ function MetaForm({ file, onSave, onDismiss }) {
 
       <div className="flex gap-2">
         <button onClick={handleSave} disabled={saving}
-          className="flex-1 bg-teal-500 hover:bg-teal-600 disabled:opacity-50 text-white text-xs font-semibold py-2 rounded-lg flex items-center justify-center gap-1.5">
+          className="flex-1 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white text-xs font-semibold py-2 rounded-lg flex items-center justify-center gap-1.5">
           {saving ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />}
           Save & Publish
         </button>
@@ -301,7 +301,7 @@ function AssignUsersForm({ file, onDone, onDismiss }) {
       {assignTarget === 'students' && (
         <>
           <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={assignAll} onChange={e => setAssignAll(e.target.checked)} className="rounded text-teal-500" />
+            <input type="checkbox" checked={assignAll} onChange={e => setAssignAll(e.target.checked)} className="rounded text-blue-500" />
             <span className="text-xs text-gray-700 font-medium">All active students ({students.length})</span>
           </label>
           {!assignAll && (
@@ -423,7 +423,7 @@ function ResourceLibrarySection() {
                         <span className="text-xs text-gray-400 capitalize">{file.resource_type || 'file'}</span>
                         {file.subject_name && (
                           <><span className="text-xs text-gray-300">·</span>
-                          <span className="text-xs text-teal-600">{file.subject_name}</span></>
+                          <span className="text-xs text-blue-600">{file.subject_name}</span></>
                         )}
                         {file.push_type && (
                           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-600">
@@ -587,7 +587,7 @@ export default function AdminBulkUploadPanel() {
         onDrop={e => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
         onClick={() => !pendingFiles.length && fileInputRef.current?.click()}
         className={`border-2 border-dashed rounded-2xl p-10 text-center transition-colors
-          ${dragOver ? 'border-teal-400 bg-teal-50' : 'border-gray-200 hover:border-teal-300 hover:bg-gray-50'}
+          ${dragOver ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'}
           ${pendingFiles.length ? 'cursor-default' : 'cursor-pointer'}`}
       >
         <input
@@ -609,7 +609,7 @@ export default function AdminBulkUploadPanel() {
             <div className="flex items-center justify-between mb-3">
               <p className="text-sm font-semibold text-gray-700">{pendingFiles.length} file(s) ready to upload</p>
               <button onClick={e => { e.stopPropagation(); fileInputRef.current?.click(); }}
-                className="text-xs text-teal-600 hover:text-teal-800 font-medium">+ Add more</button>
+                className="text-xs text-blue-600 hover:text-blue-800 font-medium">+ Add more</button>
             </div>
             {pendingFiles.map((f, i) => (
               <div key={i} className="flex items-center gap-3 bg-white border border-gray-100 rounded-xl px-3 py-2">
@@ -632,7 +632,7 @@ export default function AdminBulkUploadPanel() {
             <span>{uploadProg}%</span>
           </div>
           <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
-            <div className="h-full bg-teal-500 rounded-full transition-all duration-200" style={{ width: `${uploadProg}%` }} />
+            <div className="h-full bg-blue-500 rounded-full transition-all duration-200" style={{ width: `${uploadProg}%` }} />
           </div>
         </div>
       )}
@@ -640,7 +640,7 @@ export default function AdminBulkUploadPanel() {
       {/* Upload button */}
       {pendingFiles.length > 0 && (
         <button onClick={handleUpload} disabled={uploading}
-          className="w-full bg-teal-500 hover:bg-teal-600 disabled:opacity-50 text-white font-semibold
+          className="w-full bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-semibold
             py-3 rounded-xl text-sm flex items-center justify-center gap-2 transition-colors">
           {uploading
             ? <><Loader2 size={15} className="animate-spin" /> Uploading {uploadProg}%…</>
@@ -719,8 +719,8 @@ export default function AdminBulkUploadPanel() {
                       }}
                       className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors
                         ${assigningMeta === file.id
-                          ? 'bg-teal-500 text-white'
-                          : 'border border-teal-200 text-teal-600 hover:bg-teal-50'}`}
+                          ? 'bg-blue-500 text-white'
+                          : 'border border-blue-200 text-blue-600 hover:bg-blue-50'}`}
                     >
                       <Tag size={12} />
                       {assigningMeta === file.id ? 'Cancel' : 'Assign'}

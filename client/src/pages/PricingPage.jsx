@@ -129,7 +129,7 @@ function CurrentPlanCard() {
       </div>
 
       {message && (
-        <p className="mt-3 text-sm text-teal-300 leading-relaxed">{message}</p>
+        <p className="mt-3 text-sm text-blue-300 leading-relaxed">{message}</p>
       )}
 
       {confirm && (
@@ -213,8 +213,8 @@ export default function PricingPage() {
         <ul className="space-y-2.5 mb-8 w-full">
           {FEATURES.map((f) => (
             <li key={f} className="flex items-center gap-3">
-              <span className="w-5 h-5 rounded-full bg-teal-400/20 flex items-center justify-center shrink-0">
-                <Check size={12} className="text-teal-400" strokeWidth={3} />
+              <span className="w-5 h-5 rounded-full bg-blue-400/20 flex items-center justify-center shrink-0">
+                <Check size={12} className="text-blue-400" strokeWidth={3} />
               </span>
               <span className="text-white/90 text-sm">{f}</span>
             </li>
@@ -239,7 +239,7 @@ export default function PricingPage() {
               <button
                 onClick={() => handleEnrol('annual')}
                 disabled={paying === 'annual'}
-                className="w-full flex items-center justify-center gap-1.5 bg-teal-500 hover:bg-teal-400 disabled:opacity-50
+                className="w-full flex items-center justify-center gap-1.5 bg-blue-500 hover:bg-blue-400 disabled:opacity-50
                   text-white font-bold text-sm py-2.5 rounded-xl transition-colors mt-auto"
               >
                 {paying === 'annual'
@@ -347,7 +347,7 @@ export function UpgradeWall({ score, max, time, accuracy, onRevise }) {
           <ul className="space-y-2 w-full">
             {FEATURES.slice(0, 5).map(f => (
               <li key={f} className="flex items-center gap-2.5">
-                <Check size={12} className="text-teal-400 shrink-0" strokeWidth={3} />
+                <Check size={12} className="text-blue-400 shrink-0" strokeWidth={3} />
                 <span className="text-white/80 text-xs">{f}</span>
               </li>
             ))}
@@ -367,7 +367,7 @@ export function UpgradeWall({ score, max, time, accuracy, onRevise }) {
                 <button
                   onClick={() => handleEnrol('annual')}
                   disabled={paying === 'annual'}
-                  className="w-full bg-teal-500 hover:bg-teal-400 disabled:opacity-50 text-white font-bold text-xs py-2 rounded-lg transition-colors"
+                  className="w-full bg-blue-500 hover:bg-blue-400 disabled:opacity-50 text-white font-bold text-xs py-2 rounded-lg transition-colors"
                 >
                   {paying === 'annual' ? <Loader2 size={11} className="animate-spin mx-auto" /> : 'Enrol Now'}
                 </button>

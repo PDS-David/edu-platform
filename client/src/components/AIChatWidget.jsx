@@ -31,13 +31,13 @@ function Message({ msg }) {
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-2`}>
       {!isUser && (
-        <div className="w-6 h-6 rounded-full bg-teal-500 flex items-center justify-center shrink-0 mr-2 mt-0.5">
+        <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center shrink-0 mr-2 mt-0.5">
           <Sparkles size={10} className="text-white" />
         </div>
       )}
       <div className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm leading-relaxed ${
         isUser
-          ? 'bg-teal-500 text-white rounded-br-sm'
+          ? 'bg-blue-500 text-white rounded-br-sm'
           : 'bg-white border border-gray-100 text-gray-800 rounded-bl-sm shadow-sm'
       }`}>
         {msg.text}
@@ -168,8 +168,8 @@ export default function AIChatWidget({
           {/* Header */}
           <div className="bg-[#0a4a3f] px-4 py-3 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-full bg-teal-400/20 flex items-center justify-center">
-                <Sparkles size={13} className="text-teal-300" />
+              <div className="w-7 h-7 rounded-full bg-blue-400/20 flex items-center justify-center">
+                <Sparkles size={13} className="text-blue-300" />
               </div>
               <div>
                 <p className="text-white text-sm font-semibold leading-none">AISchoolonair AI </p>
@@ -186,7 +186,7 @@ export default function AIChatWidget({
             {messages.map(msg => <Message key={msg.id} msg={msg} />)}
             {loading && (
               <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-full bg-teal-500 flex items-center justify-center shrink-0">
+                <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center shrink-0">
                   <Sparkles size={10} className="text-white" />
                 </div>
                 <div className="bg-white border border-gray-100 rounded-2xl rounded-bl-sm shadow-sm">
@@ -212,7 +212,7 @@ export default function AIChatWidget({
             <button
               onClick={send}
               disabled={!input.trim() || loading}
-              className="w-8 h-8 rounded-full bg-teal-500 hover:bg-teal-600 disabled:opacity-40 flex items-center justify-center shrink-0 transition-colors"
+              className="w-8 h-8 rounded-full bg-blue-500 hover:bg-blue-600 disabled:opacity-40 flex items-center justify-center shrink-0 transition-colors"
             >
               {loading
                 ? <Loader2 size={13} className="text-white animate-spin" />
@@ -225,7 +225,7 @@ export default function AIChatWidget({
       {/* ── Floating trigger button ── */}
       <button
         onClick={() => setOpen(o => !o)}
-        className="fixed bottom-6 right-4 z-50 w-12 h-12 rounded-full bg-teal-500 hover:bg-teal-600 shadow-lg flex items-center justify-center transition-all active:scale-95"
+        className="fixed bottom-6 right-4 z-50 w-12 h-12 rounded-full bg-blue-500 hover:bg-blue-600 shadow-lg flex items-center justify-center transition-all active:scale-95"
         aria-label="Open AI study assistant"
       >
         {open
