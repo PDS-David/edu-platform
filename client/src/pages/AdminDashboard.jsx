@@ -28,11 +28,11 @@ class PanelErrorBoundary extends Component {
       return (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <AlertTriangle className="w-8 h-8 text-red-400 mb-3" />
-          <p className="text-sm font-semibold text-gray-700">Something went wrong in this panel</p>
-          <p className="text-xs text-gray-400 mt-1 mb-4 max-w-xs">{this.state.message}</p>
+          <p className="text-sm font-semibold text-white/70">Something went wrong in this panel</p>
+          <p className="text-xs text-white/30 mt-1 mb-4 max-w-xs">{this.state.message}</p>
           <button
             onClick={() => this.setState({ hasError: false, message: '' })}
-            className="text-sm text-teal-600 hover:underline"
+            className="text-sm text-teal-400 hover:text-teal-300"
           >
             Try again
           </button>
@@ -55,12 +55,12 @@ const safeEmoji = (raw) => {
 
 // ─── Reusable Modal ───────────────────────────────────────────────────────────
 const Modal = ({ title, onClose, children }) => (
-  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white">
-        <h3 className="text-lg font-bold text-gray-900">{title}</h3>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
-          <X size={20} />
+  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+    <div className="bg-[#1a1a1b] border border-white/[0.08] rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.08] sticky top-0 bg-[#1a1a1b]">
+        <h3 className="text-base font-semibold text-white">{title}</h3>
+        <button onClick={onClose} className="text-white/40 hover:text-white/80 transition-colors">
+          <X size={18} />
         </button>
       </div>
       <div className="px-6 py-5">{children}</div>
@@ -70,11 +70,11 @@ const Modal = ({ title, onClose, children }) => (
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
 const Toast = ({ message, type, onClose }) => (
-  <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-white text-sm font-medium
-    ${type === 'success' ? 'bg-green-600' : 'bg-red-500'}`}>
-    {type === 'success' ? <Check size={16} /> : <AlertTriangle size={16} />}
+  <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-lg shadow-xl text-white text-sm font-medium border
+    ${type === 'success' ? 'bg-[#1a1a1b] border-emerald-500/40 text-emerald-300' : 'bg-[#1a1a1b] border-red-500/40 text-red-300'}`}>
+    {type === 'success' ? <Check size={15} className="text-emerald-400" /> : <AlertTriangle size={15} className="text-red-400" />}
     {message}
-    <button onClick={onClose}><X size={14} /></button>
+    <button onClick={onClose} className="text-white/40 hover:text-white/70 ml-1"><X size={13} /></button>
   </div>
 );
 
@@ -2062,155 +2062,196 @@ const AdminDashboard = () => {
   }, []);
 
   const statCards = [
-    { label: 'Total Users',     value: statsLoading ? '…' : stats?.total_users      ?? '—', icon: Users,         color: 'bg-blue-500'   },
-    { label: 'Exam Types',      value: statsLoading ? '…' : stats?.total_exam_types  ?? '—', icon: GraduationCap, color: 'bg-purple-500' },
-    { label: 'Total Subjects',  value: statsLoading ? '…' : stats?.total_subjects    ?? '—', icon: BookOpen,      color: 'bg-green-500'  },
-    { label: 'Active Students', value: statsLoading ? '…' : stats?.active_students   ?? '—', icon: Settings,      color: 'bg-amber-500'  },
+    { label: 'Total Users',     value: statsLoading ? '…' : stats?.total_users      ?? '—', icon: Users,         accent: '#3b82f6' },
+    { label: 'Exam Types',      value: statsLoading ? '…' : stats?.total_exam_types  ?? '—', icon: GraduationCap, accent: '#a855f7' },
+    { label: 'Total Subjects',  value: statsLoading ? '…' : stats?.total_subjects    ?? '—', icon: BookOpen,      accent: '#10b981' },
+    { label: 'Active Students', value: statsLoading ? '…' : stats?.active_students   ?? '—', icon: UserCheck,     accent: '#f59e0b' },
   ];
 
+  const navItems = [
+    { key: 'analytics',  icon: Zap,          label: 'Analytics'    },
+    { key: 'users',      icon: Users,         label: 'Users'        },
+    { key: 'schools',    icon: School,        label: 'Schools'      },
+    { key: 'content',    icon: BookOpen,      label: 'Content'      },
+    { key: 'catalog',    icon: GraduationCap, label: 'Catalog'      },
+    { key: 'teachers',   icon: UserCheck,     label: 'Teachers'     },
+    { key: 'aigenerate', icon: Sparkles,      label: 'AI Generate'  },
+    { key: 'bulkupload', icon: Upload,        label: 'Bulk Upload'  },
+    { key: 'pastpapers', icon: BookOpen,      label: 'Past Papers'  },
+    { key: 'settings',   icon: Settings,      label: 'Settings'     },
+  ];
+
+  // Panel wrapper — dark card
+  const Panel = ({ children, title }) => (
+    <div className="bg-[#1a1a1b] border border-white/[0.08] rounded-xl mt-4 overflow-hidden">
+      {title && (
+        <div className="px-6 py-4 border-b border-white/[0.08]">
+          <h2 className="text-sm font-semibold text-white/80 uppercase tracking-wider">{title}</h2>
+        </div>
+      )}
+      <div className="p-6">{children}</div>
+    </div>
+  );
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#0f0f10] text-white">
       <TopNav />
 
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">Admin Dashboard</h1>
+      <div className="flex">
+        {/* ── SIDEBAR ──────────────────────────────────────────── */}
+        <aside className="w-56 shrink-0 min-h-[calc(100vh-56px)] bg-[#111112] border-r border-white/[0.06] sticky top-14 self-start">
+          <div className="px-3 py-4">
+            {/* Role label */}
+            <div className="px-3 py-2 mb-4">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-white/30">Admin Console</span>
+            </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          {statCards.map((stat, idx) => (
-            <div key={idx} className="bg-white rounded-xl shadow p-6">
-              <div className={`w-12 h-12 ${stat.color} rounded-lg flex items-center justify-center mb-4`}>
-                {statsLoading
-                  ? <Loader2 className="w-6 h-6 text-white animate-spin" />
-                  : <stat.icon className="w-6 h-6 text-white" />
-                }
+            <nav className="space-y-0.5">
+              {navItems.map(({ key, icon: Icon, label }) => {
+                const active = activePanel === key;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setActivePanel(active ? null : key)}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                      active
+                        ? 'bg-white/[0.08] text-white font-medium'
+                        : 'text-white/50 hover:text-white/80 hover:bg-white/[0.04]'
+                    }`}
+                  >
+                    <Icon size={15} className={active ? 'text-teal-400' : 'text-white/40'} />
+                    {label}
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+        </aside>
+
+        {/* ── MAIN ─────────────────────────────────────────────── */}
+        <main className="flex-1 min-w-0 px-6 py-6">
+
+          {/* Header */}
+          <div className="mb-6">
+            <h1 className="text-xl font-bold text-white">Admin Dashboard</h1>
+            <p className="text-sm text-white/40 mt-0.5">Platform management console</p>
+          </div>
+
+          {/* Stat cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+            {statCards.map((s, i) => (
+              <div key={i} className="bg-[#1a1a1b] border border-white/[0.08] rounded-xl p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs text-white/40 font-medium">{s.label}</span>
+                  <s.icon size={14} style={{ color: s.accent }} className="opacity-70" />
+                </div>
+                <p className="text-2xl font-mono font-bold text-white">
+                  {statsLoading ? <Loader2 size={18} className="animate-spin text-white/30" /> : s.value}
+                </p>
               </div>
-              <div className="text-3xl font-bold text-gray-900 mb-1">{stat.value}</div>
-              <div className="text-sm text-gray-600">{stat.label}</div>
+            ))}
+          </div>
+
+          {/* No panel selected — show grid of service tiles */}
+          {!activePanel && (
+            <div className="bg-[#1a1a1b] border border-white/[0.08] rounded-xl p-5">
+              <p className="text-xs font-semibold uppercase tracking-wider text-white/30 mb-4">Services</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                {navItems.map(({ key, icon: Icon, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => setActivePanel(key)}
+                    className="flex flex-col items-start gap-2 p-4 rounded-lg border border-white/[0.06] hover:border-white/[0.15] hover:bg-white/[0.04] transition-all text-left group"
+                  >
+                    <Icon size={18} className="text-teal-400 group-hover:text-teal-300" />
+                    <span className="text-sm font-medium text-white/70 group-hover:text-white">{label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-          ))}
-        </div>
+          )}
 
-        <div className="bg-white rounded-xl shadow p-6 mb-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">System Management</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            {[
-              { key: 'analytics',    icon: Zap,         color: 'teal',   label: 'Analytics',          desc: 'Platform-wide stats and charts'       },
-              { key: 'users',        icon: Users,        color: 'blue',   label: 'User Management',    desc: 'Manage users and permissions'          },
-              { key: 'schools',      icon: School,       color: 'purple', label: 'School Management',  desc: 'Manage schools and institutions'       },
-              { key: 'content',      icon: BookOpen,     color: 'green',  label: 'Content Management', desc: 'Manage courses and subjects'           },
-              { key: 'catalog',      icon: GraduationCap,color: 'orange', label: 'Catalog Management', desc: 'Manage exam types & subjects'          },
-              { key: 'teachers',     icon: UserCheck,    color: 'purple', label: 'Teacher Assignment', desc: 'Assign subjects to teachers'           },
-              { key: 'aigenerate',   icon: Sparkles,     color: 'teal',   label: 'AI Generate',        desc: 'Generate questions with Gemini'        },
-              { key: 'bulkupload',   icon: Upload,       color: 'blue',   label: 'Bulk Upload',        desc: 'Upload files in bulk, assign later'    },
-              { key: 'pastpapers',   icon: BookOpen,     color: 'green',  label: 'Past Papers',        desc: 'Manage past papers students can access' },
-              { key: 'settings',     icon: Settings,     color: 'purple', label: 'Settings',           desc: 'Platform configuration & feature flags' },
-            ].map(({ key, icon: Icon, color, label, desc }) => {
-              const active = activePanel === key;
-              const borderMap = { teal: 'border-teal-500', blue: 'border-blue-500', purple: 'border-purple-500', green: 'border-green-500', orange: 'border-green-500' };
-              const bgMap =     { teal: 'bg-teal-50',      blue: 'bg-blue-50',      purple: 'bg-purple-50',      green: 'bg-green-50',      orange: 'bg-green-50'      };
-              const textMap =   { teal: 'text-teal-600',   blue: 'text-blue-600',   purple: 'text-purple-600',   green: 'text-green-600',   orange: 'text-orange-500'  };
-              return (
-                <button
-                  key={key}
-                  onClick={() => setActivePanel(active ? null : key)}
-                  className={`p-6 border-2 rounded-lg transition-colors text-left ${
-                    active ? `${borderMap[color]} ${bgMap[color]}` : 'border-gray-200 hover:bg-gray-50'
-                  }`}
-                >
-                  <Icon className={`w-8 h-8 mb-2 ${active ? textMap[color] : textMap[color]}`} />
-                  <h3 className="font-semibold mb-1">{label}</h3>
-                  <p className="text-sm text-gray-600">{desc}</p>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+          {/* ── PANELS ──────────────────────────────────────────── */}
 
-        {activePanel === 'schools' && (
-          <div className="bg-white rounded-xl shadow p-6 mt-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-5">School Management</h2>
-            <div className="text-center py-16 text-gray-400">
-              <School className="w-12 h-12 mx-auto mb-3 opacity-30" />
-              <p className="text-sm font-medium">School management coming soon.</p>
-              <p className="text-xs mt-1">This section will allow you to register and manage schools, link students to institutions, and track school-level analytics.</p>
-            </div>
-          </div>
-        )}
+          {activePanel === 'analytics' && (
+            <Panel title="Platform Analytics">
+              <PanelErrorBoundary><PlatformAnalyticsPanel /></PanelErrorBoundary>
+            </Panel>
+          )}
 
-        {activePanel === 'content' && (
-          <div className="bg-white rounded-xl shadow p-6 mt-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-5">Content Management</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-              <button onClick={() => setActivePanel('catalog')} className="border border-gray-200 rounded-xl p-4 hover:border-green-400 hover:bg-green-50 transition-colors text-left group">
-                <BookOpen className="w-7 h-7 text-green-500 mb-2" />
-                <p className="font-semibold text-gray-800 text-sm group-hover:text-green-700">Manage Subjects</p>
-                <p className="text-xs text-gray-400 mt-1">Add, edit or deactivate exam types and subjects</p>
-                <span className="text-xs text-green-600 font-semibold mt-2 inline-block">Open Catalog Management →</span>
-              </button>
-              <button onClick={() => navigate('/past-papers')} className="border border-gray-200 rounded-xl p-4 hover:border-blue-400 hover:bg-blue-50 transition-colors text-left group">
-                <Settings className="w-7 h-7 text-blue-500 mb-2" />
-                <p className="font-semibold text-gray-800 text-sm group-hover:text-blue-700">Past Papers</p>
-                <p className="text-xs text-gray-400 mt-1">View and manage past exam papers available to students</p>
-                <span className="text-xs text-blue-600 font-semibold mt-2 inline-block">Go to Past Papers →</span>
-              </button>
-              <button onClick={() => navigate('/admin/questions/review')} className="border border-gray-200 rounded-xl p-4 hover:border-amber-400 hover:bg-amber-50 transition-colors text-left group">
-                <BookOpen className="w-7 h-7 text-amber-500 mb-2" />
-                <p className="font-semibold text-gray-800 text-sm group-hover:text-amber-700">Question Review</p>
-                <p className="text-xs text-gray-400 mt-1">Review and approve AI-generated and submitted questions</p>
-                <span className="text-xs text-amber-600 font-semibold mt-2 inline-block">Review Queue →</span>
-              </button>
-            </div>
-          </div>
-        )}
+          {activePanel === 'users' && (
+            <Panel title="User Management">
+              <PanelErrorBoundary><UserManagementPanel /></PanelErrorBoundary>
+            </Panel>
+          )}
 
-        {activePanel === 'analytics' && (
-          <div className="bg-white rounded-xl shadow p-6 mt-6">
-            <PanelErrorBoundary><PlatformAnalyticsPanel /></PanelErrorBoundary>
-          </div>
-        )}
+          {activePanel === 'schools' && (
+            <Panel title="School Management">
+              <div className="text-center py-16">
+                <School className="w-10 h-10 mx-auto mb-3 text-white/10" />
+                <p className="text-sm font-medium text-white/50">School management coming soon.</p>
+                <p className="text-xs mt-1 text-white/30 max-w-xs mx-auto">Register schools, link students to institutions, and track school-level analytics.</p>
+              </div>
+            </Panel>
+          )}
 
-        {activePanel === 'users' && (
-          <div className="bg-white rounded-xl shadow p-6 mt-6">
-            <PanelErrorBoundary><UserManagementPanel /></PanelErrorBoundary>
-          </div>
-        )}
+          {activePanel === 'content' && (
+            <Panel title="Content Management">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {[
+                  { label: 'Manage Subjects', desc: 'Add, edit or deactivate exam types and subjects', action: () => setActivePanel('catalog'), color: 'teal' },
+                  { label: 'Past Papers',      desc: 'View and manage past exam papers',               action: () => navigate('/past-papers'),              color: 'blue'  },
+                  { label: 'Question Review',  desc: 'Review and approve submitted questions',          action: () => navigate('/admin/questions/review'),   color: 'amber' },
+                ].map(c => (
+                  <button key={c.label} onClick={c.action}
+                    className="p-4 border border-white/[0.08] hover:border-white/[0.2] rounded-lg text-left transition-colors group">
+                    <p className="font-semibold text-white/80 text-sm group-hover:text-white">{c.label}</p>
+                    <p className="text-xs text-white/30 mt-1">{c.desc}</p>
+                    <span className="text-xs text-teal-400 mt-2 inline-block">Open →</span>
+                  </button>
+                ))}
+              </div>
+            </Panel>
+          )}
 
-        {activePanel === 'catalog' && (
-          <div className="bg-white rounded-xl shadow p-6">
-            <PanelErrorBoundary><CatalogPanel /></PanelErrorBoundary>
-          </div>
-        )}
+          {activePanel === 'catalog' && (
+            <Panel title="Catalog Management">
+              <PanelErrorBoundary><CatalogPanel /></PanelErrorBoundary>
+            </Panel>
+          )}
 
-        {activePanel === 'teachers' && (
-          <div className="bg-white rounded-xl shadow p-6">
-            <PanelErrorBoundary><TeacherAssignmentPanel /></PanelErrorBoundary>
-          </div>
-        )}
+          {activePanel === 'teachers' && (
+            <Panel title="Teacher Assignment">
+              <PanelErrorBoundary><TeacherAssignmentPanel /></PanelErrorBoundary>
+            </Panel>
+          )}
 
-        {activePanel === 'aigenerate' && (
-          <div className="bg-white rounded-xl shadow p-6">
-            <PanelErrorBoundary><AIGeneratePanel /></PanelErrorBoundary>
-          </div>
-        )}
+          {activePanel === 'aigenerate' && (
+            <Panel title="AI Question Generation">
+              <PanelErrorBoundary><AIGeneratePanel /></PanelErrorBoundary>
+            </Panel>
+          )}
 
-        {activePanel === 'bulkupload' && (
-          <div className="bg-white rounded-xl shadow p-6">
-            <PanelErrorBoundary><AdminBulkUploadPanel /></PanelErrorBoundary>
-          </div>
-        )}
+          {activePanel === 'bulkupload' && (
+            <Panel title="Bulk Upload">
+              <PanelErrorBoundary><AdminBulkUploadPanel /></PanelErrorBoundary>
+            </Panel>
+          )}
 
-        {activePanel === 'pastpapers' && (
-          <div className="bg-white rounded-xl shadow p-6 mt-6">
-            <PanelErrorBoundary><AdminPastPapersPanel /></PanelErrorBoundary>
-          </div>
-        )}
+          {activePanel === 'pastpapers' && (
+            <Panel title="Past Papers">
+              <PanelErrorBoundary><AdminPastPapersPanel /></PanelErrorBoundary>
+            </Panel>
+          )}
 
-        {activePanel === 'settings' && (
-          <div className="bg-white rounded-xl shadow p-6 mt-6">
-            <PanelErrorBoundary><AdminSettingsPanel /></PanelErrorBoundary>
-          </div>
-        )}
-      </main>
+          {activePanel === 'settings' && (
+            <Panel title="Settings">
+              <PanelErrorBoundary><AdminSettingsPanel /></PanelErrorBoundary>
+            </Panel>
+          )}
+
+        </main>
+      </div>
     </div>
   );
 };
