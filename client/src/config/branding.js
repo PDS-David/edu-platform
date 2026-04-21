@@ -1,4 +1,4 @@
-// EAC Platform Branding Configuration
+// AISchoolonair Platform Branding Configuration
 export const branding = {
   platformName: 'AISchoolonair',
   tagline: 'Transform Your Learning Experience',
@@ -13,11 +13,10 @@ export const branding = {
   },
 
   logo: {
-    main: '/school-logo.png',
-    alt: '/EAC logo.png',
+    main: '/logo.svg',
+    alt:  '/logo.svg',
   },
 
-  // Correct EAC contact details
   contact: {
     email: 'info@eac.edu.ng',
     phones: ['+234 809 012 3412', '+234 809 912 3412', '+234 803 123 1234'],
@@ -25,27 +24,28 @@ export const branding = {
   },
 
   social: {
-    twitter: 'https://twitter.com/eacibadan',
-    facebook: 'https://facebook.com/eacibadan',
-    linkedin: 'https://linkedin.com/company/eacibadan',
-    instagram: 'https://instagram.com/eacibadan'
+    twitter:   'https://twitter.com/aischoolonair',
+    facebook:  'https://facebook.com/aischoolonair',
+    linkedin:  'https://linkedin.com/company/aischoolonair',
+    instagram: 'https://instagram.com/aischoolonair'
   },
 
   features: {
-    showPricing: true,
-    showTestimonials: true,
-    showStats: true,
-    showPartners: false,
-    enableChat: false,
+    showPricing:         true,
+    showTestimonials:    true,
+    showStats:           true,
+    showPartners:        false,
+    enableChat:          false,
     enableNotifications: true
   },
 
   stats: {
     students: '50,000+',
     teachers: '2,000+',
-    courses: '500+',
-    schools: '100+'
+    courses:  '500+',
+    schools:  '100+'
   }
 };
 
 export default branding;
+
