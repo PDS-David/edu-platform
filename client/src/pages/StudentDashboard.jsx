@@ -244,33 +244,46 @@ function SubjectCard({ subject, pct, onClick }) {
 }
 
 // ── InlineViewer ──────────────────────────────────────────────────────────────
-// Renders PDF in iframe, video/audio inline, images directly.
+// Renders files inline. Uses Google Docs viewer for office docs/PDFs to avoid
+// X-Frame-Options and cross-origin iframe blocks.
 function InlineViewer({ file, base }) {
-  const url  = file.file_url?.startsWith("http") ? file.file_url : `${base}${file.file_url}`;
-  const type = (file.type || file.resource_type || "").toLowerCase();
+  const rawUrl = file.file_url?.startsWith("http") ? file.file_url : `${base}${file.file_url}`;
+  // Normalise legacy eacbuddy-api.onrender.com URLs to current API base
+  const currentBase = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/api$/, "");
+  const url = rawUrl.replace(/https?:\/\/eacbuddy-api\.onrender\.com/, currentBase);
 
-  if (type === "video" || /\.(mp4|webm|mov)$/i.test(url)) {
+  const type = (file.type || file.resource_type || "").toLowerCase();
+  const ext  = url.split("?")[0].split(".").pop().toLowerCase();
+
+  if (type === "video" || ["mp4","webm","mov"].includes(ext)) {
     return (
       <div className="mt-2 rounded-xl overflow-hidden bg-black">
         <video src={url} controls className="w-full max-h-56 rounded-xl" />
       </div>
     );
   }
-  if (type === "audio" || /\.(mp3|wav|ogg|m4a)$/i.test(url)) {
+  if (type === "audio" || ["mp3","wav","ogg","m4a"].includes(ext)) {
     return <audio src={url} controls className="w-full mt-2" />;
   }
-  if (type === "image" || /\.(jpg|jpeg|png|gif|webp)$/i.test(url)) {
+  if (type === "image" || ["jpg","jpeg","png","gif","webp"].includes(ext)) {
     return <img src={url} alt={file.title} className="mt-2 rounded-xl w-full max-h-48 object-contain bg-gray-100" />;
   }
-  // PDF / document — iframe embed
+  // PDF, docx, pptx, xlsx — use Google Docs viewer (bypasses X-Frame-Options)
+  const viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
   return (
-    <div className="mt-2 rounded-xl overflow-hidden border border-gray-200">
+    <div className="mt-2 rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
       <iframe
-        src={`${url}#toolbar=0`}
+        src={viewerUrl}
         title={file.title}
         className="w-full"
-        style={{ height: 340 }}
+        style={{ height: 380 }}
+        allow="fullscreen"
       />
+      <div className="flex items-center justify-center py-1.5 bg-gray-50 border-t border-gray-100">
+        <a href={url} target="_blank" rel="noreferrer" className="text-xs text-teal-600 hover:underline">
+          Open in new tab if preview doesn't load
+        </a>
+      </div>
     </div>
   );
 }
@@ -370,7 +383,7 @@ function AssignedFilesSection({ resources, loading, groupedByType, totalResource
                                       Practice
                                     </button>
                                   )}
-                                  <a href={file.file_url?.startsWith("http") ? file.file_url : `${BASE}${file.file_url}`}
+                                  <a href={(() => { const raw = file.file_url?.startsWith("http") ? file.file_url : `${BASE}${file.file_url}`; return raw.replace(/https?:\/\/eacbuddy-api\.onrender\.com/, BASE); })()}
                                     download title="Download"
                                     className="p-1.5 rounded-lg text-green-600 hover:bg-green-50 transition-colors border border-green-200">
                                     <Download size={13} />

@@ -50,7 +50,6 @@ export default function PastPapersPage() {
   const [yearTo,    setYearTo]    = useState(YEAR_MAX);
 
   const [examTypes, setExamTypes] = useState([]); // full catalog/types list for id lookup
-  const [subjects,  setSubjects]  = useState([]);
 
   // Load exam board catalog once (for id→code mapping)
   useEffect(() => {
