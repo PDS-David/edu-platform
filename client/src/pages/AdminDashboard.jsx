@@ -28,11 +28,11 @@ class PanelErrorBoundary extends Component {
       return (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <AlertTriangle className="w-8 h-8 text-red-400 mb-3" />
-          <p className="text-sm font-semibold text-white/70">Something went wrong in this panel</p>
-          <p className="text-xs text-white/30 mt-1 mb-4 max-w-xs">{this.state.message}</p>
+          <p className="text-sm font-semibold text-[#3b3330]">Something went wrong in this panel</p>
+          <p className="text-xs text-[#9b9087] mt-1 mb-4 max-w-xs">{this.state.message}</p>
           <button
             onClick={() => this.setState({ hasError: false, message: '' })}
-            className="text-sm text-teal-400 hover:text-teal-300"
+            className="text-sm text-[#d97757] hover:underline"
           >
             Try again
           </button>
@@ -55,11 +55,11 @@ const safeEmoji = (raw) => {
 
 // ─── Reusable Modal ───────────────────────────────────────────────────────────
 const Modal = ({ title, onClose, children }) => (
-  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-    <div className="bg-[#1a1a1b] border border-white/[0.08] rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.08] sticky top-0 bg-[#1a1a1b]">
-        <h3 className="text-base font-semibold text-white">{title}</h3>
-        <button onClick={onClose} className="text-white/40 hover:text-white/80 transition-colors">
+  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
+    <div className="bg-white border border-[#e8e4dd] rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-[#e8e4dd] sticky top-0 bg-white">
+        <h3 className="text-base font-semibold text-[#1a1a1a]">{title}</h3>
+        <button onClick={onClose} className="text-[#b5a99a] hover:text-[#6b6259] transition-colors">
           <X size={18} />
         </button>
       </div>
@@ -70,11 +70,11 @@ const Modal = ({ title, onClose, children }) => (
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
 const Toast = ({ message, type, onClose }) => (
-  <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-lg shadow-xl text-white text-sm font-medium border
-    ${type === 'success' ? 'bg-[#1a1a1b] border-emerald-500/40 text-emerald-300' : 'bg-[#1a1a1b] border-red-500/40 text-red-300'}`}>
-    {type === 'success' ? <Check size={15} className="text-emerald-400" /> : <AlertTriangle size={15} className="text-red-400" />}
+  <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-sm font-medium border
+    ${type === 'success' ? 'bg-white border-emerald-200 text-emerald-700' : 'bg-white border-red-200 text-red-600'}`}>
+    {type === 'success' ? <Check size={15} className="text-emerald-500" /> : <AlertTriangle size={15} className="text-red-500" />}
     {message}
-    <button onClick={onClose} className="text-white/40 hover:text-white/70 ml-1"><X size={13} /></button>
+    <button onClick={onClose} className="text-[#b5a99a] hover:text-[#6b6259] ml-1"><X size={13} /></button>
   </div>
 );
 
@@ -2081,12 +2081,12 @@ const AdminDashboard = () => {
     { key: 'settings',   icon: Settings,      label: 'Settings'     },
   ];
 
-  // Panel wrapper — dark card
+  // Panel wrapper — warm card
   const Panel = ({ children, title }) => (
-    <div className="bg-[#1a1a1b] border border-white/[0.08] rounded-xl mt-4 overflow-hidden">
+    <div className="bg-white border border-[#e8e4dd] rounded-xl mt-4 overflow-hidden shadow-sm">
       {title && (
-        <div className="px-6 py-4 border-b border-white/[0.08]">
-          <h2 className="text-sm font-semibold text-white/80 uppercase tracking-wider">{title}</h2>
+        <div className="px-6 py-4 border-b border-[#e8e4dd]">
+          <h2 className="text-xs font-bold text-[#9b9087] uppercase tracking-wider">{title}</h2>
         </div>
       )}
       <div className="p-6">{children}</div>
@@ -2094,18 +2094,16 @@ const AdminDashboard = () => {
   );
 
   return (
-    <div className="min-h-screen bg-[#0f0f10] text-white">
+    <div className="min-h-screen bg-[#f9f7f4] text-[#1a1a1a]">
       <TopNav />
 
       <div className="flex">
         {/* ── SIDEBAR ──────────────────────────────────────────── */}
-        <aside className="w-56 shrink-0 min-h-[calc(100vh-56px)] bg-[#111112] border-r border-white/[0.06] sticky top-14 self-start">
+        <aside className="w-52 shrink-0 min-h-[calc(100vh-56px)] bg-[#f0ede8] border-r border-[#e8e4dd] sticky top-14 self-start">
           <div className="px-3 py-4">
-            {/* Role label */}
-            <div className="px-3 py-2 mb-4">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-white/30">Admin Console</span>
+            <div className="px-3 py-2 mb-3">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-[#b5a99a]">Admin Console</span>
             </div>
-
             <nav className="space-y-0.5">
               {navItems.map(({ key, icon: Icon, label }) => {
                 const active = activePanel === key;
@@ -2115,11 +2113,11 @@ const AdminDashboard = () => {
                     onClick={() => setActivePanel(active ? null : key)}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
                       active
-                        ? 'bg-white/[0.08] text-white font-medium'
-                        : 'text-white/50 hover:text-white/80 hover:bg-white/[0.04]'
+                        ? 'bg-white text-[#1a1a1a] font-medium shadow-sm border border-[#e8e4dd]'
+                        : 'text-[#6b6259] hover:text-[#1a1a1a] hover:bg-white/60'
                     }`}
                   >
-                    <Icon size={15} className={active ? 'text-teal-400' : 'text-white/40'} />
+                    <Icon size={14} className={active ? 'text-[#d97757]' : 'text-[#b5a99a]'} />
                     {label}
                   </button>
                 );
@@ -2133,41 +2131,33 @@ const AdminDashboard = () => {
 
           {/* Header */}
           <div className="mb-6">
-            <h1 className="text-xl font-bold text-white">Admin Dashboard</h1>
-            <p className="text-sm text-white/40 mt-0.5">Platform management console</p>
+            <h1 className="text-xl font-bold text-[#1a1a1a]">Admin Dashboard</h1>
+            <p className="text-sm text-[#9b9087] mt-0.5">Platform management console</p>
           </div>
 
           {/* Stat cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
             {statCards.map((s, i) => (
-              <div key={i} className="bg-[#1a1a1b] border border-white/[0.08] rounded-xl p-4">
+              <div key={i} className="bg-white border border-[#e8e4dd] rounded-xl p-4 shadow-sm">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs text-white/40 font-medium">{s.label}</span>
-                  <s.icon size={14} style={{ color: s.accent }} className="opacity-70" />
+                  <span className="text-xs text-[#9b9087] font-medium">{s.label}</span>
+                  <s.icon size={14} style={{ color: s.accent }} className="opacity-80" />
                 </div>
-                <p className="text-2xl font-mono font-bold text-white">
-                  {statsLoading ? <Loader2 size={18} className="animate-spin text-white/30" /> : s.value}
+                <p className="text-2xl font-mono font-bold text-[#1a1a1a]">
+                  {statsLoading ? <Loader2 size={18} className="animate-spin text-[#b5a99a]" /> : s.value}
                 </p>
               </div>
             ))}
           </div>
 
-          {/* No panel selected — show grid of service tiles */}
+          {/* No panel selected */}
           {!activePanel && (
-            <div className="bg-[#1a1a1b] border border-white/[0.08] rounded-xl p-5">
-              <p className="text-xs font-semibold uppercase tracking-wider text-white/30 mb-4">Services</p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-                {navItems.map(({ key, icon: Icon, label }) => (
-                  <button
-                    key={key}
-                    onClick={() => setActivePanel(key)}
-                    className="flex flex-col items-start gap-2 p-4 rounded-lg border border-white/[0.06] hover:border-white/[0.15] hover:bg-white/[0.04] transition-all text-left group"
-                  >
-                    <Icon size={18} className="text-teal-400 group-hover:text-teal-300" />
-                    <span className="text-sm font-medium text-white/70 group-hover:text-white">{label}</span>
-                  </button>
-                ))}
+            <div className="flex flex-col items-center justify-center py-24 text-center">
+              <div className="w-12 h-12 rounded-xl bg-[#f0ede8] flex items-center justify-center mb-4">
+                <Settings size={22} className="text-[#b5a99a]" />
               </div>
+              <p className="text-sm font-medium text-[#6b6259]">Select a service from the left panel</p>
+              <p className="text-xs text-[#b5a99a] mt-1">Click any item in the sidebar to get started</p>
             </div>
           )}
 
@@ -2188,9 +2178,9 @@ const AdminDashboard = () => {
           {activePanel === 'schools' && (
             <Panel title="School Management">
               <div className="text-center py-16">
-                <School className="w-10 h-10 mx-auto mb-3 text-white/10" />
-                <p className="text-sm font-medium text-white/50">School management coming soon.</p>
-                <p className="text-xs mt-1 text-white/30 max-w-xs mx-auto">Register schools, link students to institutions, and track school-level analytics.</p>
+                <School className="w-10 h-10 mx-auto mb-3 text-[#d8d0c8]" />
+                <p className="text-sm font-medium text-[#6b6259]">School management coming soon.</p>
+                <p className="text-xs mt-1 text-[#b5a99a] max-w-xs mx-auto">Register schools, link students to institutions, and track school-level analytics.</p>
               </div>
             </Panel>
           )}
@@ -2199,15 +2189,15 @@ const AdminDashboard = () => {
             <Panel title="Content Management">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {[
-                  { label: 'Manage Subjects', desc: 'Add, edit or deactivate exam types and subjects', action: () => setActivePanel('catalog'), color: 'teal' },
-                  { label: 'Past Papers',      desc: 'View and manage past exam papers',               action: () => navigate('/past-papers'),              color: 'blue'  },
-                  { label: 'Question Review',  desc: 'Review and approve submitted questions',          action: () => navigate('/admin/questions/review'),   color: 'amber' },
+                  { label: 'Manage Subjects', desc: 'Add, edit or deactivate exam types and subjects', action: () => setActivePanel('catalog') },
+                  { label: 'Past Papers',      desc: 'View and manage past exam papers',               action: () => navigate('/past-papers') },
+                  { label: 'Question Review',  desc: 'Review and approve submitted questions',          action: () => navigate('/admin/questions/review') },
                 ].map(c => (
                   <button key={c.label} onClick={c.action}
-                    className="p-4 border border-white/[0.08] hover:border-white/[0.2] rounded-lg text-left transition-colors group">
-                    <p className="font-semibold text-white/80 text-sm group-hover:text-white">{c.label}</p>
-                    <p className="text-xs text-white/30 mt-1">{c.desc}</p>
-                    <span className="text-xs text-teal-400 mt-2 inline-block">Open →</span>
+                    className="p-4 border border-[#e8e4dd] hover:border-[#d97757]/40 hover:bg-[#fdf5f1] rounded-lg text-left transition-colors group">
+                    <p className="font-semibold text-[#3b3330] text-sm group-hover:text-[#d97757]">{c.label}</p>
+                    <p className="text-xs text-[#9b9087] mt-1">{c.desc}</p>
+                    <span className="text-xs text-[#d97757] mt-2 inline-block">Open →</span>
                   </button>
                 ))}
               </div>
