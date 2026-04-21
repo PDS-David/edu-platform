@@ -72,12 +72,9 @@ export default function TopNav() {
       {/* LEFT — logo matching login page */}
       <div className="flex items-center gap-3 shrink-0">
         <Link to={dashboardPath} className="flex items-center gap-2.5 group">
-          <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center shadow-sm">
-            <span className="text-white text-sm font-black">A</span>
-          </div>
+          <img src="/logo.svg" alt="AISchoolonair" className="w-8 h-8" />
           <div className="hidden sm:flex flex-col leading-tight">
             <span className="text-gray-900 text-sm font-bold tracking-tight">AISchoolonair</span>
-            <span className="text-gray-400 text-[10px] font-medium">by EAC</span>
           </div>
         </Link>
         <div className="hidden sm:block h-6 w-px bg-gray-200 mx-1" />
