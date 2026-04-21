@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, ChevronDown, ArrowRight, CheckCircle, Circle } from 'lucide-react';
 import api from '../../services/apiClient';
+import { useAuth } from '../../context/AuthContext';
 
 
 
@@ -14,6 +15,7 @@ const MODE_SUBTITLES = {
 
 export default function TopicsModal({ subjectId, mode, onClose }) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [topics, setTopics]         = useState([]);
   const [expanded, setExpanded]     = useState(null);
   const [loading, setLoading]       = useState(true);
@@ -59,7 +61,31 @@ export default function TopicsModal({ subjectId, mode, onClose }) {
           )}
 
           {!loading && topics.length === 0 && (
-            <p className="text-center text-gray-400 text-sm py-8">No topics found.</p>
+            <div className="py-10 px-6 text-center">
+              <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-3">
+                <Circle size={22} className="text-blue-300" />
+              </div>
+              <p className="text-sm font-semibold text-gray-700 mb-1">No topics added yet</p>
+              <p className="text-xs text-gray-400 mb-4 leading-relaxed">
+                This subject doesn't have any topics or subtopics set up yet.
+                {user?.role === 'student'
+                  ? ' Your teacher or admin needs to add content before you can study here.'
+                  : ' Add topics and subtopics so students can access practice questions and resources.'}
+              </p>
+              {(user?.role === 'teacher' || user?.role === 'admin') && (
+                <button
+                  onClick={() => { onClose(); navigate('/teacher/content'); }}
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
+                >
+                  Go to Content Manager →
+                </button>
+              )}
+              {user?.role === 'admin' && (
+                <p className="text-xs text-gray-400 mt-2">
+                  Or use <button onClick={() => { onClose(); navigate('/admin/dashboard'); }} className="text-blue-500 hover:underline">Admin → Catalog</button> to manage subjects.
+                </p>
+              )}
+            </div>
           )}
 
           <div className="space-y-2">
