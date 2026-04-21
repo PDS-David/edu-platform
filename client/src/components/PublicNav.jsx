@@ -24,18 +24,24 @@ export default function PublicNav({
         boxShadow: '0 1px 24px rgba(17,22,41,0.06)',
       }}
     >
-      {/* Left: brand */}
+      {/* Left: brand logos — AISchoolonair | EAC | LessonTeacher */}
       <div className="flex items-center gap-3 shrink-0">
-        <Link to="/" title="Home" className="flex items-center gap-2.5 group">
+        <Link to="/" title="Home" className="flex items-center gap-2 group">
           <img src="/logo.svg" alt="AISchoolonair" className="w-8 h-8 shrink-0" />
-          <div className="flex flex-col leading-none">
-            <span className="font-bold text-[15px] tracking-tight" style={{color:'#111629'}}>
-              AISchoolonair
-            </span>
-          </div>
+          <span className="font-bold text-[15px] tracking-tight hidden sm:block" style={{color:'#111629'}}>
+            AISchoolonair
+          </span>
         </Link>
 
-        <span className="hidden md:block h-7 w-px" style={{background:'rgba(17,22,41,0.10)'}} />
+        <span className="h-7 w-px shrink-0" style={{background:'rgba(17,22,41,0.10)'}} />
+
+        {/* EAC logo */}
+        <img src="/eac_logo.png" alt="EAC" className="h-8 w-auto object-contain shrink-0" style={{maxWidth:'68px'}} />
+
+        <span className="hidden md:block h-7 w-px shrink-0" style={{background:'rgba(17,22,41,0.10)'}} />
+
+        {/* LessonTeacher logo */}
+        <img src="/lessonteacher_logo.jpg" alt="LessonTeacher" className="hidden md:block h-6 w-auto object-contain shrink-0" style={{maxWidth:'96px'}} />
       </div>
 
       {right && (

@@ -69,16 +69,27 @@ export default function TopNav() {
 
   return (
     <nav className="w-full bg-white border-b border-gray-200 sticky top-0 z-50 h-14 flex items-center px-4 md:px-6 shadow-sm">
-      {/* LEFT — logo matching login page */}
+      {/* LEFT — logos: AISchoolonair | EAC | LessonTeacher */}
       <div className="flex items-center gap-3 shrink-0">
-        <Link to={dashboardPath} className="flex items-center gap-2.5 group">
-          <img src="/logo.svg" alt="AISchoolonair" className="w-8 h-8" />
-          <div className="hidden sm:flex flex-col leading-tight">
-            <span className="text-gray-900 text-sm font-bold tracking-tight">AISchoolonair</span>
-          </div>
+        <Link to={dashboardPath} className="flex items-center gap-2 group">
+          <img src="/logo.svg" alt="AISchoolonair" className="w-7 h-7 shrink-0" />
+          <span className="hidden sm:block text-gray-900 text-sm font-bold tracking-tight">AISchoolonair</span>
         </Link>
-        <div className="hidden sm:block h-6 w-px bg-gray-200 mx-1" />
-        <span className={`hidden sm:inline-flex text-xs font-semibold px-2.5 py-1 rounded-full border ${roleBadge.cls}`}>
+
+        {/* Divider */}
+        <div className="h-6 w-px bg-gray-200 shrink-0" />
+
+        {/* EAC logo — always visible */}
+        <img src="/eac_logo.png" alt="EAC" className="h-7 w-auto object-contain shrink-0" style={{maxWidth:'64px'}} />
+
+        {/* Divider */}
+        <div className="hidden sm:block h-6 w-px bg-gray-200 shrink-0" />
+
+        {/* LessonTeacher logo — hidden on very small screens */}
+        <img src="/lessonteacher_logo.jpg" alt="LessonTeacher" className="hidden sm:block h-6 w-auto object-contain shrink-0" style={{maxWidth:'88px'}} />
+
+        <div className="hidden md:block h-6 w-px bg-gray-200 mx-0.5" />
+        <span className={`hidden md:inline-flex text-xs font-semibold px-2.5 py-1 rounded-full border ${roleBadge.cls}`}>
           {roleBadge.label}
         </span>
       </div>
