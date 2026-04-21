@@ -10,6 +10,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/apiClient';
+import useAuth from '../hooks/useAuth';
 import { FileText, Download, Filter, Loader2, BookOpen } from 'lucide-react';
 import PublicNav from '../components/PublicNav';
 
@@ -40,6 +41,7 @@ function formatSize(bytes) {
 }
 
 export default function PastPapersPage() {
+  const { user } = useAuth();
   const [papers,   setPapers]   = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [loading,  setLoading]  = useState(true);
@@ -206,14 +208,16 @@ export default function PastPapersPage() {
           </div>
         )}
 
-        {/* ── CTA for non-registered ── */}
-        <div className="mt-12 bg-[#0a4a3f] rounded-2xl p-6 text-center">
-          <p className="text-white font-bold text-lg mb-2">Practice with AI-powered feedback</p>
-          <p className="text-white/60 text-sm mb-4">Attempt past paper questions and get instant AI marking — free for 5 questions/day</p>
-          <Link to="/register" className="inline-block bg-teal-400 hover:bg-teal-300 text-gray-900 font-bold text-sm px-6 py-2.5 rounded-xl transition-colors">
-            Create Free Account
-          </Link>
-        </div>
+        {/* ── CTA for non-registered users only ── */}
+        {!user && (
+          <div className="mt-12 bg-[#0a4a3f] rounded-2xl p-6 text-center">
+            <p className="text-white font-bold text-lg mb-2">Practice with AI-powered feedback</p>
+            <p className="text-white/60 text-sm mb-4">Attempt past paper questions and get instant AI marking — free for 5 questions/day</p>
+            <Link to="/register" className="inline-block bg-teal-400 hover:bg-teal-300 text-gray-900 font-bold text-sm px-6 py-2.5 rounded-xl transition-colors">
+              Create Free Account
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   );
