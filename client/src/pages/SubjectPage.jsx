@@ -73,7 +73,7 @@ function TopicsModal({ open, onClose, mode, topics, onSelectSubtopic }) {
                           onSelectSubtopic(topic.subtopics[0].id, mode);
                         }
                       }}
-                      className="text-xs text-teal-600 font-medium mb-3 hover:underline"
+                      className="text-xs text-blue-600 font-medium mb-3 hover:underline"
                     >
                       View all ({topic.subtopics?.length || 0})
                     </button>
@@ -87,7 +87,7 @@ function TopicsModal({ open, onClose, mode, topics, onSelectSubtopic }) {
                           {/* Completion circle */}
                           <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
                             sub.completed
-                              ? 'border-teal-500 bg-teal-500'
+                              ? 'border-blue-500 bg-blue-500'
                               : 'border-gray-300'
                           }`}>
                             {sub.completed && (
@@ -99,7 +99,7 @@ function TopicsModal({ open, onClose, mode, topics, onSelectSubtopic }) {
                           <span className={`text-sm flex-1 text-left ${sub.completed ? 'text-gray-400' : 'text-gray-700'}`}>
                             {sub.name}
                           </span>
-                          <ArrowRight size={14} className="text-gray-300 group-hover:text-teal-500 transition-colors shrink-0" />
+                          <ArrowRight size={14} className="text-gray-300 group-hover:text-blue-500 transition-colors shrink-0" />
                         </button>
                       ))
                     ) : (
@@ -129,6 +129,8 @@ export default function SubjectPage() {
   const [loading,       setLoading]       = useState(true);
   const [modalMode,     setModalMode]     = useState(null); // 'resources'|'practice'|'quiz'|null
   const [pageAccordion, setPageAccordion] = useState(null); // expanded topic id on page
+  const [isEnrolled,    setIsEnrolled]    = useState(false);
+  const [enrolling,     setEnrolling]     = useState(false);
 
   // ── Load subject + topics ──────────────────────────────────────────────────
   useEffect(() => {
@@ -172,6 +174,36 @@ export default function SubjectPage() {
     load();
   }, [user, subjectId]);
 
+  // ── Check enrollment status ────────────────────────────────────────────────
+  useEffect(() => {
+    if (!user || !subjectId) return;
+    api.get('/students/my-subjects')
+      .then(r => {
+        const enrolled = (r.data || []).some(s => String(s.id) === String(subjectId));
+        setIsEnrolled(enrolled);
+      })
+      .catch(() => {});
+  }, [user, subjectId]);
+
+  // ── Enroll / Unenroll ──────────────────────────────────────────────────────
+  const handleEnroll = async () => {
+    if (!user) { navigate('/login'); return; }
+    setEnrolling(true);
+    try {
+      if (isEnrolled) {
+        await api.delete(`/students/subjects/${subjectId}`);
+        setIsEnrolled(false);
+      } else {
+        await api.post('/students/subjects', { subject_id: subjectId });
+        setIsEnrolled(true);
+      }
+    } catch (err) {
+      console.error('Enroll error:', err);
+    } finally {
+      setEnrolling(false);
+    }
+  };
+
   // ── Navigate to subtopic with tab ──────────────────────────────────────────
   const handleSelectSubtopic = (subtopicId, mode) => {
     setModalMode(null);
@@ -183,7 +215,7 @@ export default function SubjectPage() {
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-white">
       <TopNav />
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 text-teal-400 animate-spin" />
+        <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
       </div>
     </div>
   );
@@ -200,19 +232,40 @@ export default function SubjectPage() {
 
         {/* ── Breadcrumb ── */}
         <nav className="flex items-center gap-1.5 text-sm text-gray-400 mb-4 flex-wrap">
-          <Link to="/student/dashboard" className="hover:text-teal-600 transition-colors">Home</Link>
+          <Link to="/student/dashboard" className="hover:text-blue-600 transition-colors">Home</Link>
           <span>›</span>
-          <Link to="/student/dashboard" className="hover:text-teal-600 transition-colors">{curriculumName}</Link>
+          <Link to="/student/dashboard" className="hover:text-blue-600 transition-colors">{curriculumName}</Link>
           <span>›</span>
-          <span className="text-teal-600 font-medium">{subjectName}</span>
+          <span className="text-blue-600 font-medium">{subjectName}</span>
         </nav>
 
-        {/* ── Your Progress dropdown ── */}
-        <div className="flex justify-end mb-4">
+        {/* ── Your Progress dropdown + Enroll button ── */}
+        <div className="flex justify-end items-center gap-3 mb-4">
+          {/* Enroll / Unenroll */}
+          {user?.role === 'student' && (
+            <button
+              onClick={handleEnroll}
+              disabled={enrolling}
+              className={`flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-full transition-colors ${
+                isEnrolled
+                  ? 'border border-blue-300 text-blue-600 hover:bg-red-50 hover:border-red-300 hover:text-red-600'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white'
+              }`}
+            >
+              {enrolling ? (
+                <Loader2 size={13} className="animate-spin" />
+              ) : isEnrolled ? (
+                '✓ Enrolled'
+              ) : (
+                '+ Enroll in this subject'
+              )}
+            </button>
+          )}
+
           <div className="relative">
             <button
               onClick={() => setProgressOpen(o => !o)}
-              className="flex items-center gap-2 border border-teal-300 text-teal-600 text-sm font-semibold px-4 py-2 rounded-full hover:bg-teal-50 transition-colors"
+              className="flex items-center gap-2 border border-blue-300 text-blue-600 text-sm font-semibold px-4 py-2 rounded-full hover:bg-blue-50 transition-colors"
             >
               <Trophy size={15} />
               Your Progress
@@ -220,14 +273,14 @@ export default function SubjectPage() {
             </button>
             {progressOpen && progress && (
               <div className="absolute right-0 mt-2 bg-white rounded-xl shadow-lg border border-gray-100 p-4 min-w-[240px] z-30">
-                <p className="text-base font-bold text-teal-600">
+                <p className="text-base font-bold text-blue-600">
                   {progress.completed_subtopics} of {progress.total_subtopics} Complete
                 </p>
                 <p className="text-xs text-gray-400 mt-1">
                   {progress.completed_subtopics} sub-topics completed from {curriculumName} {subjectName}
                 </p>
                 <div className="mt-2 w-full bg-gray-100 rounded-full h-1.5">
-                  <div className="h-1.5 rounded-full bg-teal-500 transition-all" style={{ width: `${progress.completion_pct}%` }} />
+                  <div className="h-1.5 rounded-full bg-blue-500 transition-all" style={{ width: `${progress.completion_pct}%` }} />
                 </div>
               </div>
             )}
@@ -263,7 +316,7 @@ export default function SubjectPage() {
             className="flex items-center gap-2 border border-gray-200 text-gray-700 text-sm font-medium px-5 py-2.5 rounded-full hover:bg-gray-50 transition-colors relative"
           >
             <span className="text-base"></span> Practice Questions
-            <span className="bg-teal-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">AI </span>
+            <span className="bg-blue-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">AI </span>
             <ArrowRight size={14} className="text-gray-400" />
           </button>
 
@@ -273,7 +326,7 @@ export default function SubjectPage() {
             className="flex items-center gap-2 border border-gray-200 text-gray-700 text-sm font-medium px-5 py-2.5 rounded-full hover:bg-gray-50 transition-colors relative"
           >
             <span className="text-base"></span> Quiz
-            <span className="bg-teal-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">AI </span>
+            <span className="bg-blue-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">AI </span>
             <ArrowRight size={14} className="text-gray-400" />
           </button>
         </div>
@@ -322,7 +375,7 @@ export default function SubjectPage() {
                             className="w-full flex items-center gap-3 py-2.5 hover:bg-white rounded-lg px-2 transition-colors group"
                           >
                             <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                              sub.completed ? 'border-teal-500 bg-teal-500' : 'border-gray-300'
+                              sub.completed ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
                             }`}>
                               {sub.completed && (
                                 <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
@@ -331,7 +384,7 @@ export default function SubjectPage() {
                               )}
                             </div>
                             <span className="text-sm text-gray-700 flex-1 text-left">{sub.name}</span>
-                            <ArrowRight size={14} className="text-gray-300 group-hover:text-teal-500 transition-colors shrink-0" />
+                            <ArrowRight size={14} className="text-gray-300 group-hover:text-blue-500 transition-colors shrink-0" />
                           </button>
                         ))
                       ) : (
