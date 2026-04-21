@@ -20,7 +20,7 @@ const SubjectCatalog = () => {
   useEffect(() => {
     if (!user) return;
     setEnrolledLoading(true);
-    api.get('/student/my-subjects')
+    api.get('/students/my-subjects')
       .then(r => setEnrolledSubjects(r.data || []))
       .catch(() => setEnrolledSubjects([]))
       .finally(() => setEnrolledLoading(false));
