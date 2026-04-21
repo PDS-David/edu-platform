@@ -308,91 +308,78 @@ function AssignedFilesSection({ resources, loading, groupedByType, totalResource
   const subjects = Object.keys(bySubject).sort();
 
   return (
-    <div className="bg-white p-4 rounded-xl shadow-sm">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="font-semibold text-gray-800">Assigned Files</h2>
-        {totalResources > 0 && (
-          <span className="text-xs text-gray-400">{totalResources} file{totalResources !== 1 ? "s" : ""}</span>
-        )}
-      </div>
-
+    <div>
       {loading ? (
-        <p className="text-sm text-gray-400">Loading…</p>
+        <p className="text-xs text-white/30 py-4 text-center">Loading…</p>
       ) : totalResources === 0 ? (
-        <div className="text-center py-6 text-gray-400">
-          <File size={28} className="mx-auto mb-2 opacity-30" />
+        <div className="text-center py-8 text-white/30">
+          <File size={24} className="mx-auto mb-2 opacity-30" />
           <p className="text-sm">No files assigned yet.</p>
           <p className="text-xs mt-1">Files sent by your teacher will appear here.</p>
         </div>
       ) : (
-        <div className="space-y-5">
+        <div className="space-y-4">
           {subjects.map(subject => {
             const files = bySubject[subject];
-            // Within each subject, group by resolved push_type
             const byType = {};
             for (const f of files) {
               const pt = resolvePushType(f.push_type);
               if (!byType[pt]) byType[pt] = [];
               byType[pt].push(f);
             }
-
             return (
               <div key={subject}>
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                  <BookOpen size={11} /> {subject}
+                <p className="text-xs font-mono text-white/40 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                  <BookOpen size={10} /> {subject}
                 </p>
                 {PUSH_ORDER.filter(pt => byType[pt]?.length > 0).map(pt => {
                   const meta = PUSH_TYPE_META[pt];
                   return (
                     <div key={pt} className="mb-3">
-                      <p className="text-[10px] font-semibold text-gray-400 mb-1.5 ml-0.5">{meta.label}</p>
-                      <div className="space-y-2">
+                      <p className="text-[10px] font-semibold text-white/30 mb-1.5 uppercase tracking-wider">{meta.label}</p>
+                      <div className="space-y-1.5">
                         {byType[pt].map(file => {
                           const fileType = (file.type || file.resource_type || "").toLowerCase();
                           const isOpen   = openFile === `${file.id}-${pt}`;
                           const isPractice = pt === "practice_test" || pt === "quiz";
-
                           return (
-                            <div key={`${file.id}-${pt}`} className={`border rounded-xl overflow-hidden ${meta.color}`}>
+                            <div key={`${file.id}-${pt}`} className="border border-white/[0.06] rounded-lg overflow-hidden bg-white/[0.02] hover:bg-white/[0.04] transition-colors">
                               <div className="p-3 flex items-center gap-3">
-                                <FileIcon type={fileType} size={16} />
+                                <FileIcon type={fileType} size={15} />
                                 <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium text-gray-800 truncate">{file.title}</p>
+                                  <p className="text-sm font-medium text-white/80 truncate">{file.title}</p>
                                   {file.assigned_by_name && (
-                                    <p className="text-[10px] text-gray-400">From: {file.assigned_by_name}</p>
+                                    <p className="text-[10px] text-white/30">From: {file.assigned_by_name}</p>
                                   )}
                                 </div>
-                                <div className="flex gap-1.5 shrink-0 flex-wrap justify-end">
-                                  {/* Open inline button */}
+                                <div className="flex gap-1.5 shrink-0">
                                   <button
                                     onClick={() => setOpenFile(isOpen ? null : `${file.id}-${pt}`)}
-                                    className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-colors ${
+                                    className={`text-xs font-semibold px-2.5 py-1 rounded border transition-colors ${
                                       isOpen
-                                        ? "bg-gray-700 text-white border-gray-700"
-                                        : "border-gray-300 text-gray-600 hover:bg-gray-50"
+                                        ? "bg-white/10 text-white border-white/20"
+                                        : "border-white/[0.10] text-white/50 hover:text-white hover:bg-white/[0.06]"
                                     }`}
                                   >
                                     {isOpen ? "Close" : "Open"}
                                   </button>
-                                  {/* Practice button for question materials */}
                                   {isPractice && file.subtopic_id && (
                                     <button
                                       onClick={() => navigate(`/student/subtopic/${file.subtopic_id}?tab=practice`)}
-                                      className="text-xs font-semibold px-2.5 py-1 rounded-lg border border-indigo-200 text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                      className="text-xs font-semibold px-2.5 py-1 rounded border border-blue-500/30 text-blue-400 hover:bg-blue-500/10 transition-colors"
                                     >
                                       Practice
                                     </button>
                                   )}
                                   <a href={(() => { const raw = file.file_url?.startsWith("http") ? file.file_url : `${BASE}${file.file_url}`; return raw.replace(/https?:\/\/eacbuddy-api\.onrender\.com/, BASE); })()}
                                     download title="Download"
-                                    className="p-1.5 rounded-lg text-green-600 hover:bg-green-50 transition-colors border border-green-200">
+                                    className="p-1.5 rounded border border-white/[0.08] text-white/40 hover:text-emerald-400 hover:border-emerald-500/30 transition-colors">
                                     <Download size={13} />
                                   </a>
                                 </div>
                               </div>
-                              {/* Inline viewer */}
                               {isOpen && (
-                                <div className="px-3 pb-3">
+                                <div className="px-3 pb-3 border-t border-white/[0.06]">
                                   <InlineViewer file={file} base={BASE} />
                                 </div>
                               )}
@@ -516,182 +503,245 @@ export default function StudentDashboard() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#0f0f10] text-white">
       <TopNav />
-      <div className="max-w-2xl mx-auto p-4">
-        <h1 className="text-xl font-bold mb-4 text-gray-800">Hi, {firstName} 👋</h1>
 
-        <Outlet />
+      {/* Page header */}
+      <div className="border-b border-white/[0.06] px-4 md:px-8 py-5">
+        <div className="max-w-5xl mx-auto flex items-center justify-between">
+          <div>
+            <p className="text-white/40 text-xs font-mono uppercase tracking-widest mb-1">Student Console</p>
+            <h1 className="text-xl font-bold text-white">Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, {firstName}</h1>
+          </div>
+          <div className="flex gap-2">
+            {quickLinks.map(({ label, icon, path, onClick: qlClick }) => (
+              <button key={label} onClick={() => qlClick ? qlClick() : navigate(path)}
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/[0.06] hover:bg-white/[0.10] border border-white/[0.08] text-white/70 hover:text-white text-xs font-medium transition-colors">
+                {icon} {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
 
-        {isRootDashboard && (
-          <>
-            {/* A — Stats strip */}
-            <StatsStrip summary={summary} loading={loadingSummary} />
+      <Outlet />
 
-            {/* D — Streak banner */}
-            <StreakBanner days={summary.study_streak_days} />
+      {isRootDashboard && (
+        <div className="max-w-5xl mx-auto px-4 md:px-8 py-6 space-y-6">
 
-            {/* C — Focus areas (weak topics) */}
-            <FocusAreaCard
-              topics={weakTopics}
-              loading={loadingWeak}
-              onPractice={() => navigate("/student/practice")}
-            />
+          {/* ── Metric row ── */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {loadingSummary ? (
+              [0,1,2,3].map(i => <div key={i} className="h-20 rounded-lg bg-white/[0.04] animate-pulse" />)
+            ) : [
+              { label: 'Questions Done', value: (summary.total_attempts ?? 0).toLocaleString(), sub: 'all time',       color: 'text-blue-400'  },
+              { label: 'Accuracy',       value: `${summary.accuracy_pct ?? 0}%`,               sub: 'overall',        color: 'text-emerald-400'},
+              { label: 'Day Streak',     value: summary.study_streak_days ?? 0,                sub: 'consecutive',    color: 'text-amber-400' },
+              { label: "Today's Goal",   value: `${todayAttempts}/${dailyTarget}`,              sub: `${dailyPct}% done`, color: dailyPct >= 100 ? 'text-emerald-400' : 'text-violet-400' },
+            ].map(m => (
+              <div key={m.label} className="bg-[#1a1a1b] border border-white/[0.06] rounded-lg p-4">
+                <p className="text-white/40 text-xs mb-2">{m.label}</p>
+                <p className={`font-mono text-2xl font-bold ${m.color}`}>{m.value}</p>
+                <p className="text-white/30 text-xs mt-1">{m.sub}</p>
+              </div>
+            ))}
+          </div>
 
-            {/* MY SUBJECTS — with B (grade badge) + H (topic chips) */}
-            <div className="bg-white p-4 rounded-xl mb-4 shadow-sm">
-              <h2 className="font-semibold mb-3 text-gray-800">My Subjects</h2>
-              {loadingSubjects ? (
-                <div className="grid grid-cols-2 gap-3">
-                  {[0,1,2,3].map(i => <div key={i} className="h-24 bg-gray-100 rounded-xl animate-pulse" />)}
-                </div>
-              ) : subjects.length === 0 ? (
-                <div className="text-center py-6">
-                  <BookOpen size={32} className="text-gray-300 mx-auto mb-2" />
-                  <p className="text-sm text-gray-400">No subjects enrolled yet.</p>
-                  <button onClick={() => navigate("/subjects")} className="mt-2 text-sm text-indigo-600 font-medium hover:underline">
-                    Browse subjects →
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-3">
-                  {subjects.map(subject => (
-                    <SubjectCard
-                      key={subject.id}
-                      subject={subject}
-                      pct={subjectProgress[subject.id] ?? null}
-                      onClick={() => navigate(`/student/subject/${subject.id}`)}
-                    />
-                  ))}
-                </div>
-              )}
+          {/* ── Daily progress bar ── */}
+          <div className="bg-[#1a1a1b] border border-white/[0.06] rounded-lg px-4 py-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-white/50 font-mono">DAILY TARGET</span>
+              <span className={`text-xs font-mono font-bold ${dailyPct >= 100 ? 'text-emerald-400' : 'text-white/60'}`}>
+                {todayAttempts} / {dailyTarget} questions
+              </span>
             </div>
+            <div className="h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+              <div className={`h-full rounded-full transition-all duration-700 ${dailyPct >= 100 ? 'bg-emerald-500' : 'bg-blue-500'}`}
+                style={{ width: `${dailyPct}%` }} />
+            </div>
+            {dailyPct >= 100
+              ? <p className="text-xs text-emerald-400 mt-1.5 font-mono">✓ Goal complete</p>
+              : <p className="text-xs text-white/30 mt-1.5">{dailyTarget - todayAttempts} more to reach daily goal</p>}
+          </div>
 
-            {/* QUICK LINKS */}
-            <div className="mb-4">
-              <h2 className="font-semibold mb-3 text-gray-800">Quick Links</h2>
-              <div className="grid grid-cols-4 gap-2">
-                {quickLinks.map(({ label, icon, path, bg, onClick: qlClick }) => (
-                  <button
-                    key={label}
-                    onClick={() => qlClick ? qlClick() : navigate(path)}
-                    className={`border ${bg} p-3 rounded-xl flex flex-col items-center gap-1.5 hover:opacity-80 transition-opacity shadow-sm`}
-                  >
-                    {icon}
-                    <span className="text-[10px] font-semibold text-gray-700 text-center leading-tight">{label}</span>
-                  </button>
-                ))}
+          {/* ── Two-column layout ── */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            {/* My Subjects */}
+            <div className="bg-[#1a1a1b] border border-white/[0.06] rounded-lg overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
+                <p className="text-xs font-mono text-white/50 uppercase tracking-widest">My Subjects</p>
+                <span className="text-xs text-white/30">{subjects.length} enrolled</span>
+              </div>
+              <div className="p-3 space-y-1.5">
+                {loadingSubjects ? (
+                  [0,1,2].map(i => <div key={i} className="h-12 rounded-md bg-white/[0.04] animate-pulse" />)
+                ) : subjects.length === 0 ? (
+                  <div className="py-8 text-center">
+                    <BookOpen size={24} className="text-white/20 mx-auto mb-2" />
+                    <p className="text-xs text-white/30">No subjects enrolled yet</p>
+                    <button onClick={() => navigate("/subjects")} className="mt-2 text-xs text-blue-400 hover:underline">Browse subjects →</button>
+                  </div>
+                ) : subjects.map(subject => {
+                  const pct = subjectProgress[subject.id] ?? null;
+                  const grade = predictGrade(pct);
+                  return (
+                    <button key={subject.id} onClick={() => navigate(`/student/subject/${subject.id}`)}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-white/[0.04] border border-transparent hover:border-white/[0.08] transition-all text-left group">
+                      <div className="w-8 h-8 rounded-md bg-white/[0.06] flex items-center justify-center text-sm shrink-0">
+                        {subject.icon_emoji || '📚'}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-white/80 truncate group-hover:text-white">{subject.name}</p>
+                        {pct !== null && (
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <div className="flex-1 h-1 bg-white/[0.06] rounded-full overflow-hidden">
+                              <div className="h-full bg-blue-500 rounded-full" style={{ width: `${pct}%` }} />
+                            </div>
+                            <span className="text-[10px] text-white/30 font-mono">{pct}%</span>
+                          </div>
+                        )}
+                      </div>
+                      {grade && (
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded font-mono shrink-0 ${
+                          pct >= 80 ? 'bg-emerald-500/20 text-emerald-400' :
+                          pct >= 60 ? 'bg-blue-500/20 text-blue-400' :
+                          pct >= 40 ? 'bg-amber-500/20 text-amber-400' : 'bg-red-500/20 text-red-400'
+                        }`}>{grade.grade}</span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            {/* #6 — Mock Exam Subject Picker Modal */}
-            {showMockPicker && (
-              <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-4">
-                <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
-                  <div className="bg-rose-500 px-5 py-4">
-                    <p className="text-white font-bold text-base">Start Mock Exam</p>
-                    <p className="text-white/70 text-xs mt-0.5">Choose a subject to begin your 45-minute timed exam</p>
+            {/* Right column: Focus areas + Recent activity */}
+            <div className="space-y-4">
+              {/* Focus areas */}
+              {!loadingWeak && weakTopics.length > 0 && (
+                <div className="bg-[#1a1a1b] border border-red-500/20 rounded-lg overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
+                    <p className="text-xs font-mono text-red-400/80 uppercase tracking-widest">Focus Areas</p>
+                    <span className="text-xs text-white/30">Last 30 days</span>
                   </div>
-                  <div className="p-4 space-y-2 max-h-64 overflow-y-auto">
-                    {subjects.length === 0 ? (
-                      <p className="text-sm text-gray-400 text-center py-4">No subjects enrolled yet.</p>
-                    ) : subjects.map(s => (
-                      <button key={s.id}
-                        onClick={() => { setShowMockPicker(false); navigate(`/student/mock/${s.id}`); }}
-                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-gray-100 hover:bg-rose-50 hover:border-rose-200 transition-colors text-left">
-                        <span className="text-xl">{s.icon_emoji || "📚"}</span>
-                        <div>
-                          <p className="text-sm font-semibold text-gray-800">{s.name}</p>
-                          {s.exam_board_code && <p className="text-xs text-gray-400">{s.exam_board_code}</p>}
+                  <div className="p-3 space-y-2">
+                    {weakTopics.slice(0, 3).map((t, i) => (
+                      <div key={i} className="flex items-center gap-3 px-2 py-2 rounded-md hover:bg-white/[0.04] transition-colors">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-white/70 truncate">{t.topic || t.subject_name}</p>
+                          <p className="text-[10px] text-white/30">{t.subject_name} · {t.attempt_count} attempts</p>
                         </div>
-                        <ClipboardList size={14} className="text-rose-300 ml-auto shrink-0" />
-                      </button>
+                        <span className={`text-xs font-mono font-bold shrink-0 ${t.accuracy_pct < 40 ? 'text-red-400' : 'text-amber-400'}`}>{t.accuracy_pct}%</span>
+                        <button onClick={() => navigate("/student/practice")}
+                          className="text-[10px] bg-red-500/10 hover:bg-red-500/20 text-red-400 font-semibold px-2 py-1 rounded shrink-0 transition-colors">
+                          Practice
+                        </button>
+                      </div>
                     ))}
                   </div>
-                  <div className="px-4 pb-4">
-                    <button onClick={() => setShowMockPicker(false)}
-                      className="w-full py-2 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-xl">
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* #8 — Daily Target */}
-            <div className="bg-white rounded-xl p-4 mb-4 shadow-sm">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <Target size={15} className="text-indigo-500" />
-                  <span className="text-sm font-semibold text-gray-800">Today's Target</span>
-                </div>
-                <span className={`text-xs font-bold ${dailyPct >= 100 ? "text-green-600" : "text-indigo-600"}`}>
-                  {todayAttempts} / {dailyTarget} questions
-                </span>
-              </div>
-              <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all duration-700 ${dailyPct >= 100 ? "bg-green-500" : "bg-indigo-500"}`}
-                  style={{ width: `${dailyPct}%` }}
-                />
-              </div>
-              {dailyPct >= 100
-                ? <p className="text-xs text-green-600 font-medium mt-1.5">✅ Daily goal complete — great work!</p>
-                : <p className="text-xs text-gray-400 mt-1.5">
-                    {dailyTarget - todayAttempts} more to hit your daily goal
-                    {weakTopics.length > 0 && ` · try ${weakTopics[0]?.topic || weakTopics[0]?.subject_name || "your weak topics"}`}
-                  </p>
-              }
-            </div>
-
-            {/* RECENT QUIZ ACTIVITY */}
-            <div className="bg-white p-4 rounded-xl mb-4 shadow-sm">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="font-semibold text-gray-800">Recent Activity</h2>
-                <TrendingUp size={14} className="text-gray-300" />
-              </div>
-              {loadingScores ? (
-                <p className="text-sm text-gray-400">Loading…</p>
-              ) : recentScores.length === 0 ? (
-                <div className="text-center py-4">
-                  <p className="text-sm text-gray-400">No quiz activity yet.</p>
-                  <button onClick={() => navigate("/student/practice")} className="mt-1 text-sm text-indigo-600 font-medium hover:underline">
-                    Start practising →
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-2.5">
-                  {recentScores.slice(0, 5).map((row, i) => {
-                    const pct = parseFloat(row.accuracy_pct) || 0;
-                    const barColor = pct >= 75 ? "bg-green-500" : pct >= 50 ? "bg-amber-400" : "bg-red-400";
-                    return (
-                      <div key={i} className="flex items-center gap-3">
-                        <span className="text-xs text-gray-400 w-14 shrink-0">
-                          {new Date(row.date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                        </span>
-                        <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                          <div className={`h-full ${barColor} rounded-full transition-all`} style={{ width: `${pct}%` }} />
-                        </div>
-                        <span className="text-xs font-bold text-gray-600 w-9 text-right shrink-0">{pct}%</span>
-                        <span className="text-[10px] text-gray-400 shrink-0">({row.attempts}Q)</span>
-                      </div>
-                    );
-                  })}
                 </div>
               )}
-            </div>
 
-            {/* #3 — ASSIGNED FILES: grouped by subject, then push type, with inline viewer */}
-            <AssignedFilesSection
-              resources={resources}
-              loading={loadingResources}
-              groupedByType={groupedByType}
-              totalResources={totalResources}
-              navigate={navigate}
-            />
-          </>
-        )}
-      </div>
+              {/* Recent activity */}
+              <div className="bg-[#1a1a1b] border border-white/[0.06] rounded-lg overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
+                  <p className="text-xs font-mono text-white/50 uppercase tracking-widest">Recent Activity</p>
+                  <TrendingUp size={12} className="text-white/20" />
+                </div>
+                <div className="p-3">
+                  {loadingScores ? (
+                    <p className="text-xs text-white/30 py-4 text-center">Loading…</p>
+                  ) : recentScores.length === 0 ? (
+                    <div className="py-6 text-center">
+                      <p className="text-xs text-white/30">No quiz activity yet</p>
+                      <button onClick={() => navigate("/student/practice")} className="mt-1 text-xs text-blue-400 hover:underline">Start practising →</button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {recentScores.slice(0, 5).map((row, i) => {
+                        const pct = parseFloat(row.accuracy_pct) || 0;
+                        return (
+                          <div key={i} className="flex items-center gap-3">
+                            <span className="text-[10px] text-white/30 font-mono w-12 shrink-0">
+                              {new Date(row.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                            </span>
+                            <div className="flex-1 h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+                              <div className={`h-full rounded-full transition-all ${pct >= 75 ? 'bg-emerald-500' : pct >= 50 ? 'bg-amber-400' : 'bg-red-400'}`}
+                                style={{ width: `${pct}%` }} />
+                            </div>
+                            <span className="text-xs font-mono font-bold text-white/60 w-9 text-right shrink-0">{pct}%</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Assigned Files ── */}
+          <div className="bg-[#1a1a1b] border border-white/[0.06] rounded-lg overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
+              <p className="text-xs font-mono text-white/50 uppercase tracking-widest">Assigned Files</p>
+              {totalResources > 0 && <span className="text-xs text-white/30">{totalResources} file{totalResources !== 1 ? 's' : ''}</span>}
+            </div>
+            <div className="p-3">
+              <AssignedFilesSection
+                resources={resources}
+                loading={loadingResources}
+                groupedByType={groupedByType}
+                totalResources={totalResources}
+                navigate={navigate}
+              />
+            </div>
+          </div>
+
+          {/* ── Mobile quick links ── */}
+          <div className="sm:hidden grid grid-cols-2 gap-2">
+            {quickLinks.map(({ label, icon, path, onClick: qlClick }) => (
+              <button key={label} onClick={() => qlClick ? qlClick() : navigate(path)}
+                className="flex items-center gap-2 px-4 py-3 rounded-lg bg-[#1a1a1b] border border-white/[0.06] text-white/60 hover:text-white text-sm font-medium transition-colors">
+                {icon} {label}
+              </button>
+            ))}
+          </div>
+
+        </div>
+      )}
+
+      {/* Mock exam subject picker modal */}
+      {showMockPicker && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+          <div className="bg-[#1a1a1b] border border-white/[0.10] rounded-xl w-full max-w-sm shadow-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-white/[0.08]">
+              <p className="text-white font-bold">Start Mock Exam</p>
+              <p className="text-white/40 text-xs mt-0.5">Choose a subject — 45-minute timed exam</p>
+            </div>
+            <div className="p-2 max-h-64 overflow-y-auto">
+              {subjects.length === 0 ? (
+                <p className="text-sm text-white/30 text-center py-4">No subjects enrolled yet.</p>
+              ) : subjects.map(s => (
+                <button key={s.id}
+                  onClick={() => { setShowMockPicker(false); navigate(`/student/mock/${s.id}`); }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/[0.06] transition-colors text-left">
+                  <span className="text-lg">{s.icon_emoji || '📚'}</span>
+                  <div>
+                    <p className="text-sm font-medium text-white/80">{s.name}</p>
+                    {s.exam_board_code && <p className="text-xs text-white/30">{s.exam_board_code}</p>}
+                  </div>
+                </button>
+              ))}
+            </div>
+            <div className="px-4 py-3 border-t border-white/[0.08]">
+              <button onClick={() => setShowMockPicker(false)}
+                className="w-full py-2 text-sm text-white/40 hover:text-white/70 transition-colors">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
