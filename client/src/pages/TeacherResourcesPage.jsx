@@ -359,9 +359,10 @@ function ResourcesTab({ showToast }) {
     setPushForm({ push_type: 'learning_material', student_ids: [], class_ids: [], assign_all: false });
     setPushSearch('');
     if (students.length === 0) {
-      // /teacher/students scopes to this teacher's class members (falls back to all students)
-      // avoids the admin-only GET /users?role=student that returns 403 for teachers
-      api.get('/teacher/students').then(r => setStudents(extractList(r))).catch(() => {});
+      // /teacher/students returns class members (fallback: all students)
+      api.get('/teacher/students').then(r => setStudents(extractList(r))).catch(() => {
+        api.get('/users', { params: { role: 'student', limit: 200 } }).then(r => setStudents(extractList(r))).catch(() => {});
+      });
     }
     if (classes.length === 0) {
       api.get('/teacher/classes').then(r => setClasses(extractList(r))).catch(() => {});

@@ -35,11 +35,21 @@ router.get('/stats', protect, authorize('admin'), async (req, res) => {
 // ─────────────────────────────────────────────
 // GET /api/users (paginated)
 // ─────────────────────────────────────────────
-router.get('/', protect, authorize('admin'), async (req, res) => {
-  const role   = req.query.role   || '';
+router.get('/', protect, async (req, res) => {
+  // Admins can list all users; teachers can only list students (for resource assignment)
+  const isAdmin   = req.user.role === 'admin';
+  const isTeacher = req.user.role === 'teacher';
+  if (!isAdmin && !isTeacher) {
+    return error(res, 'Access denied', 403);
+  }
+
+  // Teachers may only query students
+  let role = req.query.role || '';
+  if (isTeacher) role = 'student';
+
   const search = req.query.search || '';
   const page   = Math.max(parseInt(req.query.page || '1'), 1);
-  const limit  = Math.min(parseInt(req.query.limit || '20'), 100);
+  const limit  = Math.min(parseInt(req.query.limit || '50'), 200);
   const offset = (page - 1) * limit;
 
   try {
