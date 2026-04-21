@@ -3,171 +3,148 @@ import { useNavigate, Link, Outlet } from 'react-router-dom';
 import api from '../services/apiClient';
 import {
   Users, Plus, Copy, CheckCircle, Loader2, AlertTriangle,
-  BarChart2, Zap, X, ChevronRight, Send, PenTool,
-  BookOpen, Upload, AlertCircle, TrendingUp, TrendingDown,
-  Clock, Target, ChevronDown,
+  BarChart2, X, PenTool, BookOpen, Upload, Send,
+  ChevronDown, AlertCircle, ChevronRight,
 } from 'lucide-react';
 import TopNav from '../components/TopNav';
 import { useAuth } from '../context/AuthContext';
 
-/* ================= HELPERS ================= */
-
-const accColor = (pct) => {
-  if (!pct && pct !== 0) return 'text-gray-400';
-  if (pct >= 70) return 'text-green-600';
-  if (pct >= 40) return 'text-amber-600';
-  return 'text-red-500';
-};
-
-function getDisplayName(user) {
-  if (!user) return 'Teacher';
-  const first = user.firstName || user.first_name;
-  if (first && first.trim()) return first.trim();
-  const full = user.lastName || user.last_name || user.name || '';
-  if (full.trim()) return full.trim().split(' ')[0];
-  if (user.email) return user.email.split('@')[0];
-  return 'Teacher';
+/* ── Helpers ─────────────────────────────────────────────────────────────── */
+function getDisplayName(u) {
+  if (!u) return 'Teacher';
+  const f = u.first_name || u.firstName;
+  if (f?.trim()) return f.trim();
+  return u.last_name || u.lastName || u.name?.split(' ')[0] || u.email?.split('@')[0] || 'Teacher';
 }
+const accColor = p => !p && p !== 0 ? 'text-white/30' : p >= 70 ? 'text-emerald-400' : p >= 40 ? 'text-amber-400' : 'text-red-400';
+const fmtDate  = d => d ? new Date(d).toLocaleDateString('en-NG',{day:'2-digit',month:'short',timeZone:'UTC'}) : '—';
 
+/* ── Toast ───────────────────────────────────────────────────────────────── */
 function Toast({ msg, type, onClose }) {
   return (
-    <div className={`fixed bottom-6 right-4 z-50 flex items-center gap-2.5 px-5 py-3 rounded-2xl shadow-xl text-sm font-semibold text-white
-      ${type === 'success' ? 'bg-gray-900' : 'bg-red-600'}`}>
-      {type === 'success'
-        ? <CheckCircle size={14} className="text-teal-400" />
-        : <AlertTriangle size={14} />}
+    <div className={`fixed bottom-6 right-4 z-50 flex items-center gap-2.5 px-5 py-3 rounded-lg shadow-2xl text-sm font-semibold text-white border ${type === 'success' ? 'bg-[#1a1a1b] border-emerald-500/30' : 'bg-red-900/90 border-red-500/30'}`}>
+      {type === 'success' ? <CheckCircle size={14} className="text-emerald-400" /> : <AlertTriangle size={14} className="text-red-400" />}
       {msg}
-      <button onClick={onClose}>
-        <X size={13} className="opacity-60" />
-      </button>
+      <button onClick={onClose}><X size={13} className="opacity-40 hover:opacity-80" /></button>
     </div>
   );
 }
 
-/* ================= CLASSES TAB ================= */
+/* ── Input style ─────────────────────────────────────────────────────────── */
+const inp = 'w-full bg-white/[0.04] border border-white/[0.10] rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30';
 
+/* ── Classes Tab ─────────────────────────────────────────────────────────── */
 function ClassesTab({ onViewAnalytics }) {
-  const [classes, setClasses] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [classes,    setClasses]    = useState([]);
+  const [loading,    setLoading]    = useState(true);
   const [showCreate, setShowCreate] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [creating, setCreating] = useState(false);
-  const [copied, setCopied] = useState(null);
-  const [toast, setToast] = useState(null);
+  const [newName,    setNewName]    = useState('');
+  const [creating,   setCreating]   = useState(false);
+  const [copied,     setCopied]     = useState(null);
+  const [toast,      setToast]      = useState(null);
 
-  const load = () => {
+  const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
+
+  const load = useCallback(() => {
     setLoading(true);
-    api.get('/teacher/classes')
-      .then(r => setClasses(r.data || []))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(load, []);
+    api.get('/teacher/classes').then(r => setClasses(r.data || [])).catch(() => {}).finally(() => setLoading(false));
+  }, []);
+  useEffect(load, [load]);
 
   const createClass = async () => {
     if (!newName.trim()) return;
     setCreating(true);
     try {
-      await api.post('/teacher/classes', { name: newName });
-      setNewName('');
-      setShowCreate(false);
-      setToast({ type: 'success', msg: 'Class created!' });
-      load();
-    } catch {
-      setToast({ type: 'error', msg: 'Failed to create class.' });
-    } finally {
-      setCreating(false);
-      setTimeout(() => setToast(null), 3000);
-    }
+      await api.post('/teacher/classes', { name: newName.trim() });
+      setNewName(''); setShowCreate(false); showToast('Class created!'); load();
+    } catch (err) { showToast(err?.error || 'Failed to create class.', 'error'); }
+    finally { setCreating(false); }
   };
 
-  const copyCode = (code) => {
-    navigator.clipboard.writeText(code).then(() => {
-      setCopied(code);
-      setTimeout(() => setCopied(null), 2000);
-    });
+  const copyCode = code => {
+    navigator.clipboard.writeText(code).catch(() => {});
+    setCopied(code); setTimeout(() => setCopied(null), 2000);
   };
-
-  if (loading) {
-    return (
-      <div className="flex justify-center py-12">
-        <Loader2 size={24} className="text-teal-400 animate-spin" />
-      </div>
-    );
-  }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-500">
-          {classes.length} class{classes.length !== 1 ? 'es' : ''}
-        </p>
-
-        <button
-          onClick={() => setShowCreate(true)}
-          className="flex items-center gap-1.5 bg-teal-500 hover:bg-teal-600 text-white text-sm font-semibold px-4 py-2 rounded-xl"
-        >
-          <Plus size={14} /> New Class
+        <p className="text-xs font-mono text-white/40">{classes.length} CLASS{classes.length !== 1 ? 'ES' : ''}</p>
+        <button onClick={() => setShowCreate(v => !v)}
+          className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-3 py-1.5 rounded-md transition-colors">
+          <Plus size={12} /> New Class
         </button>
       </div>
 
       {showCreate && (
-        <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4 flex gap-3">
-          <input
-            value={newName}
-            onChange={e => setNewName(e.target.value)}
-            placeholder="Class name"
-            className="flex-1 border rounded-xl px-3 py-2 text-sm"
-          />
-
-          <button onClick={createClass} disabled={creating}>
-            {creating ? <Loader2 size={14} /> : 'Create'}
+        <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 flex gap-2">
+          <input value={newName} onChange={e => setNewName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && createClass()}
+            placeholder="e.g. WAEC Biology 2025" autoFocus className={inp + ' flex-1'} />
+          <button onClick={createClass} disabled={creating || !newName.trim()}
+            className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-3 py-1.5 rounded-md disabled:opacity-40">
+            {creating ? <Loader2 size={13} className="animate-spin" /> : 'Create'}
           </button>
-
-          <button onClick={() => setShowCreate(false)}>
-            <X size={16} />
+          <button onClick={() => { setShowCreate(false); setNewName(''); }} className="text-white/30 hover:text-white/70 px-1">
+            <X size={14} />
           </button>
         </div>
       )}
 
-      {classes.map(cls => (
-        <div key={cls.id} className="bg-white rounded-2xl border p-5">
-          <p className="font-semibold">{cls.name}</p>
-
-          <button onClick={() => onViewAnalytics(cls)}>
-            View Analytics
-          </button>
-
-          <button onClick={() => copyCode(cls.join_code)}>
-            {copied === cls.join_code ? 'Copied!' : 'Copy Code'}
-          </button>
+      {loading ? (
+        <div className="flex justify-center py-10"><Loader2 size={20} className="animate-spin text-white/30" /></div>
+      ) : classes.length === 0 && !showCreate ? (
+        <div className="text-center py-14 border border-dashed border-white/[0.08] rounded-lg">
+          <Users size={28} className="mx-auto mb-2 text-white/20" />
+          <p className="text-sm text-white/30">No classes yet</p>
+          <p className="text-xs text-white/20 mt-1">Create a class to start managing students</p>
         </div>
-      ))}
-
+      ) : (
+        <div className="space-y-2">
+          {classes.map(cls => (
+            <div key={cls.id} className="bg-[#1a1a1b] border border-white/[0.06] rounded-lg p-4 hover:border-white/[0.12] transition-colors">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-semibold text-white/90">{cls.name}</p>
+                  <p className="text-xs text-white/30 mt-0.5 font-mono">
+                    {cls.student_count ?? 0} student{cls.student_count !== 1 ? 's' : ''} · {fmtDate(cls.created_at)}
+                  </p>
+                </div>
+                <button onClick={() => onViewAnalytics(cls)}
+                  className="flex items-center gap-1.5 text-xs text-blue-400 border border-blue-500/30 hover:bg-blue-500/10 px-3 py-1.5 rounded-md font-semibold transition-colors">
+                  <BarChart2 size={12} /> Manage
+                </button>
+              </div>
+              <div className="mt-3 flex items-center gap-2">
+                <span className="text-xs text-white/30 font-mono">JOIN CODE</span>
+                <span className="font-mono font-bold text-emerald-400 tracking-widest text-sm">{cls.join_code}</span>
+                <button onClick={() => copyCode(cls.join_code)} className="text-white/30 hover:text-white transition-colors ml-1" title="Copy">
+                  {copied === cls.join_code ? <CheckCircle size={13} className="text-emerald-400" /> : <Copy size={13} />}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
     </div>
   );
 }
 
-/* ================= ANALYTICS TAB ================= */
-
+/* ── Analytics Tab ───────────────────────────────────────────────────────── */
 function AnalyticsTab() {
-  const [classes,       setClasses]       = useState([]);
-  const [selectedClass, setSelectedClass] = useState(null);
-  const [analytics,     setAnalytics]     = useState(null);
-  const [loading,       setLoading]       = useState(false);
-  const [loadingClasses,setLoadingClasses]= useState(true);
+  const [classes,        setClasses]        = useState([]);
+  const [selectedClass,  setSelectedClass]  = useState(null);
+  const [analytics,      setAnalytics]      = useState(null);
+  const [loading,        setLoading]        = useState(false);
+  const [loadingClasses, setLoadingClasses] = useState(true);
 
   useEffect(() => {
-    api.get('/teacher/classes')
-      .then(r => {
-        const cls = Array.isArray(r?.data) ? r.data : [];
-        setClasses(cls);
-        if (cls.length > 0) setSelectedClass(cls[0].id);
-      })
-      .catch(() => {})
-      .finally(() => setLoadingClasses(false));
+    api.get('/teacher/classes').then(r => {
+      const cls = Array.isArray(r?.data) ? r.data : [];
+      setClasses(cls);
+      if (cls.length > 0) setSelectedClass(cls[0].id);
+    }).catch(() => {}).finally(() => setLoadingClasses(false));
   }, []);
 
   useEffect(() => {
@@ -179,85 +156,61 @@ function AnalyticsTab() {
       .finally(() => setLoading(false));
   }, [selectedClass]);
 
-  const accColor = (pct) => {
-    if (!pct && pct !== 0) return 'text-gray-400';
-    if (pct >= 70) return 'text-green-600';
-    if (pct >= 40) return 'text-amber-600';
-    return 'text-red-500';
-  };
-
-  if (loadingClasses) return <div className="flex justify-center py-12"><Loader2 size={24} className="animate-spin text-teal-400" /></div>;
+  if (loadingClasses) return <div className="flex justify-center py-12"><Loader2 size={20} className="animate-spin text-white/30" /></div>;
 
   if (classes.length === 0) return (
-    <div className="text-center py-16 text-gray-400">
-      <BarChart2 size={36} className="mx-auto mb-3 opacity-30" />
-      <p className="text-sm font-medium">No classes yet.</p>
-      <p className="text-xs mt-1">Create a class first to see analytics.</p>
+    <div className="text-center py-16 border border-dashed border-white/[0.08] rounded-lg">
+      <BarChart2 size={28} className="mx-auto mb-2 text-white/20" />
+      <p className="text-sm text-white/30">No classes yet — create one first.</p>
     </div>
   );
 
   return (
-    <div className="space-y-5">
-      {/* Class selector */}
+    <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <label className="text-sm font-medium text-gray-600">Class:</label>
+        <span className="text-xs text-white/40 font-mono">CLASS</span>
         <div className="relative">
-          <select
-            value={selectedClass || ''}
-            onChange={e => setSelectedClass(e.target.value)}
-            className="appearance-none border border-gray-200 rounded-xl px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 bg-white"
-          >
-            {classes.map(c => <option key={c.id} value={c.id}>{c.name} ({c.student_count ?? 0} students)</option>)}
+          <select value={selectedClass || ''} onChange={e => setSelectedClass(e.target.value)}
+            className="appearance-none bg-[#1a1a1b] border border-white/[0.10] rounded-lg px-3 py-2 pr-7 text-sm text-white/80 focus:outline-none focus:border-blue-500/50">
+            {classes.map(c => <option key={c.id} value={c.id}>{c.name} ({c.student_count ?? 0})</option>)}
           </select>
-          <ChevronDown size={14} className="absolute right-2 top-3 text-gray-400 pointer-events-none" />
+          <ChevronDown size={12} className="absolute right-2 top-3 text-white/30 pointer-events-none" />
         </div>
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-8"><Loader2 size={20} className="animate-spin text-teal-400" /></div>
-      ) : !analytics ? (
-        <div className="text-center py-8 text-gray-400 text-sm">No analytics data available yet.</div>
-      ) : analytics.students?.length === 0 ? (
-        <div className="text-center py-8 text-gray-400 text-sm">No students in this class yet.</div>
+        <div className="flex justify-center py-8"><Loader2 size={20} className="animate-spin text-white/30" /></div>
+      ) : !analytics || analytics.students?.length === 0 ? (
+        <div className="text-center py-8 text-white/30 text-sm border border-dashed border-white/[0.08] rounded-lg">No student data yet.</div>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-gray-100">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-xs text-gray-400 font-semibold uppercase">
-              <tr>
-                <th className="text-left px-4 py-3">Student</th>
-                <th className="text-center px-4 py-3">Accuracy</th>
-                <th className="text-center px-4 py-3">Attempts</th>
-                <th className="text-center px-4 py-3">Streak</th>
-                <th className="text-left px-4 py-3 hidden sm:table-cell">Last Active</th>
-                <th className="text-center px-4 py-3">Nudge</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {analytics.students.map(s => (
-                <tr key={s.id} className="bg-white hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3">
-                    <p className="font-semibold text-gray-800">{s.name}</p>
-                    <p className="text-xs text-gray-400 truncate max-w-[140px]">{s.email}</p>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <span className={`font-bold text-base ${accColor(s.accuracy_pct)}`}>
-                      {s.accuracy_pct != null ? `${s.accuracy_pct}%` : '—'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-center text-gray-600">{s.attempts ?? 0}</td>
-                  <td className="px-4 py-3 text-center">
-                    <span className="text-amber-500 font-semibold">{s.streak ?? 0}🔥</span>
-                  </td>
-                  <td className="px-4 py-3 hidden sm:table-cell text-xs text-gray-400">
-                    {s.last_active ? new Date(s.last_active).toLocaleDateString('en-NG', { day:'2-digit', month:'short' }) : '—'}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <NudgeButton studentId={s.id} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="bg-[#1a1a1b] border border-white/[0.06] rounded-lg overflow-hidden">
+          <div className="grid grid-cols-12 text-[10px] font-mono text-white/30 uppercase px-4 py-2.5 border-b border-white/[0.06]">
+            <span className="col-span-4">Student</span>
+            <span className="col-span-2 text-center">Accuracy</span>
+            <span className="col-span-2 text-center">Attempts</span>
+            <span className="col-span-2 text-center hidden sm:block">Streak</span>
+            <span className="col-span-2 text-center">Nudge</span>
+          </div>
+          <div className="divide-y divide-white/[0.04]">
+            {analytics.students.map(s => (
+              <div key={s.id} className="grid grid-cols-12 items-center px-4 py-3 hover:bg-white/[0.02] transition-colors">
+                <div className="col-span-4 min-w-0">
+                  <p className="text-sm font-medium text-white/80 truncate">{s.name}</p>
+                  <p className="text-xs text-white/30 truncate">{s.email}</p>
+                </div>
+                <div className="col-span-2 text-center">
+                  <span className={`font-mono font-bold text-sm ${accColor(s.accuracy_pct)}`}>
+                    {s.accuracy_pct != null ? `${s.accuracy_pct}%` : '—'}
+                  </span>
+                </div>
+                <div className="col-span-2 text-center text-sm text-white/50 font-mono">{s.attempts ?? 0}</div>
+                <div className="col-span-2 text-center hidden sm:block text-sm text-amber-400 font-mono">{s.streak ?? 0}</div>
+                <div className="col-span-2 text-center">
+                  <NudgeButton studentId={s.id} />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -269,38 +222,30 @@ function NudgeButton({ studentId }) {
   const [busy, setBusy] = useState(false);
   const nudge = async () => {
     setBusy(true);
-    try {
-      await api.post(`/teacher/nudge/${studentId}`);
-      setSent(true);
-      setTimeout(() => setSent(false), 3000);
-    } catch {}
-    finally { setBusy(false); }
+    try { await api.post(`/teacher/nudge/${studentId}`); setSent(true); setTimeout(() => setSent(false), 3000); }
+    catch {} finally { setBusy(false); }
   };
   return (
     <button onClick={nudge} disabled={busy || sent}
-      title="Send nudge"
-      className={`text-xs px-2.5 py-1 rounded-lg font-semibold transition-colors ${
-        sent ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500 hover:bg-teal-50 hover:text-teal-600'
-      }`}>
-      {busy ? <Loader2 size={10} className="animate-spin" /> : sent ? '✓ Sent' : <Send size={10} />}
+      className={`text-xs px-2.5 py-1 rounded border font-semibold transition-colors ${sent ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'border-white/[0.10] text-white/40 hover:text-white/70 hover:border-white/20'}`}>
+      {busy ? <Loader2 size={10} className="animate-spin" /> : sent ? '✓' : <Send size={10} />}
     </button>
   );
 }
 
-/* ================= TEST BUILDER TAB ================= */
-
+/* ── Test Builder Tab ────────────────────────────────────────────────────── */
 function TestBuilderTab() {
-  const [tests,       setTests]       = useState([]);
-  const [classes,     setClasses]     = useState([]);
-  const [subjects,    setSubjects]    = useState([]);
-  const [loading,     setLoading]     = useState(true);
-  const [creating,    setCreating]    = useState(false);
-  const [publishing,  setPublishing]  = useState(null);
-  const [assigning,   setAssigning]   = useState(null);  // test id being assigned
-  const [assignClass, setAssignClass] = useState('');
-  const [toast,       setToast]       = useState(null);
-  const [showCreate,  setShowCreate]  = useState(false);
-  const [form,        setForm]        = useState({ title: '', duration_minutes: 60, total_marks: 100 });
+  const navigate = useNavigate();
+  const [tests,      setTests]      = useState([]);
+  const [classes,    setClasses]    = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [creating,   setCreating]   = useState(false);
+  const [publishing, setPublishing] = useState(null);
+  const [assigning,  setAssigning]  = useState(null);
+  const [assignClass,setAssignClass]= useState('');
+  const [toast,      setToast]      = useState(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [form,       setForm]       = useState({ title: '', duration_minutes: 60, total_marks: 100 });
 
   const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3500); };
 
@@ -309,94 +254,77 @@ function TestBuilderTab() {
     Promise.all([
       api.get('/teacher/tests').catch(() => ({ data: [] })),
       api.get('/teacher/classes').catch(() => ({ data: [] })),
-      api.get('/teacher/my-subjects').catch(() => ({ data: [] })),
-    ]).then(([t, c, s]) => {
+    ]).then(([t, c]) => {
       setTests(Array.isArray(t?.data) ? t.data : []);
       setClasses(Array.isArray(c?.data) ? c.data : []);
-      setSubjects(Array.isArray(s?.data) ? s.data : []);
     }).finally(() => setLoading(false));
   }, []);
-
   useEffect(load, [load]);
 
   const createTest = async () => {
     if (!form.title.trim()) { showToast('Title is required.', 'error'); return; }
     setCreating(true);
-    try {
-      await api.post('/teacher/tests', form);
-      showToast('Test created!');
-      setForm({ title: '', duration_minutes: 60, total_marks: 100 });
-      setShowCreate(false);
-      load();
-    } catch (err) {
-      showToast(err?.error || 'Failed to create test.', 'error');
-    } finally { setCreating(false); }
+    try { await api.post('/teacher/tests', form); showToast('Test created!'); setForm({ title: '', duration_minutes: 60, total_marks: 100 }); setShowCreate(false); load(); }
+    catch (err) { showToast(err?.error || 'Failed.', 'error'); }
+    finally { setCreating(false); }
   };
 
-  const publishTest = async (id) => {
+  const publishTest = async id => {
     setPublishing(id);
-    try {
-      await api.put(`/teacher/tests/${id}/publish`);
-      showToast('Test published — students can now take it.');
-      load();
-    } catch (err) {
-      showToast(err?.error || 'Publish failed.', 'error');
-    } finally { setPublishing(null); }
+    try { await api.put(`/teacher/tests/${id}/publish`); showToast('Test published!'); load(); }
+    catch (err) { showToast(err?.error || 'Publish failed.', 'error'); }
+    finally { setPublishing(null); }
   };
 
-  const assignTest = async (testId) => {
+  const assignTest = async testId => {
     if (!assignClass) { showToast('Select a class first.', 'error'); return; }
-    try {
-      await api.post(`/teacher/tests/${testId}/assign`, { class_id: assignClass });
-      showToast('Test assigned to class!');
-      setAssigning(null);
-      setAssignClass('');
-    } catch (err) {
-      showToast(err?.error || 'Assignment failed.', 'error');
-    }
+    try { await api.post(`/teacher/tests/${testId}/assign`, { class_id: assignClass }); showToast('Assigned!'); setAssigning(null); setAssignClass(''); }
+    catch (err) { showToast(err?.error || 'Failed.', 'error'); }
   };
 
-  const inp = 'w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300';
-
-  if (loading) return <div className="flex justify-center py-12"><Loader2 size={24} className="animate-spin text-teal-400" /></div>;
+  if (loading) return <div className="flex justify-center py-12"><Loader2 size={20} className="animate-spin text-white/30" /></div>;
 
   return (
-    <div className="space-y-5">
-      {toast && (
-        <div className={`fixed bottom-6 right-4 z-50 flex items-center gap-2.5 px-5 py-3 rounded-2xl shadow-xl text-sm font-semibold text-white
-          ${toast.type === 'success' ? 'bg-gray-900' : 'bg-red-600'}`}>
-          {toast.type === 'success' ? <CheckCircle size={14} className="text-teal-400" /> : <AlertTriangle size={14} />}
-          {toast.msg}
-          <button onClick={() => setToast(null)}><X size={13} className="opacity-60" /></button>
+    <div className="space-y-4">
+      {toast && <Toast {...toast} onClose={() => setToast(null)} />}
+
+      {/* Info card */}
+      <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 space-y-2">
+        <p className="text-xs font-mono text-blue-400 uppercase tracking-widest">What is Test Builder?</p>
+        <p className="text-sm text-white/70">Create custom assessments from your subject's question bank. Set duration and marks, then push to a class or individual student.</p>
+        <div className="flex gap-2 mt-2 flex-wrap">
+          <button onClick={() => navigate('/teacher/content')}
+            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-3 py-1.5 rounded-md">
+            <PenTool size={12} /> Open Full Test Builder
+          </button>
+          <button onClick={() => navigate('/teacher/questions/add')}
+            className="flex items-center gap-1.5 border border-white/[0.10] text-white/60 hover:text-white text-xs font-semibold px-3 py-1.5 rounded-md">
+            <Plus size={12} /> Add Question
+          </button>
         </div>
-      )}
+      </div>
 
       <div className="flex items-center justify-between">
-        <div>
-          <h3 className="font-semibold text-gray-900">Test Builder</h3>
-          <p className="text-xs text-gray-400 mt-0.5">Create tests and assign them to your classes</p>
-        </div>
+        <p className="text-xs font-mono text-white/40">{tests.length} TEST{tests.length !== 1 ? 'S' : ''}</p>
         <button onClick={() => setShowCreate(v => !v)}
-          className="flex items-center gap-1.5 bg-teal-500 hover:bg-teal-600 text-white text-sm font-semibold px-4 py-2 rounded-xl">
-          <Plus size={14} /> New Test
+          className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-3 py-1.5 rounded-md">
+          <Plus size={12} /> New Test
         </button>
       </div>
 
-      {/* Create form */}
       {showCreate && (
-        <div className="bg-teal-50 border border-teal-200 rounded-2xl p-5 space-y-3">
-          <p className="text-sm font-semibold text-teal-800">New Test</p>
+        <div className="bg-white/[0.03] border border-white/[0.10] rounded-lg p-4 space-y-3">
           <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
             placeholder="Test title *" className={inp} />
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">Duration (minutes)</label>
+              <label className="text-xs text-white/40 mb-1 block font-mono">DURATION (min)</label>
               <input type="number" min={5} value={form.duration_minutes}
                 onChange={e => setForm(f => ({ ...f, duration_minutes: parseInt(e.target.value) || 60 }))}
                 className={inp} />
             </div>
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">Total Marks</label>
+              <label className="text-xs text-white/40 mb-1 block font-mono">TOTAL MARKS</label>
               <input type="number" min={1} value={form.total_marks}
                 onChange={e => setForm(f => ({ ...f, total_marks: parseInt(e.target.value) || 100 }))}
                 className={inp} />
@@ -404,72 +332,55 @@ function TestBuilderTab() {
           </div>
           <div className="flex gap-2">
             <button onClick={createTest} disabled={creating}
-              className="flex-1 bg-teal-500 hover:bg-teal-600 disabled:opacity-50 text-white text-sm font-semibold py-2 rounded-xl flex items-center justify-center gap-2">
-              {creating ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-              Create Test
+              className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-xs font-semibold py-2 rounded-md flex items-center justify-center gap-2">
+              {creating ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />} Create
             </button>
-            <button onClick={() => setShowCreate(false)} className="px-4 py-2 border border-gray-200 rounded-xl text-sm text-gray-500 hover:bg-gray-50">
-              Cancel
-            </button>
+            <button onClick={() => setShowCreate(false)} className="px-4 py-2 border border-white/[0.10] rounded-md text-xs text-white/40 hover:text-white/70">Cancel</button>
           </div>
         </div>
       )}
 
-      {/* Tests list */}
       {tests.length === 0 ? (
-        <div className="text-center py-12 border-2 border-dashed border-gray-100 rounded-2xl text-gray-400">
-          <PenTool size={32} className="mx-auto mb-2 opacity-30" />
-          <p className="text-sm">No tests yet. Click "New Test" to get started.</p>
+        <div className="text-center py-10 border border-dashed border-white/[0.08] rounded-lg">
+          <PenTool size={24} className="mx-auto mb-2 text-white/20" />
+          <p className="text-sm text-white/30">No tests yet — click "New Test" to start.</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {tests.map(t => (
-            <div key={t.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+            <div key={t.id} className="bg-[#1a1a1b] border border-white/[0.06] rounded-lg overflow-hidden">
               <div className="p-4 flex items-center gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="font-semibold text-gray-800">{t.title}</p>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                      t.is_published ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                    }`}>
-                      {t.is_published ? 'Published' : 'Draft'}
+                    <p className="font-medium text-white/80">{t.title}</p>
+                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${t.is_published ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-white/[0.04] text-white/30 border-white/[0.10]'}`}>
+                      {t.is_published ? 'LIVE' : 'DRAFT'}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {t.duration_minutes}min · {t.total_marks} marks · {t.question_count ?? 0} questions
-                  </p>
+                  <p className="text-xs text-white/30 mt-0.5 font-mono">{t.duration_minutes}min · {t.total_marks}pts · {t.question_count ?? 0}q</p>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex gap-2 shrink-0">
                   {!t.is_published && (
                     <button onClick={() => publishTest(t.id)} disabled={publishing === t.id}
-                      className="text-xs px-3 py-1.5 bg-green-50 text-green-600 hover:bg-green-100 font-semibold rounded-lg border border-green-200 transition-colors">
+                      className="text-xs px-3 py-1.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 font-semibold rounded-md border border-emerald-500/30">
                       {publishing === t.id ? <Loader2 size={12} className="animate-spin" /> : 'Publish'}
                     </button>
                   )}
                   <button onClick={() => setAssigning(assigning === t.id ? null : t.id)}
-                    className={`text-xs px-3 py-1.5 font-semibold rounded-lg border transition-colors ${
-                      assigning === t.id ? 'bg-indigo-600 text-white border-indigo-600' : 'border-indigo-200 text-indigo-600 hover:bg-indigo-50'
-                    }`}>
+                    className="text-xs px-3 py-1.5 border border-white/[0.10] text-white/50 hover:text-white hover:border-white/20 font-semibold rounded-md">
                     Assign
                   </button>
                 </div>
               </div>
-
-              {/* Assign to class panel */}
               {assigning === t.id && (
-                <div className="border-t border-gray-100 bg-indigo-50 px-4 py-3 flex items-center gap-3">
+                <div className="border-t border-white/[0.06] bg-white/[0.02] px-4 py-3 flex items-center gap-2">
                   <select value={assignClass} onChange={e => setAssignClass(e.target.value)}
-                    className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white">
+                    className="flex-1 bg-white/[0.04] border border-white/[0.10] rounded-md px-3 py-2 text-xs text-white/70 focus:outline-none">
                     <option value="">Select class…</option>
                     {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
-                  <button onClick={() => assignTest(t.id)}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-3 py-2 rounded-lg">
-                    Assign
-                  </button>
-                  <button onClick={() => setAssigning(null)} className="text-gray-400 hover:text-gray-600">
-                    <X size={14} />
-                  </button>
+                  <button onClick={() => assignTest(t.id)} className="bg-blue-600 text-white text-xs font-semibold px-3 py-2 rounded-md">Assign</button>
+                  <button onClick={() => setAssigning(null)} className="text-white/30 hover:text-white/60"><X size={14} /></button>
                 </div>
               )}
             </div>
@@ -480,14 +391,12 @@ function TestBuilderTab() {
   );
 }
 
+/* ── Main Dashboard ──────────────────────────────────────────────────────── */
 export default function TeacherDashboard() {
+  const { user }   = useAuth();
+  const navigate   = useNavigate();
 
-  const { user } = useAuth();
-  const navigate = useNavigate();
-
-  const [activeTab, setActiveTab] = useState('classes');
-  const [selectedClass, setSelectedClass] = useState(null);
-
+  const [activeTab,        setActiveTab]        = useState('classes');
   const [assignedSubjects, setAssignedSubjects] = useState(null);
 
   useEffect(() => {
@@ -496,81 +405,94 @@ export default function TeacherDashboard() {
       .catch(() => setAssignedSubjects([]));
   }, []);
 
+  const displayName     = getDisplayName(user);
   const subjectsLoading = assignedSubjects === null;
-  const hasSubjects = assignedSubjects?.length > 0;
-
-  const displayName = getDisplayName(user);
+  const hasSubjects     = (assignedSubjects?.length ?? 0) > 0;
 
   const tabs = [
-    { id: 'classes', label: 'My Classes', icon: Users },
-    { id: 'analytics', label: 'Analytics', icon: BarChart2 },
-    { id: 'testbuilder', label: 'Test Builder', icon: PenTool },
+    { id: 'classes',     label: 'Classes',     icon: Users    },
+    { id: 'analytics',   label: 'Analytics',   icon: BarChart2},
+    { id: 'testbuilder', label: 'Tests',        icon: PenTool  },
   ];
 
-  return (
-    <div className="min-h-screen bg-gray-50">
+  /* Group assigned subjects by exam board for display */
+  const byBoard = {};
+  (assignedSubjects || []).forEach(s => {
+    const b = s.exam_board_name || s.exam_board_code || 'General';
+    if (!byBoard[b]) byBoard[b] = [];
+    byBoard[b].push(s);
+  });
 
+  return (
+    <div className="min-h-screen bg-[#0f0f10] text-white">
       <TopNav />
 
-      {/* HEADER */}
-      <div className="bg-[#0a4a3f] px-4 py-5">
-        <div className="max-w-4xl mx-auto flex justify-between">
+      {/* Page header */}
+      <div className="border-b border-white/[0.06] px-4 md:px-8 py-5">
+        <div className="max-w-5xl mx-auto flex items-center justify-between">
           <div>
-            <p className="text-white/50 text-xs">Teacher Dashboard</p>
-            <h1 className="text-white text-xl font-bold">
-              Welcome back, {displayName} 👋
-            </h1>
+            <p className="text-white/40 text-xs font-mono uppercase tracking-widest mb-1">Teacher Console</p>
+            <h1 className="text-xl font-bold text-white">Welcome back, {displayName}</h1>
           </div>
-
-          {hasSubjects && (
-            <Link to="/teacher/resources" className="bg-teal-500 text-white px-4 py-2 rounded-xl">
-              Upload Resources
+          <div className="flex gap-2">
+            {hasSubjects && (
+              <Link to="/teacher/resources"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/[0.06] hover:bg-white/[0.10] border border-white/[0.08] text-white/70 hover:text-white text-xs font-medium transition-colors">
+                <Upload size={13} /> Resources
+              </Link>
+            )}
+            <Link to="/teacher/questions/add"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition-colors">
+              <Plus size={13} /> Add Question
             </Link>
-          )}
+          </div>
         </div>
       </div>
 
-      {/* SUBJECT BANNER */}
+      {/* Subject assignments bar */}
       {!subjectsLoading && (
-        <div className="px-4 py-3 border-b">
-          {hasSubjects ? (
-            <p className="text-sm text-teal-700">
-              Subjects assigned: {assignedSubjects.map(s => s.name).join(', ')}
-            </p>
-          ) : (
-            <p className="text-sm text-amber-700">
-              Awaiting subject assignment
-            </p>
-          )}
+        <div className={`border-b px-4 md:px-8 py-2.5 ${hasSubjects ? 'border-emerald-500/20 bg-emerald-500/[0.04]' : 'border-amber-500/20 bg-amber-500/[0.04]'}`}>
+          <div className="max-w-5xl mx-auto">
+            {hasSubjects ? (
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-xs font-mono text-emerald-400/70 uppercase">Assigned</span>
+                {Object.entries(byBoard).map(([board, subs]) => (
+                  <span key={board} className="flex items-center gap-1.5">
+                    <span className="text-xs text-white/30 font-mono">{board}:</span>
+                    {subs.map(s => (
+                      <span key={s.id} className="text-xs bg-white/[0.06] border border-white/[0.08] text-white/60 px-2 py-0.5 rounded font-medium">{s.name}</span>
+                    ))}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <AlertCircle size={13} className="text-amber-400 shrink-0" />
+                <p className="text-xs text-amber-400/80">No subjects assigned — contact admin to get assigned to exam types and subjects</p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
-      {/* TABS */}
-      <div className="bg-white border-b sticky top-14">
-        <div className="max-w-4xl mx-auto flex gap-2 px-4">
+      {/* Tabs */}
+      <div className="border-b border-white/[0.06] px-4 md:px-8 sticky top-12 bg-[#0f0f10] z-10">
+        <div className="max-w-5xl mx-auto flex">
           {tabs.map(t => (
-            <button
-              key={t.id}
-              onClick={() => setActiveTab(t.id)}
-              className={`px-4 py-3 text-sm ${
-                activeTab === t.id ? 'text-teal-600' : 'text-gray-400'
-              }`}
-            >
-              {t.label}
+            <button key={t.id} onClick={() => setActiveTab(t.id)}
+              className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium border-b-2 transition-colors ${activeTab === t.id ? 'border-blue-500 text-blue-400' : 'border-transparent text-white/40 hover:text-white/70'}`}>
+              <t.icon size={13} /> {t.label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* CONTENT */}
-      <div className="max-w-4xl mx-auto px-4 py-6">
-
+      {/* Content */}
+      <div className="max-w-5xl mx-auto px-4 md:px-8 py-6">
         <Outlet />
-
-        {activeTab === 'classes'     && <ClassesTab onViewAnalytics={setSelectedClass} />}
+        {activeTab === 'classes'     && <ClassesTab onViewAnalytics={() => {}} />}
         {activeTab === 'analytics'   && <AnalyticsTab />}
         {activeTab === 'testbuilder' && <TestBuilderTab />}
-
       </div>
     </div>
   );
