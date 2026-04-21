@@ -229,7 +229,7 @@ export default function QuestionReview() {
                 <div className="px-6 pb-5 flex gap-3">
                   <button
                     onClick={() => { setReviewing(q); setAction('approve'); setFeedback(''); }}
-                    className="flex-1 bg-green-500 hover:bg-green-600 text-white font-semibold py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors text-sm"
+                    className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors text-sm"
                   >
                     <CheckCircle className="w-4 h-4" /> Approve
                   </button>
@@ -314,7 +314,7 @@ export default function QuestionReview() {
                 disabled={submitting}
                 className={`flex-1 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors text-sm ${
                   action === 'approve'
-                    ? 'bg-green-500 hover:bg-green-600'
+                    ? 'bg-blue-500 hover:bg-blue-600'
                     : 'bg-red-500 hover:bg-red-600'
                 } disabled:opacity-50`}
               >

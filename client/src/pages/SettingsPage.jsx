@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 
 const Toast = ({ message, type, onClose }) => (
-  <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-white text-sm font-medium ${type === 'success' ? 'bg-green-600' : 'bg-red-500'}`}>
+  <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-white text-sm font-medium ${type === 'success' ? 'bg-blue-600' : 'bg-red-500'}`}>
     {type === 'success' ? <Check size={16} /> : <AlertTriangle size={16} />}
     {message}
     <button onClick={onClose}><X size={14} /></button>

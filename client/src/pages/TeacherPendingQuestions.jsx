@@ -27,7 +27,7 @@ export default function TeacherPendingQuestions() {
       <div className="bg-[#0a4a3f] px-4 py-5">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div>
-            <p className="text-white/50 text-xs mb-1">Teacher</p>
+            <Link to="/teacher/dashboard" className="text-white/50 text-xs mb-1 hover:text-white/80 flex items-center gap-1">← Dashboard</Link>
             <h1 className="text-white text-xl font-bold">My Questions</h1>
             <p className="text-white/60 text-sm mt-0.5">Questions you have submitted</p>
           </div>
