@@ -452,4 +452,44 @@ router.post('/questions', protect, teacherOnly, async (req, res) => {
   }
 });
 
+// ── GET /api/teacher/students ─────────────────────────────────────────────────
+// Returns students visible to this teacher:
+//   • If the teacher has classes → students who are members of those classes.
+//   • Fallback (no classes yet) → all active students.
+// This replaces the broken GET /api/users?role=student call in TeacherResourcesPage
+// which requires admin role and always returns 403 for teachers.
+router.get('/students', protect, teacherOnly, async (req, res) => {
+  await ensureClassTables();
+  try {
+    // First try: students in this teacher's classes
+    const classStudents = await safeQuery(
+      `SELECT DISTINCT u.id, u.first_name, u.last_name, u.email,
+              c.id AS class_id, c.name AS class_name
+       FROM class_memberships cm
+       JOIN users   u ON u.id = cm.student_id
+       JOIN classes c ON c.id = cm.class_id
+       WHERE c.teacher_id = :teacherId
+         AND u.is_active  = true
+       ORDER BY u.last_name ASC, u.first_name ASC`,
+      { teacherId: req.user.id }
+    );
+
+    if (classStudents.length > 0) {
+      return res.json({ success: true, data: classStudents, source: 'class_members' });
+    }
+
+    // Fallback: teacher has no classes yet — return all active students so push still works
+    const allStudents = await safeQuery(
+      `SELECT id, first_name, last_name, email
+       FROM users
+       WHERE role = 'student' AND is_active = true
+       ORDER BY last_name ASC, first_name ASC`,
+      {}
+    );
+    return res.json({ success: true, data: allStudents, source: 'all_students' });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;

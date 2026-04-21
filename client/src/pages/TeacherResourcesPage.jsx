@@ -359,7 +359,9 @@ function ResourcesTab({ showToast }) {
     setPushForm({ push_type: 'learning_material', student_ids: [], class_ids: [], assign_all: false });
     setPushSearch('');
     if (students.length === 0) {
-      api.get('/users', { params: { role: 'student' } }).then(r => setStudents(extractList(r))).catch(() => {});
+      // /teacher/students scopes to this teacher's class members (falls back to all students)
+      // avoids the admin-only GET /users?role=student that returns 403 for teachers
+      api.get('/teacher/students').then(r => setStudents(extractList(r))).catch(() => {});
     }
     if (classes.length === 0) {
       api.get('/teacher/classes').then(r => setClasses(extractList(r))).catch(() => {});
@@ -519,6 +521,7 @@ function ResourcesTab({ showToast }) {
                         <label key={s.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0">
                           <input type="checkbox" checked={pushForm.student_ids.includes(s.id)} onChange={() => toggleStudent(s.id)} className="rounded" />
                           <span className="text-xs">{s.first_name} {s.last_name}</span>
+                          {s.class_name && <span className="text-[10px] bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded-full">{s.class_name}</span>}
                           <span className="text-xs text-gray-400 ml-auto">{s.email}</span>
                         </label>
                       ))}
