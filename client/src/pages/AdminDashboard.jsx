@@ -27,8 +27,8 @@ class PanelErrorBoundary extends Component {
       return (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <AlertTriangle className="w-8 h-8 text-red-400 mb-3" />
-          <p className="text-sm font-semibold text-gray-800">Something went wrong in this panel</p>
-          <p className="text-xs text-gray-400 mt-1 mb-4 max-w-xs">{this.state.message}</p>
+          <p className="text-sm font-semibold text-white/70">Something went wrong in this panel</p>
+          <p className="text-xs text-white/30 mt-1 mb-4 max-w-xs">{this.state.message}</p>
           <button onClick={() => this.setState({ hasError: false, message: '' })}
             className="text-sm text-violet-600 hover:underline">Try again</button>
         </div>
@@ -47,11 +47,11 @@ const safeEmoji = (raw) => {
 
 // ─── Reusable Modal ───────────────────────────────────────────────────────────
 const Modal = ({ title, onClose, children }) => (
-  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-    <div className="bg-white border border-gray-100 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white">
-        <h3 className="text-base font-semibold text-gray-900">{title}</h3>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors"><X size={18} /></button>
+  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div className="bg-[#1a1a1b] border border-white/[0.10] rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06] sticky top-0 bg-[#1a1a1b]">
+        <h3 className="text-base font-semibold text-white/90">{title}</h3>
+        <button onClick={onClose} className="text-white/30 hover:text-white/70 transition-colors"><X size={18} /></button>
       </div>
       <div className="px-6 py-5">{children}</div>
     </div>
@@ -60,16 +60,16 @@ const Modal = ({ title, onClose, children }) => (
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
 const Toast = ({ message, type, onClose }) => (
-  <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium border
-    ${type === 'success' ? 'bg-white border-emerald-200 text-emerald-700' : 'bg-white border-red-200 text-red-600'}`}>
-    {type === 'success' ? <Check size={15} className="text-emerald-500" /> : <AlertTriangle size={15} className="text-red-500" />}
+  <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-lg shadow-2xl text-sm font-medium border
+    ${type === 'success' ? 'bg-[#1a1a1b] border-emerald-500/30 text-emerald-400' : 'bg-[#1a1a1b] border-red-500/30 text-red-400'}`}>
+    {type === 'success' ? <Check size={15} className="text-emerald-400" /> : <AlertTriangle size={15} className="text-red-400" />}
     {message}
-    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 ml-1"><X size={13} /></button>
+    <button onClick={onClose} className="text-white/30 hover:text-white/60 ml-1"><X size={13} /></button>
   </div>
 );
 
 // ─── Input style helper ───────────────────────────────────────────────────────
-const inputCls = 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-300';
+const inputCls = 'w-full bg-white/[0.04] border border-white/[0.10] rounded-lg px-3 py-2.5 text-sm text-white/80 placeholder-white/25 focus:outline-none focus:ring-1 focus:ring-violet-500/50 focus:border-violet-500/40';
 
 // ─── Catalog Management Panel ─────────────────────────────────────────────────
 const CatalogPanel = () => {
@@ -150,38 +150,38 @@ const CatalogPanel = () => {
     finally { setShowDeleteConfirm(null); }
   };
 
-  if (loading) return <div className="flex items-center justify-center py-16"><Loader2 className="w-8 h-8 text-violet-500 animate-spin mr-3" /><span className="text-gray-500">Loading catalog...</span></div>;
+  if (loading) return <div className="flex items-center justify-center py-16"><Loader2 className="w-8 h-8 text-violet-400 animate-spin mr-3" /><span className="text-white/40">Loading catalog...</span></div>;
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-xl font-bold text-gray-900">Catalog Management</h2>
-          <p className="text-sm text-gray-500 mt-0.5">{types.length} examination type{types.length !== 1 ? 's' : ''}</p>
+          <h2 className="text-xl font-bold text-white/90">Catalog Management</h2>
+          <p className="text-sm text-white/40 mt-0.5">{types.length} examination type{types.length !== 1 ? 's' : ''}</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={fetchTypes} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 px-3 py-2 border border-gray-200 rounded-xl"><RefreshCw size={14} /> Refresh</button>
+          <button onClick={fetchTypes} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 px-3 py-2 border border-white/[0.08] rounded-xl"><RefreshCw size={14} /> Refresh</button>
           <button onClick={openAddType} className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white font-semibold px-4 py-2 rounded-xl text-sm shadow-sm"><Plus size={16} /> Add Type</button>
         </div>
       </div>
 
       <div className="space-y-2">
         {types.map((type) => (
-          <div key={type.id} className={`border-2 rounded-2xl overflow-hidden transition-all ${type.is_active ? 'border-gray-200' : 'border-gray-100 opacity-60'}`}>
+          <div key={type.id} className={`border-2 rounded-2xl overflow-hidden transition-all ${type.is_active ? 'border-white/[0.08]' : 'border-gray-100 opacity-60'}`}>
             <div className="flex items-center gap-3 px-4 py-3 bg-white">
               <button onClick={() => toggleExpand(type.id)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
                 {expandedType === type.id ? <ChevronDown size={18} className="text-gray-400 shrink-0" /> : <ChevronRight size={18} className="text-gray-400 shrink-0" />}
                 <span className="text-2xl leading-none">{type.icon_emoji || ''}</span>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold text-gray-900">{type.name}</span>
+                    <span className="font-bold text-white/90">{type.name}</span>
                     <span className="text-xs font-mono bg-violet-50 text-violet-600 px-2 py-0.5 rounded">{type.code}</span>
                     {!type.is_active && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-semibold">Inactive</span>}
                   </div>
-                  <p className="text-xs text-gray-400 mt-0.5 truncate">{type.full_name}</p>
+                  <p className="text-xs text-white/30 mt-0.5 truncate">{type.full_name}</p>
                 </div>
               </button>
-              <span className="text-xs text-gray-400 shrink-0 hidden sm:block">{type.subject_count} subject{type.subject_count !== 1 ? 's' : ''}</span>
+              <span className="text-xs text-white/30 shrink-0 hidden sm:block">{type.subject_count} subject{type.subject_count !== 1 ? 's' : ''}</span>
               <div className="flex gap-1 shrink-0">
                 <button onClick={() => openAddSubject(type.id)} className="flex items-center gap-1 text-xs text-violet-600 hover:text-violet-700 border border-violet-200 hover:border-violet-400 px-2.5 py-1.5 rounded-lg font-semibold"><Plus size={12} /> Subject</button>
                 <button onClick={() => openEditType(type)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><Pencil size={15} /></button>
@@ -195,7 +195,7 @@ const CatalogPanel = () => {
                   : (
                     <div className="space-y-2">
                       {(typeSubjects[type.id] || []).map((subject) => (
-                        <div key={subject.id} className={`flex items-center gap-3 bg-white rounded-xl px-4 py-3 border ${subject.is_active ? 'border-gray-200' : 'border-gray-100 opacity-50'}`}>
+                        <div key={subject.id} className={`flex items-center gap-3 bg-white/[0.03] rounded-xl px-4 py-3 border ${subject.is_active ? 'border-white/[0.08]' : 'border-gray-100 opacity-50'}`}>
                           <div className="w-8 h-8 rounded-lg flex items-center justify-center text-base shrink-0" style={{ backgroundColor: (subject.color || '#7c3aed') + '20' }}>
                             {subject.icon_emoji || ''}
                           </div>
@@ -226,12 +226,12 @@ const CatalogPanel = () => {
         <Modal title={editingType ? 'Edit Examination Type' : 'Add Examination Type'} onClose={() => setShowTypeModal(false)}>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div><label className="block text-sm font-semibold text-gray-700 mb-1">Code *</label><input type="text" value={typeForm.code} onChange={(e) => setTypeForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} disabled={!!editingType} placeholder="e.g. ALEVEL" className={inputCls + ' disabled:bg-gray-100'} /></div>
-              <div><label className="block text-sm font-semibold text-gray-700 mb-1">Icon Emoji</label><input type="text" value={typeForm.icon_emoji} onChange={(e) => setTypeForm(f => ({ ...f, icon_emoji: e.target.value }))} className={inputCls} /></div>
+              <div><label className="block text-sm font-semibold text-white/60 mb-1">Code *</label><input type="text" value={typeForm.code} onChange={(e) => setTypeForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} disabled={!!editingType} placeholder="e.g. ALEVEL" className={inputCls + ' disabled:bg-white/[0.02] disabled:opacity-50'} /></div>
+              <div><label className="block text-sm font-semibold text-white/60 mb-1">Icon Emoji</label><input type="text" value={typeForm.icon_emoji} onChange={(e) => setTypeForm(f => ({ ...f, icon_emoji: e.target.value }))} className={inputCls} /></div>
             </div>
-            <div><label className="block text-sm font-semibold text-gray-700 mb-1">Name *</label><input type="text" value={typeForm.name} onChange={(e) => setTypeForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. A-Levels" className={inputCls} /></div>
-            <div><label className="block text-sm font-semibold text-gray-700 mb-1">Full Name</label><input type="text" value={typeForm.full_name} onChange={(e) => setTypeForm(f => ({ ...f, full_name: e.target.value }))} className={inputCls} /></div>
-            <div><label className="block text-sm font-semibold text-gray-700 mb-1">Description</label><textarea value={typeForm.description} onChange={(e) => setTypeForm(f => ({ ...f, description: e.target.value }))} rows={2} className={inputCls + ' resize-none'} /></div>
+            <div><label className="block text-sm font-semibold text-white/60 mb-1">Name *</label><input type="text" value={typeForm.name} onChange={(e) => setTypeForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. A-Levels" className={inputCls} /></div>
+            <div><label className="block text-sm font-semibold text-white/60 mb-1">Full Name</label><input type="text" value={typeForm.full_name} onChange={(e) => setTypeForm(f => ({ ...f, full_name: e.target.value }))} className={inputCls} /></div>
+            <div><label className="block text-sm font-semibold text-white/60 mb-1">Description</label><textarea value={typeForm.description} onChange={(e) => setTypeForm(f => ({ ...f, description: e.target.value }))} rows={2} className={inputCls + ' resize-none'} /></div>
             <div className="flex gap-3 pt-2">
               <button onClick={() => setShowTypeModal(false)} className="flex-1 border border-gray-300 text-gray-700 font-semibold py-2.5 rounded-xl text-sm hover:bg-gray-50">Cancel</button>
               <button onClick={saveType} disabled={saving} className="flex-1 bg-violet-600 hover:bg-violet-700 text-white font-semibold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2 disabled:opacity-60">
@@ -247,14 +247,14 @@ const CatalogPanel = () => {
         <Modal title={editingSubject ? 'Edit Subject' : 'Add Subject'} onClose={() => setShowSubjectModal(false)}>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div><label className="block text-sm font-semibold text-gray-700 mb-1">Name *</label><input type="text" value={subjectForm.name} onChange={(e) => setSubjectForm(f => ({ ...f, name: e.target.value }))} className={inputCls} /></div>
-              <div><label className="block text-sm font-semibold text-gray-700 mb-1">Code *</label><input type="text" value={subjectForm.code} onChange={(e) => setSubjectForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} className={inputCls + ' font-mono'} /></div>
+              <div><label className="block text-sm font-semibold text-white/60 mb-1">Name *</label><input type="text" value={subjectForm.name} onChange={(e) => setSubjectForm(f => ({ ...f, name: e.target.value }))} className={inputCls} /></div>
+              <div><label className="block text-sm font-semibold text-white/60 mb-1">Code *</label><input type="text" value={subjectForm.code} onChange={(e) => setSubjectForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} className={inputCls + ' font-mono'} /></div>
             </div>
-            <div><label className="block text-sm font-semibold text-gray-700 mb-1">Description</label><textarea value={subjectForm.description} onChange={(e) => setSubjectForm(f => ({ ...f, description: e.target.value }))} rows={2} className={inputCls + ' resize-none'} /></div>
+            <div><label className="block text-sm font-semibold text-white/60 mb-1">Description</label><textarea value={subjectForm.description} onChange={(e) => setSubjectForm(f => ({ ...f, description: e.target.value }))} rows={2} className={inputCls + ' resize-none'} /></div>
             <div className="grid grid-cols-3 gap-3">
-              <div><label className="block text-sm font-semibold text-gray-700 mb-1">Emoji</label><input type="text" value={subjectForm.icon_emoji} onChange={(e) => setSubjectForm(f => ({ ...f, icon_emoji: e.target.value }))} className={inputCls} /></div>
-              <div><label className="block text-sm font-semibold text-gray-700 mb-1">Color</label><div className="flex items-center gap-1.5"><input type="color" value={subjectForm.color} onChange={(e) => setSubjectForm(f => ({ ...f, color: e.target.value }))} className="w-9 h-9 rounded-lg border border-gray-300 cursor-pointer p-0.5" /><input type="text" value={subjectForm.color} onChange={(e) => setSubjectForm(f => ({ ...f, color: e.target.value }))} className="flex-1 border border-gray-300 rounded-xl px-2 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-violet-300" /></div></div>
-              <div><label className="block text-sm font-semibold text-gray-700 mb-1">Level</label><input type="text" value={subjectForm.level} onChange={(e) => setSubjectForm(f => ({ ...f, level: e.target.value }))} placeholder="e.g. SS3" className={inputCls} /></div>
+              <div><label className="block text-sm font-semibold text-white/60 mb-1">Emoji</label><input type="text" value={subjectForm.icon_emoji} onChange={(e) => setSubjectForm(f => ({ ...f, icon_emoji: e.target.value }))} className={inputCls} /></div>
+              <div><label className="block text-sm font-semibold text-white/60 mb-1">Color</label><div className="flex items-center gap-1.5"><input type="color" value={subjectForm.color} onChange={(e) => setSubjectForm(f => ({ ...f, color: e.target.value }))} className="w-9 h-9 rounded-lg border border-gray-300 cursor-pointer p-0.5" /><input type="text" value={subjectForm.color} onChange={(e) => setSubjectForm(f => ({ ...f, color: e.target.value }))} className="flex-1 border border-gray-300 rounded-xl px-2 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-violet-300" /></div></div>
+              <div><label className="block text-sm font-semibold text-white/60 mb-1">Level</label><input type="text" value={subjectForm.level} onChange={(e) => setSubjectForm(f => ({ ...f, level: e.target.value }))} placeholder="e.g. SS3" className={inputCls} /></div>
             </div>
             <div className="flex gap-3 pt-2">
               <button onClick={() => setShowSubjectModal(false)} className="flex-1 border border-gray-300 text-gray-700 font-semibold py-2.5 rounded-xl text-sm hover:bg-gray-50">Cancel</button>
@@ -349,15 +349,15 @@ const TeacherAssignmentPanel = () => {
     catch { showToast('Failed to remove', 'error'); }
   };
 
-  if (loading) return <div className="flex items-center justify-center py-12"><Loader2 className="w-7 h-7 text-violet-500 animate-spin mr-3" /><span className="text-gray-500">Loading…</span></div>;
+  if (loading) return <div className="flex items-center justify-center py-12"><Loader2 className="w-7 h-7 text-violet-400 animate-spin mr-3" /><span className="text-gray-500">Loading…</span></div>;
 
   return (
     <div>
       {toast && <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white ${toast.type === 'error' ? 'bg-red-500' : 'bg-violet-600'}`}>{toast.msg}</div>}
       <div className="flex items-center justify-between mb-5">
-        <div><h2 className="text-xl font-bold text-gray-900">Teacher Assignment</h2><p className="text-sm text-gray-500 mt-0.5">Assign teachers to subjects and exam types</p></div>
+        <div><h2 className="text-xl font-bold text-white/90">Teacher Assignment</h2><p className="text-sm text-gray-500 mt-0.5">Assign teachers to subjects and exam types</p></div>
         <div className="flex gap-2">
-          <button onClick={fetchAll} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 px-3 py-2 border border-gray-200 rounded-xl"><RefreshCw size={14} /> Refresh</button>
+          <button onClick={fetchAll} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 px-3 py-2 border border-white/[0.08] rounded-xl"><RefreshCw size={14} /> Refresh</button>
           <button onClick={() => { setForm({ teacher_id: '', exam_type_id: '' }); setSelectedSubjectIds([]); setFilteredSubjects([]); setShowModal(true); }} className="flex items-center gap-1.5 text-sm bg-violet-600 hover:bg-violet-700 text-white px-4 py-2 rounded-xl font-semibold"><Plus size={14} /> Add Assignment</button>
         </div>
       </div>
@@ -386,21 +386,21 @@ const TeacherAssignmentPanel = () => {
 
       {showModal && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
+          <div className="bg-[#1a1a1b] border border-white/[0.10] rounded-xl shadow-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-5"><h3 className="text-lg font-bold text-gray-900">Add Assignment</h3><button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button></div>
             <div className="space-y-4">
-              <div><label className="block text-xs font-semibold text-gray-600 mb-1.5">Teacher *</label><select value={form.teacher_id} onChange={e => setForm(f => ({ ...f, teacher_id: e.target.value }))} className={inputCls}><option value="">Select a teacher…</option>{[...new Map(teachers.map(t => [t.id, t])).values()].map(t => <option key={t.id} value={t.id}>{t.first_name} {t.last_name} — {t.email}</option>)}</select></div>
-              <div><label className="block text-xs font-semibold text-gray-600 mb-1.5">Exam Type *</label><select value={form.exam_type_id} onChange={e => handleExamTypeChange(e.target.value)} className={inputCls}><option value="">Select an exam type…</option>{loadingTypes ? <option disabled>Loading…</option> : examTypes.filter(et => et.is_active !== false).map(et => <option key={et.id} value={et.id}>{safeEmoji(et.icon_emoji) ? safeEmoji(et.icon_emoji) + ' ' : ''}{et.name} ({et.code})</option>)}</select></div>
+              <div><label className="block text-xs font-semibold text-white/60 mb-1.5">Teacher *</label><select value={form.teacher_id} onChange={e => setForm(f => ({ ...f, teacher_id: e.target.value }))} className={inputCls}><option value="">Select a teacher…</option>{[...new Map(teachers.map(t => [t.id, t])).values()].map(t => <option key={t.id} value={t.id}>{t.first_name} {t.last_name} — {t.email}</option>)}</select></div>
+              <div><label className="block text-xs font-semibold text-white/60 mb-1.5">Exam Type *</label><select value={form.exam_type_id} onChange={e => handleExamTypeChange(e.target.value)} className={inputCls}><option value="">Select an exam type…</option>{loadingTypes ? <option disabled>Loading…</option> : examTypes.filter(et => et.is_active !== false).map(et => <option key={et.id} value={et.id}>{safeEmoji(et.icon_emoji) ? safeEmoji(et.icon_emoji) + ' ' : ''}{et.name} ({et.code})</option>)}</select></div>
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-xs font-semibold text-gray-600">Subject(s) *{selectedSubjectIds.length > 0 && <span className="ml-2 text-violet-600 font-bold">{selectedSubjectIds.length} selected</span>}</label>
                   {form.exam_type_id && <button type="button" onClick={refreshSubjects} disabled={loadingSubjects} className="flex items-center gap-1 text-xs text-gray-400 hover:text-violet-600 disabled:opacity-40"><RefreshCw size={11} className={loadingSubjects ? 'animate-spin' : ''} /> Refresh</button>}
                 </div>
-                {!form.exam_type_id ? <div className="border-2 border-dashed border-gray-200 rounded-xl p-4 text-center text-gray-400 text-sm">Select an exam type first</div>
+                {!form.exam_type_id ? <div className="border-2 border-dashed border-white/[0.08] rounded-xl p-4 text-center text-gray-400 text-sm">Select an exam type first</div>
                   : loadingSubjects ? <div className="flex items-center gap-2 py-4 text-gray-400 text-sm"><Loader2 size={15} className="animate-spin" /> Loading subjects…</div>
-                  : filteredSubjects.length === 0 ? <div className="border-2 border-dashed border-gray-200 rounded-xl p-4 text-center text-gray-400 text-sm">No subjects found. Add subjects in Catalog Management.</div>
+                  : filteredSubjects.length === 0 ? <div className="border-2 border-dashed border-white/[0.08] rounded-xl p-4 text-center text-gray-400 text-sm">No subjects found. Add subjects in Catalog Management.</div>
                   : (
-                    <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1 border border-gray-200 rounded-xl p-2">
+                    <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1 border border-white/[0.08] rounded-xl p-2">
                       {filteredSubjects.map(s => {
                         const selected = selectedSubjectIds.includes(s.id);
                         return (
@@ -422,7 +422,7 @@ const TeacherAssignmentPanel = () => {
                 className="flex-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2">
                 {saving ? <><Loader2 size={14} className="animate-spin" /> Saving…</> : <><Check size={14} /> Save {selectedSubjectIds.length > 0 ? `${selectedSubjectIds.length} Assignment${selectedSubjectIds.length > 1 ? 's' : ''}` : 'Assignment'}</>}
               </button>
-              <button onClick={() => setShowModal(false)} className="flex-1 border border-gray-200 text-gray-600 hover:bg-gray-50 font-semibold py-2.5 rounded-xl text-sm">Cancel</button>
+              <button onClick={() => setShowModal(false)} className="flex-1 border border-white/[0.08] text-gray-600 hover:bg-gray-50 font-semibold py-2.5 rounded-xl text-sm">Cancel</button>
             </div>
           </div>
         </div>
@@ -481,12 +481,12 @@ const AIGeneratePanel = () => {
         {pendingCount !== null && <a href="/admin/questions/review" className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-100 px-3 py-1.5 rounded-full hover:bg-amber-200"><Zap size={12} />{pendingCount} pending review</a>}
       </div>
       <form onSubmit={handleGenerate} className="space-y-4 max-w-lg">
-        <div><label className="block text-xs font-semibold text-gray-600 mb-1">Exam Type *</label><select value={form.exam_type_id} onChange={e => handleExamTypeChange(e.target.value)} className={inputCls} required><option value="">Select exam type first…</option>{examTypesLoad ? <option disabled>Loading…</option> : examTypes.filter(et => et.is_active !== false).map(et => <option key={et.id} value={et.id}>{safeEmoji(et.icon_emoji) ? safeEmoji(et.icon_emoji) + ' ' : ''}{et.name} ({et.code})</option>)}</select></div>
-        <div><label className="block text-xs font-semibold text-gray-600 mb-1">Subject *</label>{!form.exam_type_id ? <div className="border-2 border-dashed border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-400">Select an exam type above</div> : <select value={form.subject_id} onChange={e => setForm(f => ({ ...f, subject_id: e.target.value }))} className={inputCls} required><option value="">Select subject…</option>{subjectsLoad ? <option disabled>Loading subjects…</option> : subjects.length === 0 ? <option disabled>No subjects found</option> : subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>}</div>
-        <div><label className="block text-xs font-semibold text-gray-600 mb-1">Topic *</label><input type="text" value={form.topic} onChange={e => setForm(f => ({ ...f, topic: e.target.value }))} placeholder="e.g. Cell Biology, Algebra" className={inputCls} required /></div>
+        <div><label className="block text-xs font-semibold text-white/60 mb-1">Exam Type *</label><select value={form.exam_type_id} onChange={e => handleExamTypeChange(e.target.value)} className={inputCls} required><option value="">Select exam type first…</option>{examTypesLoad ? <option disabled>Loading…</option> : examTypes.filter(et => et.is_active !== false).map(et => <option key={et.id} value={et.id}>{safeEmoji(et.icon_emoji) ? safeEmoji(et.icon_emoji) + ' ' : ''}{et.name} ({et.code})</option>)}</select></div>
+        <div><label className="block text-xs font-semibold text-white/60 mb-1">Subject *</label>{!form.exam_type_id ? <div className="border-2 border-dashed border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white/30">Select an exam type above</div> : <select value={form.subject_id} onChange={e => setForm(f => ({ ...f, subject_id: e.target.value }))} className={inputCls} required><option value="">Select subject…</option>{subjectsLoad ? <option disabled>Loading subjects…</option> : subjects.length === 0 ? <option disabled>No subjects found</option> : subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>}</div>
+        <div><label className="block text-xs font-semibold text-white/60 mb-1">Topic *</label><input type="text" value={form.topic} onChange={e => setForm(f => ({ ...f, topic: e.target.value }))} placeholder="e.g. Cell Biology, Algebra" className={inputCls} required /></div>
         <div className="grid grid-cols-2 gap-3">
-          <div><label className="block text-xs font-semibold text-gray-600 mb-1">Difficulty</label><select value={form.difficulty} onChange={e => setForm(f => ({ ...f, difficulty: e.target.value }))} className={inputCls}><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option></select></div>
-          <div><label className="block text-xs font-semibold text-gray-600 mb-1">Count</label><select value={form.count} onChange={e => setForm(f => ({ ...f, count: Number(e.target.value) }))} className={inputCls}><option value={10}>10</option><option value={20}>20</option><option value={30}>30</option></select></div>
+          <div><label className="block text-xs font-semibold text-white/60 mb-1">Difficulty</label><select value={form.difficulty} onChange={e => setForm(f => ({ ...f, difficulty: e.target.value }))} className={inputCls}><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option></select></div>
+          <div><label className="block text-xs font-semibold text-white/60 mb-1">Count</label><select value={form.count} onChange={e => setForm(f => ({ ...f, count: Number(e.target.value) }))} className={inputCls}><option value={10}>10</option><option value={20}>20</option><option value={30}>30</option></select></div>
         </div>
         {error && <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm"><AlertTriangle size={14} /> {error}</div>}
         {result && <div className="flex items-center gap-2 text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 text-sm"><Check size={14} /> {result.message || 'Questions generated successfully!'}</div>}
@@ -498,7 +498,7 @@ const AIGeneratePanel = () => {
         <div className="mt-6 max-w-lg">
           <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3">Generated Preview ({previewQuestions.length})<span className="ml-2 text-[10px] font-bold bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full">Pending Review</span></p>
           <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
-            {previewQuestions.map((q, i) => <div key={q.id || i} className="bg-gray-50 border border-gray-200 rounded-xl p-4"><p className="text-sm font-medium text-gray-800 leading-relaxed">{i + 1}. {q.question_text}</p></div>)}
+            {previewQuestions.map((q, i) => <div key={q.id || i} className="bg-gray-50 border border-white/[0.08] rounded-xl p-4"><p className="text-sm font-medium text-gray-800 leading-relaxed">{i + 1}. {q.question_text}</p></div>)}
           </div>
           <p className="text-xs text-gray-400 mt-3">Go to <button onClick={() => navigate('/admin/questions/review')} className="text-violet-600 hover:underline font-semibold">Question Review</button> to approve.</p>
         </div>
@@ -546,8 +546,8 @@ const UserManagementPanel = () => {
     <div>
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       <div className="flex items-center justify-between mb-5">
-        <div><h2 className="text-xl font-bold text-gray-900">User Management</h2><p className="text-sm text-gray-400 mt-0.5">{total} users total</p></div>
-        <button onClick={fetchUsers} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 px-3 py-2 border border-gray-200 rounded-xl"><RefreshCw size={14} /> Refresh</button>
+        <div><h2 className="text-xl font-bold text-white/90">User Management</h2><p className="text-sm text-gray-400 mt-0.5">{total} users total</p></div>
+        <button onClick={fetchUsers} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 px-3 py-2 border border-white/[0.08] rounded-xl"><RefreshCw size={14} /> Refresh</button>
       </div>
       {userStats && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
@@ -558,11 +558,11 @@ const UserManagementPanel = () => {
       )}
       <div className="flex gap-3 mb-4 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
-          <input type="text" placeholder="Search by name or email…" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} className="w-full border border-gray-200 rounded-xl pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300" />
+          <input type="text" placeholder="Search by name or email…" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} className="w-full border border-white/[0.08] rounded-xl pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300" />
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
           {search && <button onClick={() => { setSearch(''); setPage(1); }} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"><X size={13} /></button>}
         </div>
-        <select value={roleFilter} onChange={e => { setRoleFilter(e.target.value); setPage(1); }} className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"><option value="">All Roles</option><option value="student">Students</option><option value="teacher">Teachers</option><option value="admin">Admins</option></select>
+        <select value={roleFilter} onChange={e => { setRoleFilter(e.target.value); setPage(1); }} className="border border-white/[0.08] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"><option value="">All Roles</option><option value="student">Students</option><option value="teacher">Teachers</option><option value="admin">Admins</option></select>
       </div>
       {loading ? <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 text-violet-400 animate-spin" /></div>
         : users.length === 0 ? <div className="text-center py-12 text-gray-400 text-sm">No users found.</div>
@@ -579,7 +579,7 @@ const UserManagementPanel = () => {
                     <td className="px-4 py-3 hidden sm:table-cell text-gray-400 text-xs">{fmtDate(u.last_login)}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <select value={u.role} onChange={e => changeRole(u.id, e.target.value)} className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-violet-400"><option value="student">Student</option><option value="teacher">Teacher</option><option value="admin">Admin</option></select>
+                        <select value={u.role} onChange={e => changeRole(u.id, e.target.value)} className="text-xs border border-white/[0.08] rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-violet-400"><option value="student">Student</option><option value="teacher">Teacher</option><option value="admin">Admin</option></select>
                         <button onClick={() => toggleActive(u.id, u.is_active)} className={`text-xs px-2.5 py-1 rounded-lg font-semibold ${u.is_active ? 'bg-red-50 text-red-500 hover:bg-red-100' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'}`}>{u.is_active ? 'Deactivate' : 'Activate'}</button>
                         <button onClick={() => deleteUser(u.id, u.email)} className="text-xs px-2.5 py-1 rounded-lg bg-gray-100 text-gray-500 hover:bg-red-100 hover:text-red-600"><Trash2 size={12} /></button>
                       </div>
@@ -595,8 +595,8 @@ const UserManagementPanel = () => {
         <div className="flex items-center justify-between mt-4">
           <span className="text-xs text-gray-400">Page {page} of {totalPages} · {total} users</span>
           <div className="flex gap-2">
-            <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="text-sm px-3 py-1.5 border border-gray-200 rounded-xl disabled:opacity-40 hover:bg-gray-50">← Previous</button>
-            <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} className="text-sm px-3 py-1.5 border border-gray-200 rounded-xl disabled:opacity-40 hover:bg-gray-50">Next →</button>
+            <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="text-sm px-3 py-1.5 border border-white/[0.08] rounded-xl disabled:opacity-40 hover:bg-gray-50">← Previous</button>
+            <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} className="text-sm px-3 py-1.5 border border-white/[0.08] rounded-xl disabled:opacity-40 hover:bg-gray-50">Next →</button>
           </div>
         </div>
       )}
@@ -635,7 +635,7 @@ const PlatformAnalyticsPanel = () => {
   };
   useEffect(() => { fetchStats(); }, []);
 
-  if (loading) return <div className="flex items-center justify-center py-16"><Loader2 className="w-7 h-7 text-violet-500 animate-spin mr-3" /><span className="text-gray-500">Loading analytics…</span></div>;
+  if (loading) return <div className="flex items-center justify-center py-16"><Loader2 className="w-7 h-7 text-violet-400 animate-spin mr-3" /><span className="text-gray-500">Loading analytics…</span></div>;
   if (error)   return <div className="text-center py-12 text-red-500"><AlertTriangle className="w-8 h-8 mx-auto mb-2" /><p className="text-sm">{error}</p><button onClick={fetchStats} className="mt-3 text-sm text-violet-600 hover:underline">Retry</button></div>;
   if (!stats)  return null;
 
@@ -646,8 +646,8 @@ const PlatformAnalyticsPanel = () => {
     <div className="space-y-6">
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       <div className="flex items-center justify-between">
-        <div><h2 className="text-xl font-bold text-gray-900">Platform Analytics</h2><p className="text-sm text-gray-500 mt-0.5">Live snapshot of platform activity</p></div>
-        <button onClick={fetchStats} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 px-3 py-2 border border-gray-200 rounded-xl"><RefreshCw size={14} /> Refresh</button>
+        <div><h2 className="text-xl font-bold text-white/90">Platform Analytics</h2><p className="text-sm text-gray-500 mt-0.5">Live snapshot of platform activity</p></div>
+        <button onClick={fetchStats} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 px-3 py-2 border border-white/[0.08] rounded-xl"><RefreshCw size={14} /> Refresh</button>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
@@ -694,16 +694,16 @@ const PlatformAnalyticsPanel = () => {
         </div>
       </div>
       {notifModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-4">Send Notification</h3>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1a1a1b] border border-white/[0.10] rounded-xl shadow-2xl w-full max-w-md p-6">
+            <h3 className="text-lg font-bold text-white/90 mb-4">Send Notification</h3>
             <div className="space-y-4">
-              <div><label className="text-xs font-semibold text-gray-500 mb-1 block">Send To</label><select value={notifTarget} onChange={e => setNotifTarget(e.target.value)} className={inputCls}><option value="all">All Users</option><option value="students">Students Only</option><option value="teachers">Teachers Only</option></select></div>
-              <div><label className="text-xs font-semibold text-gray-500 mb-1 block">Title</label><input type="text" value={notifTitle} onChange={e => setNotifTitle(e.target.value)} placeholder="Notification title…" className={inputCls} /></div>
-              <div><label className="text-xs font-semibold text-gray-500 mb-1 block">Message</label><textarea value={notifMessage} onChange={e => setNotifMessage(e.target.value)} rows={4} className={inputCls + ' resize-none'} /></div>
+              <div><label className="text-xs font-semibold text-white/50 mb-1 block font-mono uppercase tracking-wider">Send To</label><select value={notifTarget} onChange={e => setNotifTarget(e.target.value)} className={inputCls}><option value="all">All Users</option><option value="students">Students Only</option><option value="teachers">Teachers Only</option></select></div>
+              <div><label className="text-xs font-semibold text-white/50 mb-1 block font-mono uppercase tracking-wider">Title</label><input type="text" value={notifTitle} onChange={e => setNotifTitle(e.target.value)} placeholder="Notification title…" className={inputCls} /></div>
+              <div><label className="text-xs font-semibold text-white/50 mb-1 block font-mono uppercase tracking-wider">Message</label><textarea value={notifMessage} onChange={e => setNotifMessage(e.target.value)} rows={4} className={inputCls + ' resize-none'} /></div>
             </div>
             <div className="flex gap-3 mt-5">
-              <button onClick={() => { setNotifModal(false); setNotifTitle(''); setNotifMessage(''); }} className="flex-1 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+              <button onClick={() => { setNotifModal(false); setNotifTitle(''); setNotifMessage(''); }} className="flex-1 py-2 rounded-xl border border-white/[0.08] text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
               <button onClick={sendNotification} disabled={notifSending} className="flex-1 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold disabled:opacity-60">{notifSending ? 'Sending…' : 'Send'}</button>
             </div>
           </div>
@@ -742,19 +742,19 @@ const AdminPastPapersPanel = () => {
     <div>
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       <div className="flex items-center justify-between mb-5">
-        <div><h2 className="text-xl font-bold text-gray-900">Past Papers</h2><p className="text-sm text-gray-400 mt-0.5">Manage past exam papers for students</p></div>
+        <div><h2 className="text-xl font-bold text-white/90">Past Papers</h2><p className="text-sm text-gray-400 mt-0.5">Manage past exam papers for students</p></div>
         <div className="flex gap-2">
-          <button onClick={fetchPapers} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 px-3 py-2 border border-gray-200 rounded-xl"><RefreshCw size={14} /> Refresh</button>
+          <button onClick={fetchPapers} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 px-3 py-2 border border-white/[0.08] rounded-xl"><RefreshCw size={14} /> Refresh</button>
           <button onClick={() => navigate('/past-papers')} className="flex items-center gap-2 text-sm border border-violet-200 text-violet-700 hover:bg-violet-50 font-semibold px-4 py-2 rounded-xl"><BookOpen size={14} /> Student View</button>
         </div>
       </div>
       <div className="flex gap-3 mb-5 flex-wrap">
-        <select value={filters.exam_board} onChange={e => setFilters(f => ({ ...f, exam_board: e.target.value }))} className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"><option value="">All Exam Types</option>{['JAMB','WAEC','NECO','GCE_OL','GCE_AL','IELTS','TOEFL','SAT','JUPEB'].map(c => <option key={c} value={c}>{c}</option>)}</select>
-        <input type="number" placeholder="Year from" value={filters.year_from} onChange={e => setFilters(f => ({ ...f, year_from: e.target.value }))} className="w-28 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300" />
-        <input type="number" placeholder="Year to" value={filters.year_to} onChange={e => setFilters(f => ({ ...f, year_to: e.target.value }))} className="w-28 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300" />
+        <select value={filters.exam_board} onChange={e => setFilters(f => ({ ...f, exam_board: e.target.value }))} className="border border-white/[0.08] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"><option value="">All Exam Types</option>{['JAMB','WAEC','NECO','GCE_OL','GCE_AL','IELTS','TOEFL','SAT','JUPEB'].map(c => <option key={c} value={c}>{c}</option>)}</select>
+        <input type="number" placeholder="Year from" value={filters.year_from} onChange={e => setFilters(f => ({ ...f, year_from: e.target.value }))} className="w-28 border border-white/[0.08] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300" />
+        <input type="number" placeholder="Year to" value={filters.year_to} onChange={e => setFilters(f => ({ ...f, year_to: e.target.value }))} className="w-28 border border-white/[0.08] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300" />
         <button onClick={fetchPapers} className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold rounded-xl">Filter</button>
       </div>
-      {loading ? <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 text-violet-500 animate-spin" /></div>
+      {loading ? <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 text-violet-400 animate-spin" /></div>
         : papers.length === 0 ? <div className="text-center py-16 text-gray-400"><BookOpen className="w-10 h-10 mx-auto mb-3 opacity-30" /><p className="text-sm">No past papers found.</p></div>
         : (
           <div className="overflow-x-auto rounded-xl border border-gray-100">
@@ -816,14 +816,14 @@ const AdminSettingsPanel = ({ setActivePanel }) => {
 
   return (
     <div>
-      <div className="mb-6"><h2 className="text-xl font-bold text-gray-900">Settings</h2><p className="text-sm text-gray-400 mt-0.5">Platform configuration and quick links</p></div>
+      <div className="mb-6"><h2 className="text-xl font-bold text-white/90">Settings</h2><p className="text-sm text-gray-400 mt-0.5">Platform configuration and quick links</p></div>
       <div className="space-y-6">
         {sections.map(sec => (
           <div key={sec.title}>
             <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">{sec.title}</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {sec.items.map(item => (
-                <button key={item.label} onClick={item.action} className="text-left border border-gray-200 rounded-xl p-4 hover:border-violet-300 hover:bg-violet-50 transition-colors group">
+                <button key={item.label} onClick={item.action} className="text-left border border-white/[0.08] rounded-xl p-4 hover:border-violet-300 hover:bg-violet-50 transition-colors group">
                   <p className="font-semibold text-gray-800 text-sm group-hover:text-violet-700">{item.label}</p>
                   <p className="text-xs text-gray-400 mt-1 leading-relaxed">{item.desc}</p>
                 </button>
@@ -872,33 +872,33 @@ const AdminDashboard = () => {
   ];
 
   const Panel = ({ children }) => (
-    <div className="bg-white border border-gray-100 rounded-2xl mt-4 overflow-hidden shadow-sm">
+    <div className="bg-[#1a1a1b] border border-white/[0.06] rounded-lg mt-4 overflow-hidden">
       <div className="p-6">{children}</div>
     </div>
   );
 
+  const firstName = user?.first_name || user?.firstName || user?.email?.split('@')[0] || 'Admin';
+
   return (
-    <div className="min-h-screen bg-slate-50 text-gray-900">
+    <div className="min-h-screen bg-[#0f0f10] text-white">
       <TopNav />
 
       <div className="flex">
         {/* ── SIDEBAR ── */}
-        <aside className="w-52 shrink-0 min-h-[calc(100vh-48px)] bg-white border-r border-gray-100 sticky top-12 self-start shadow-sm">
-          <div className="px-3 py-5">
-            <div className="px-3 py-2 mb-4">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-violet-400">Admin Console</span>
-            </div>
+        <aside className="w-48 shrink-0 min-h-[calc(100vh-48px)] bg-[#0f0f10] border-r border-white/[0.06] sticky top-12 self-start">
+          <div className="px-2 py-4">
+            <p className="text-[10px] font-mono text-white/30 uppercase tracking-widest px-3 mb-3">Admin Console</p>
             <nav className="space-y-0.5">
               {navItems.map(({ key, icon: Icon, label }) => {
                 const active = activePanel === key;
                 return (
                   <button key={key} onClick={() => setActivePanel(active ? null : key)}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all text-left ${
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition-all text-left ${
                       active
-                        ? 'bg-violet-600 text-white font-semibold shadow-sm shadow-violet-200'
-                        : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                        ? 'bg-violet-600/20 text-violet-300 border border-violet-500/30'
+                        : 'text-white/40 hover:text-white/80 hover:bg-white/[0.04]'
                     }`}>
-                    <Icon size={14} className={active ? 'text-white' : 'text-gray-400'} />
+                    <Icon size={13} className={active ? 'text-violet-400' : 'text-white/30'} />
                     {label}
                   </button>
                 );
@@ -909,33 +909,34 @@ const AdminDashboard = () => {
 
         {/* ── MAIN ── */}
         <main className="flex-1 min-w-0 px-6 py-6">
-          <div className="mb-6">
-            <h1 className="text-xl font-bold text-gray-900">Admin Dashboard</h1>
-            <p className="text-sm text-gray-400 mt-0.5">Platform management console</p>
+          {/* Page header */}
+          <div className="mb-6 border-b border-white/[0.06] pb-5">
+            <p className="text-white/30 text-xs font-mono uppercase tracking-widest mb-1">Admin Console</p>
+            <h1 className="text-xl font-bold text-white">Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, {firstName}</h1>
           </div>
 
           {/* Stat cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
             {statCards.map((s, i) => (
-              <div key={i} className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
+              <div key={i} className="bg-[#1a1a1b] border border-white/[0.06] rounded-lg p-4 hover:border-white/[0.12] transition-colors">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs text-gray-400 font-medium">{s.label}</span>
-                  <s.icon size={14} style={{ color: s.accent }} className="opacity-80" />
+                  <span className="text-xs text-white/40 font-mono uppercase tracking-wide">{s.label}</span>
+                  <s.icon size={13} style={{ color: s.accent }} className="opacity-60" />
                 </div>
-                <p className="text-2xl font-mono font-bold text-gray-900">
-                  {statsLoading ? <Loader2 size={18} className="animate-spin text-gray-300" /> : s.value}
+                <p className="text-2xl font-mono font-bold" style={{ color: s.accent }}>
+                  {statsLoading ? <Loader2 size={16} className="animate-spin text-white/20" /> : s.value}
                 </p>
               </div>
             ))}
           </div>
 
           {!activePanel && (
-            <div className="flex flex-col items-center justify-center py-24 text-center">
-              <div className="w-12 h-12 rounded-2xl bg-violet-100 flex items-center justify-center mb-4">
-                <Settings size={22} className="text-violet-500" />
+            <div className="flex flex-col items-center justify-center py-24 text-center border border-dashed border-white/[0.06] rounded-lg">
+              <div className="w-10 h-10 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center mb-3">
+                <Settings size={18} className="text-violet-400" />
               </div>
-              <p className="text-sm font-medium text-gray-600">Select a service from the left panel</p>
-              <p className="text-xs text-gray-400 mt-1">Click any item in the sidebar to get started</p>
+              <p className="text-sm font-medium text-white/50">Select a service from the sidebar</p>
+              <p className="text-xs text-white/25 mt-1 font-mono">Click any item on the left to open it</p>
             </div>
           )}
 
@@ -943,7 +944,10 @@ const AdminDashboard = () => {
           {activePanel === 'users'      && <Panel><PanelErrorBoundary><UserManagementPanel /></PanelErrorBoundary></Panel>}
           {activePanel === 'schools'    && (
             <Panel>
-              <div className="text-center py-16"><School className="w-10 h-10 mx-auto mb-3 text-gray-200" /><p className="text-sm font-medium text-gray-500">School management coming soon.</p></div>
+              <div className="text-center py-16">
+                <School className="w-8 h-8 mx-auto mb-3 text-white/10" />
+                <p className="text-sm text-white/30">School management coming soon.</p>
+              </div>
             </Panel>
           )}
           {activePanel === 'content'    && (
@@ -954,10 +958,11 @@ const AdminDashboard = () => {
                   { label: 'Past Papers',     desc: 'View and manage past exam papers',               action: () => setActivePanel('pastpapers') },
                   { label: 'Question Review', desc: 'Review and approve submitted questions',          action: () => navigate('/admin/questions/review') },
                 ].map(c => (
-                  <button key={c.label} onClick={c.action} className="p-4 border border-gray-100 hover:border-violet-200 hover:bg-violet-50 rounded-xl text-left transition-colors group">
-                    <p className="font-semibold text-gray-800 text-sm group-hover:text-violet-700">{c.label}</p>
-                    <p className="text-xs text-gray-400 mt-1">{c.desc}</p>
-                    <span className="text-xs text-violet-600 mt-2 inline-block">Open →</span>
+                  <button key={c.label} onClick={c.action}
+                    className="p-4 bg-[#1a1a1b] border border-white/[0.06] hover:border-violet-500/30 hover:bg-violet-500/[0.05] rounded-lg text-left transition-colors group">
+                    <p className="font-semibold text-white/70 text-sm group-hover:text-white">{c.label}</p>
+                    <p className="text-xs text-white/30 mt-1">{c.desc}</p>
+                    <span className="text-xs text-violet-400 mt-2 inline-block font-mono">Open →</span>
                   </button>
                 ))}
               </div>
