@@ -93,19 +93,21 @@ export default function PastPapersPage() {
       .finally(() => setLoading(false));
   }, [board, subjectId, yearFrom, yearTo]);
 
-  const selectCls = 'border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-teal-300';
+  const selectCls = 'border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-300';
 
   return (
     <div className="min-h-screen bg-gray-50">
 
       <PublicNav
         right={
-          <>
-            <Link to="/login"    className="text-sm text-gray-500 hover:text-gray-800">Sign in</Link>
-            <Link to="/register" className="text-sm bg-teal-500 hover:bg-teal-600 text-white font-semibold px-4 py-2 rounded-xl transition-colors">
-              Start Free
-            </Link>
-          </>
+          !user ? (
+            <>
+              <Link to="/login"    className="text-sm text-gray-500 hover:text-gray-800">Sign in</Link>
+              <Link to="/register" className="text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-xl transition-colors">
+                Start Free
+              </Link>
+            </>
+          ) : null
         }
       />
 
@@ -159,7 +161,7 @@ export default function PastPapersPage() {
         {/* ── Papers grid ── */}
         {loading ? (
           <div className="flex justify-center py-16">
-            <Loader2 size={28} className="text-teal-400 animate-spin" />
+            <Loader2 size={28} className="text-blue-400 animate-spin" />
           </div>
         ) : papers.length === 0 ? (
           <div className="text-center py-16 text-gray-400">
@@ -169,7 +171,7 @@ export default function PastPapersPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {papers.map(p => (
-              <div key={p.id} className="bg-white border border-gray-100 rounded-2xl p-4 hover:border-teal-200 transition-colors">
+              <div key={p.id} className="bg-white border border-gray-100 rounded-2xl p-4 hover:border-blue-200 transition-colors">
                 <div className="flex items-start gap-3 mb-3">
                   <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center shrink-0">
                     <FileText size={18} className="text-red-400" />
@@ -182,7 +184,7 @@ export default function PastPapersPage() {
 
                 <div className="flex items-center gap-2 flex-wrap mb-3">
                   {p.exam_board && (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-100 text-teal-700">{p.exam_board}</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">{p.exam_board}</span>
                   )}
                   {p.year && (
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{p.year}</span>
@@ -213,7 +215,7 @@ export default function PastPapersPage() {
           <div className="mt-12 bg-[#0a4a3f] rounded-2xl p-6 text-center">
             <p className="text-white font-bold text-lg mb-2">Practice with AI-powered feedback</p>
             <p className="text-white/60 text-sm mb-4">Attempt past paper questions and get instant AI marking — free for 5 questions/day</p>
-            <Link to="/register" className="inline-block bg-teal-400 hover:bg-teal-300 text-gray-900 font-bold text-sm px-6 py-2.5 rounded-xl transition-colors">
+            <Link to="/register" className="inline-block bg-blue-600 hover:bg-blue-700 text-gray-900 font-bold text-sm px-6 py-2.5 rounded-xl transition-colors">
               Create Free Account
             </Link>
           </div>
