@@ -494,248 +494,295 @@ export default function StudentDashboard() {
     location.pathname === "/student/" ||
     location.pathname === "/student/dashboard";
 
-  const quickLinks = [
-    { label: "Past Papers",   icon: <FileText size={18} className="text-blue-500" />,      path: "/past-papers",          bg: "bg-blue-50 border-blue-100"   },
-    { label: "Practice",      icon: <Zap size={18} className="text-amber-500" />,           path: "/student/practice",     bg: "bg-amber-50 border-amber-100" },
-    { label: "Mock Exam",     icon: <ClipboardList size={18} className="text-rose-500" />,  path: null,                    bg: "bg-rose-50 border-rose-100",  onClick: () => setShowMockPicker(true) },
-    { label: "Analytics",     icon: <BarChart2 size={18} className="text-green-500" />,     path: "/student/analytics",    bg: "bg-green-50 border-green-100" },
+  const sidebarItems = [
+    { label: "Dashboard",   icon: BarChart2,    path: "/student/dashboard",  exact: true },
+    { label: "Subjects",    icon: BookOpen,     path: null,                  onClick: () => {} },
+    { label: "Practice",   icon: Zap,          path: "/student/practice"   },
+    { label: "Past Papers", icon: FileText,     path: "/past-papers"        },
+    { label: "Mock Exam",  icon: ClipboardList, path: null,                 onClick: () => setShowMockPicker(true) },
+    { label: "Analytics",  icon: TrendingUp,   path: "/student/analytics"  },
+    { label: "Files",      icon: Download,     path: null,                  onClick: () => {} },
   ];
+
+  const isActive = (item) => {
+    if (!item.path) return false;
+    if (item.exact) return location.pathname === item.path;
+    return location.pathname.startsWith(item.path);
+  };
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#0f0f10] text-white">
+    <div className="min-h-screen bg-[#f9f7f4] text-[#1a1a1a]">
       <TopNav />
 
-      {/* Page header */}
-      <div className="border-b border-white/[0.06] px-4 md:px-8 py-5">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <div>
-            <p className="text-white/40 text-xs font-mono uppercase tracking-widest mb-1">Student Console</p>
-            <h1 className="text-xl font-bold text-white">Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, {firstName}</h1>
-          </div>
-          <div className="flex gap-2">
-            {quickLinks.map(({ label, icon, path, onClick: qlClick }) => (
-              <button key={label} onClick={() => qlClick ? qlClick() : navigate(path)}
-                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/[0.06] hover:bg-white/[0.10] border border-white/[0.08] text-white/70 hover:text-white text-xs font-medium transition-colors">
-                {icon} {label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <Outlet />
-
-      {isRootDashboard && (
-        <div className="max-w-5xl mx-auto px-4 md:px-8 py-6 space-y-6">
-
-          {/* ── Metric row ── */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {loadingSummary ? (
-              [0,1,2,3].map(i => <div key={i} className="h-20 rounded-lg bg-white/[0.04] animate-pulse" />)
-            ) : [
-              { label: 'Questions Done', value: (summary.total_attempts ?? 0).toLocaleString(), sub: 'all time',       color: 'text-blue-400'  },
-              { label: 'Accuracy',       value: `${summary.accuracy_pct ?? 0}%`,               sub: 'overall',        color: 'text-emerald-400'},
-              { label: 'Day Streak',     value: summary.study_streak_days ?? 0,                sub: 'consecutive',    color: 'text-amber-400' },
-              { label: "Today's Goal",   value: `${todayAttempts}/${dailyTarget}`,              sub: `${dailyPct}% done`, color: dailyPct >= 100 ? 'text-emerald-400' : 'text-violet-400' },
-            ].map(m => (
-              <div key={m.label} className="bg-[#1a1a1b] border border-white/[0.06] rounded-lg p-4">
-                <p className="text-white/40 text-xs mb-2">{m.label}</p>
-                <p className={`font-mono text-2xl font-bold ${m.color}`}>{m.value}</p>
-                <p className="text-white/30 text-xs mt-1">{m.sub}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* ── Daily progress bar ── */}
-          <div className="bg-[#1a1a1b] border border-white/[0.06] rounded-lg px-4 py-3">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-white/50 font-mono">DAILY TARGET</span>
-              <span className={`text-xs font-mono font-bold ${dailyPct >= 100 ? 'text-emerald-400' : 'text-white/60'}`}>
-                {todayAttempts} / {dailyTarget} questions
-              </span>
+      <div className="flex">
+        {/* ── SIDEBAR ── */}
+        <aside className="w-48 shrink-0 min-h-[calc(100vh-56px)] bg-[#f0ede8] border-r border-[#e8e4dd] sticky top-14 self-start hidden md:block">
+          <div className="px-3 py-4">
+            <div className="px-3 py-2 mb-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-[#b5a99a]">Student</p>
+              <p className="text-xs font-semibold text-[#3b3330] mt-0.5 truncate">{firstName}</p>
             </div>
-            <div className="h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
-              <div className={`h-full rounded-full transition-all duration-700 ${dailyPct >= 100 ? 'bg-emerald-500' : 'bg-blue-500'}`}
-                style={{ width: `${dailyPct}%` }} />
+
+            {/* Streak badge */}
+            {(summary.study_streak_days ?? 0) >= 2 && (
+              <div className="mx-3 mb-3 px-2 py-1.5 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-1.5">
+                <Flame size={12} className="text-amber-500 shrink-0" />
+                <span className="text-[10px] font-semibold text-amber-700">{summary.study_streak_days}d streak</span>
+              </div>
+            )}
+
+            <nav className="space-y-0.5">
+              {sidebarItems.map(({ label, icon: Icon, path, onClick: itemClick }) => {
+                const active = isActive({ path, exact: label === "Dashboard" });
+                return (
+                  <button
+                    key={label}
+                    onClick={() => itemClick ? itemClick() : path && navigate(path)}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                      active
+                        ? "bg-white text-[#1a1a1a] font-medium shadow-sm border border-[#e8e4dd]"
+                        : "text-[#6b6259] hover:text-[#1a1a1a] hover:bg-white/60"
+                    }`}
+                  >
+                    <Icon size={14} className={active ? "text-[#d97757]" : "text-[#b5a99a]"} />
+                    {label}
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+        </aside>
+
+        {/* ── MAIN ── */}
+        <main className="flex-1 min-w-0">
+          {/* Page header */}
+          <div className="border-b border-[#e8e4dd] px-4 md:px-8 py-5 bg-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[#b5a99a] text-xs uppercase tracking-widest mb-0.5">
+                  Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}
+                </p>
+                <h1 className="text-xl font-bold text-[#1a1a1a]">{firstName}</h1>
+              </div>
+              {/* Mobile quick links */}
+              <div className="flex gap-2 md:hidden">
+                <button onClick={() => navigate("/student/practice")}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#f0ede8] text-[#6b6259] text-xs font-medium">
+                  <Zap size={13} /> Practice
+                </button>
+                <button onClick={() => setShowMockPicker(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#d97757] text-white text-xs font-semibold">
+                  <ClipboardList size={13} /> Mock
+                </button>
+              </div>
             </div>
-            {dailyPct >= 100
-              ? <p className="text-xs text-emerald-400 mt-1.5 font-mono">✓ Goal complete</p>
-              : <p className="text-xs text-white/30 mt-1.5">{dailyTarget - todayAttempts} more to reach daily goal</p>}
           </div>
 
-          {/* ── Two-column layout ── */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Outlet />
 
-            {/* My Subjects */}
-            <div className="bg-[#1a1a1b] border border-white/[0.06] rounded-lg overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
-                <p className="text-xs font-mono text-white/50 uppercase tracking-widest">My Subjects</p>
-                <span className="text-xs text-white/30">{subjects.length} enrolled</span>
-              </div>
-              <div className="p-3 space-y-1.5">
-                {loadingSubjects ? (
-                  [0,1,2].map(i => <div key={i} className="h-12 rounded-md bg-white/[0.04] animate-pulse" />)
-                ) : subjects.length === 0 ? (
-                  <div className="py-8 text-center">
-                    <BookOpen size={24} className="text-white/20 mx-auto mb-2" />
-                    <p className="text-xs text-white/30">No subjects enrolled yet</p>
-                    <button onClick={() => navigate("/subjects")} className="mt-2 text-xs text-blue-400 hover:underline">Browse subjects →</button>
+          {isRootDashboard && (
+            <div className="px-4 md:px-8 py-6 space-y-5">
+
+              {/* Metric row */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {loadingSummary ? (
+                  [0,1,2,3].map(i => <div key={i} className="h-20 rounded-lg bg-[#e8e4dd] animate-pulse" />)
+                ) : [
+                  { label: "Questions Done", value: (summary.total_attempts ?? 0).toLocaleString(), sub: "all time",       color: "text-blue-600"   },
+                  { label: "Accuracy",        value: `${summary.accuracy_pct ?? 0}%`,               sub: "overall",        color: "text-emerald-600" },
+                  { label: "Day Streak",      value: summary.study_streak_days ?? 0,                sub: "consecutive",    color: "text-amber-600"  },
+                  { label: "Today's Goal",    value: `${todayAttempts}/${dailyTarget}`,              sub: `${dailyPct}% done`, color: dailyPct >= 100 ? "text-emerald-600" : "text-[#d97757]" },
+                ].map(m => (
+                  <div key={m.label} className="bg-white border border-[#e8e4dd] rounded-lg p-4 shadow-sm">
+                    <p className="text-[#9b9087] text-xs mb-2">{m.label}</p>
+                    <p className={`font-mono text-2xl font-bold ${m.color}`}>{m.value}</p>
+                    <p className="text-[#b5a99a] text-xs mt-1">{m.sub}</p>
                   </div>
-                ) : subjects.map(subject => {
-                  const pct = subjectProgress[subject.id] ?? null;
-                  const grade = predictGrade(pct);
-                  return (
-                    <button key={subject.id} onClick={() => navigate(`/student/subject/${subject.id}`)}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-white/[0.04] border border-transparent hover:border-white/[0.08] transition-all text-left group">
-                      <div className="w-8 h-8 rounded-md bg-white/[0.06] flex items-center justify-center text-sm shrink-0">
-                        {subject.icon_emoji || '📚'}
+                ))}
+              </div>
+
+              {/* Daily progress bar */}
+              <div className="bg-white border border-[#e8e4dd] rounded-lg px-4 py-3 shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-[#9b9087] font-mono uppercase tracking-wider">Daily Target</span>
+                  <span className={`text-xs font-mono font-bold ${dailyPct >= 100 ? "text-emerald-600" : "text-[#6b6259]"}`}>
+                    {todayAttempts} / {dailyTarget} questions
+                  </span>
+                </div>
+                <div className="h-1.5 bg-[#e8e4dd] rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full transition-all duration-700 ${dailyPct >= 100 ? "bg-emerald-500" : "bg-[#d97757]"}`}
+                    style={{ width: `${dailyPct}%` }} />
+                </div>
+                {dailyPct >= 100
+                  ? <p className="text-xs text-emerald-600 mt-1.5">✓ Goal complete</p>
+                  : <p className="text-xs text-[#b5a99a] mt-1.5">{dailyTarget - todayAttempts} more to reach daily goal</p>}
+              </div>
+
+              {/* Two-column layout */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+                {/* My Subjects */}
+                <div className="bg-white border border-[#e8e4dd] rounded-lg overflow-hidden shadow-sm">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-[#e8e4dd]">
+                    <p className="text-xs font-semibold text-[#9b9087] uppercase tracking-wider">My Subjects</p>
+                    <span className="text-xs text-[#b5a99a]">{subjects.length} enrolled</span>
+                  </div>
+                  <div className="p-3 space-y-1">
+                    {loadingSubjects ? (
+                      [0,1,2].map(i => <div key={i} className="h-12 rounded-md bg-[#f0ede8] animate-pulse" />)
+                    ) : subjects.length === 0 ? (
+                      <div className="py-8 text-center">
+                        <BookOpen size={24} className="text-[#d8d0c8] mx-auto mb-2" />
+                        <p className="text-xs text-[#b5a99a]">No subjects enrolled yet</p>
+                        <button onClick={() => navigate("/subjects")} className="mt-2 text-xs text-[#d97757] hover:underline">Browse subjects →</button>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-white/80 truncate group-hover:text-white">{subject.name}</p>
-                        {pct !== null && (
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <div className="flex-1 h-1 bg-white/[0.06] rounded-full overflow-hidden">
-                              <div className="h-full bg-blue-500 rounded-full" style={{ width: `${pct}%` }} />
-                            </div>
-                            <span className="text-[10px] text-white/30 font-mono">{pct}%</span>
+                    ) : subjects.map(subject => {
+                      const pct = subjectProgress[subject.id] ?? null;
+                      const grade = predictGrade(pct);
+                      return (
+                        <button key={subject.id} onClick={() => navigate(`/student/subject/${subject.id}`)}
+                          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-[#f9f7f4] border border-transparent hover:border-[#e8e4dd] transition-all text-left group">
+                          <div className="w-8 h-8 rounded-md bg-[#f0ede8] flex items-center justify-center text-sm shrink-0">
+                            {subject.icon_emoji || "📚"}
                           </div>
-                        )}
-                      </div>
-                      {grade && (
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded font-mono shrink-0 ${
-                          pct >= 80 ? 'bg-emerald-500/20 text-emerald-400' :
-                          pct >= 60 ? 'bg-blue-500/20 text-blue-400' :
-                          pct >= 40 ? 'bg-amber-500/20 text-amber-400' : 'bg-red-500/20 text-red-400'
-                        }`}>{grade.grade}</span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Right column: Focus areas + Recent activity */}
-            <div className="space-y-4">
-              {/* Focus areas */}
-              {!loadingWeak && weakTopics.length > 0 && (
-                <div className="bg-[#1a1a1b] border border-red-500/20 rounded-lg overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
-                    <p className="text-xs font-mono text-red-400/80 uppercase tracking-widest">Focus Areas</p>
-                    <span className="text-xs text-white/30">Last 30 days</span>
-                  </div>
-                  <div className="p-3 space-y-2">
-                    {weakTopics.slice(0, 3).map((t, i) => (
-                      <div key={i} className="flex items-center gap-3 px-2 py-2 rounded-md hover:bg-white/[0.04] transition-colors">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium text-white/70 truncate">{t.topic || t.subject_name}</p>
-                          <p className="text-[10px] text-white/30">{t.subject_name} · {t.attempt_count} attempts</p>
-                        </div>
-                        <span className={`text-xs font-mono font-bold shrink-0 ${t.accuracy_pct < 40 ? 'text-red-400' : 'text-amber-400'}`}>{t.accuracy_pct}%</span>
-                        <button onClick={() => navigate("/student/practice")}
-                          className="text-[10px] bg-red-500/10 hover:bg-red-500/20 text-red-400 font-semibold px-2 py-1 rounded shrink-0 transition-colors">
-                          Practice
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-[#3b3330] truncate group-hover:text-[#1a1a1a]">{subject.name}</p>
+                            {pct !== null && (
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <div className="flex-1 h-1 bg-[#e8e4dd] rounded-full overflow-hidden">
+                                  <div className="h-full bg-[#d97757] rounded-full" style={{ width: `${pct}%` }} />
+                                </div>
+                                <span className="text-[10px] text-[#b5a99a] font-mono">{pct}%</span>
+                              </div>
+                            )}
+                          </div>
+                          {grade && (
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded font-mono shrink-0 ${
+                              pct >= 80 ? "bg-emerald-100 text-emerald-700" :
+                              pct >= 60 ? "bg-blue-100 text-blue-700" :
+                              pct >= 40 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-600"
+                            }`}>{grade.grade}</span>
+                          )}
                         </button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
-              )}
 
-              {/* Recent activity */}
-              <div className="bg-[#1a1a1b] border border-white/[0.06] rounded-lg overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
-                  <p className="text-xs font-mono text-white/50 uppercase tracking-widest">Recent Activity</p>
-                  <TrendingUp size={12} className="text-white/20" />
-                </div>
-                <div className="p-3">
-                  {loadingScores ? (
-                    <p className="text-xs text-white/30 py-4 text-center">Loading…</p>
-                  ) : recentScores.length === 0 ? (
-                    <div className="py-6 text-center">
-                      <p className="text-xs text-white/30">No quiz activity yet</p>
-                      <button onClick={() => navigate("/student/practice")} className="mt-1 text-xs text-blue-400 hover:underline">Start practising →</button>
-                    </div>
-                  ) : (
-                    <div className="space-y-2.5">
-                      {recentScores.slice(0, 5).map((row, i) => {
-                        const pct = parseFloat(row.accuracy_pct) || 0;
-                        return (
-                          <div key={i} className="flex items-center gap-3">
-                            <span className="text-[10px] text-white/30 font-mono w-12 shrink-0">
-                              {new Date(row.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                            </span>
-                            <div className="flex-1 h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
-                              <div className={`h-full rounded-full transition-all ${pct >= 75 ? 'bg-emerald-500' : pct >= 50 ? 'bg-amber-400' : 'bg-red-400'}`}
-                                style={{ width: `${pct}%` }} />
+                {/* Right column */}
+                <div className="space-y-4">
+                  {/* Focus areas */}
+                  {!loadingWeak && weakTopics.length > 0 && (
+                    <div className="bg-white border border-rose-200 rounded-lg overflow-hidden shadow-sm">
+                      <div className="flex items-center justify-between px-4 py-3 border-b border-[#e8e4dd]">
+                        <p className="text-xs font-semibold text-rose-600 uppercase tracking-wider">Focus Areas</p>
+                        <span className="text-xs text-[#b5a99a]">Last 30 days</span>
+                      </div>
+                      <div className="p-3 space-y-2">
+                        {weakTopics.slice(0, 3).map((t, i) => (
+                          <div key={i} className="flex items-center gap-3 px-2 py-2 rounded-md hover:bg-[#f9f7f4] transition-colors">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium text-[#3b3330] truncate">{t.topic || t.subject_name}</p>
+                              <p className="text-[10px] text-[#b5a99a]">{t.subject_name} · {t.attempt_count} attempts</p>
                             </div>
-                            <span className="text-xs font-mono font-bold text-white/60 w-9 text-right shrink-0">{pct}%</span>
+                            <span className={`text-xs font-mono font-bold shrink-0 ${t.accuracy_pct < 40 ? "text-red-500" : "text-amber-600"}`}>{t.accuracy_pct}%</span>
+                            <button onClick={() => navigate("/student/practice")}
+                              className="text-[10px] bg-rose-50 hover:bg-rose-100 text-rose-600 font-semibold px-2 py-1 rounded shrink-0 transition-colors">
+                              Practice
+                            </button>
                           </div>
-                        );
-                      })}
+                        ))}
+                      </div>
                     </div>
                   )}
+
+                  {/* Recent activity */}
+                  <div className="bg-white border border-[#e8e4dd] rounded-lg overflow-hidden shadow-sm">
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-[#e8e4dd]">
+                      <p className="text-xs font-semibold text-[#9b9087] uppercase tracking-wider">Recent Activity</p>
+                      <TrendingUp size={12} className="text-[#d8d0c8]" />
+                    </div>
+                    <div className="p-3">
+                      {loadingScores ? (
+                        <p className="text-xs text-[#b5a99a] py-4 text-center">Loading…</p>
+                      ) : recentScores.length === 0 ? (
+                        <div className="py-6 text-center">
+                          <p className="text-xs text-[#b5a99a]">No quiz activity yet</p>
+                          <button onClick={() => navigate("/student/practice")} className="mt-1 text-xs text-[#d97757] hover:underline">Start practising →</button>
+                        </div>
+                      ) : (
+                        <div className="space-y-2.5">
+                          {recentScores.slice(0, 5).map((row, i) => {
+                            const pct = parseFloat(row.accuracy_pct) || 0;
+                            return (
+                              <div key={i} className="flex items-center gap-3">
+                                <span className="text-[10px] text-[#b5a99a] font-mono w-12 shrink-0">
+                                  {new Date(row.date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                                </span>
+                                <div className="flex-1 h-1.5 bg-[#e8e4dd] rounded-full overflow-hidden">
+                                  <div className={`h-full rounded-full transition-all ${pct >= 75 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-400" : "bg-red-400"}`}
+                                    style={{ width: `${pct}%` }} />
+                                </div>
+                                <span className="text-xs font-mono font-bold text-[#6b6259] w-9 text-right shrink-0">{pct}%</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          {/* ── Assigned Files ── */}
-          <div className="bg-[#1a1a1b] border border-white/[0.06] rounded-lg overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
-              <p className="text-xs font-mono text-white/50 uppercase tracking-widest">Assigned Files</p>
-              {totalResources > 0 && <span className="text-xs text-white/30">{totalResources} file{totalResources !== 1 ? 's' : ''}</span>}
-            </div>
-            <div className="p-3">
-              <AssignedFilesSection
-                resources={resources}
-                loading={loadingResources}
-                groupedByType={groupedByType}
-                totalResources={totalResources}
-                navigate={navigate}
-              />
-            </div>
-          </div>
+              {/* Assigned Files */}
+              <div className="bg-white border border-[#e8e4dd] rounded-lg overflow-hidden shadow-sm">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-[#e8e4dd]">
+                  <p className="text-xs font-semibold text-[#9b9087] uppercase tracking-wider">Assigned Files</p>
+                  {totalResources > 0 && <span className="text-xs text-[#b5a99a]">{totalResources} file{totalResources !== 1 ? "s" : ""}</span>}
+                </div>
+                <div className="p-3">
+                  <AssignedFilesSection
+                    resources={resources}
+                    loading={loadingResources}
+                    groupedByType={groupedByType}
+                    totalResources={totalResources}
+                    navigate={navigate}
+                  />
+                </div>
+              </div>
 
-          {/* ── Mobile quick links ── */}
-          <div className="sm:hidden grid grid-cols-2 gap-2">
-            {quickLinks.map(({ label, icon, path, onClick: qlClick }) => (
-              <button key={label} onClick={() => qlClick ? qlClick() : navigate(path)}
-                className="flex items-center gap-2 px-4 py-3 rounded-lg bg-[#1a1a1b] border border-white/[0.06] text-white/60 hover:text-white text-sm font-medium transition-colors">
-                {icon} {label}
-              </button>
-            ))}
-          </div>
-
-        </div>
-      )}
+            </div>
+          )}
+        </main>
+      </div>
 
       {/* Mock exam subject picker modal */}
       {showMockPicker && (
-        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
-          <div className="bg-[#1a1a1b] border border-white/[0.10] rounded-xl w-full max-w-sm shadow-2xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-white/[0.08]">
-              <p className="text-white font-bold">Start Mock Exam</p>
-              <p className="text-white/40 text-xs mt-0.5">Choose a subject — 45-minute timed exam</p>
+        <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-[#e8e4dd] rounded-xl w-full max-w-sm shadow-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-[#e8e4dd]">
+              <p className="text-[#1a1a1a] font-bold">Start Mock Exam</p>
+              <p className="text-[#9b9087] text-xs mt-0.5">Choose a subject — 45-minute timed exam</p>
             </div>
             <div className="p-2 max-h-64 overflow-y-auto">
               {subjects.length === 0 ? (
-                <p className="text-sm text-white/30 text-center py-4">No subjects enrolled yet.</p>
+                <p className="text-sm text-[#b5a99a] text-center py-4">No subjects enrolled yet.</p>
               ) : subjects.map(s => (
                 <button key={s.id}
                   onClick={() => { setShowMockPicker(false); navigate(`/student/mock/${s.id}`); }}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/[0.06] transition-colors text-left">
-                  <span className="text-lg">{s.icon_emoji || '📚'}</span>
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[#f9f7f4] transition-colors text-left">
+                  <span className="text-lg">{s.icon_emoji || "📚"}</span>
                   <div>
-                    <p className="text-sm font-medium text-white/80">{s.name}</p>
-                    {s.exam_board_code && <p className="text-xs text-white/30">{s.exam_board_code}</p>}
+                    <p className="text-sm font-medium text-[#3b3330]">{s.name}</p>
+                    {s.exam_board_code && <p className="text-xs text-[#b5a99a]">{s.exam_board_code}</p>}
                   </div>
                 </button>
               ))}
             </div>
-            <div className="px-4 py-3 border-t border-white/[0.08]">
+            <div className="px-4 py-3 border-t border-[#e8e4dd]">
               <button onClick={() => setShowMockPicker(false)}
-                className="w-full py-2 text-sm text-white/40 hover:text-white/70 transition-colors">
+                className="w-full py-2 text-sm text-[#9b9087] hover:text-[#6b6259] transition-colors">
                 Cancel
               </button>
             </div>
