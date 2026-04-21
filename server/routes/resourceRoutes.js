@@ -205,6 +205,17 @@ async function ensureResourceAssignments() {
       CONSTRAINT ra_must_have_target CHECK (student_id IS NOT NULL OR class_id IS NOT NULL)
     )
   `).catch(() => {});
+  // Add UNIQUE constraints so ON CONFLICT DO NOTHING actually deduplicates
+  await sequelize.query(`
+    ALTER TABLE resource_assignments
+      ADD CONSTRAINT IF NOT EXISTS ra_uniq_student
+        UNIQUE (resource_id, student_id, push_type)
+  `).catch(() => {});
+  await sequelize.query(`
+    ALTER TABLE resource_assignments
+      ADD CONSTRAINT IF NOT EXISTS ra_uniq_class
+        UNIQUE (resource_id, class_id, push_type)
+  `).catch(() => {});
   await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_ra_student ON resource_assignments(student_id)`).catch(() => {});
   await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_ra_class   ON resource_assignments(class_id)`).catch(() => {});
   // Gap 4 & 6: UNIQUE constraints required for ON CONFLICT DO NOTHING to work.
@@ -221,6 +232,8 @@ async function ensureResourceAssignments() {
       ADD CONSTRAINT IF NOT EXISTS uq_ra_class
       UNIQUE (resource_id, class_id, push_type)
   `).catch(() => {});
+  raEnsured = true;
+}
   raEnsured = true;
 }
 
