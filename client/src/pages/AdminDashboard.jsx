@@ -184,14 +184,14 @@ const CatalogPanel = () => {
               <span className="text-xs text-white/30 shrink-0 hidden sm:block">{type.subject_count} subject{type.subject_count !== 1 ? 's' : ''}</span>
               <div className="flex gap-1 shrink-0">
                 <button onClick={() => openAddSubject(type.id)} className="flex items-center gap-1 text-xs text-violet-600 hover:text-violet-700 border border-violet-200 hover:border-violet-400 px-2.5 py-1.5 rounded-lg font-semibold"><Plus size={12} /> Subject</button>
-                <button onClick={() => openEditType(type)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><Pencil size={15} /></button>
+                <button onClick={() => openEditType(type)} className="p-1.5 text-white/30 hover:text-blue-400 hover:bg-blue-500/10 rounded-md"><Pencil size={15} /></button>
                 <button onClick={() => setShowDeleteConfirm({ kind: 'type', id: type.id, name: type.name })} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 size={15} /></button>
               </div>
             </div>
             {expandedType === type.id && (
               <div className="bg-gray-50 border-t border-gray-100 px-4 pb-4 pt-3">
-                {loadingSubjects[type.id] ? <div className="flex items-center gap-2 py-4 text-gray-400 text-sm"><Loader2 size={16} className="animate-spin" /> Loading subjects...</div>
-                  : (typeSubjects[type.id] || []).length === 0 ? <div className="text-center py-6"><p className="text-gray-400 text-sm mb-3">No subjects yet.</p><button onClick={() => openAddSubject(type.id)} className="inline-flex items-center gap-1.5 text-sm text-violet-600 font-semibold"><Plus size={14} /> Add first subject</button></div>
+                {loadingSubjects[type.id] ? <div className="flex items-center gap-2 py-4 text-white/40 text-sm"><Loader2 size={16} className="animate-spin" /> Loading subjects...</div>
+                  : (typeSubjects[type.id] || []).length === 0 ? <div className="text-center py-6"><p className="text-white/40 text-sm mb-3">No subjects yet.</p><button onClick={() => openAddSubject(type.id)} className="inline-flex items-center gap-1.5 text-sm text-violet-600 font-semibold"><Plus size={14} /> Add first subject</button></div>
                   : (
                     <div className="space-y-2">
                       {(typeSubjects[type.id] || []).map((subject) => (
@@ -208,7 +208,7 @@ const CatalogPanel = () => {
                             {subject.category && <span className="text-xs text-gray-400">{subject.category}</span>}
                           </div>
                           <div className="flex gap-1 shrink-0">
-                            <button onClick={() => { setActiveTypeId(type.id); openEditSubject(subject, type.id); }} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><Pencil size={14} /></button>
+                            <button onClick={() => { setActiveTypeId(type.id); openEditSubject(subject, type.id); }} className="p-1.5 text-white/30 hover:text-blue-400 hover:bg-blue-500/10 rounded-md"><Pencil size={14} /></button>
                             <button onClick={() => { setActiveTypeId(type.id); setShowDeleteConfirm({ kind: 'subject', id: subject.id, name: subject.name }); }} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 size={14} /></button>
                           </div>
                         </div>
@@ -372,7 +372,7 @@ const TeacherAssignmentPanel = () => {
               {assignments.map(a => (
                 <tr key={a.id} className="border-b border-gray-50 hover:bg-gray-50">
                   <td className="py-3 font-medium text-gray-800">{a.teacher_name}</td>
-                  <td className="py-3 text-gray-500 text-xs">{a.email}</td>
+                  <td className="py-3 text-white/40 text-xs">{a.email}</td>
                   <td className="py-3 text-gray-700">{a.subject_name}</td>
                   <td className="py-3 text-gray-500">{a.exam_board_code || '—'}</td>
                   <td className="py-3"><span className={`text-xs font-semibold px-2 py-1 rounded-full ${a.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>{a.is_active ? 'Active' : 'Inactive'}</span></td>
@@ -396,9 +396,9 @@ const TeacherAssignmentPanel = () => {
                   <label className="block text-xs font-semibold text-gray-600">Subject(s) *{selectedSubjectIds.length > 0 && <span className="ml-2 text-violet-600 font-bold">{selectedSubjectIds.length} selected</span>}</label>
                   {form.exam_type_id && <button type="button" onClick={refreshSubjects} disabled={loadingSubjects} className="flex items-center gap-1 text-xs text-gray-400 hover:text-violet-600 disabled:opacity-40"><RefreshCw size={11} className={loadingSubjects ? 'animate-spin' : ''} /> Refresh</button>}
                 </div>
-                {!form.exam_type_id ? <div className="border-2 border-dashed border-white/[0.08] rounded-xl p-4 text-center text-gray-400 text-sm">Select an exam type first</div>
-                  : loadingSubjects ? <div className="flex items-center gap-2 py-4 text-gray-400 text-sm"><Loader2 size={15} className="animate-spin" /> Loading subjects…</div>
-                  : filteredSubjects.length === 0 ? <div className="border-2 border-dashed border-white/[0.08] rounded-xl p-4 text-center text-gray-400 text-sm">No subjects found. Add subjects in Catalog Management.</div>
+                {!form.exam_type_id ? <div className="border-2 border-dashed border-white/[0.08] rounded-xl p-4 text-center text-white/40 text-sm">Select an exam type first</div>
+                  : loadingSubjects ? <div className="flex items-center gap-2 py-4 text-white/40 text-sm"><Loader2 size={15} className="animate-spin" /> Loading subjects…</div>
+                  : filteredSubjects.length === 0 ? <div className="border-2 border-dashed border-white/[0.08] rounded-xl p-4 text-center text-white/40 text-sm">No subjects found. Add subjects in Catalog Management.</div>
                   : (
                     <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1 border border-white/[0.08] rounded-xl p-2">
                       {filteredSubjects.map(s => {
@@ -565,18 +565,18 @@ const UserManagementPanel = () => {
         <select value={roleFilter} onChange={e => { setRoleFilter(e.target.value); setPage(1); }} className="border border-white/[0.08] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"><option value="">All Roles</option><option value="student">Students</option><option value="teacher">Teachers</option><option value="admin">Admins</option></select>
       </div>
       {loading ? <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 text-violet-400 animate-spin" /></div>
-        : users.length === 0 ? <div className="text-center py-12 text-gray-400 text-sm">No users found.</div>
+        : users.length === 0 ? <div className="text-center py-12 text-white/40 text-sm">No users found.</div>
         : (
           <div className="overflow-x-auto rounded-xl border border-gray-100">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 text-xs text-gray-400 font-medium"><tr><th className="text-left px-4 py-3">Name / Email</th><th className="text-left px-4 py-3">Role</th><th className="text-left px-4 py-3">Subscription</th><th className="text-left px-4 py-3 hidden sm:table-cell">Last Login</th><th className="text-left px-4 py-3">Actions</th></tr></thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody className="divide-y divide-white/[0.04]">
                 {users.map(u => (
-                  <tr key={u.id} className={`bg-white hover:bg-gray-50 ${!u.is_active ? 'opacity-50' : ''}`}>
+                  <tr key={u.id} className={`hover:bg-white/[0.02] ${!u.is_active ? 'opacity-50' : ''}`}>
                     <td className="px-4 py-3"><p className="font-semibold text-gray-800">{u.first_name} {u.last_name}</p><p className="text-xs text-gray-400">{u.email}</p></td>
                     <td className="px-4 py-3"><span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${roleBadge(u.role)}`}>{u.role}</span></td>
                     <td className="px-4 py-3"><span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">{u.subscription_status || 'free'}</span></td>
-                    <td className="px-4 py-3 hidden sm:table-cell text-gray-400 text-xs">{fmtDate(u.last_login)}</td>
+                    <td className="px-4 py-3 hidden sm:table-cell text-white/30 text-xs">{fmtDate(u.last_login)}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <select value={u.role} onChange={e => changeRole(u.id, e.target.value)} className="text-xs border border-white/[0.08] rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-violet-400"><option value="student">Student</option><option value="teacher">Teacher</option><option value="admin">Admin</option></select>
@@ -646,7 +646,7 @@ const PlatformAnalyticsPanel = () => {
     <div className="space-y-6">
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       <div className="flex items-center justify-between">
-        <div><h2 className="text-xl font-bold text-white/90">Platform Analytics</h2><p className="text-sm text-gray-500 mt-0.5">Live snapshot of platform activity</p></div>
+        <div><h2 className="text-xl font-bold text-white/90">Platform Analytics</h2><p className="text-sm text-white/40 mt-0.5">Live snapshot of platform activity</p></div>
         <button onClick={fetchStats} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 px-3 py-2 border border-white/[0.08] rounded-xl"><RefreshCw size={14} /> Refresh</button>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -658,7 +658,7 @@ const PlatformAnalyticsPanel = () => {
         ].map((c, i) => <div key={i} className={`border rounded-2xl p-4 ${c.color.split(' ').slice(0,2).join(' ')}`}><p className="text-xs text-gray-500 mb-1">{c.label}</p><p className={`text-3xl font-black ${c.color.split(' ')[2]}`}>{typeof c.value === 'number' ? c.value.toLocaleString() : c.value}</p></div>)}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+        <div className="bg-white/[0.03] border border-white/[0.06] rounded-lg p-5">
           <p className="text-sm font-semibold text-gray-700 mb-4">Daily Activity (Last 14 Days)</p>
           {daily_activity.length === 0 ? <p className="text-xs text-gray-400 text-center py-8">No activity data yet</p> : (
             <ResponsiveContainer width="100%" height={180}>
@@ -672,7 +672,7 @@ const PlatformAnalyticsPanel = () => {
             </ResponsiveContainer>
           )}
         </div>
-        <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+        <div className="bg-white/[0.03] border border-white/[0.06] rounded-lg p-5">
           <p className="text-sm font-semibold text-gray-700 mb-4">Top Subjects — Avg Accuracy (%)</p>
           {top_subjects.length === 0 ? <p className="text-xs text-gray-400 text-center py-8">No subject data yet</p> : (
             <ResponsiveContainer width="100%" height={180}>
@@ -686,7 +686,7 @@ const PlatformAnalyticsPanel = () => {
           )}
         </div>
       </div>
-      <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+      <div className="bg-white/[0.03] border border-white/[0.06] rounded-lg p-5">
         <p className="text-sm font-semibold text-gray-700 mb-3">Quick Actions</p>
         <div className="flex flex-wrap gap-3">
           <button onClick={() => setNotifModal(true)} className="flex items-center gap-2 text-sm bg-violet-600 hover:bg-violet-700 text-white font-semibold px-4 py-2 rounded-xl"><Zap size={14} /> Send Notification</button>
@@ -760,14 +760,14 @@ const AdminPastPapersPanel = () => {
           <div className="overflow-x-auto rounded-xl border border-gray-100">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 text-xs text-gray-400 font-medium"><tr><th className="text-left px-4 py-3">Title</th><th className="text-left px-4 py-3">Subject</th><th className="text-left px-4 py-3">Exam Type</th><th className="text-left px-4 py-3">Year</th><th className="text-left px-4 py-3">Size</th><th className="text-left px-4 py-3">Actions</th></tr></thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody className="divide-y divide-white/[0.04]">
                 {papers.map(p => (
-                  <tr key={p.id} className="bg-white hover:bg-gray-50">
+                  <tr key={p.id} className="hover:bg-white/[0.02]">
                     <td className="px-4 py-3 font-medium text-gray-800 max-w-xs truncate">{p.title}</td>
                     <td className="px-4 py-3 text-gray-500">{p.subject_name || '—'}</td>
                     <td className="px-4 py-3"><span className="text-xs font-mono bg-violet-50 text-violet-600 px-2 py-0.5 rounded">{p.exam_board}</span></td>
                     <td className="px-4 py-3 text-gray-500">{p.year || '—'}</td>
-                    <td className="px-4 py-3 text-gray-400 text-xs">{fmtSize(p.file_size_bytes)}</td>
+                    <td className="px-4 py-3 text-white/30 text-xs">{fmtSize(p.file_size_bytes)}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         {p.file_url && <a href={p.file_url} target="_blank" rel="noopener noreferrer" className="text-xs text-violet-600 hover:text-violet-800 font-semibold">View</a>}
@@ -824,7 +824,7 @@ const AdminSettingsPanel = ({ setActivePanel }) => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {sec.items.map(item => (
                 <button key={item.label} onClick={item.action} className="text-left border border-white/[0.08] rounded-xl p-4 hover:border-violet-300 hover:bg-violet-50 transition-colors group">
-                  <p className="font-semibold text-gray-800 text-sm group-hover:text-violet-700">{item.label}</p>
+                  <p className="font-semibold text-white/80 text-sm group-hover:text-violet-700">{item.label}</p>
                   <p className="text-xs text-gray-400 mt-1 leading-relaxed">{item.desc}</p>
                 </button>
               ))}

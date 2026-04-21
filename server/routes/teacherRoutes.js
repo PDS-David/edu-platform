@@ -227,7 +227,40 @@ async function ensureClassTables() {
   }
 }
 
-// ── GET /api/teacher/classes ──────────────────────────────────────────────────
+// ── GET /api/teacher/students ─────────────────────────────────────────────────
+// Returns all students who are members of any of this teacher's classes.
+// Used by TeacherResourcesPage to populate the push-to-student list.
+router.get('/students', protect, teacherOnly, async (req, res) => {
+  try {
+    const rows = await safeQuery(
+      `SELECT DISTINCT u.id, u.first_name, u.last_name, u.email
+       FROM users u
+       JOIN class_memberships cm ON cm.student_id = u.id
+       JOIN classes c ON c.id = cm.class_id
+       WHERE c.teacher_id = :teacherId
+         AND u.is_active = true
+       ORDER BY u.first_name, u.last_name`,
+      { teacherId: req.user.id }
+    );
+    // Fallback: if teacher has no classes, return all active students
+    if (!rows.length) {
+      const allStudents = await safeQuery(
+        `SELECT id, first_name, last_name, email
+         FROM users
+         WHERE role = 'student' AND is_active = true
+         ORDER BY first_name, last_name
+         LIMIT 200`,
+        {}
+      );
+      return res.json({ success: true, data: allStudents });
+    }
+    return res.json({ success: true, data: rows });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── GET /api/teacher/class/:classId/students (already exists below) ───────────
 router.get('/classes', protect, teacherOnly, async (req, res) => {
   await ensureClassTables();
   try {
