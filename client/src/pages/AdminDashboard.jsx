@@ -931,12 +931,70 @@ const AdminDashboard = () => {
           </div>
 
           {!activePanel && (
-            <div className="flex flex-col items-center justify-center py-24 text-center border border-dashed border-white/[0.06] rounded-lg">
-              <div className="w-10 h-10 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center mb-3">
-                <Settings size={18} className="text-violet-400" />
+            <div className="space-y-4">
+              {/* Content quick-actions — always visible on landing */}
+              <div>
+                <p className="text-[10px] font-mono text-white/30 uppercase tracking-widest mb-3">Quick Actions</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {[
+                    {
+                      icon: GraduationCap,
+                      label: 'Catalog Management',
+                      desc:  'Add exam types and subjects so teachers can assign topics',
+                      action: () => setActivePanel('catalog'),
+                      accent: 'text-violet-400',
+                      border: 'hover:border-violet-500/40',
+                    },
+                    {
+                      icon: BookOpen,
+                      label: 'Question Review',
+                      desc:  'Approve or reject questions submitted by teachers and AI',
+                      action: () => navigate('/admin/questions/review'),
+                      accent: 'text-blue-400',
+                      border: 'hover:border-blue-500/40',
+                    },
+                    {
+                      icon: UserCheck,
+                      label: 'Teacher Assignment',
+                      desc:  'Assign teachers to subjects so they can manage content',
+                      action: () => setActivePanel('teachers'),
+                      accent: 'text-emerald-400',
+                      border: 'hover:border-emerald-500/40',
+                    },
+                    {
+                      icon: Sparkles,
+                      label: 'AI Generate',
+                      desc:  'Generate questions for a subject using Gemini AI',
+                      action: () => setActivePanel('aigenerate'),
+                      accent: 'text-amber-400',
+                      border: 'hover:border-amber-500/40',
+                    },
+                    {
+                      icon: Upload,
+                      label: 'Bulk Upload',
+                      desc:  'Upload files in bulk and assign them to students',
+                      action: () => setActivePanel('bulkupload'),
+                      accent: 'text-rose-400',
+                      border: 'hover:border-rose-500/40',
+                    },
+                    {
+                      icon: Users,
+                      label: 'User Management',
+                      desc:  'View, search and manage all platform users',
+                      action: () => setActivePanel('users'),
+                      accent: 'text-sky-400',
+                      border: 'hover:border-sky-500/40',
+                    },
+                  ].map(c => (
+                    <button key={c.label} onClick={c.action}
+                      className={`p-4 bg-[#1a1a1b] border border-white/[0.06] ${c.border} rounded-lg text-left transition-colors group`}>
+                      <c.icon size={18} className={`${c.accent} mb-2`} />
+                      <p className="font-semibold text-white/80 text-sm group-hover:text-white">{c.label}</p>
+                      <p className="text-xs text-white/30 mt-1 leading-relaxed">{c.desc}</p>
+                    </button>
+                  ))}
+                </div>
               </div>
-              <p className="text-sm font-medium text-white/50">Select a service from the sidebar</p>
-              <p className="text-xs text-white/25 mt-1 font-mono">Click any item on the left to open it</p>
             </div>
           )}
 

@@ -391,11 +391,12 @@ export default function TeacherDashboard() {
 
   // ── Sidebar items — all wired ─────────────────────────────────────────────
   const sidebarItems = [
-    { id: 'classes',     icon: Users,     label: 'My Classes',   tab: true  },
-    { id: 'analytics',   icon: BarChart2, label: 'Analytics',    tab: true  },
-    { id: 'testbuilder', icon: PenTool,   label: 'Test Builder', tab: true  },
-    { id: 'resources',   icon: Upload,    label: 'Resources',    link: '/teacher/resources'    },
-    { id: 'addq',        icon: Plus,      label: 'Add Question', link: '/teacher/questions/add'},
+    { id: 'classes',     icon: Users,     label: 'My Classes',      tab: true  },
+    { id: 'analytics',   icon: BarChart2, label: 'Analytics',       tab: true  },
+    { id: 'testbuilder', icon: PenTool,   label: 'Test Builder',    tab: true  },
+    { id: 'content',     icon: BookOpen,  label: 'Content Manager', link: '/teacher/content'      },
+    { id: 'resources',   icon: Upload,    label: 'Resources',       link: '/teacher/resources'    },
+    { id: 'addq',        icon: Plus,      label: 'Add Question',    link: '/teacher/questions/add'},
   ];
 
   const isTabActive = (item) => item.tab && activeTab === item.id;
