@@ -476,11 +476,13 @@ export default function LandingPage() {
 
           {/* Brand */}
           <div className="space-y-3">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <img src="/logo.svg" alt="AISchoolonair" className="w-6 h-6" />
-              <span className="font-bold text-white text-base">
-                AISchoolonair
-              </span>
+              <span className="font-bold text-white text-base">AISchoolonair</span>
+              <span className="w-px h-5 bg-white/20 shrink-0" />
+              <img src="/eac_logo.png" alt="EAC" className="h-6 w-auto object-contain brightness-200" style={{maxWidth:'52px'}} />
+              <span className="hidden sm:block w-px h-5 bg-white/20 shrink-0" />
+              <img src="/lessonteacher_logo.jpg" alt="LessonTeacher" className="hidden sm:block h-5 w-auto object-contain brightness-200" style={{maxWidth:'70px'}} />
             </div>
             <p className="text-xs leading-relaxed">{branding.tagline}</p>
             <div className="flex gap-3 pt-1">
