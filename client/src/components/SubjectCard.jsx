@@ -56,7 +56,7 @@ const SubjectCard = ({ subject, examBoard, showExamBoard = true }) => {
             <div>
               <h3 className="text-xl font-bold text-gray-900">{subject.name}</h3>
               {showExamBoard && (
-                <span className="inline-block mt-1 px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded">
+                <span className="inline-block mt-1 px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">
                   {examBoard}
                 </span>
               )}
@@ -77,7 +77,7 @@ const SubjectCard = ({ subject, examBoard, showExamBoard = true }) => {
             {subject.topics.slice(0, 6).map((topic, index) => (
               <span 
                 key={index}
-                className="px-3 py-1 bg-white border border-gray-200 text-gray-700 rounded-full text-xs font-medium hover:border-green-400 transition-colors"
+                className="px-3 py-1 bg-white border border-gray-200 text-gray-700 rounded-full text-xs font-medium hover:border-blue-400 transition-colors"
               >
                 {topic}
               </span>
@@ -117,7 +117,7 @@ const SubjectCard = ({ subject, examBoard, showExamBoard = true }) => {
           </div>
 
           {/* Revision Notes */}
-          <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
+          <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
             <span className="text-3xl"></span>
             <div>
               <div className="text-lg font-bold text-gray-900">
@@ -144,11 +144,11 @@ const SubjectCard = ({ subject, examBoard, showExamBoard = true }) => {
           <div className="mb-4">
             <div className="flex justify-between items-center mb-2">
               <span className="text-xs font-medium text-gray-600">Your Progress</span>
-              <span className="text-xs font-bold text-green-600">{subject.progress}%</span>
+              <span className="text-xs font-bold text-blue-600">{subject.progress}%</span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
               <div 
-                className="bg-green-600 h-2 rounded-full transition-all duration-500"
+                className="bg-blue-600 h-2 rounded-full transition-all duration-500"
                 style={{ width: `${subject.progress}%` }}
               ></div>
             </div>
@@ -158,7 +158,7 @@ const SubjectCard = ({ subject, examBoard, showExamBoard = true }) => {
         {/* CTA Button */}
         <button
           onClick={handleAccessResources}
-          className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-md hover:shadow-lg"
+          className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-md hover:shadow-lg"
         >
           Access {examBoard} Resources →
         </button>

@@ -97,7 +97,7 @@ export default function PaymentVerify() {
             )}
             <Link
               to="/student/dashboard"
-              className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-3 rounded-xl transition-colors w-full justify-center"
+              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl transition-colors w-full justify-center"
             >
               Go to Dashboard <ChevronRight size={16} />
             </Link>
@@ -115,7 +115,7 @@ export default function PaymentVerify() {
             <div className="flex flex-col gap-3">
               <Link
                 to="/pricing"
-                className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-3 rounded-xl transition-colors justify-center"
+                className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl transition-colors justify-center"
               >
                 <RefreshCw size={15} /> Try Again
               </Link>

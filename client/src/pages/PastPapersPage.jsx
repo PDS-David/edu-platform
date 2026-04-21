@@ -107,7 +107,14 @@ export default function PastPapersPage() {
                 Start Free
               </Link>
             </>
-          ) : null
+          ) : (
+            <Link
+              to={user.role === 'teacher' ? '/teacher/dashboard' : user.role === 'admin' ? '/admin/dashboard' : '/student/dashboard'}
+              className="text-sm text-gray-500 hover:text-gray-900 flex items-center gap-1.5 font-medium"
+            >
+              ← Dashboard
+            </Link>
+          )
         }
       />
 

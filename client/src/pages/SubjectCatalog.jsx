@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import ExamBoardSelector from "../components/ExamBoardSelector";
 import SubjectCard from "../components/SubjectCard";
 import PublicNav from "../components/PublicNav";
@@ -58,6 +59,18 @@ const SubjectCatalog = () => {
       <PublicNav />
 
       <main className="pt-6 pb-20 px-4 max-w-7xl mx-auto">
+
+        {/* Back to dashboard for logged-in users */}
+        {user && (
+          <div className="mb-4">
+            <Link
+              to={user.role === 'teacher' ? '/teacher/dashboard' : user.role === 'admin' ? '/admin/dashboard' : '/student/dashboard'}
+              className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 font-medium"
+            >
+              ← Dashboard
+            </Link>
+          </div>
+        )}
 
         <h1 className="text-4xl font-extrabold text-gray-900 text-center mb-10">
           Examinations

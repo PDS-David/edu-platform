@@ -89,9 +89,9 @@ const ExamTypeSelector = ({
           className={`
             w-full ${sizeClasses[size]}
             border border-gray-300 rounded-lg
-            focus:ring-2 focus:ring-green-500 focus:border-green-500
+            focus:ring-2 focus:ring-blue-500 focus:border-blue-500
             bg-white shadow-sm appearance-none cursor-pointer
-            transition-all duration-200 hover:border-green-400
+            transition-all duration-200 hover:border-blue-400
           `}
         >
           {includeAll && <option value=""> All Exam Types</option>}

@@ -43,28 +43,66 @@ function FileIcon({ type, size = 16 }) {
   return <File size={size} className="text-gray-400" />;
 }
 
+// ── URL resolver — rewrites old eacbuddy-api URLs to current API base ─────────
+function resolveFileUrl(rawUrl) {
+  const apiBase = (import.meta.env.VITE_API_URL || window.location.origin)
+    .replace(/\/api$/, "")
+    .replace(/\/$/, "");
+
+  if (!rawUrl) return "";
+
+  // Already a relative path → prepend current API base
+  if (!rawUrl.startsWith("http")) return `${apiBase}${rawUrl}`;
+
+  // Old dead server → rewrite to current API
+  if (/eacbuddy-api\.onrender\.com/.test(rawUrl)) {
+    return rawUrl.replace(/https?:\/\/eacbuddy-api\.onrender\.com/, apiBase);
+  }
+
+  return rawUrl;
+}
+
 // ── Inline file viewer ────────────────────────────────────────────────────────
-function InlineViewer({ file, base }) {
-  const rawUrl = file.file_url?.startsWith("http") ? file.file_url : `${base}${file.file_url}`;
-  const currentBase = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/api$/, "");
-  const url = rawUrl.replace(/https?:\/\/eacbuddy-api\.onrender\.com/, currentBase);
+function InlineViewer({ file }) {
+  const url  = resolveFileUrl(file.file_url);
   const type = (file.type || file.resource_type || "").toLowerCase();
   const ext  = url.split("?")[0].split(".").pop().toLowerCase();
+  const [broken, setBroken] = useState(false);
 
   if (type === "video" || ["mp4","webm","mov"].includes(ext))
     return <div className="mt-2 rounded-xl overflow-hidden bg-black"><video src={url} controls className="w-full max-h-56 rounded-xl" /></div>;
   if (type === "audio" || ["mp3","wav","ogg","m4a"].includes(ext))
     return <audio src={url} controls className="w-full mt-2" />;
   if (type === "image" || ["jpg","jpeg","png","gif","webp"].includes(ext))
-    return <img src={url} alt={file.title} className="mt-2 rounded-xl w-full max-h-48 object-contain bg-gray-100" />;
+    return <img src={url} alt={file.title} className="mt-2 rounded-xl w-full max-h-48 object-contain bg-gray-100" onError={() => setBroken(true)} />;
 
-  const viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
+  if (broken) return (
+    <div className="mt-2 rounded-xl border border-red-100 bg-red-50 p-4 text-center">
+      <p className="text-sm text-red-600 font-medium">File unavailable</p>
+      <p className="text-xs text-red-400 mt-1">This file may have been uploaded to a server that no longer exists.</p>
+    </div>
+  );
+
+  // Office formats → Microsoft Office Online viewer (handles docx/pptx/xlsx natively)
+  const isOffice = ["docx","pptx","xlsx","doc","ppt","xls"].includes(ext);
+  const viewerUrl = isOffice
+    ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`
+    : `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
+
   return (
-    <div className="mt-2 rounded-xl overflow-hidden border border-purple-100 bg-purple-50">
-      <iframe src={viewerUrl} title={file.title} className="w-full" style={{ height: 380 }} allow="fullscreen" />
-      <div className="flex items-center justify-center py-1.5 bg-purple-50 border-t border-purple-100">
-        <a href={url} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline">
-          Open in new tab if preview doesn't load
+    <div className="mt-2 rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
+      <iframe
+        src={viewerUrl}
+        title={file.title}
+        className="w-full"
+        style={{ height: 420 }}
+        allow="fullscreen"
+        onError={() => setBroken(true)}
+      />
+      <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-t border-gray-200">
+        <span className="text-[10px] text-gray-400">{isOffice ? "Powered by Microsoft Office Online" : "Powered by Google Docs Viewer"}</span>
+        <a href={url} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline font-medium">
+          Open in new tab ↗
         </a>
       </div>
     </div>
@@ -74,7 +112,6 @@ function InlineViewer({ file, base }) {
 // ── Assigned files section ────────────────────────────────────────────────────
 function AssignedFilesSection({ resources, loading, totalResources, navigate }) {
   const [openFile, setOpenFile] = useState(null);
-  const BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/api$/, "");
 
   const bySubject = useMemo(() => {
     const map = {};
@@ -121,7 +158,8 @@ function AssignedFilesSection({ resources, loading, totalResources, navigate }) 
                       const fileType = (file.type || file.resource_type || "").toLowerCase();
                       const isOpen   = openFile === `${file.id}-${pt}`;
                       const isPractice = pt === "practice_test" || pt === "quiz";
-                      const rawUrl = file.file_url?.startsWith("http") ? file.file_url : `${BASE}${file.file_url}`;
+                      // Always use resolveFileUrl so old eacbuddy URLs are rewritten
+                      const resolvedUrl = resolveFileUrl(file.file_url);
                       return (
                         <div key={`${file.id}-${pt}`} className="border border-gray-100 rounded-xl overflow-hidden bg-white hover:border-blue-200 transition-colors">
                           <div className="p-3 flex items-center gap-3">
@@ -137,7 +175,7 @@ function AssignedFilesSection({ resources, loading, totalResources, navigate }) 
                                 onClick={() => setOpenFile(isOpen ? null : `${file.id}-${pt}`)}
                                 className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-colors ${
                                   isOpen
-                                    ? "bg-blue-500 text-white border-violet-600"
+                                    ? "bg-blue-500 text-white border-blue-600"
                                     : "border-blue-200 text-blue-600 hover:bg-blue-50"
                                 }`}
                               >
@@ -151,7 +189,7 @@ function AssignedFilesSection({ resources, loading, totalResources, navigate }) 
                                   Practice
                                 </button>
                               )}
-                              <a href={rawUrl} download
+                              <a href={resolvedUrl} target="_blank" rel="noreferrer" download
                                 className="p-1.5 rounded-lg border border-gray-200 text-gray-400 hover:text-blue-600 hover:border-blue-200 transition-colors">
                                 <Download size={13} />
                               </a>
@@ -159,7 +197,7 @@ function AssignedFilesSection({ resources, loading, totalResources, navigate }) 
                           </div>
                           {isOpen && (
                             <div className="px-3 pb-3 border-t border-gray-100">
-                              <InlineViewer file={file} base={BASE} />
+                              <InlineViewer file={file} />
                             </div>
                           )}
                         </div>
@@ -269,15 +307,15 @@ export default function StudentDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-gray-900">
+    <div className="min-h-screen bg-[#f9f7f4] text-[#1a1a1a]">
       <TopNav />
 
       <div className="flex">
         {/* ── SIDEBAR ─────────────────────────────────────────────── */}
-        <aside className="w-52 shrink-0 min-h-[calc(100vh-48px)] bg-white border-r border-gray-100 sticky top-12 self-start hidden md:block shadow-sm">
+        <aside className="w-52 shrink-0 min-h-[calc(100vh-48px)] bg-[#f0ede8] border-r border-[#e8e4dd] sticky top-12 self-start hidden md:block">
           <div className="px-3 py-5">
             <div className="px-3 py-2 mb-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-blue-400">Student</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-[#b5a99a]">Student</p>
               <p className="text-xs font-semibold text-gray-700 mt-0.5 truncate">{firstName}</p>
             </div>
 
@@ -296,13 +334,13 @@ export default function StudentDashboard() {
                   <button
                     key={item.label}
                     onClick={() => handleSidebarClick(item)}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all text-left ${
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all text-left ${
                       active
-                        ? "bg-blue-500 text-white font-semibold shadow-sm shadow-blue-200"
-                        : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
+                        ? "bg-white text-[#1a1a1a] font-semibold shadow-sm border border-[#e8e4dd]"
+                        : "text-[#6b6259] hover:text-[#1a1a1a] hover:bg-white/60"
                     }`}
                   >
-                    <Icon size={14} className={active ? "text-white" : "text-gray-400"} />
+                    <Icon size={14} className={active ? "text-[#d97757]" : "text-[#b5a99a]"} />
                     {item.label}
                   </button>
                 );
