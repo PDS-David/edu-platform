@@ -19,7 +19,7 @@ const Toast = ({ message, type, onClose }) => (
 );
 
 const Section = ({ title, subtitle, icon: Icon, children, accent = 'teal' }) => {
-  const colors = { teal: 'bg-teal-50 text-teal-600', purple: 'bg-purple-50 text-purple-600', blue: 'bg-blue-50 text-blue-600', red: 'bg-red-50 text-red-500' };
+  const colors = { teal: 'bg-blue-50 text-blue-600', purple: 'bg-purple-50 text-purple-600', blue: 'bg-blue-50 text-blue-600', red: 'bg-red-50 text-red-500' };
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
       <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100">
@@ -42,7 +42,7 @@ const RoleBadge = ({ role }) => {
 };
 
 const Toggle = ({ value, onChange }) => (
-  <button onClick={() => onChange(!value)} className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${value ? 'bg-teal-500' : 'bg-gray-200'}`}>
+  <button onClick={() => onChange(!value)} className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${value ? 'bg-blue-500' : 'bg-gray-200'}`}>
     <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${value ? 'translate-x-5' : 'translate-x-0.5'}`} />
   </button>
 );
@@ -166,7 +166,7 @@ export default function SettingsPage() {
           type={showPw[showKey] ? 'text' : 'password'}
           value={pwForm[field]}
           onChange={e => { setPwForm(f => ({ ...f, [field]: e.target.value })); setPwErrors(er => ({ ...er, [field]: undefined })); }}
-          className={`w-full border rounded-xl px-4 py-2.5 pr-11 text-sm focus:outline-none focus:ring-2 ${pwErrors[field] ? 'border-red-300 focus:ring-red-200' : 'border-gray-200 focus:ring-teal-300'}`}
+          className={`w-full border rounded-xl px-4 py-2.5 pr-11 text-sm focus:outline-none focus:ring-2 ${pwErrors[field] ? 'border-red-300 focus:ring-red-200' : 'border-gray-200 focus:ring-blue-300'}`}
         />
         <button type="button" onClick={() => setShowPw(s => ({ ...s, [showKey]: !s[showKey] }))} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
           {showPw[showKey] ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -197,7 +197,7 @@ export default function SettingsPage() {
         {/* ── Profile ── */}
         <Section title="Profile" subtitle="Update your personal information" icon={User}>
           <div className="flex items-center gap-4 mb-5">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center text-white text-2xl font-bold shrink-0">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-2xl font-bold shrink-0">
               {fullName.charAt(0).toUpperCase()}
             </div>
             <div>
@@ -209,16 +209,16 @@ export default function SettingsPage() {
 
           {/* Subscription banner for students */}
           {role === 'student' && (
-            <div className={`mb-4 rounded-xl p-3 flex items-center justify-between ${user?.subscription_status === 'active' ? 'bg-green-50' : user?.subscription_status === 'free_trial' ? 'bg-teal-50' : 'bg-amber-50'}`}>
+            <div className={`mb-4 rounded-xl p-3 flex items-center justify-between ${user?.subscription_status === 'active' ? 'bg-green-50' : user?.subscription_status === 'free_trial' ? 'bg-blue-50' : 'bg-amber-50'}`}>
               <div className="flex items-center gap-2">
-                <Sparkles size={14} className={user?.subscription_status === 'active' ? 'text-green-600' : 'text-teal-600'} />
+                <Sparkles size={14} className={user?.subscription_status === 'active' ? 'text-green-600' : 'text-blue-600'} />
                 <div>
                   <p className="text-xs font-bold text-gray-800 capitalize">{user?.subscription_status === 'free_trial' ? '14-Day Free Trial' : user?.subscription_status || 'Free'}</p>
                   {trialDaysLeft() !== null && <p className="text-xs text-gray-500">{trialDaysLeft()} days remaining</p>}
                 </div>
               </div>
               {user?.subscription_status !== 'active' && (
-                <button onClick={() => navigate('/pricing')} className="text-xs font-semibold text-teal-700 hover:underline flex items-center gap-1">Upgrade <ChevronRight size={12} /></button>
+                <button onClick={() => navigate('/pricing')} className="text-xs font-semibold text-blue-700 hover:underline flex items-center gap-1">Upgrade <ChevronRight size={12} /></button>
               )}
             </div>
           )}
@@ -237,13 +237,13 @@ export default function SettingsPage() {
                   <input
                     value={profile[field]}
                     onChange={e => setProfile(p => ({ ...p, [field]: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-xl pl-8 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
+                    className="w-full border border-gray-200 rounded-xl pl-8 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
                   />
                 </div>
               </div>
             ))}
           </div>
-          <button onClick={handleProfileSave} disabled={profileSaving} className="mt-4 flex items-center gap-2 bg-teal-500 hover:bg-teal-600 disabled:opacity-50 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors">
+          <button onClick={handleProfileSave} disabled={profileSaving} className="mt-4 flex items-center gap-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors">
             {profileSaving ? <><Loader2 size={14} className="animate-spin" /> Saving…</> : <><Check size={14} /> Save Profile</>}
           </button>
         </Section>
@@ -257,7 +257,7 @@ export default function SettingsPage() {
                 <div className="flex gap-2 flex-wrap">
                   {GOALS.map(g => (
                     <button key={g} onClick={() => setStudyPrefs(p => ({ ...p, daily_goal: g }))}
-                      className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-colors ${studyPrefs.daily_goal === g ? 'bg-teal-500 border-teal-500 text-white' : 'border-gray-200 text-gray-600 hover:border-teal-300'}`}>
+                      className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-colors ${studyPrefs.daily_goal === g ? 'bg-blue-500 border-blue-500 text-white' : 'border-gray-200 text-gray-600 hover:border-blue-300'}`}>
                       {g}
                     </button>
                   ))}
@@ -302,7 +302,7 @@ export default function SettingsPage() {
               <div className="flex items-center gap-2">
                 {[1,2,3,4].map(i => {
                   const s = strengthScore(pwForm.new_password);
-                  const color = s >= 4 ? 'bg-green-500' : s >= 3 ? 'bg-teal-400' : s >= 2 ? 'bg-amber-400' : 'bg-red-400';
+                  const color = s >= 4 ? 'bg-green-500' : s >= 3 ? 'bg-blue-400' : s >= 2 ? 'bg-amber-400' : 'bg-red-400';
                   return <div key={i} className={`h-1 flex-1 rounded-full ${i <= s ? color : 'bg-gray-100'}`} />;
                 })}
                 <span className="text-xs text-gray-400 whitespace-nowrap">
@@ -310,7 +310,7 @@ export default function SettingsPage() {
                 </span>
               </div>
             )}
-            <button onClick={handlePasswordChange} disabled={pwSaving} className="flex items-center gap-2 bg-teal-500 hover:bg-teal-600 disabled:opacity-50 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors">
+            <button onClick={handlePasswordChange} disabled={pwSaving} className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors">
               {pwSaving ? <><Loader2 size={14} className="animate-spin" /> Saving…</> : <><Lock size={14} /> Update Password</>}
             </button>
           </div>

@@ -25,7 +25,7 @@ function Toast({ msg, type, onClose }) {
       rounded-2xl shadow-xl text-sm font-semibold text-white max-w-sm
       ${type === 'success' ? 'bg-gray-900' : 'bg-red-600'}`}>
       {type === 'success'
-        ? <CheckCircle size={14} className="text-teal-400 shrink-0" />
+        ? <CheckCircle size={14} className="text-blue-400 shrink-0" />
         : <AlertTriangle size={14} className="shrink-0" />}
       <span className="flex-1">{msg}</span>
       <button onClick={onClose}><X size={13} className="opacity-60" /></button>
@@ -172,7 +172,7 @@ function UploadTab({ showToast }) {
     }
   };
 
-  const sel = 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-300 disabled:bg-gray-50 disabled:text-gray-400';
+  const sel = 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:bg-gray-50 disabled:text-gray-400';
   const lbl = 'block text-xs font-semibold text-gray-600 mb-1.5';
 
   return (
@@ -185,7 +185,7 @@ function UploadTab({ showToast }) {
         onDrop={handleDrop}
         onClick={() => fileRef.current?.click()}
         className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-colors
-          ${dragOver ? 'border-teal-400 bg-teal-50' : 'border-gray-200 hover:border-teal-300 hover:bg-gray-50'}`}
+          ${dragOver ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'}`}
       >
         <input
           ref={fileRef}
@@ -308,7 +308,7 @@ function UploadTab({ showToast }) {
           </div>
           <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
             <div
-              className="h-full bg-teal-500 rounded-full transition-all duration-300"
+              className="h-full bg-blue-500 rounded-full transition-all duration-300"
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -318,7 +318,7 @@ function UploadTab({ showToast }) {
       <button
         onClick={handleUpload}
         disabled={uploading || !file || !form.title.trim()}
-        className="w-full bg-teal-500 hover:bg-teal-600 disabled:opacity-50 text-white font-semibold
+        className="w-full bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-semibold
           py-3 rounded-xl text-sm transition-colors flex items-center justify-center gap-2"
       >
         {uploading
@@ -419,7 +419,7 @@ function ResourcesTab({ showToast }) {
 
   if (loading) return (
     <div className="flex justify-center py-16">
-      <Loader2 size={24} className="animate-spin text-teal-400" />
+      <Loader2 size={24} className="animate-spin text-blue-400" />
     </div>
   );
 
@@ -448,7 +448,7 @@ function ResourcesTab({ showToast }) {
                 )}
                 {r.subject_name && (
                   <><span className="text-xs text-gray-300">·</span>
-                  <span className="text-xs text-teal-600">{r.subject_name}</span></>
+                  <span className="text-xs text-blue-600">{r.subject_name}</span></>
                 )}
                 {r.push_type && r.push_type !== 'learning_material' && (
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
@@ -461,7 +461,7 @@ function ResourcesTab({ showToast }) {
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <a href={r.url || r.file_url} target="_blank" rel="noreferrer"
-                className="text-xs text-teal-600 hover:text-teal-800 font-medium px-3 py-1.5 border border-teal-200 rounded-lg transition-colors">
+                className="text-xs text-blue-600 hover:text-blue-800 font-medium px-3 py-1.5 border border-blue-200 rounded-lg transition-colors">
                 View
               </a>
               <button
@@ -654,13 +654,13 @@ function QuestionsTab({ showToast }) {
     }
   };
 
-  const inp = 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-300 disabled:bg-gray-50 disabled:text-gray-400';
+  const inp = 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:bg-gray-50 disabled:text-gray-400';
   const lbl = 'block text-xs font-semibold text-gray-600 mb-1.5';
   const LABELS = ['A', 'B', 'C', 'D'];
 
   return (
     <div className="max-w-2xl space-y-5">
-      <div className="bg-teal-50 border border-teal-100 rounded-2xl px-4 py-3 text-xs text-teal-700">
+      <div className="bg-blue-50 border border-blue-100 rounded-2xl px-4 py-3 text-xs text-blue-700">
         Questions you submit here are <strong>automatically approved</strong> and will immediately appear in quizzes for your assigned subjects.
       </div>
 
@@ -755,12 +755,12 @@ function QuestionsTab({ showToast }) {
             <div
               key={i}
               className={`flex items-center gap-3 border-2 rounded-xl px-3 py-2.5 transition-colors
-                ${opt.is_correct ? 'border-teal-400 bg-teal-50' : 'border-gray-200'}`}
+                ${opt.is_correct ? 'border-blue-400 bg-blue-50' : 'border-gray-200'}`}
             >
               <button
                 onClick={() => setOption(i, 'is_correct', true)}
                 className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors
-                  ${opt.is_correct ? 'border-teal-500 bg-teal-500' : 'border-gray-300 hover:border-teal-300'}`}
+                  ${opt.is_correct ? 'border-blue-500 bg-blue-500' : 'border-gray-300 hover:border-blue-300'}`}
               >
                 {opt.is_correct && <div className="w-2.5 h-2.5 rounded-full bg-white" />}
               </button>
@@ -793,7 +793,7 @@ function QuestionsTab({ showToast }) {
       <button
         onClick={handleSubmit}
         disabled={saving}
-        className="w-full bg-teal-500 hover:bg-teal-600 disabled:opacity-50 text-white font-semibold
+        className="w-full bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-semibold
           py-3 rounded-xl text-sm transition-colors flex items-center justify-center gap-2"
       >
         {saving
@@ -851,7 +851,7 @@ export default function TeacherResourcesPage({ defaultTab = 'upload' }) {
                 onClick={() => setActiveTab(t.id)}
                 className={`flex items-center gap-1.5 px-4 py-3.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
                   activeTab === t.id
-                    ? 'border-teal-500 text-teal-600'
+                    ? 'border-blue-500 text-blue-600'
                     : 'border-transparent text-gray-400 hover:text-gray-600'
                 }`}
               >

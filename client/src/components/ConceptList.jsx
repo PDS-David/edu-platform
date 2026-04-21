@@ -63,7 +63,7 @@ function ConceptForm({ initial = {}, onSave, onCancel }) {
   };
 
   return (
-    <div className="bg-teal-50 border border-teal-200 rounded-xl p-3 space-y-2 my-1">
+    <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-2 my-1">
       <input
         ref={ref}
         value={title}
@@ -71,7 +71,7 @@ function ConceptForm({ initial = {}, onSave, onCancel }) {
         onKeyDown={e => { if (e.key === 'Enter') handle(); if (e.key === 'Escape') onCancel(); }}
         placeholder="Concept title e.g. Mitosis vs Meiosis"
         className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-xs
-          focus:outline-none focus:ring-2 focus:ring-teal-300 bg-white"
+          focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
       />
       <textarea
         value={description}
@@ -79,7 +79,7 @@ function ConceptForm({ initial = {}, onSave, onCancel }) {
         placeholder="Short description (optional)"
         rows={2}
         className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-xs resize-none
-          focus:outline-none focus:ring-2 focus:ring-teal-300 bg-white"
+          focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
       />
       <div className="flex gap-2 justify-end">
         <button onClick={onCancel}
@@ -87,7 +87,7 @@ function ConceptForm({ initial = {}, onSave, onCancel }) {
           Cancel
         </button>
         <button onClick={handle} disabled={saving || !title.trim()}
-          className="px-3 py-1 text-xs font-semibold bg-teal-500 hover:bg-teal-600
+          className="px-3 py-1 text-xs font-semibold bg-blue-500 hover:bg-blue-600
             disabled:opacity-50 text-white rounded-lg flex items-center gap-1">
           {saving ? <Loader2 size={10} className="animate-spin" /> : <Save size={10} />}
           {saving ? 'Saving…' : 'Save'}
@@ -173,9 +173,9 @@ export default function ConceptList({ subtopic, showToast }) {
       {/* Toggle row */}
       <button
         onClick={() => setExpanded(e => !e)}
-        className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-teal-600 transition-colors py-1 group"
+        className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-blue-600 transition-colors py-1 group"
       >
-        <BookMarked size={11} className="group-hover:text-teal-500 transition-colors" />
+        <BookMarked size={11} className="group-hover:text-blue-500 transition-colors" />
         <span className="font-medium">
           {conceptCount > 0 ? `${conceptCount} concept${conceptCount !== 1 ? 's' : ''}` : 'Concepts'}
         </span>
@@ -183,7 +183,7 @@ export default function ConceptList({ subtopic, showToast }) {
       </button>
 
       {expanded && (
-        <div className="pl-2 border-l-2 border-teal-100 ml-1 mt-1 space-y-0.5">
+        <div className="pl-2 border-l-2 border-blue-100 ml-1 mt-1 space-y-0.5">
           {loading && (
             <div className="py-2 flex items-center gap-2 text-xs text-gray-400">
               <Loader2 size={11} className="animate-spin" /> Loading concepts…
@@ -217,7 +217,7 @@ export default function ConceptList({ subtopic, showToast }) {
                     <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                       <button
                         onClick={() => setEditingId(concept.id)}
-                        className="p-1 rounded text-gray-400 hover:text-teal-600 hover:bg-teal-50 transition-colors"
+                        className="p-1 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
                         title="Edit concept"
                       >
                         <Pencil size={10} />
@@ -246,7 +246,7 @@ export default function ConceptList({ subtopic, showToast }) {
           {!showAdd && !loading && (
             <button
               onClick={() => setShowAdd(true)}
-              className="flex items-center gap-1 text-[10px] text-teal-500 hover:text-teal-700 font-medium mt-1 transition-colors"
+              className="flex items-center gap-1 text-[10px] text-blue-500 hover:text-blue-700 font-medium mt-1 transition-colors"
             >
               <Plus size={10} /> Add concept
             </button>

@@ -182,7 +182,7 @@ function predictGrade(pct) {
   if (pct >= 90) return { grade: "A*", color: "text-blue-700 bg-blue-100" };
   if (pct >= 80) return { grade: "A",  color: "text-green-700 bg-green-100"  };
   if (pct >= 70) return { grade: "B",  color: "text-blue-700 bg-blue-100"    };
-  if (pct >= 60) return { grade: "C",  color: "text-teal-700 bg-teal-100"    };
+  if (pct >= 60) return { grade: "C",  color: "text-blue-700 bg-blue-100"    };
   if (pct >= 50) return { grade: "D",  color: "text-amber-700 bg-amber-100"  };
   return { grade: "E", color: "text-red-600 bg-red-100" };
 }

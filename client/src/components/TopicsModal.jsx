@@ -54,7 +54,7 @@ export default function TopicsModal({ subjectId, mode, onClose }) {
         <div className="overflow-y-auto flex-1 px-4 py-3">
           {loading && (
             <div className="flex justify-center py-10">
-              <div className="w-7 h-7 border-4 border-teal-500 border-t-transparent rounded-full animate-spin" />
+              <div className="w-7 h-7 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
             </div>
           )}
 
@@ -70,8 +70,8 @@ export default function TopicsModal({ subjectId, mode, onClose }) {
                   onClick={() => setExpanded(e => e === topic.id ? null : topic.id)}
                   className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
                 >
-                  <div className="w-8 h-8 rounded-full border-2 border-teal-400 flex items-center justify-center shrink-0">
-                    <span className="text-[10px] font-bold text-teal-600">
+                  <div className="w-8 h-8 rounded-full border-2 border-blue-400 flex items-center justify-center shrink-0">
+                    <span className="text-[10px] font-bold text-blue-600">
                       {topic.completion_percentage ?? 0}%
                     </span>
                   </div>
@@ -86,7 +86,7 @@ export default function TopicsModal({ subjectId, mode, onClose }) {
                 {expanded === topic.id && (
                   <div className="border-t border-gray-100 bg-gray-50 px-4 py-2 space-y-1">
                     <div className="flex justify-end mb-1">
-                      <span className="text-xs text-teal-500 font-medium cursor-pointer hover:underline">View all</span>
+                      <span className="text-xs text-blue-500 font-medium cursor-pointer hover:underline">View all</span>
                     </div>
                     {(topic.subtopics || []).map(st => (
                       <button
@@ -95,11 +95,11 @@ export default function TopicsModal({ subjectId, mode, onClose }) {
                         className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-white transition-colors group"
                       >
                         {st.is_complete
-                          ? <CheckCircle size={16} className="text-teal-500 shrink-0" />
+                          ? <CheckCircle size={16} className="text-blue-500 shrink-0" />
                           : <Circle size={16} className="text-gray-300 shrink-0" />
                         }
                         <span className="flex-1 text-sm text-gray-700 text-left">{st.name}</span>
-                        <ArrowRight size={14} className="text-gray-400 group-hover:text-teal-500 transition-colors" />
+                        <ArrowRight size={14} className="text-gray-400 group-hover:text-blue-500 transition-colors" />
                       </button>
                     ))}
                     {(!topic.subtopics || topic.subtopics.length === 0) && (

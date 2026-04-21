@@ -45,7 +45,7 @@ const BoldMarkdown = ({ text = '' }) => {
 };
 
 const TILE_COLOURS = [
-  'bg-pink-400','bg-amber-400','bg-teal-400','bg-purple-400',
+  'bg-pink-400','bg-amber-400','bg-blue-400','bg-purple-400',
   'bg-blue-400','bg-green-400','bg-orange-400','bg-rose-400',
 ];
 
@@ -158,7 +158,7 @@ function SetupScreen({ subtopic, subtopicId, attemptCount, selectedPaper, setSel
           This quiz will test your understanding of {stName} through a series of carefully crafted questions
           designed to challenge and reinforce your knowledge.{' '}
           {!expanded && (
-            <button onClick={() => setExpanded(true)} className="text-teal-300 underline text-xs">more</button>
+            <button onClick={() => setExpanded(true)} className="text-blue-300 underline text-xs">more</button>
           )}
         </p>
         {expanded && (
@@ -205,7 +205,7 @@ function SetupScreen({ subtopic, subtopicId, attemptCount, selectedPaper, setSel
 
         <button
           onClick={() => navigate(`/student/subtopic/${subtopic?.id || ''}/quiz-history`)}
-          className="text-teal-300 text-sm hover:underline"
+          className="text-blue-300 text-sm hover:underline"
         >
           Quiz History
         </button>
@@ -295,7 +295,7 @@ function InProgressScreen({ subtopicId, subtopic, selectedPaper, onFinish, navig
 
   if (loading) return (
     <div className="min-h-screen bg-[#0a4a3f] flex items-center justify-center">
-      <div className="w-10 h-10 border-4 border-teal-300 border-t-transparent rounded-full animate-spin" />
+      <div className="w-10 h-10 border-4 border-blue-300 border-t-transparent rounded-full animate-spin" />
     </div>
   );
 
@@ -399,7 +399,7 @@ function InProgressScreen({ subtopicId, subtopic, selectedPaper, onFinish, navig
                       }}
                       className={`w-full flex items-center gap-3 px-4 py-3 rounded-full border transition-all text-left ${
                         isSelected
-                          ? 'bg-teal-500 border-teal-500 text-white'
+                          ? 'bg-blue-500 border-blue-500 text-white'
                           : 'bg-white border-white text-gray-900 hover:bg-gray-50'
                       }`}
                     >
@@ -453,7 +453,7 @@ function InProgressScreen({ subtopicId, subtopic, selectedPaper, onFinish, navig
                 onClick={() => setCurrent(i)}
                 className={`w-9 h-9 rounded-lg text-xs font-bold transition-colors ${
                   isCurrent
-                    ? 'bg-teal-400 text-white border-b-2 border-teal-200'
+                    ? 'bg-blue-400 text-white border-b-2 border-blue-200'
                     : isAnswered
                       ? 'bg-white/40 text-white'
                       : 'bg-white/20 text-white hover:bg-white/30'
@@ -465,7 +465,7 @@ function InProgressScreen({ subtopicId, subtopic, selectedPaper, onFinish, navig
           })}
           <button
             onClick={handleSubmitClick}
-            className="ml-auto bg-teal-500 hover:bg-teal-400 text-white font-bold text-sm px-6 py-2 rounded-full transition-colors"
+            className="ml-auto bg-blue-500 hover:bg-blue-400 text-white font-bold text-sm px-6 py-2 rounded-full transition-colors"
           >
             Submit
           </button>
@@ -499,7 +499,7 @@ function InProgressScreen({ subtopicId, subtopic, selectedPaper, onFinish, navig
               </button>
               <button
                 onClick={() => submitQuiz()}
-                className="flex-1 bg-teal-500 hover:bg-teal-600 text-white font-bold py-2.5 rounded-xl transition-colors text-sm"
+                className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2.5 rounded-xl transition-colors text-sm"
               >
                 Submit
               </button>
@@ -520,7 +520,7 @@ function OpenAnswerArea({ value, onChange }) {
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder="Type your answer here ..."
-        className="w-full bg-white rounded-2xl border-0 px-4 py-4 text-sm text-gray-800 resize-none focus:outline-none focus:ring-2 focus:ring-teal-400 min-h-[200px]"
+        className="w-full bg-white rounded-2xl border-0 px-4 py-4 text-sm text-gray-800 resize-none focus:outline-none focus:ring-2 focus:ring-blue-400 min-h-[200px]"
       />
       <div className="absolute bottom-3 right-3 flex gap-2">
         <div className="relative">
@@ -574,18 +574,18 @@ function HintModal({ question, onClose }) {
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors">
           <X size={18} />
         </button>
-        <h2 className="text-center text-lg font-bold mb-4 bg-gradient-to-r from-teal-500 to-purple-500 bg-clip-text text-transparent">
+        <h2 className="text-center text-lg font-bold mb-4 bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">
           Hint 
         </h2>
         {loading ? (
           <div className="flex justify-center py-8">
-            <div className="w-8 h-8 border-4 border-teal-400 border-t-transparent rounded-full animate-spin" />
+            <div className="w-8 h-8 border-4 border-blue-400 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
           <ul className="space-y-3">
             {hints.map((hint, i) => (
               <li key={i} className="flex items-start gap-2 text-sm text-gray-700 leading-relaxed">
-                <span className="w-5 h-5 rounded-full bg-teal-100 text-teal-600 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
                   {i + 1}
                 </span>
                 <BoldMarkdown text={hint} />
@@ -629,12 +629,12 @@ function ResultsScreen({ subtopicId, subtopic, attemptId, onRevise, onQuizComple
 
   if (loading) return (
     <div className="min-h-screen bg-[#0a4a3f] flex flex-col items-center justify-center gap-4 px-4">
-      <div className="w-10 h-10 border-4 border-teal-300 border-t-transparent rounded-full animate-spin" />
+      <div className="w-10 h-10 border-4 border-blue-300 border-t-transparent rounded-full animate-spin" />
       <p className="text-white/80 text-sm">
         {submitProgress || 'Submitting your answers...'}
       </p>
       <div className="w-48 bg-white/20 rounded-full h-2">
-        <div className="h-2 bg-teal-400 rounded-full transition-all duration-500" style={{ width: '80%' }} />
+        <div className="h-2 bg-blue-400 rounded-full transition-all duration-500" style={{ width: '80%' }} />
       </div>
     </div>
   );
@@ -696,7 +696,7 @@ function ResultsScreen({ subtopicId, subtopic, attemptId, onRevise, onQuizComple
                 onClick={() => setSelectedQ(i)}
                 className={`w-9 h-9 rounded-lg text-xs font-bold transition-colors ${
                   selectedQ === i
-                    ? 'bg-teal-400 text-white'
+                    ? 'bg-blue-400 text-white'
                     : 'bg-white/20 text-white hover:bg-white/30'
                 }`}
               >
@@ -738,19 +738,19 @@ function ResultsScreen({ subtopicId, subtopic, attemptId, onRevise, onQuizComple
               </div>
 
               <div>
-                <p className="text-teal-400 text-xs font-medium mb-1">Correct Answer</p>
-                <p className="text-teal-300 text-sm leading-relaxed">{qData.correct_answer}</p>
+                <p className="text-blue-400 text-xs font-medium mb-1">Correct Answer</p>
+                <p className="text-blue-300 text-sm leading-relaxed">{qData.correct_answer}</p>
               </div>
 
               {/* Detailed Marking Scheme */}
               <div>
                 <button
                   onClick={() => setSchemeOpen(p => ({ ...p, [selectedQ]: !p[selectedQ] }))}
-                  className="w-full flex items-center justify-between bg-teal-600/30 hover:bg-teal-600/40 border border-teal-500/30 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition-colors"
+                  className="w-full flex items-center justify-between bg-blue-600/30 hover:bg-blue-600/40 border border-blue-500/30 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition-colors"
                 >
                   <span> Detailed Marking Scheme</span>
                   {schemeOpen[selectedQ] ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                  <span className="text-teal-300 text-[11px]">{schemeOpen[selectedQ] ? 'Hide' : 'Show'}</span>
+                  <span className="text-blue-300 text-[11px]">{schemeOpen[selectedQ] ? 'Hide' : 'Show'}</span>
                 </button>
 
                 {schemeOpen[selectedQ] && (
@@ -766,8 +766,8 @@ function ResultsScreen({ subtopicId, subtopic, attemptId, onRevise, onQuizComple
           <h3 className="text-white font-bold text-sm">Examiner Recommendation &amp; Competitive Benchmark</h3>
 
           <div className="space-y-2">
-            <div className="flex items-center gap-2 bg-teal-500/20 text-teal-300 text-xs font-semibold px-3 py-2 rounded-full">
-              <span className="w-2 h-2 rounded-full bg-teal-400" />
+            <div className="flex items-center gap-2 bg-blue-500/20 text-blue-300 text-xs font-semibold px-3 py-2 rounded-full">
+              <span className="w-2 h-2 rounded-full bg-blue-400" />
               Average Score: {avgScore}%
             </div>
             <div className="flex items-center gap-2 bg-purple-500/20 text-purple-300 text-xs font-semibold px-3 py-2 rounded-full">
@@ -840,7 +840,7 @@ function MarkingScheme({ qData }) {
           <ul className="space-y-1">
             {bullets.map((s, i) => (
               <li key={i} className="flex gap-1.5 text-xs leading-relaxed">
-                <span className="text-teal-400 shrink-0">•</span>
+                <span className="text-blue-400 shrink-0">•</span>
                 <BoldMarkdown text={s} />
               </li>
             ))}
@@ -860,7 +860,7 @@ function MarkingScheme({ qData }) {
       {ai.model_answer && (
         <div>
           <p className="font-bold text-white text-xs mb-1">Model Answer</p>
-          <p className="text-teal-300 font-bold text-xs leading-relaxed">{ai.model_answer}</p>
+          <p className="text-blue-300 font-bold text-xs leading-relaxed">{ai.model_answer}</p>
         </div>
       )}
 

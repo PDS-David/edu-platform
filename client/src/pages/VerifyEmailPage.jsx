@@ -55,7 +55,7 @@ export default function VerifyEmailPage() {
             <Loader2 size={48} className="text-indigo-500 animate-spin" />
           )}
           {status === 'success' && (
-            <CheckCircle size={48} className="text-teal-500" />
+            <CheckCircle size={48} className="text-blue-500" />
           )}
           {status === 'error' && (
             <XCircle size={48} className="text-red-400" />

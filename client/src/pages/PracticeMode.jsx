@@ -172,7 +172,7 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
               </span>
             )}
             {isEssay && (
-              <span className="px-2.5 py-1 bg-teal-100 text-teal-700 rounded-full text-xs font-semibold">
+              <span className="px-2.5 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
                 Essay
               </span>
             )}

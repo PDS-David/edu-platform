@@ -26,10 +26,10 @@ function ResultScreen({ result, testTitle, onDone }) {
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 max-w-sm w-full text-center">
         <div className="text-4xl mb-3">{result.accuracy_pct >= 70 ? '' : ''}</div>
         <h2 className="text-lg font-bold text-gray-900 mb-1">{testTitle} — Complete</h2>
-        <p className="text-3xl font-black text-teal-500 mt-4">{result.accuracy_pct}%</p>
+        <p className="text-3xl font-black text-blue-500 mt-4">{result.accuracy_pct}%</p>
         <p className="text-sm text-gray-500 mt-1">{result.correct} / {result.total} correct</p>
         <button onClick={onDone}
-          className="mt-6 w-full bg-teal-500 hover:bg-teal-600 text-white font-semibold py-3 rounded-xl text-sm transition-colors">
+          className="mt-6 w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 rounded-xl text-sm transition-colors">
           Back to Dashboard
         </button>
       </div>
@@ -105,10 +105,10 @@ export default function StudentTestPage() {
   // version of handleSubmit (with current test + answers in its closure).
   handleSubmitRef.current = handleSubmit;
 
-  if (loading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><Loader2 size={28} className="text-teal-400 animate-spin" /></div>;
+  if (loading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><Loader2 size={28} className="text-blue-400 animate-spin" /></div>;
   if (submitting && !result) return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4">
-      <Loader2 size={28} className="text-teal-400 animate-spin" />
+      <Loader2 size={28} className="text-blue-400 animate-spin" />
       <p className="text-gray-600 text-sm font-medium">Submitting your test…</p>
     </div>
   );
@@ -135,7 +135,7 @@ export default function StudentTestPage() {
           </div>
         </div>
         <div className="h-1 bg-gray-100">
-          <div className="h-full bg-teal-500 transition-all" style={{ width: `${(current / test.questions.length) * 100}%` }} />
+          <div className="h-full bg-blue-500 transition-all" style={{ width: `${(current / test.questions.length) * 100}%` }} />
         </div>
       </div>
 
@@ -154,7 +154,7 @@ export default function StudentTestPage() {
               <button key={opt.id}
                 onClick={() => setAnswers(prev => ({ ...prev, [q.id]: opt.id }))}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${
-                  answers[q.id] === opt.id ? 'border-teal-400 bg-teal-50' : 'border-gray-200 hover:border-teal-300'
+                  answers[q.id] === opt.id ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-blue-300'
                 }`}>
                 <span className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 bg-gray-100 text-gray-500">{LABELS[i]}</span>
                 <span className="text-sm text-gray-800 flex-1">{opt.option_text}</span>
@@ -170,12 +170,12 @@ export default function StudentTestPage() {
           <span className="text-sm text-gray-400">{current + 1} of {test.questions.length}</span>
           {current + 1 < test.questions.length ? (
             <button onClick={() => setCurrent(c => c + 1)}
-              className="bg-teal-500 hover:bg-teal-600 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-colors">
+              className="bg-blue-500 hover:bg-blue-600 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-colors">
               Next
             </button>
           ) : (
             <button onClick={() => handleSubmit(false)}
-              className="bg-teal-500 hover:bg-teal-600 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-colors">
+              className="bg-blue-500 hover:bg-blue-600 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-colors">
               Submit Test
             </button>
           )}
