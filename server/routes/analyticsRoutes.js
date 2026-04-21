@@ -134,19 +134,46 @@ router.get('/subject-breakdown', protect, async (req, res) => {
          COUNT(pa.id)::INTEGER AS attempts,
          ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 1) AS accuracy_pct,
          ROUND(AVG(pa.time_taken_seconds), 1) AS avg_time_seconds
-       FROM practice_attempts pa
-       JOIN questions  q  ON q.id  = pa.question_id
-       JOIN subtopics  st ON st.id = q.subtopic_id
-       JOIN topics     t  ON t.id  = st.topic_id
-       JOIN subjects   s  ON s.id  = t.subject_id
-       WHERE pa.student_id = :userId
+       FROM subjects s
+       -- anchor on enrolled subjects (via courses)
+       INNER JOIN courses     c  ON c.subject_id  = s.id
+       INNER JOIN enrollments e  ON e.course_id   = c.id
+                                AND e.student_id  = :userId
+                                AND e.status      = 'active'
+       LEFT JOIN topics     t  ON t.subject_id  = s.id
+       LEFT JOIN subtopics  st ON st.topic_id   = t.id
+       LEFT JOIN questions  q  ON q.subtopic_id = st.id
+       LEFT JOIN practice_attempts pa ON pa.question_id = q.id
+                                     AND pa.student_id  = :userId
        GROUP BY s.id, s.name
-       ORDER BY accuracy_pct DESC`,
+       ORDER BY attempts DESC NULLS LAST, s.name ASC`,
       { userId: req.user.id }
     );
     return res.json({ success: true, data: rows });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    // Fall back to attempts-only query if schema differs
+    try {
+      const rows = await safeQuery(
+        `SELECT
+           s.id AS subject_id,
+           s.name AS subject_name,
+           COUNT(pa.id)::INTEGER AS attempts,
+           ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 1) AS accuracy_pct,
+           ROUND(AVG(pa.time_taken_seconds), 1) AS avg_time_seconds
+         FROM practice_attempts pa
+         JOIN questions  q  ON q.id  = pa.question_id
+         JOIN subtopics  st ON st.id = q.subtopic_id
+         JOIN topics     t  ON t.id  = st.topic_id
+         JOIN subjects   s  ON s.id  = t.subject_id
+         WHERE pa.student_id = :userId
+         GROUP BY s.id, s.name
+         ORDER BY accuracy_pct DESC`,
+        { userId: req.user.id }
+      );
+      return res.json({ success: true, data: rows });
+    } catch (err2) {
+      return res.status(500).json({ success: false, error: err2.message });
+    }
   }
 });
 
