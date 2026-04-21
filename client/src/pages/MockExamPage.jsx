@@ -6,7 +6,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import api from '../services/apiClient';
-import { ChevronLeft, Loader2 } from 'lucide-react';
+import { ChevronLeft, Loader2, ArrowLeft } from 'lucide-react';
 import { UpgradeWall } from './PricingPage';
 
 const LABELS     = ['01', '02', '03', '04', '05'];
@@ -206,6 +206,13 @@ export default function MockExamPage() {
 
   return (
     <div className="min-h-screen bg-[#0a4a3f]">
+      {/* Back to dashboard */}
+      <div className="px-4 pt-3 pb-1">
+        <button onClick={() => navigate('/student/dashboard')}
+          className="inline-flex items-center gap-1.5 text-sm text-white/60 hover:text-white transition-colors">
+          <ArrowLeft size={13} /> Dashboard
+        </button>
+      </div>
 
       {/* Top bar */}
       <div className="sticky top-0 z-40 bg-[#0a4a3f] border-b border-white/10">

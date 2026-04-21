@@ -461,3 +461,84 @@ router.delete('/teacher-subjects/:id', protect, adminOnly, async (req, res) => {
 });
 
 module.exports = router;
+
+// ── POST /api/admin/generate-topics ──────────────────────────────────────────
+// Uses Gemini AI to generate curriculum-appropriate topics and subtopics for a
+// given subject, then inserts them into the database.
+// Body: { subject_id, subject_name, exam_board_code }
+router.post('/generate-topics', protect, adminOnly, async (req, res) => {
+  const { subject_id, subject_name, exam_board_code = 'WAEC' } = req.body;
+  if (!subject_id || !subject_name) {
+    return res.status(400).json({ success: false, error: 'subject_id and subject_name are required' });
+  }
+
+  // Check if topics already exist
+  const existing = await sequelize.query(
+    `SELECT COUNT(*)::int AS cnt FROM topics WHERE subject_id = :subjectId AND is_active = true`,
+    { replacements: { subjectId: parseInt(subject_id) }, type: QueryTypes.SELECT }
+  );
+  if (existing[0]?.cnt > 0) {
+    return res.json({ success: true, message: 'Topics already exist', already_exists: true });
+  }
+
+  if (!process.env.GEMINI_API_KEY) {
+    return res.status(503).json({ success: false, error: 'AI not configured — set GEMINI_API_KEY' });
+  }
+
+  try {
+    const prompt = `You are a Nigerian secondary school curriculum expert.
+Generate a structured list of topics and subtopics for ${exam_board_code} ${subject_name}.
+
+Return ONLY valid JSON — no markdown, no preamble:
+{
+  "topics": [
+    {
+      "name": "Topic name",
+      "subtopics": ["Subtopic 1", "Subtopic 2", "Subtopic 3"]
+    }
+  ]
+}
+
+Rules:
+- Produce 8-12 topics, each with 3-6 subtopics
+- Topics must match the official ${exam_board_code} ${subject_name} syllabus
+- Names must be concise (3-7 words)
+- Order topics from foundational to advanced`;
+
+    const raw     = await generate(prompt, 'generate-questions');
+    const cleaned = raw.replace(/```json|```/g, '').trim();
+    const parsed  = JSON.parse(cleaned);
+    const topicsArr = parsed.topics || [];
+
+    if (!topicsArr.length) {
+      return res.status(500).json({ success: false, error: 'AI returned no topics' });
+    }
+
+    let created = 0;
+    for (let i = 0; i < topicsArr.length; i++) {
+      const t = topicsArr[i];
+      const [topicRow] = await sequelize.query(
+        `INSERT INTO topics (subject_id, name, order_index, is_active, created_at, updated_at)
+         VALUES (:subjectId, :name, :order, true, NOW(), NOW())
+         RETURNING id`,
+        { replacements: { subjectId: parseInt(subject_id), name: t.name, order: i }, type: QueryTypes.SELECT }
+      );
+      const topicId = topicRow?.id;
+      if (!topicId) continue;
+
+      for (let j = 0; j < (t.subtopics || []).length; j++) {
+        await sequelize.query(
+          `INSERT INTO subtopics (topic_id, subject_id, name, order_index, is_active, created_at, updated_at)
+           VALUES (:topicId, :subjectId, :name, :order, true, NOW(), NOW())`,
+          { replacements: { topicId, subjectId: parseInt(subject_id), name: t.subtopics[j], order: j }, type: QueryTypes.INSERT }
+        ).catch(() => {}); // ignore subtopic insert errors
+      }
+      created++;
+    }
+
+    return res.json({ success: true, message: `Generated ${created} topics with subtopics`, count: created });
+  } catch (err) {
+    console.error('[POST /admin/generate-topics]', err.message);
+    return res.status(500).json({ success: false, error: 'Topic generation failed: ' + err.message });
+  }
+});

@@ -112,6 +112,7 @@ const enrollmentRoutes    = safeRequire('./routes/enrollments');
 const courseRoutes        = safeRequire('./routes/courses');
 const curriculumRoutes    = safeRequire('./routes/curriculumRoutes');
 const replayRoutes        = safeRequire('./routes/eventReplayRoutes');
+const dashboardRoutes     = safeRequire('./routes/dashboardRoutes');
 
 // MOUNT
 if (authRoutes)             app.use('/api/auth',              authRoutes);
@@ -148,6 +149,7 @@ if (paymentRoutes)          app.use('/api/payments',          protect, paymentRo
 if (weakTopicRoutes)        app.use('/api/weak-topics',       protect, weakTopicRoutes);
 if (recommendationRoutes)   app.use('/api/recommendations',   protect, recommendationRoutes);
 if (sessionRoutes)          app.use('/api/sessions',          protect, sessionRoutes);
+if (dashboardRoutes)        app.use('/api/dashboard',        protect, dashboardRoutes);
 if (replayRoutes)           app.use('/api/replay',            protect, replayRoutes);
 
 // HEALTH
