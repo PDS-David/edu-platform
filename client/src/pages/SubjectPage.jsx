@@ -8,7 +8,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/apiClient';
-import { ChevronDown, ChevronUp, ArrowRight, Loader2, Trophy, ArrowLeft, Sparkles } from 'lucide-react';
+import { ChevronDown, ChevronUp, ArrowRight, Loader2, Trophy } from 'lucide-react';
 import TopNav from '../components/TopNav';
 
 
@@ -47,8 +47,14 @@ function TopicsModal({ open, onClose, mode, topics, onSelectSubtopic }) {
         {/* Accordion */}
         <div className="overflow-y-auto flex-1">
           {topics.length === 0 ? (
-            <div className="p-6 text-center text-gray-400 text-sm">
-              No topics available yet for this subject.
+            <div className="p-8 text-center">
+              <div className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                <BookOpen size={20} className="text-gray-400" />
+              </div>
+              <p className="text-sm font-semibold text-gray-700 mb-1">No topics yet for this subject</p>
+              <p className="text-xs text-gray-400 leading-relaxed max-w-xs mx-auto">
+                Your teacher hasn't added topics for this subject yet. Check back soon, or ask your teacher to add content via the Topics &amp; Content panel.
+              </p>
             </div>
           ) : (
             topics.map(topic => (
@@ -130,9 +136,7 @@ export default function SubjectPage() {
   const [modalMode,     setModalMode]     = useState(null); // 'resources'|'practice'|'quiz'|null
   const [pageAccordion, setPageAccordion] = useState(null); // expanded topic id on page
   const [isEnrolled,    setIsEnrolled]    = useState(false);
-  const [enrolling,       setEnrolling]       = useState(false);
-  const [topicGenLoading, setTopicGenLoading] = useState(false);
-  const [topicGenMsg,     setTopicGenMsg]     = useState('');
+  const [enrolling,     setEnrolling]     = useState(false);
 
   // ── Load subject + topics ──────────────────────────────────────────────────
   useEffect(() => {
@@ -206,35 +210,6 @@ export default function SubjectPage() {
     }
   };
 
-  // ── AI: generate topics when none exist ──────────────────────────────────────
-  const handleGenerateTopics = async () => {
-    if (!subject || !subjectId) return;
-    setTopicGenLoading(true);
-    setTopicGenMsg('');
-    try {
-      const res = await api.post('/admin/generate-topics', {
-        subject_id:      subjectId,
-        subject_name:    subject.name,
-        exam_board_code: subject.exam_board_code || 'WAEC',
-      });
-      if (res.data?.already_exists) {
-        setTopicGenMsg('Topics already exist — please refresh the page.');
-      } else {
-        setTopicGenMsg(`✓ Generated ${res.data?.count || 0} topics! Refreshing…`);
-        setTimeout(() => {
-          api.get('/topics', { params: { subject_id: subjectId } })
-            .then(r => setTopics(r.data?.topics || r.data || []))
-            .catch(() => {});
-          setTopicGenMsg('');
-        }, 1200);
-      }
-    } catch {
-      setTopicGenMsg('Generation failed — check AI configuration.');
-    } finally {
-      setTopicGenLoading(false);
-    }
-  };
-
   // ── Navigate to subtopic with tab ──────────────────────────────────────────
   const handleSelectSubtopic = (subtopicId, mode) => {
     setModalMode(null);
@@ -260,12 +235,6 @@ export default function SubjectPage() {
       <TopNav />
 
       <div className="max-w-3xl mx-auto px-4 py-6">
-
-        {/* ── Back to dashboard ── */}
-        <button onClick={() => navigate('/student/dashboard')}
-          className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 mb-4 transition-colors">
-          <ArrowLeft size={14} /> Back to Dashboard
-        </button>
 
         {/* ── Breadcrumb ── */}
         <nav className="flex items-center gap-1.5 text-sm text-gray-400 mb-4 flex-wrap">
@@ -380,24 +349,10 @@ export default function SubjectPage() {
           </p>
 
           {topics.length === 0 ? (
-            <div className="text-center py-10 bg-white border border-gray-100 rounded-2xl shadow-sm">
-              <div className="text-3xl mb-2">📚</div>
-              <p className="text-sm font-semibold text-gray-700 mb-1">No topics added yet</p>
-              <p className="text-xs text-gray-400 mb-4">Your teacher or admin hasn't added topics yet.</p>
-              {user?.role === 'admin' && (
-                <div className="space-y-2">
-                  <button
-                    onClick={handleGenerateTopics}
-                    disabled={topicGenLoading}
-                    className="flex items-center gap-2 mx-auto bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors"
-                  >
-                    {topicGenLoading
-                      ? <><Loader2 size={14} className="animate-spin" /> Generating…</>
-                      : <><Sparkles size={14} /> Generate Topics with AI</>}
-                  </button>
-                  {topicGenMsg && <p className="text-xs text-emerald-600 mt-1">{topicGenMsg}</p>}
-                </div>
-              )}
+            <div className="text-center py-10 bg-white rounded-2xl border border-gray-100 shadow-sm">
+              <BookOpen size={28} className="mx-auto mb-3 text-gray-200" />
+              <p className="text-sm font-semibold text-gray-600 mb-1">No topics yet</p>
+              <p className="text-xs text-gray-400 max-w-xs mx-auto">Topics for this subject haven't been added yet. Your teacher can add them via the Topics &amp; Content panel.</p>
             </div>
           ) : (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">

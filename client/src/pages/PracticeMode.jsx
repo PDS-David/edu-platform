@@ -420,23 +420,22 @@ export default function PracticeMode() {
 
   const { subjectId, subjectName, boardCode, isRemediation, conceptName } = location.state || {};
 
-  const [phase,     setPhase]     = useState('loading');
-  const [questions, setQuestions] = useState([]);
-  const [sessionId, setSessionId] = useState('');
-  const [current,   setCurrent]   = useState(0);
-  const [score,     setScore]     = useState(0);
-  const [errMsg,    setErrMsg]    = useState('');
+  const [phase,          setPhase]          = useState('loading');
+  const [questions,      setQuestions]      = useState([]);
+  const [sessionId,      setSessionId]      = useState('');
+  const [current,        setCurrent]        = useState(0);
+  const [score,          setScore]          = useState(0);
+  const [errMsg,         setErrMsg]         = useState('');
+  const [subjects,       setSubjects]       = useState([]);
+  const [pickedSubject,  setPickedSubject]  = useState(subjectId ? { id: subjectId, name: subjectName } : null);
 
-  const loadQuestions = async () => {
+  const loadQuestions = async (sid, bcode) => {
     setPhase('loading');
     setErrMsg('');
     try {
-      const params = {
-        count: 10,
-        mode:  'practice',   // ← tells backend to include AI-generated (not yet teacher-approved) questions
-      };
-      if (boardCode) params.board      = boardCode;
-      if (subjectId) params.subject_id = subjectId;
+      const params = { count: 10, mode: 'practice' };
+      if (bcode)  params.board      = bcode;
+      if (sid)    params.subject_id = sid;
 
       const res = await api.get('/questions/random', { params });
 
@@ -462,11 +461,22 @@ export default function PracticeMode() {
   };
 
   useEffect(() => {
-    if (!boardCode && !subjectId) {
-      navigate('/student/dashboard', { replace: true });
-      return;
+    if (subjectId || boardCode) {
+      loadQuestions(subjectId, boardCode);
+    } else {
+      // No subject in navigation state — load enrolled subjects for picker
+      api.get('/students/my-subjects')
+        .then(r => {
+          const list = r.data || [];
+          setSubjects(list);
+          setPhase(list.length > 0 ? 'pick' : 'error');
+          if (!list.length) setErrMsg('No subjects enrolled. Enrol in subjects from your dashboard first.');
+        })
+        .catch(() => {
+          setPhase('error');
+          setErrMsg('Could not load your subjects. Please try again.');
+        });
     }
-    loadQuestions();
   }, []); // eslint-disable-line
 
   const handleAnswer = (wasCorrect) => {
@@ -477,6 +487,39 @@ export default function PracticeMode() {
       setCurrent(c => c + 1);
     }
   };
+
+  // ── Subject picker ──────────────────────────────────────────────────────────
+  if (phase === 'pick') {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 w-full max-w-md p-6">
+          <button onClick={() => navigate('/student/dashboard')}
+            className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-700 mb-5">
+            <ChevronLeft size={16} /> Back
+          </button>
+          <div className="flex items-center gap-2 mb-1">
+            <BookOpen size={18} className="text-violet-500" />
+            <h2 className="text-base font-bold text-gray-900">Choose a Subject to Practise</h2>
+          </div>
+          <p className="text-xs text-gray-400 mb-5">Pick any subject from your enrolled list</p>
+          <div className="space-y-2">
+            {subjects.map(s => (
+              <button key={s.id}
+                onClick={() => { setPickedSubject(s); loadQuestions(s.id, s.exam_board_code); }}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-gray-100 hover:border-violet-300 hover:bg-violet-50 transition-colors text-left group">
+                <span className="text-xl shrink-0">{s.icon_emoji || '📚'}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-800 group-hover:text-violet-700 truncate">{s.name}</p>
+                  {s.exam_board_code && <p className="text-xs text-gray-400">{s.exam_board_code}</p>}
+                </div>
+                <ArrowRight size={14} className="text-gray-300 group-hover:text-violet-500 shrink-0" />
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (phase === 'loading') {
     return (
