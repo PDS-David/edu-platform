@@ -93,10 +93,8 @@ services:
     staticPublishPath: dist
 
     envVars:
-      # Set this to your backend URL after AISchoolonair-api is deployed
-      # e.g. https://AISchoolonair-api.onrender.com
       - key: VITE_API_URL
-        sync: false
+        value: https://eacbuddy-api.onrender.com
 
     routes:
       # Send all routes to index.html so React Router works correctly

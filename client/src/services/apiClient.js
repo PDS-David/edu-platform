@@ -2,22 +2,15 @@ import axios from "axios";
 
 /**
  * Unified Axios Client
- * - Enforces /api prefix
+ * - Enforces /api prefix (but not double-adding it)
  * - Handles auth token
  * - Normalizes responses
- * - Auto-corrects stale VITE_API_URL pointing to old eacbuddy-api domain
  */
 
 const RAW_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
-// If the env var still points to the old domain, rewrite it to the correct one
-const CORRECTED_BASE = RAW_BASE.replace(
-  /https?:\/\/eacbuddy-api\.onrender\.com/,
-  "https://aischoolonair-api.onrender.com"
-);
-
-// Always strip trailing slash, then ensure /api suffix (but don't double-add it)
-const normalised = CORRECTED_BASE.replace(/\/$/, "");
+// Strip trailing slash, then ensure /api suffix (don't double-add)
+const normalised = RAW_BASE.replace(/\/$/, "");
 const API_BASE_URL = normalised.endsWith("/api")
   ? normalised
   : normalised + "/api";
