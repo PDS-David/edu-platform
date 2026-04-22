@@ -460,6 +460,48 @@ router.delete('/teacher-subjects/:id', protect, adminOnly, async (req, res) => {
   }
 });
 
+// ── POST /api/admin/run-seed ──────────────────────────────────────────────────
+// One-time endpoint to seed demo content (exam boards, subjects, topics,
+// subtopics, questions, resources).  Admin-only.  Safe to call multiple times.
+router.post('/run-seed', protect, adminOnly, async (req, res) => {
+  try {
+    const seedPath = require('path').join(__dirname, '../seeds/seedDemoContent.js');
+    // seedDemoContent exports a runSeed(sequelize) function, OR we can require
+    // and execute it as a module.  Support both patterns.
+    let mod;
+    try { mod = require(seedPath); } catch (e) {
+      return res.status(500).json({ success: false, error: 'Seed file not found: ' + e.message });
+    }
+
+    if (typeof mod === 'function') {
+      // Pattern: module.exports = async (sequelizeInstance) => { ... }
+      await mod(sequelize);
+      return res.json({ success: true, message: 'Seed completed via exported function.' });
+    }
+
+    // Pattern: seed runs on require() side-effects (the common pattern in this repo)
+    // The file already ran when required.  Re-requiring won't re-run it (Node caches).
+    // So we shell out to node as a child process instead.
+    const { execFile } = require('child_process');
+    const nodeBin = process.execPath;
+    await new Promise((resolve, reject) => {
+      execFile(nodeBin, [seedPath], {
+        env: process.env,
+        timeout: 120_000,
+        cwd: require('path').join(__dirname, '..'),
+      }, (err, stdout, stderr) => {
+        if (err) return reject(new Error(stderr || err.message));
+        resolve(stdout);
+      });
+    });
+
+    return res.json({ success: true, message: 'Seed completed successfully. Demo content is now live.' });
+  } catch (err) {
+    console.error('[POST /admin/run-seed]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;
 
 // ── POST /api/admin/generate-topics ──────────────────────────────────────────
