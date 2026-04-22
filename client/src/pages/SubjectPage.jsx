@@ -8,7 +8,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/apiClient';
-import { ChevronDown, ChevronUp, ArrowRight, Loader2, Trophy } from 'lucide-react';
+import { ChevronDown, ChevronUp, ArrowRight, Loader2, Trophy, BookOpen } from 'lucide-react';
 import TopNav from '../components/TopNav';
 
 
@@ -180,18 +180,24 @@ export default function SubjectPage() {
     load();
   }, [user, subjectId]);
 
-  // ── Check enrollment status ────────────────────────────────────────────────
+  // ── Check enrollment status — auto-enroll silently on first visit ─────────
   useEffect(() => {
-    if (!user || !subjectId) return;
+    if (!user || !subjectId || user.role !== 'student') return;
     api.get('/students/my-subjects')
       .then(r => {
         const enrolled = (r.data || []).some(s => String(s.id) === String(subjectId));
         setIsEnrolled(enrolled);
+        // Auto-enroll silently — no barrier, student just sees content
+        if (!enrolled) {
+          api.post('/students/subjects', { subject_id: subjectId })
+            .then(() => setIsEnrolled(true))
+            .catch(() => {});
+        }
       })
       .catch(() => {});
   }, [user, subjectId]);
 
-  // ── Enroll / Unenroll ──────────────────────────────────────────────────────
+  // ── Manual enroll/unenroll (still available via button) ───────────────────
   const handleEnroll = async () => {
     if (!user) { navigate('/login'); return; }
     setEnrolling(true);
