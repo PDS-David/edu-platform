@@ -17,7 +17,7 @@ import {
   CheckCircle, XCircle, Lightbulb, Sparkles,
   BookOpen, FileText, HelpCircle,
   Upload, Sigma,
-, ArrowLeft } from 'lucide-react';
+  ArrowLeft } from 'lucide-react';
 import TopNav from '../components/TopNav';
 import AIChatWidget from '../components/AIChatWidget';
 import QuizTab from '../components/QuizTab';
