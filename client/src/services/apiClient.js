@@ -7,7 +7,12 @@ import axios from "axios";
  * - Normalizes responses
  */
 
-const RAW_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+// VITE_API_URL must point to the live API server.
+// Render service name: eacbuddy-api  →  https://eacbuddy-api.onrender.com
+// Fallback is hardcoded so login works even if the env var is wrong/missing.
+const RAW_BASE =
+  import.meta.env.VITE_API_URL ||
+  "https://eacbuddy-api.onrender.com";
 
 // Strip trailing slash, then ensure /api suffix (don't double-add)
 const normalised = RAW_BASE.replace(/\/$/, "");
