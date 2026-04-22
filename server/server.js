@@ -40,6 +40,18 @@ app.set('trust proxy', 1);
 // Static file handlers, helmet, rate-limiters, and error handlers
 // all respond without CORS headers if CORS isn't first.
 // ─────────────────────────────────────────────
+
+// Belt-and-suspenders: manually inject CORS headers on EVERY response
+// before any middleware can intercept and respond without them.
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,x-request-id');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
+
 const corsOptions = {
   origin: (origin, cb) => cb(null, true),  // accept all origins
   credentials: true,
