@@ -50,9 +50,9 @@ export default function StudentSubjectsPage() {
             <p className="text-sm text-gray-400 mt-0.5">Select a subject to access resources, practice questions and quizzes</p>
           </div>
           <button
-            onClick={() => navigate('/subjects')}
+            onClick={() => navigate('/student/exam-types')}
             className="flex items-center gap-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 py-2 rounded-lg transition-colors">
-            <Plus size={13} /> Add Subject
+            <Plus size={13} /> Add Exam Type
           </button>
         </div>
 
@@ -65,9 +65,9 @@ export default function StudentSubjectsPage() {
             <BookOpen size={40} className="text-gray-200 mx-auto mb-3" />
             <p className="text-sm font-semibold text-gray-700 mb-1">No subjects enrolled yet</p>
             <p className="text-xs text-gray-400 mb-4">Browse the catalog and enroll in your exam subjects to begin studying.</p>
-            <button onClick={() => navigate('/subjects')}
+            <button onClick={() => navigate('/student/exam-types')}
               className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors">
-              Browse Subjects
+              Browse Exam Types
             </button>
           </div>
         ) : (
