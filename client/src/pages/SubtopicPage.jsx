@@ -397,10 +397,6 @@ function MCQQuestion({ question, questionNumber, totalQuestions, onAnswer, onPre
     if (isSelected && !isCorrect) return 'border-red-300 bg-red-50';
     return 'border-gray-100 opacity-60';
   };
-    if (isCorrect)                return 'border-blue-400 bg-blue-50';
-    if (isSelected && !isCorrect) return 'border-red-300 bg-red-50';
-    return 'border-gray-100 opacity-60';
-  };
 
   return (
     <div className="pb-24">
