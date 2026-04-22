@@ -882,15 +882,15 @@ const AdminDashboard = () => {
   const greeting = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
 
   return (
-    <div className="min-h-screen bg-slate-50 text-gray-900">
+    <div className="min-h-screen bg-[#f9f7f4] text-[#1a1a1a]">
       <TopNav />
 
       <div className="flex">
         {/* ── SIDEBAR ── */}
-        <aside className="w-52 shrink-0 min-h-[calc(100vh-48px)] bg-white border-r border-gray-100 sticky top-12 self-start hidden md:block shadow-sm">
+        <aside className="w-52 shrink-0 min-h-[calc(100vh-48px)] bg-[#f0ede8] border-r border-[#e8e4dd] sticky top-12 self-start hidden md:block">
           <div className="px-3 py-5">
             <div className="px-3 py-2 mb-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-violet-500">Admin</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-[#b5a99a]">Admin</p>
               <p className="text-xs font-semibold text-gray-700 mt-0.5 truncate">{firstName}</p>
             </div>
             <nav className="space-y-0.5">
@@ -900,10 +900,10 @@ const AdminDashboard = () => {
                   <button key={key} onClick={() => setActivePanel(active ? null : key)}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all text-left ${
                       active
-                        ? 'bg-violet-600 text-white font-semibold shadow-sm shadow-violet-200'
-                        : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                        ? 'bg-white text-[#1a1a1a] font-semibold shadow-sm border border-[#e8e4dd]'
+                        : 'text-[#6b6259] hover:text-[#1a1a1a] hover:bg-white/60'
                     }`}>
-                    <Icon size={14} className={active ? 'text-white' : 'text-gray-400'} />
+                    <Icon size={14} className={active ? 'text-[#d97757]' : 'text-[#b5a99a]'} />
                     {label}
                   </button>
                 );
@@ -915,8 +915,8 @@ const AdminDashboard = () => {
         {/* ── MAIN ── */}
         <main className="flex-1 min-w-0">
           {/* Header */}
-          <div className="border-b border-gray-100 px-6 md:px-8 py-5 bg-white">
-            <p className="text-violet-500 text-xs uppercase tracking-widest mb-0.5 font-medium">Admin Console</p>
+          <div className="border-b border-[#e8e4dd] px-6 md:px-8 py-5 bg-white">
+            <p className="text-[#b5a99a] text-xs uppercase tracking-widest mb-0.5 font-medium">Admin Console</p>
             <h1 className="text-xl font-bold text-gray-900">Good {greeting}, {firstName}</h1>
           </div>
 

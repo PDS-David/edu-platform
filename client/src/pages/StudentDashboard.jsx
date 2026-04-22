@@ -413,176 +413,32 @@ export default function StudentDashboard() {
                   : <p className="text-xs text-gray-400 mt-1.5">{dailyTarget - todayAttempts} more to reach daily goal</p>}
               </div>
 
-              {/* Two-column grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-
-                {/* My Subjects */}
-                <div className="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm">
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">My Subjects</p>
-                    <span className="text-xs text-gray-400">{subjects.length} enrolled</span>
+              {/* Focus areas — only shown after student has quiz history */}
+              {weakTopics.length > 0 && (
+                <div className="bg-white border border-rose-100 rounded-xl overflow-hidden shadow-sm">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-[#e8e4dd]">
+                    <p className="text-xs font-semibold text-rose-600 uppercase tracking-wider flex items-center gap-1.5">
+                      <Target size={11} /> Focus Areas
+                    </p>
+                    <span className="text-xs text-[#b5a99a]">Last 30 days</span>
                   </div>
                   <div className="p-3 space-y-1">
-                    {loadingSubjects
-                      ? [0,1,2].map(i => <div key={i} className="h-12 rounded-lg bg-gray-100 animate-pulse" />)
-                      : subjects.length === 0
-                        ? (
-                          <div className="py-8 text-center">
-                            <BookOpen size={24} className="text-gray-200 mx-auto mb-2" />
-                            <p className="text-xs text-gray-400">No subjects enrolled yet</p>
-                            <button onClick={() => navigate("/subjects")} className="mt-2 text-xs text-blue-600 hover:underline font-medium">Browse subjects →</button>
-                          </div>
-                        )
-                        : subjects.map(subject => {
-                          const pct   = subjectProgress[subject.id] ?? null;
-                          const grade = predictGrade(pct);
-                          return (
-                            <button key={subject.id} onClick={() => navigate(`/student/subject/${subject.id}`)}
-                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-blue-50 border border-transparent hover:border-blue-100 transition-all text-left group">
-                              <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-sm shrink-0">
-                                {subject.icon_emoji || "📚"}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-gray-800 truncate">{subject.name}</p>
-                                {pct !== null && (
-                                  <div className="flex items-center gap-2 mt-0.5">
-                                    <div className="flex-1 h-1 bg-gray-100 rounded-full overflow-hidden">
-                                      <div className="h-full bg-blue-500 rounded-full" style={{ width: `${pct}%` }} />
-                                    </div>
-                                    <span className="text-[10px] text-gray-400 font-mono">{pct}%</span>
-                                  </div>
-                                )}
-                              </div>
-                              {grade && (
-                                <span className={`text-xs font-bold px-2 py-0.5 rounded font-mono shrink-0 ${grade.color}`}>{grade.grade}</span>
-                              )}
-                            </button>
-                          );
-                        })
-                    }
-                  </div>
-                </div>
-
-                {/* Right column */}
-                <div className="space-y-4">
-                  {/* Focus areas — show when student has quiz history */}
-                  {weakTopics.length > 0 && (
-                    <div className="bg-white border border-rose-100 rounded-xl overflow-hidden shadow-sm">
-                      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                        <p className="text-xs font-semibold text-rose-600 uppercase tracking-wider flex items-center gap-1.5">
-                          <Target size={11} /> Focus Areas
-                        </p>
-                        <span className="text-xs text-gray-400">Last 30 days</span>
-                      </div>
-                      <div className="p-3 space-y-1">
-                        {weakTopics.slice(0, 3).map((t, i) => (
-                          <div key={i} className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-rose-50 transition-colors">
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs font-medium text-gray-800 truncate">{t.topic || t.subject_name}</p>
-                              <p className="text-[10px] text-gray-400">{t.subject_name} · {t.attempt_count} attempts</p>
-                            </div>
-                            <span className={`text-xs font-mono font-bold shrink-0 ${t.accuracy_pct < 40 ? "text-red-500" : "text-amber-600"}`}>{t.accuracy_pct}%</span>
-                            <button onClick={() => navigate("/student/practice")}
-                              className="text-[10px] bg-rose-50 hover:bg-rose-100 text-rose-600 font-semibold px-2 py-1 rounded shrink-0 transition-colors border border-rose-100">
-                              Practice
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Discover what to study — shown to new students with no quiz history */}
-                  {weakTopics.length === 0 && !loadingSubjects && subjects.length > 0 && (
-                    <div className="bg-white border border-blue-100 rounded-xl overflow-hidden shadow-sm">
-                      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                        <p className="text-xs font-semibold text-blue-600 uppercase tracking-wider flex items-center gap-1.5">
-                          <BookOpen size={11} /> Discover What to Study
-                        </p>
-                        <span className="text-xs text-gray-400">{subjects.length} subject{subjects.length !== 1 ? "s" : ""}</span>
-                      </div>
-                      <div className="p-3 space-y-1.5">
-                        <p className="text-[11px] text-gray-400 px-2 pb-1">You haven't taken any quizzes yet. Pick a subject and start now:</p>
-                        {subjects.slice(0, 4).map((s) => (
-                          <button key={s.id} onClick={() => navigate(`/student/subject/${s.id}`)}
-                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-blue-50 transition-colors text-left group border border-transparent hover:border-blue-100">
-                            <span className="text-base shrink-0">{s.icon_emoji || "📚"}</span>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs font-semibold text-gray-800 group-hover:text-blue-700 truncate">{s.name}</p>
-                              {s.exam_board_code && <p className="text-[10px] text-gray-400">{s.exam_board_code}</p>}
-                            </div>
-                            <span className="text-[10px] text-blue-500 font-semibold shrink-0 group-hover:underline">Start →</span>
-                          </button>
-                        ))}
-                        {subjects.length > 4 && (
-                          <button onClick={() => navigate("/subjects")} className="w-full text-center text-[10px] text-blue-500 hover:underline pt-1">
-                            Browse all {subjects.length} subjects →
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* New student with no subjects enrolled yet */}
-                  {weakTopics.length === 0 && !loadingSubjects && subjects.length === 0 && (
-                    <div className="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm">
-                      <div className="px-4 py-3 border-b border-gray-100">
-                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Get Started</p>
-                      </div>
-                      <div className="p-5 text-center">
-                        <BookOpen size={28} className="mx-auto mb-2 text-blue-200" />
-                        <p className="text-sm font-semibold text-gray-700 mb-1">No subjects enrolled yet</p>
-                        <p className="text-xs text-gray-400 mb-3">Browse the catalog and enroll in your exam subjects to begin studying.</p>
-                        <button onClick={() => navigate("/subjects")}
-                          className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors">
-                          Browse Subjects
+                    {weakTopics.slice(0, 3).map((t, i) => (
+                      <div key={i} className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-rose-50 transition-colors">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-[#3b3330] truncate">{t.topic || t.subject_name}</p>
+                          <p className="text-[10px] text-[#b5a99a]">{t.subject_name} · {t.attempt_count} attempts</p>
+                        </div>
+                        <span className={`text-xs font-mono font-bold shrink-0 ${t.accuracy_pct < 40 ? "text-red-500" : "text-amber-600"}`}>{t.accuracy_pct}%</span>
+                        <button onClick={() => navigate("/student/practice")}
+                          className="text-[10px] bg-rose-50 hover:bg-rose-100 text-rose-600 font-semibold px-2 py-1 rounded shrink-0 transition-colors border border-rose-100">
+                          Practice
                         </button>
                       </div>
-                    </div>
-                  )}
-
-                  {/* Recent activity */}
-                  <div className="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm">
-                    <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Recent Activity</p>
-                      <TrendingUp size={12} className="text-gray-300" />
-                    </div>
-                    <div className="p-3">
-                      {loadingScores
-                        ? <p className="text-xs text-gray-400 py-4 text-center">Loading…</p>
-                        : recentScores.length === 0
-                          ? (
-                            <div className="py-6 text-center">
-                              <p className="text-xs text-gray-400">No quiz activity yet</p>
-                              <button onClick={() => navigate("/student/practice")} className="mt-1 text-xs text-blue-600 hover:underline font-medium">Start practising →</button>
-                            </div>
-                          )
-                          : (
-                            <div className="space-y-2.5">
-                              {recentScores.slice(0, 5).map((row, i) => {
-                                const pct = parseFloat(row.accuracy_pct) || 0;
-                                return (
-                                  <div key={i} className="flex items-center gap-3">
-                                    <span className="text-[10px] text-gray-400 font-mono w-12 shrink-0">
-                                      {new Date(row.date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                                    </span>
-                                    <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                      <div className={`h-full rounded-full transition-all ${pct >= 75 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-400" : "bg-red-400"}`}
-                                        style={{ width: `${pct}%` }} />
-                                    </div>
-                                    <span className="text-xs font-mono font-bold text-gray-600 w-9 text-right shrink-0">{pct}%</span>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )
-                      }
-                    </div>
+                    ))}
                   </div>
                 </div>
-              </div>
-
-              {/* Files are on the dedicated /student/files page */}
+              )}
 
             </div>
           )}
