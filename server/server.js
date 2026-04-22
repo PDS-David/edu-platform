@@ -48,23 +48,19 @@ if (fs.existsSync(clientDist)) {
   app.use(express.static(clientDist));
 }
 
-// MIDDLEWARE
-app.use(requestId);
-app.use(helmet({ contentSecurityPolicy: false }));
-app.use(globalLimiter);
-
-const ALLOWED_ORIGINS = [
-  'http://localhost:5173',
-  'http://localhost:3000',
-  'https://aischoolonair.onrender.com',
-  process.env.CLIENT_URL,
-  process.env.PROD_CLIENT_URL,
-].filter(Boolean);
-
+// MIDDLEWARE — CORS must be FIRST so all responses have correct headers
+// even on rate-limited, errored, or cold-start responses
 app.use(cors({
-  origin: (origin, cb) => cb(null, true),
+  origin: (origin, cb) => cb(null, true),   // accept all origins
   credentials: true,
+  methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization','x-request-id'],
 }));
+app.options('*', cors());  // pre-flight for all routes
+
+app.use(requestId);
+app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: false }));
+app.use(globalLimiter);
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true }));
