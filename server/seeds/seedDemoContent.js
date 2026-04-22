@@ -426,11 +426,55 @@ async function run(externalSequelize) {
   const raw  = (sql, rep = {}) => db.query(sql, { replacements: rep, type: QueryTypes.RAW });
   const ownConn = !externalSequelize;
 
+  // Helper: add a column if it doesn't already exist
+  const addCol = (table, col, type) =>
+    db.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${col} ${type}`)
+      .catch(() => {});
+
   try {
     if (ownConn) {
       await db.authenticate();
       console.log('✅ Database connected\n');
     }
+
+    // 0. Ensure all columns the seed needs actually exist
+    console.log('🔧 Ensuring schema columns...');
+    await Promise.all([
+      addCol('exam_boards',  'icon_emoji',       'VARCHAR(10)'),
+      addCol('exam_boards',  'display_order',    'INTEGER DEFAULT 0'),
+      addCol('exam_boards',  'full_name',         'VARCHAR(255)'),
+      addCol('subjects',     'icon_emoji',        'VARCHAR(10)'),
+      addCol('subjects',     'description',       'TEXT'),
+      addCol('subjects',     'is_active',         'BOOLEAN DEFAULT true'),
+      addCol('subjects',     'updated_at',        'TIMESTAMPTZ DEFAULT NOW()'),
+      addCol('topics',       'is_active',         'BOOLEAN DEFAULT true'),
+      addCol('topics',       'order_index',       'INTEGER DEFAULT 0'),
+      addCol('subtopics',    'subject_id',        'INTEGER'),
+      addCol('subtopics',    'is_active',         'BOOLEAN DEFAULT true'),
+      addCol('subtopics',    'order_index',       'INTEGER DEFAULT 0'),
+      addCol('questions',    'is_active',         'BOOLEAN DEFAULT true'),
+      addCol('questions',    'difficulty',        "VARCHAR(20) DEFAULT 'medium'"),
+      addCol('questions',    'marks',             'INTEGER DEFAULT 1'),
+      addCol('questions',    'explanation',       'TEXT'),
+      addCol('resources',    'is_active',         'BOOLEAN DEFAULT true'),
+      addCol('resources',    'is_staged',         'BOOLEAN DEFAULT false'),
+      addCol('resources',    'is_free',           'BOOLEAN DEFAULT true'),
+      addCol('resources',    'resource_type',     "VARCHAR(50) DEFAULT 'document'"),
+      addCol('resources',    'content_text',      'TEXT'),
+    ]);
+    // Ensure resource_assignments table exists
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS resource_assignments (
+        id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        resource_id UUID NOT NULL,
+        student_id  UUID NOT NULL,
+        assigned_by UUID,
+        assigned_at TIMESTAMPTZ DEFAULT NOW(),
+        resource_type VARCHAR(50),
+        UNIQUE(resource_id, student_id)
+      )
+    `).catch(() => {});
+    console.log('  ✓ Schema ready\n');
 
     // 1. Exam boards
     console.log('📋 Ensuring exam boards...');
@@ -558,19 +602,6 @@ async function run(externalSequelize) {
     // 6. Assign resources to all students
     console.log('\n👥 Assigning resources to all students...');
     if (adminId) {
-      // Ensure resource_assignments table exists
-      await raw(`
-        CREATE TABLE IF NOT EXISTS resource_assignments (
-          id          SERIAL      PRIMARY KEY,
-          resource_id INTEGER     NOT NULL REFERENCES resources(id) ON DELETE CASCADE,
-          assigned_by UUID        REFERENCES users(id) ON DELETE SET NULL,
-          student_id  UUID        REFERENCES users(id) ON DELETE CASCADE,
-          class_id    UUID        REFERENCES classes(id) ON DELETE CASCADE,
-          push_type   VARCHAR(50) NOT NULL DEFAULT 'learning_material',
-          assigned_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )
-      `).catch(() => {});
-
       await raw(`
         INSERT INTO resource_assignments(resource_id,assigned_by,student_id,push_type,assigned_at)
         SELECT r.id, :admin::uuid, u.id, 'learning_material', NOW()
