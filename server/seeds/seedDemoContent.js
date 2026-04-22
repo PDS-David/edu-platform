@@ -504,12 +504,18 @@ async function run() {
         for (const qd of qs) {
           const exists = await sel(`SELECT id FROM questions WHERE question_text=:t AND subtopic_id=:s LIMIT 1`, { t: qd.q, s: stId });
           if (exists.length) continue;
+          // Build JSONB options array matching the app's question format
+          const optsJson = JSON.stringify(qd.opts.map(o => ({
+            option_text: o,
+            is_correct: o === qd.a,
+          })));
           await sel(
-            `INSERT INTO questions(subtopic_id,question_text,option_a,option_b,option_c,option_d,
-               correct_answer,explanation,question_type,difficulty,is_active,submitted_by,created_at)
-             VALUES(:s,:q,:a,:b,:c,:d,:ans,:exp,'mcq','medium',true,:admin,NOW()) RETURNING id`,
-            { s: stId, q: qd.q, a: qd.opts[0], b: qd.opts[1], c: qd.opts[2], d: qd.opts[3], ans: qd.a, exp: qd.exp, admin: adminId }
-          ).catch(() => {});
+            `INSERT INTO questions(subtopic_id, question_text, options, correct_answer,
+               explanation, type, difficulty, is_active, submitted_by, created_at, updated_at)
+             VALUES(:s, :q, :opts::jsonb, :ans, :exp, 'mcq', 'medium', true, :admin, NOW(), NOW())
+             RETURNING id`,
+            { s: stId, q: qd.q, opts: optsJson, ans: qd.a, exp: qd.exp, admin: adminId }
+          ).catch(e => console.log(`  ⚠️  Q insert: ${e.message.slice(0,80)}`));
           added++;
         }
         console.log(`  ✓ ${stName}: +${added} questions`);
