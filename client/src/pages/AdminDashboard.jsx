@@ -937,15 +937,43 @@ const AdminDashboard = () => {
             </div>
 
             {/* No panel selected — show a clean welcome state */}
-            {!activePanel && (
-              <div className="bg-white border border-gray-100 rounded-2xl p-8 shadow-sm text-center">
-                <div className="w-14 h-14 bg-violet-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <Settings size={24} className="text-violet-500" />
+            {!activePanel && (() => {
+              const [seeding, setSeeding] = useState(false);
+              const [seedMsg, setSeedMsg] = useState(null);
+              const runSeed = async () => {
+                setSeeding(true); setSeedMsg(null);
+                try {
+                  const r = await api.post('/admin/run-seed');
+                  setSeedMsg({ ok: true, text: r.message || 'Seed completed!' });
+                } catch (e) {
+                  setSeedMsg({ ok: false, text: e.message || 'Seed failed.' });
+                } finally { setSeeding(false); }
+              };
+              return (
+                <div className="bg-white border border-gray-100 rounded-2xl p-8 shadow-sm text-center">
+                  <div className="w-14 h-14 bg-violet-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <Settings size={24} className="text-violet-500" />
+                  </div>
+                  <h2 className="text-base font-bold text-gray-900 mb-1">Select a section from the sidebar</h2>
+                  <p className="text-sm text-gray-400 max-w-sm mx-auto mb-6">Use the left pane to manage users, catalog, teacher assignments, AI question generation, bulk uploads and more.</p>
+
+                  {/* One-time seed button */}
+                  <div className="border-t border-gray-100 pt-5 mt-2">
+                    <p className="text-xs text-gray-400 mb-3 font-medium uppercase tracking-wider">Demo Content</p>
+                    <button onClick={runSeed} disabled={seeding}
+                      className="inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:bg-violet-300 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors">
+                      {seeding ? <><Loader2 size={14} className="animate-spin" /> Seeding…</> : '⚡ Seed Demo Content'}
+                    </button>
+                    <p className="text-xs text-gray-400 mt-2">Seeds JAMB & WAEC boards, subjects, topics, questions and resources. Safe to run multiple times.</p>
+                    {seedMsg && (
+                      <p className={`text-sm font-semibold mt-3 ${seedMsg.ok ? 'text-emerald-600' : 'text-red-500'}`}>
+                        {seedMsg.ok ? '✓' : '✗'} {seedMsg.text}
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <h2 className="text-base font-bold text-gray-900 mb-1">Select a section from the sidebar</h2>
-                <p className="text-sm text-gray-400 max-w-sm mx-auto">Use the left pane to manage users, catalog, teacher assignments, AI question generation, bulk uploads and more.</p>
-              </div>
-            )}
+              );
+            })()}
 
             {activePanel === 'analytics'  && <Panel><PanelErrorBoundary><PlatformAnalyticsPanel /></PanelErrorBoundary></Panel>}
             {activePanel === 'users'      && <Panel><PanelErrorBoundary><UserManagementPanel /></PanelErrorBoundary></Panel>}
