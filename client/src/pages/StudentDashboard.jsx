@@ -275,16 +275,16 @@ export default function StudentDashboard() {
 
   const loadAll = useCallback(async () => {
     await Promise.allSettled([
-      api.get("/analytics/summary").then(r => { setSummary(r.data || {}); setLoadingSummary(false); }),
-      api.get("/students/my-subjects").then(r => { setSubjects(r.data || []); setLoadingSubjects(false); }),
+      api.get("/analytics/summary").then(r => { setSummary(r.data || {}); setLoadingSummary(false); }).catch(() => setLoadingSummary(false)),
+      api.get("/students/my-subjects").then(r => { setSubjects(r.data || []); setLoadingSubjects(false); }).catch(() => setLoadingSubjects(false)),
       api.get("/analytics/subject-breakdown").then(r => {
         const map = {};
         (r.data || []).forEach(row => { map[row.subject_id] = parseFloat(row.accuracy_pct) || 0; });
         setSubjectProgress(map);
-      }),
-      api.get("/analytics/weak-topics?limit=3").then(r => setWeakTopics(r.data || [])),
-      api.get("/resources/my-assignments").then(r => { setResources(r.data || []); setLoadingResources(false); }),
-      api.get("/quizzes/history").then(r => { setRecentScores(r.data || []); setLoadingScores(false); }),
+      }).catch(() => {}),
+      api.get("/analytics/weak-topics?limit=3").then(r => setWeakTopics(r.data || [])).catch(() => {}),
+      api.get("/resources/my-assignments").then(r => { setResources(r.data || []); setLoadingResources(false); }).catch(() => { setResources([]); setLoadingResources(false); }),
+      api.get("/quizzes/history").then(r => { setRecentScores(r.data || []); setLoadingScores(false); }).catch(() => { setRecentScores([]); setLoadingScores(false); }),
     ]);
     setLoadingSummary(false); setLoadingSubjects(false);
     setLoadingResources(false); setLoadingScores(false);
@@ -396,32 +396,32 @@ export default function StudentDashboard() {
           <Outlet />
 
           {isRootDashboard && (
-            <div className="px-4 md:px-8 py-6 space-y-5">
+            <div className="px-4 md:px-6 py-5 space-y-6 max-w-2xl">
 
-              {/* Metric cards */}
+              {/* ── METRIC STRIP ── keep cards for analytics numbers */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {loadingSummary
                   ? [0,1,2,3].map(i => <div key={i} className="h-20 rounded-xl bg-gray-100 animate-pulse" />)
                   : [
-                      { label: "Questions Done", value: (summary.total_attempts ?? 0).toLocaleString(), sub: "all time",       color: "text-blue-600" },
-                      { label: "Accuracy",        value: `${summary.accuracy_pct ?? 0}%`,               sub: "overall",        color: "text-emerald-600" },
-                      { label: "Day Streak",      value: summary.study_streak_days ?? 0,                sub: "consecutive",    color: "text-amber-600"  },
+                      { label: "Questions Done", value: (summary.total_attempts ?? 0).toLocaleString(), sub: "all time",         color: "text-blue-600"    },
+                      { label: "Accuracy",        value: `${summary.accuracy_pct ?? 0}%`,               sub: "overall",          color: "text-emerald-600" },
+                      { label: "Day Streak",      value: summary.study_streak_days ?? 0,                sub: "consecutive days", color: "text-amber-600"   },
                       { label: "Today's Goal",    value: `${todayAttempts}/${dailyTarget}`,              sub: `${dailyPct}% done`, color: dailyPct >= 100 ? "text-emerald-600" : "text-blue-600" },
                     ].map(m => (
                       <div key={m.label} className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
-                        <p className="text-gray-400 text-xs mb-2">{m.label}</p>
-                        <p className={`font-mono text-2xl font-bold ${m.color}`}>{m.value}</p>
-                        <p className="text-gray-400 text-xs mt-1">{m.sub}</p>
+                        <p className="text-gray-400 text-[11px] mb-1">{m.label}</p>
+                        <p className={`font-mono text-2xl font-bold leading-none ${m.color}`}>{m.value}</p>
+                        <p className="text-gray-300 text-[10px] mt-1">{m.sub}</p>
                       </div>
                     ))
                 }
               </div>
 
-              {/* Daily progress */}
-              <div className="bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-gray-400 font-medium uppercase tracking-wider">Daily Target</span>
-                  <span className={`text-xs font-mono font-bold ${dailyPct >= 100 ? "text-emerald-600" : "text-gray-600"}`}>
+              {/* ── DAILY PROGRESS BAR ── */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Daily Target</span>
+                  <span className={`text-xs font-mono font-bold ${dailyPct >= 100 ? "text-emerald-600" : "text-gray-500"}`}>
                     {todayAttempts} / {dailyTarget} questions
                   </span>
                 </div>
@@ -429,37 +429,127 @@ export default function StudentDashboard() {
                   <div className={`h-full rounded-full transition-all duration-700 ${dailyPct >= 100 ? "bg-emerald-500" : "bg-blue-500"}`}
                     style={{ width: `${dailyPct}%` }} />
                 </div>
-                {dailyPct >= 100
-                  ? <p className="text-xs text-emerald-600 mt-1.5 font-medium">✓ Goal complete!</p>
-                  : <p className="text-xs text-gray-400 mt-1.5">{dailyTarget - todayAttempts} more to reach daily goal</p>}
+                <p className="text-[11px] text-gray-400 mt-1">
+                  {dailyPct >= 100 ? "✓ Daily goal complete — great work!" : `${dailyTarget - todayAttempts} more questions to hit today's goal`}
+                </p>
               </div>
 
-              {/* Focus areas — only shown after student has quiz history */}
-              {weakTopics.length > 0 && (
-                <div className="bg-white border border-rose-100 rounded-xl overflow-hidden shadow-sm">
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-[#e8e4dd]">
-                    <p className="text-xs font-semibold text-rose-600 uppercase tracking-wider flex items-center gap-1.5">
-                      <Target size={11} /> Focus Areas
-                    </p>
-                    <span className="text-xs text-[#b5a99a]">Last 30 days</span>
+              {/* ── MY SUBJECTS: list rows, not cards ── */}
+              <section>
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider">My Subjects</h2>
+                  <button onClick={() => navigate("/student/subjects")}
+                    className="text-xs text-blue-600 hover:underline font-medium">
+                    View all →
+                  </button>
+                </div>
+                {loadingSubjects ? (
+                  <div className="space-y-2">
+                    {[0,1,2].map(i => <div key={i} className="h-12 rounded-lg bg-gray-100 animate-pulse" />)}
                   </div>
-                  <div className="p-3 space-y-1">
+                ) : subjects.length === 0 ? (
+                  <div className="text-center py-8 border border-dashed border-gray-200 rounded-xl">
+                    <BookOpen size={22} className="text-gray-200 mx-auto mb-2" />
+                    <p className="text-sm text-gray-400">No subjects enrolled yet</p>
+                    <button onClick={() => navigate("/subjects")} className="mt-2 text-xs text-blue-600 hover:underline font-medium">Browse subjects →</button>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden bg-white">
+                    {subjects.slice(0, 6).map(subject => {
+                      const pct = subjectProgress[subject.id] ?? null;
+                      return (
+                        <button key={subject.id}
+                          onClick={() => navigate(`/student/subject/${subject.id}`)}
+                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-blue-50 transition-colors text-left group">
+                          <span className="text-lg shrink-0 w-7 text-center">{subject.icon_emoji || "📚"}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-800 truncate group-hover:text-blue-700">{subject.name}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <div className="flex-1 h-1 bg-gray-100 rounded-full overflow-hidden max-w-[120px]">
+                                <div className="h-full bg-blue-400 rounded-full" style={{ width: `${pct ?? 0}%` }} />
+                              </div>
+                              <span className="text-[10px] text-gray-400 font-mono">{pct !== null ? `${pct}%` : "Not started"}</span>
+                            </div>
+                          </div>
+                          <span className="text-[10px] text-gray-300 group-hover:text-blue-400 font-semibold shrink-0">›</span>
+                        </button>
+                      );
+                    })}
+                    {subjects.length > 6 && (
+                      <button onClick={() => navigate("/student/subjects")}
+                        className="w-full text-center text-xs text-blue-500 hover:text-blue-700 py-2.5 font-medium hover:bg-blue-50 transition-colors">
+                        +{subjects.length - 6} more subjects →
+                      </button>
+                    )}
+                  </div>
+                )}
+              </section>
+
+              {/* ── FOCUS AREAS: only after student has quiz history ── */}
+              {weakTopics.length > 0 && (
+                <section>
+                  <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <Target size={13} className="text-rose-500" /> Focus Areas
+                  </h2>
+                  <div className="divide-y divide-gray-100 border border-rose-100 rounded-xl overflow-hidden bg-white">
                     {weakTopics.slice(0, 3).map((t, i) => (
-                      <div key={i} className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-rose-50 transition-colors">
+                      <div key={i} className="flex items-center gap-3 px-4 py-3 hover:bg-rose-50 transition-colors">
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium text-[#3b3330] truncate">{t.topic || t.subject_name}</p>
-                          <p className="text-[10px] text-[#b5a99a]">{t.subject_name} · {t.attempt_count} attempts</p>
+                          <p className="text-sm font-medium text-gray-700 truncate">{t.topic || t.subject_name}</p>
+                          <p className="text-[11px] text-gray-400">{t.subject_name} · {t.attempt_count} attempts</p>
                         </div>
-                        <span className={`text-xs font-mono font-bold shrink-0 ${t.accuracy_pct < 40 ? "text-red-500" : "text-amber-600"}`}>{t.accuracy_pct}%</span>
+                        <span className={`text-sm font-mono font-bold shrink-0 ${t.accuracy_pct < 40 ? "text-red-500" : "text-amber-500"}`}>
+                          {t.accuracy_pct}%
+                        </span>
                         <button onClick={() => navigate("/student/practice")}
-                          className="text-[10px] bg-rose-50 hover:bg-rose-100 text-rose-600 font-semibold px-2 py-1 rounded shrink-0 transition-colors border border-rose-100">
+                          className="text-xs text-rose-600 hover:text-rose-800 font-semibold shrink-0 px-2 py-1 rounded-lg hover:bg-rose-100 transition-colors">
                           Practice
                         </button>
                       </div>
                     ))}
                   </div>
-                </div>
+                </section>
               )}
+
+              {/* ── RECENT ACTIVITY: list rows ── */}
+              <section>
+                <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <TrendingUp size={13} className="text-gray-400" /> Recent Activity
+                </h2>
+                {loadingScores ? (
+                  <div className="space-y-2">
+                    {[0,1].map(i => <div key={i} className="h-10 rounded-lg bg-gray-100 animate-pulse" />)}
+                  </div>
+                ) : recentScores.length === 0 ? (
+                  <div className="text-center py-6 border border-dashed border-gray-200 rounded-xl text-gray-400">
+                    <p className="text-sm">No quiz activity yet.</p>
+                    <button onClick={() => navigate("/student/practice")} className="mt-1 text-xs text-blue-600 hover:underline font-medium">
+                      Start practising →
+                    </button>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden bg-white">
+                    {recentScores.slice(0, 5).map((row, i) => {
+                      const pct = parseFloat(row.accuracy_pct) || 0;
+                      const col = pct >= 75 ? "text-emerald-600 bg-emerald-50" : pct >= 50 ? "text-amber-600 bg-amber-50" : "text-red-500 bg-red-50";
+                      return (
+                        <div key={i} className="flex items-center gap-3 px-4 py-2.5">
+                          <span className="text-[11px] text-gray-400 font-mono w-14 shrink-0">
+                            {new Date(row.date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                          </span>
+                          <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full ${pct >= 75 ? "bg-emerald-400" : pct >= 50 ? "bg-amber-400" : "bg-red-400"}`}
+                              style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded-full shrink-0 ${col}`}>
+                            {pct}%
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
 
             </div>
           )}
