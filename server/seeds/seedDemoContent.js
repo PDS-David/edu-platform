@@ -28,8 +28,7 @@ const sequelize = new Sequelize(DB_URL, {
   logging: false,
 });
 
-const sel  = (sql, rep = {}) => sequelize.query(sql, { replacements: rep, type: QueryTypes.SELECT });
-const raw  = (sql, rep = {}) => sequelize.query(sql, { replacements: rep, type: QueryTypes.RAW });
+
 
 // ─── Curriculum ───────────────────────────────────────────────────────────────
 const SUBJECTS = [
@@ -418,10 +417,17 @@ TIP: Find the TRUE subject first, then match the verb to it.` },
 };
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
-async function run() {
+async function run(externalSequelize) {
+  const db   = externalSequelize || sequelize;
+  const sel  = (sql, rep = {}) => db.query(sql, { replacements: rep, type: QueryTypes.SELECT });
+  const raw  = (sql, rep = {}) => db.query(sql, { replacements: rep, type: QueryTypes.RAW });
+  const ownConn = !externalSequelize;
+
   try {
-    await sequelize.authenticate();
-    console.log('✅ Database connected\n');
+    if (ownConn) {
+      await db.authenticate();
+      console.log('✅ Database connected\n');
+    }
 
     // 1. Exam boards
     console.log('📋 Ensuring exam boards...');
@@ -589,8 +595,12 @@ async function run() {
     console.error('\n❌ Seed error:', err.message);
     process.exit(1);
   } finally {
-    await sequelize.close();
+    if (ownConn) await db.close();
   }
 }
 
-run();
+// Allow direct CLI invocation: node seeds/seedDemoContent.js
+if (require.main === module) run();
+
+// Allow API endpoint to call with the server's existing sequelize
+module.exports = run;
