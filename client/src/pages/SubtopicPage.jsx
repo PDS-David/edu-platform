@@ -179,16 +179,20 @@ function ResourcesTab({ subtopicId, subtopic, subtopicName, onComplete }) {
             {(res.resource_type === 'document' || res.resource_type === 'pdf') && (() => {
                 const base = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/api$/, '');
                 const fullUrl = res.file_url?.startsWith('http') ? res.file_url : `${base}${res.file_url}`;
+                const isDataUri = fullUrl.startsWith('data:text/');
                 return (
                   <div className="flex gap-2">
-                    <a href={fullUrl} target="_blank" rel="noreferrer" onClick={() => handleOpen(res)}
+                    <button
+                      onClick={() => { handleOpen(res); }}
                       className="border border-gray-200 text-gray-600 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">
-                      View
-                    </a>
-                    <a href={fullUrl} download
-                      className="bg-gray-100 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-gray-200 transition-colors">
-                      ↓
-                    </a>
+                      {activeRes?.id === res.id ? 'Close' : 'Read'}
+                    </button>
+                    {!isDataUri && (
+                      <a href={fullUrl} download
+                        className="bg-gray-100 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-gray-200 transition-colors">
+                        ↓
+                      </a>
+                    )}
                   </div>
                 );
               })()}
@@ -202,6 +206,29 @@ function ResourcesTab({ subtopicId, subtopic, subtopicName, onComplete }) {
             <audio controls className="w-full mt-2"
               src={`${(import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/api$/, '')}${res.file_url}`} />
           )}
+          {activeRes?.id === res.id && (res.resource_type === 'document' || res.resource_type === 'pdf') && (() => {
+            const base = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/api$/, '');
+            const fullUrl = res.file_url?.startsWith('http') ? res.file_url : `${base}${res.file_url}`;
+            if (fullUrl.startsWith('data:text/')) {
+              let text = '';
+              try { text = decodeURIComponent(fullUrl.replace(/^data:text\/[^;]+;charset=utf-8,/, '')); }
+              catch { text = fullUrl.replace(/^data:text\/[^;]+,/, ''); }
+              return (
+                <div className="mt-3 rounded-xl border border-blue-100 bg-white overflow-hidden">
+                  <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border-b border-blue-100">
+                    <span className="text-xs font-bold text-blue-700">📄 {res.title}</span>
+                    <span className="ml-auto text-[10px] text-blue-400">Learning Resource</span>
+                  </div>
+                  <div className="p-4 max-h-[500px] overflow-y-auto">
+                    <pre className="text-sm text-gray-800 whitespace-pre-wrap font-sans leading-relaxed">{text}</pre>
+                  </div>
+                </div>
+              );
+            }
+            // Regular file — open in new tab
+            window.open(fullUrl, '_blank');
+            return null;
+          })()}
         </div>
       ))}
     </div>
@@ -326,7 +353,7 @@ function PracticeTab({ subtopicId, subjectId, onComplete }) {
 
 // ─── MCQ Question ──────────────────────────────────────────────────────────────
 function MCQQuestion({ question, questionNumber, totalQuestions, onAnswer, onPrev }) {
-  const [selected,    setSelected]    = useState(null);
+  const [selected,    setSelected]    = useState(null); // option_text of selected option
   const [result,      setResult]      = useState(null);
   const [submitting,  setSubmitting]  = useState(false);
   const [shownHints,  setShownHints]  = useState(0);
@@ -347,12 +374,12 @@ function MCQQuestion({ question, questionNumber, totalQuestions, onAnswer, onPre
     setSubmitting(true);
     try {
       const res = await api.post(`/questions/${question.id}/answer`, {
-        selected_option_id: selected,
-        time_taken_ms:      Date.now() - startTime.current,
+        selected_answer:  selected,                        // option text
+        time_taken_ms:    Date.now() - startTime.current,
       });
       setResult(res);
       setExplainLoad(true);
-      api.post('/ai/explain', { question_id: question.id, selected_option_id: selected })
+      api.post('/ai/explain', { question_id: question.id })
         .then(r => { if (r.success) setAiExplain(r.explanation); })
         .catch(() => {})
         .finally(() => setExplainLoad(false));
@@ -362,10 +389,14 @@ function MCQQuestion({ question, questionNumber, totalQuestions, onAnswer, onPre
 
   const diffBadge = { easy: 'bg-green-500', medium: 'bg-amber-500', hard: 'bg-red-500' };
 
-  const optStyle = (optId) => {
-    if (!result) return selected === optId ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-blue-300 cursor-pointer';
-    const isCorrect  = result.correct_options?.some(c => c.id === optId);
-    const isSelected = selected === optId;
+  const optStyle = (optText) => {
+    if (!result) return selected === optText ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-blue-300 cursor-pointer';
+    const isCorrect  = String(optText).trim().toLowerCase() === String(result.correct_answer || '').trim().toLowerCase();
+    const isSelected = selected === optText;
+    if (isCorrect)                return 'border-green-400 bg-green-50';
+    if (isSelected && !isCorrect) return 'border-red-300 bg-red-50';
+    return 'border-gray-100 opacity-60';
+  };
     if (isCorrect)                return 'border-blue-400 bg-blue-50';
     if (isSelected && !isCorrect) return 'border-red-300 bg-red-50';
     return 'border-gray-100 opacity-60';
@@ -389,15 +420,20 @@ function MCQQuestion({ question, questionNumber, totalQuestions, onAnswer, onPre
           <p className="text-gray-900 font-medium text-sm leading-relaxed">{question.question_text}</p>
         </div>
         <div className="px-5 pb-4 space-y-2">
-          {question.options?.map((opt, i) => (
-            <button key={opt.id} onClick={() => !result && setSelected(opt.id)} disabled={!!result}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${optStyle(opt.id)}`}>
-              <span className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 bg-gray-100 text-gray-500">{LABELS[i]}</span>
-              <span className="text-sm text-gray-800 flex-1">{opt.option_text}</span>
-              {result && result.correct_options?.some(c => c.id === opt.id) && <CheckCircle size={14} className="text-blue-500 shrink-0" />}
-              {result && selected === opt.id && !result.correct_options?.some(c => c.id === opt.id) && <XCircle size={14} className="text-red-400 shrink-0" />}
-            </button>
-          ))}
+          {question.options?.map((opt, i) => {
+            const optText   = opt.option_text || opt.text || String(opt);
+            const isCorrect = result && String(optText).trim().toLowerCase() === String(result.correct_answer || '').trim().toLowerCase();
+            const isSelected = selected === optText;
+            return (
+              <button key={i} onClick={() => !result && setSelected(optText)} disabled={!!result}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${optStyle(optText)}`}>
+                <span className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 bg-gray-100 text-gray-500">{LABELS[i]}</span>
+                <span className="text-sm text-gray-800 flex-1">{optText}</span>
+                {isCorrect  && <CheckCircle size={14} className="text-green-500 shrink-0" />}
+                {isSelected && !isCorrect && result && <XCircle size={14} className="text-red-400 shrink-0" />}
+              </button>
+            );
+          })}
         </div>
 
         {staticHints.length > 0 && !result && (

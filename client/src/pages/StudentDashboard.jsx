@@ -71,6 +71,27 @@ function InlineViewer({ file }) {
   const ext  = url.split("?")[0].split(".").pop().toLowerCase();
   const [broken, setBroken] = useState(false);
 
+  // ── data: URI — plain text seeded content, decode and display directly ──
+  if (url.startsWith("data:text/")) {
+    let text = "";
+    try {
+      text = decodeURIComponent(url.replace(/^data:text\/[^;]+;charset=utf-8,/, ""));
+    } catch {
+      text = url.replace(/^data:text\/[^;]+,/, "");
+    }
+    return (
+      <div className="mt-2 rounded-xl border border-blue-100 bg-white overflow-hidden">
+        <div className="flex items-center justify-between px-3 py-2 bg-blue-50 border-b border-blue-100">
+          <span className="text-xs font-semibold text-blue-700">{file.title}</span>
+          <span className="text-[10px] text-blue-400">Learning Resource</span>
+        </div>
+        <div className="p-4 max-h-96 overflow-y-auto">
+          <pre className="text-sm text-gray-800 whitespace-pre-wrap font-sans leading-relaxed">{text}</pre>
+        </div>
+      </div>
+    );
+  }
+
   if (type === "video" || ["mp4","webm","mov"].includes(ext))
     return <div className="mt-2 rounded-xl overflow-hidden bg-black"><video src={url} controls className="w-full max-h-56 rounded-xl" /></div>;
   if (type === "audio" || ["mp3","wav","ogg","m4a"].includes(ext))
