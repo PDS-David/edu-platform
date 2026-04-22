@@ -35,6 +35,20 @@ const safeRequire = (modulePath) => {
 const app = express();
 app.set('trust proxy', 1);
 
+// ─────────────────────────────────────────────
+// CORS — MUST be registered before EVERYTHING else.
+// Static file handlers, helmet, rate-limiters, and error handlers
+// all respond without CORS headers if CORS isn't first.
+// ─────────────────────────────────────────────
+const corsOptions = {
+  origin: (origin, cb) => cb(null, true),  // accept all origins
+  credentials: true,
+  methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization','x-request-id'],
+};
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));  // handle ALL pre-flight requests
+
 // STATIC — uploaded files (resources, past-papers, videos)
 // In production Docker: nginx serves /uploads directly from the shared volume.
 // In development (npm run dev): Node serves them here.
@@ -47,16 +61,6 @@ const clientDist = path.join(__dirname, '..', 'client', 'dist');
 if (fs.existsSync(clientDist)) {
   app.use(express.static(clientDist));
 }
-
-// MIDDLEWARE — CORS must be FIRST so all responses have correct headers
-// even on rate-limited, errored, or cold-start responses
-app.use(cors({
-  origin: (origin, cb) => cb(null, true),   // accept all origins
-  credentials: true,
-  methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
-  allowedHeaders: ['Content-Type','Authorization','x-request-id'],
-}));
-app.options('*', cors());  // pre-flight for all routes
 
 app.use(requestId);
 app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: false }));
