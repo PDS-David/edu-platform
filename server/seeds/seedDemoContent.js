@@ -18,15 +18,18 @@ require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 const { Sequelize, QueryTypes } = require('sequelize');
 
 const DB_URL = process.env.DATABASE_URL;
-if (!DB_URL) { console.error('❌ DATABASE_URL not set'); process.exit(1); }
 
-const sequelize = new Sequelize(DB_URL, {
-  dialect: 'postgres',
-  dialectOptions: process.env.DB_SSL === 'false'
-    ? {}
-    : { ssl: { require: true, rejectUnauthorized: false } },
-  logging: false,
-});
+// Build a private sequelize only when running as CLI (not when required as module)
+let sequelize;
+if (require.main === module) {
+  if (!DB_URL) { console.error('❌ DATABASE_URL not set'); process.exit(1); }
+  const { Sequelize: S } = require('sequelize');
+  sequelize = new S(DB_URL, {
+    dialect: 'postgres',
+    dialectOptions: process.env.DB_SSL === 'false' ? {} : { ssl: { require: true, rejectUnauthorized: false } },
+    logging: false,
+  });
+}
 
 
 
@@ -593,7 +596,8 @@ async function run(externalSequelize) {
     console.log(`   Topics: ${t[0].n}  Subtopics: ${s[0].n}  Questions: ${q2[0].n}  Resources: ${r[0].n}`);
   } catch (err) {
     console.error('\n❌ Seed error:', err.message);
-    process.exit(1);
+    if (ownConn) process.exit(1);   // only exit when run as CLI
+    else throw err;                  // let the API endpoint handle it
   } finally {
     if (ownConn) await db.close();
   }
