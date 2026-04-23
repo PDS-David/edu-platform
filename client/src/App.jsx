@@ -100,6 +100,7 @@ export default function App() {
             <Route path="settings" element={<SettingsPage />} />
             <Route path="subjects"   element={<StudentSubjectsPage />} />
             <Route path="files"      element={<StudentFilesPage />} />
+            <Route path="resources"  element={<StudentFilesPage />} />
             <Route path="exam-types" element={<StudentExamTypesPage />} />
           </Route>
         </Route>

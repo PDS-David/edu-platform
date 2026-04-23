@@ -49,11 +49,20 @@ function InlineViewer({ file }) {
   );
 }
 
+// A resource is treated as "Questions" if its push_type or resource_type
+// looks question-y. Everything else is "Learning".
+const isQuestionResource = (r) => {
+  const p = String(r.push_type || '').toLowerCase();
+  const t = String(r.resource_type || '').toLowerCase();
+  return /(question|quiz|practice|exam|paper)/.test(p) || /(question|quiz)/.test(t);
+};
+
 export default function StudentFilesPage() {
   const navigate              = useNavigate();
   const [resources, setResources] = useState([]);
   const [loading,   setLoading]   = useState(true);
   const [openId,    setOpenId]     = useState(null);
+  const [tab,       setTab]       = useState('learning'); // 'learning' | 'questions'
 
   useEffect(() => {
     api.get('/resources/my-assignments')
@@ -62,9 +71,13 @@ export default function StudentFilesPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Group by subject
+  const learning  = resources.filter(r => !isQuestionResource(r));
+  const questions = resources.filter(r =>  isQuestionResource(r));
+  const visible   = tab === 'questions' ? questions : learning;
+
+  // Group visible by subject
   const bySubject = {};
-  for (const r of resources) {
+  for (const r of visible) {
     const key = r.subject_name || 'General';
     if (!bySubject[key]) bySubject[key] = [];
     bySubject[key].push(r);
@@ -79,20 +92,52 @@ export default function StudentFilesPage() {
           <ArrowLeft size={14} /> Back to Dashboard
         </Link>
 
-        <div className="mb-6">
-          <h1 className="text-xl font-bold text-gray-900">My Files</h1>
-          <p className="text-sm text-gray-400 mt-0.5">Resources assigned by your teachers and admin</p>
+        <div className="mb-4">
+          <h1 className="text-xl font-bold text-gray-900">Resources</h1>
+          <p className="text-sm text-gray-400 mt-0.5">Materials assigned by your teachers and admin</p>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex items-center gap-1 mb-5 border-b border-gray-200">
+          <button
+            onClick={() => setTab('learning')}
+            className={`px-4 py-2 text-sm font-semibold transition-colors -mb-px border-b-2 ${
+              tab === 'learning'
+                ? 'border-blue-600 text-blue-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Learning Resources
+            <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">{learning.length}</span>
+          </button>
+          <button
+            onClick={() => setTab('questions')}
+            className={`px-4 py-2 text-sm font-semibold transition-colors -mb-px border-b-2 ${
+              tab === 'questions'
+                ? 'border-blue-600 text-blue-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Questions
+            <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">{questions.length}</span>
+          </button>
         </div>
 
         {loading ? (
           <div className="flex justify-center py-20">
             <Loader2 size={24} className="animate-spin text-blue-400" />
           </div>
-        ) : resources.length === 0 ? (
+        ) : visible.length === 0 ? (
           <div className="bg-white border border-gray-100 rounded-2xl p-12 text-center shadow-sm">
             <BookOpen size={40} className="text-gray-200 mx-auto mb-3" />
-            <p className="text-sm font-semibold text-gray-700 mb-1">No files assigned yet</p>
-            <p className="text-xs text-gray-400">Files sent by your teacher or admin will appear here.</p>
+            <p className="text-sm font-semibold text-gray-700 mb-1">
+              {tab === 'questions' ? 'No question sets assigned yet' : 'No learning resources assigned yet'}
+            </p>
+            <p className="text-xs text-gray-400">
+              {resources.length === 0
+                ? 'Files sent by your teacher or admin will appear here.'
+                : `Try the "${tab === 'questions' ? 'Learning Resources' : 'Questions'}" tab — there are items there.`}
+            </p>
           </div>
         ) : (
           <div className="space-y-6">
