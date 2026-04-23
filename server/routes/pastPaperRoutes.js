@@ -12,6 +12,7 @@ const { QueryTypes } = require('sequelize');
 const sequelize = require('../config/database');
 const { protect } = require('../middleware/auth');
 const r2 = require('../utils/r2Storage');
+const pastPaperScraper = require('../services/pastPaperScraper');
 
 // ── Multer ───────────────────────────────────────────────────────────────────
 // When R2 is configured, hold the file in memory and push to object storage.
@@ -164,6 +165,52 @@ router.delete('/:id', protect, (req, res, next) => {
     }
     return res.json({ success: true });
   } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── POST /api/past-papers/scrape ──────────────────────────────────────────────
+// Admin-only. Crawl a starting URL for PDFs and import any it finds into the
+// past_papers library. Re-runs are safe — duplicates are skipped by source_url.
+//
+// Body:
+//   { source_url, exam_board?, subject_id?, paper_type?, year_hint?,
+//     follow_subpages? }
+router.post('/scrape', protect, (req, res, next) => {
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({ success: false, error: 'Admin only' });
+  }
+  next();
+}, async (req, res) => {
+  const {
+    source_url,
+    exam_board,
+    subject_id,
+    paper_type,
+    year_hint,
+    follow_subpages,
+  } = req.body || {};
+
+  if (!source_url || !/^https?:\/\//i.test(source_url)) {
+    return res.status(400).json({
+      success: false,
+      error: 'A valid source_url (http/https) is required.',
+    });
+  }
+
+  try {
+    const summary = await pastPaperScraper.scrape({
+      source_url,
+      exam_board: exam_board || null,
+      subject_id: subject_id ? Number(subject_id) : null,
+      paper_type: paper_type || null,
+      year_hint:  year_hint  ? Number(year_hint)  : null,
+      follow_subpages: follow_subpages !== false,
+      created_by: req.user.id,
+    });
+    return res.json({ success: true, data: summary });
+  } catch (err) {
+    console.error('[POST /past-papers/scrape]', err.message);
     return res.status(500).json({ success: false, error: err.message });
   }
 });

@@ -810,6 +810,136 @@ const PlatformAnalyticsPanel = () => {
   );
 };
 
+// ─── Scrape-from-URL sub-panel ────────────────────────────────────────────────
+// Lets an admin paste a past-papers source URL and import every PDF it links
+// to. Re-runs are safe — duplicates are skipped server-side by source_url.
+const ScrapePastPapersForm = ({ onImported, showToast }) => {
+  const [form, setForm] = useState({
+    source_url: '',
+    exam_board: '',
+    paper_type: '',
+    year_hint:  '',
+    follow_subpages: true,
+  });
+  const [busy, setBusy] = useState(false);
+  const [lastSummary, setLastSummary] = useState(null);
+
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const run = async () => {
+    if (!/^https?:\/\//i.test(form.source_url.trim())) {
+      showToast('Enter a full URL starting with http:// or https://', 'error');
+      return;
+    }
+    setBusy(true);
+    setLastSummary(null);
+    try {
+      const r = await api.post('/past-papers/scrape', {
+        source_url: form.source_url.trim(),
+        exam_board: form.exam_board || null,
+        paper_type: form.paper_type || null,
+        year_hint:  form.year_hint ? Number(form.year_hint) : null,
+        follow_subpages: form.follow_subpages,
+      });
+      const s = r?.data || {};
+      setLastSummary(s);
+      showToast(
+        `Imported ${s.pdfs_imported ?? 0} new paper${s.pdfs_imported === 1 ? '' : 's'} ` +
+        `(found ${s.pdfs_found ?? 0}, skipped ${s.pdfs_skipped_duplicate ?? 0}).`
+      );
+      if ((s.pdfs_imported ?? 0) > 0) onImported?.();
+    } catch (err) {
+      showToast(err?.error || err?.message || 'Scrape failed', 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 mb-5 space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-bold text-gray-900">Scrape past papers from a URL</h3>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Paste a page that links to past-paper PDFs. We'll download every PDF found and add them to the library.
+            Re-runs are safe — duplicates are skipped automatically.
+          </p>
+        </div>
+      </div>
+
+      <input
+        value={form.source_url}
+        onChange={(e) => set('source_url', e.target.value)}
+        placeholder="https://example.com/jamb-past-questions/biology"
+        className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-violet-400 focus:ring-1 focus:ring-violet-200"
+      />
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <select
+          value={form.exam_board}
+          onChange={(e) => set('exam_board', e.target.value)}
+          className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-violet-400"
+        >
+          <option value="">Exam type (optional)</option>
+          {['JAMB','WAEC','NECO','GCE_OL','GCE_AL','IELTS','TOEFL','SAT','JUPEB'].map(c => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+        <input
+          value={form.paper_type}
+          onChange={(e) => set('paper_type', e.target.value)}
+          placeholder="Paper type (e.g. Theory)"
+          className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-violet-400"
+        />
+        <input
+          type="number"
+          value={form.year_hint}
+          onChange={(e) => set('year_hint', e.target.value)}
+          placeholder="Default year (fallback)"
+          className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-violet-400"
+        />
+      </div>
+
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <label className="flex items-center gap-2 text-xs text-gray-600">
+          <input
+            type="checkbox"
+            checked={form.follow_subpages}
+            onChange={(e) => set('follow_subpages', e.target.checked)}
+            className="rounded border-gray-300 text-violet-600 focus:ring-violet-400"
+          />
+          Also crawl one level of in-domain sub-pages
+        </label>
+        <button
+          onClick={run}
+          disabled={busy || !form.source_url.trim()}
+          className="bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold px-4 py-2 rounded-lg disabled:opacity-40 flex items-center gap-1.5"
+        >
+          {busy ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+          {busy ? 'Scraping…' : 'Start scrape'}
+        </button>
+      </div>
+
+      {lastSummary && (
+        <div className="text-[11px] font-mono text-gray-600 bg-white border border-gray-100 rounded-lg p-3 space-y-0.5">
+          <div>Pages crawled: <b>{lastSummary.pages_crawled}</b></div>
+          <div>PDFs found: <b>{lastSummary.pdfs_found}</b> · Imported: <b className="text-emerald-600">{lastSummary.pdfs_imported}</b> · Skipped (dupes): <b>{lastSummary.pdfs_skipped_duplicate}</b> · Failed: <b className={lastSummary.pdfs_failed ? 'text-red-600' : ''}>{lastSummary.pdfs_failed}</b></div>
+          {lastSummary.failures?.length > 0 && (
+            <details className="mt-1">
+              <summary className="cursor-pointer text-red-600">Show {lastSummary.failures.length} failure(s)</summary>
+              <ul className="mt-1 space-y-0.5 max-h-32 overflow-y-auto">
+                {lastSummary.failures.slice(0, 20).map((f, i) => (
+                  <li key={i} className="truncate">• {f.kind}: {f.url} — {f.error}</li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── Past Papers Panel (Admin) ────────────────────────────────────────────────
 const AdminPastPapersPanel = () => {
   const navigate = useNavigate();
@@ -845,6 +975,7 @@ const AdminPastPapersPanel = () => {
           <button onClick={() => navigate('/past-papers')} className="flex items-center gap-2 text-sm border border-violet-200 text-violet-700 hover:bg-violet-50 font-semibold px-4 py-2 rounded-xl"><BookOpen size={14} /> Student View</button>
         </div>
       </div>
+      <ScrapePastPapersForm onImported={fetchPapers} showToast={showToast} />
       <div className="flex gap-3 mb-5 flex-wrap">
         <select value={filters.exam_board} onChange={e => setFilters(f => ({ ...f, exam_board: e.target.value }))} className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"><option value="">All Exam Types</option>{['JAMB','WAEC','NECO','GCE_OL','GCE_AL','IELTS','TOEFL','SAT','JUPEB'].map(c => <option key={c} value={c}>{c}</option>)}</select>
         <input type="number" placeholder="Year from" value={filters.year_from} onChange={e => setFilters(f => ({ ...f, year_from: e.target.value }))} className="w-28 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300" />
