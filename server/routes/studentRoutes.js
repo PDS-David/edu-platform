@@ -19,36 +19,9 @@ const { protect }    = require('../middleware/auth');
 const UUID_REGEX  = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isValidUUID = (v) => UUID_REGEX.test(v);
 
-// ── POST /api/students/join-class ─────────────────────────────────────────────
-router.post('/join-class', protect, async (req, res) => {
-  const { join_code } = req.body;
-  if (!join_code?.trim()) {
-    return res.status(400).json({ success: false, error: 'join_code is required' });
-  }
-  try {
-    let classes = [];
-    try {
-      classes = await sequelize.query(
-        `SELECT id, name FROM classes WHERE UPPER(join_code) = UPPER(:code)`,
-        { replacements: { code: join_code.trim() }, type: QueryTypes.SELECT }
-      );
-    } catch { return res.status(404).json({ success: false, error: 'Class system not yet active.' }); }
-    if (!classes.length) {
-      return res.status(404).json({ success: false, error: 'Invalid join code. Please check and try again.' });
-    }
-    const cls = classes[0];
-    await sequelize.query(
-      `INSERT INTO class_memberships (class_id, student_id, joined_at)
-       VALUES (:classId, :studentId, NOW())
-       ON CONFLICT (class_id, student_id) DO NOTHING`,
-      { replacements: { classId: cls.id, studentId: req.user.id }, type: QueryTypes.INSERT }
-    );
-    return res.status(200).json({ success: true, message: `Joined "${cls.name}" successfully`, data: { class_name: cls.name } });
-  } catch (err) {
-    console.error('[POST /students/join-class]', err.message);
-    return res.status(500).json({ success: false, error: err.message });
-  }
-});
+// ── (removed) POST /api/students/join-class ───────────────────────────────────
+// Join codes are no longer used. Teachers add students directly from the
+// student picker in the Teacher Dashboard.
 
 // ── GET /api/students/performance ─────────────────────────────────────────────
 // Returns performance data for a student's subject (for My Performance tab)
