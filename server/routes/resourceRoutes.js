@@ -337,7 +337,7 @@ router.put(
       const [rows] = await sequelize.query(
         `UPDATE resources
             SET title       = COALESCE(:title, title),
-                subject_id  = COALESCE(:subject_id::uuid, subject_id),
+                subject_id  = COALESCE(:subject_id::int,  subject_id),
                 topic_id    = COALESCE(:topic_id::int,    topic_id),
                 subtopic_id = COALESCE(:subtopic_id::int, subtopic_id),
                 push_type   = COALESCE(:push_type, push_type),
@@ -390,18 +390,32 @@ router.delete(
         { replacements: { id }, type: QueryTypes.SELECT }
       );
 
+      if (!rows[0]) {
+        return res.status(404).json({ success: false, error: 'Resource not found' });
+      }
+
+      // Clean up dependent rows first to avoid FK violations
+      await sequelize.query(
+        `DELETE FROM resource_assignments WHERE resource_id = :id`,
+        { replacements: { id }, type: QueryTypes.DELETE }
+      ).catch(() => {});
+      await sequelize.query(
+        `DELETE FROM resource_user_assignments WHERE resource_id = :id`,
+        { replacements: { id }, type: QueryTypes.DELETE }
+      ).catch(() => {});
+
       await sequelize.query(
         `DELETE FROM resources WHERE id = :id`,
         { replacements: { id }, type: QueryTypes.DELETE }
       );
 
-      if (rows[0] && rows[0].file_url) {
+      if (rows[0].file_url) {
         const filename = path.basename(rows[0].file_url);
         const full = path.join(UPLOADS_DIR, filename);
         fs.unlink(full, () => { /* ignore */ });
       }
 
-      return res.json({ success: true });
+      return res.json({ success: true, id });
     } catch (err) {
       console.error('[delete resource]', err.message);
       return res.status(500).json({ success: false, error: err.message });

@@ -22,8 +22,20 @@ import api from '../services/apiClient';
 import {
   Upload, FileText, Video, Music, Image, File,
   CheckCircle, AlertTriangle, X, Loader2,
-  ChevronDown, Users, Tag, RefreshCw, Inbox, BookOpen,
+  ChevronDown, Users, Tag, RefreshCw, Inbox, BookOpen, Trash2,
 } from 'lucide-react';
+
+// Shared delete helper
+async function deleteResource(id) {
+  if (!window.confirm('Delete this file permanently? This also removes any student assignments to it.')) return false;
+  try {
+    await api.delete(`/resources/${id}`);
+    return true;
+  } catch (err) {
+    alert(err?.error || err?.message || 'Failed to delete file.');
+    return false;
+  }
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const extract = (r) => (Array.isArray(r) ? r : Array.isArray(r?.data) ? r.data : []);
@@ -443,6 +455,16 @@ function ResourceLibrarySection() {
                       <Users size={11} />
                       {pushing === file.id ? 'Cancel' : 'Push'}
                     </button>
+                    <button
+                      onClick={async () => {
+                        const ok = await deleteResource(file.id);
+                        if (ok) setResources(prev => prev.filter(r => r.id !== file.id));
+                      }}
+                      title="Delete file"
+                      className="flex items-center justify-center text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                      <Trash2 size={11} />
+                    </button>
                   </div>
 
                   {pushing === file.id && (
@@ -740,6 +762,16 @@ export default function AdminBulkUploadPanel() {
                     >
                       <Users size={12} />
                       {assigningUsers === file.id ? 'Cancel' : 'Students'}
+                    </button>
+                    <button
+                      onClick={async () => {
+                        const ok = await deleteResource(file.id);
+                        if (ok) setStaged(prev => prev.filter(f => f.id !== file.id));
+                      }}
+                      title="Delete file"
+                      className="flex items-center justify-center text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                      <Trash2 size={12} />
                     </button>
                   </div>
                 </div>
