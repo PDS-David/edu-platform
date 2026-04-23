@@ -56,21 +56,35 @@ function StatusBadge({ staged }) {
 }
 
 // ── Cascade dropdowns hook ────────────────────────────────────────────────────
+// All four levels (Exam Type → Subject → Topic → Subtopic) are independently
+// usable. Subject is NOT gated by Exam Type — when no Exam Type is picked we
+// load every active subject so admins can always tag a file. Picking an Exam
+// Type filters the subject list down to that exam's subjects.
 function useMeta() {
   const [examTypes,  setExamTypes]  = useState([]);
   const [subjects,   setSubjects]   = useState([]);
   const [topics,     setTopics]     = useState([]);
   const [subtopics,  setSubtopics]  = useState([]);
 
-  useEffect(() => {
-    api.get('/catalog/types').then(r => setExamTypes(extract(r))).catch(() => {});
+  // Always have ALL subjects available so the dropdown is never empty/locked.
+  const loadAllSubjects = useCallback(() => {
+    api.get('/catalog/all-subjects')
+      .then(r => setSubjects(extract(r)))
+      .catch(() => setSubjects([]));
   }, []);
 
+  useEffect(() => {
+    api.get('/catalog/types').then(r => setExamTypes(extract(r))).catch(() => {});
+    loadAllSubjects();
+  }, [loadAllSubjects]);
+
   const loadSubjects = useCallback((typeId) => {
-    setSubjects([]); setTopics([]); setSubtopics([]);
-    if (!typeId) return;
-    api.get(`/catalog/types/${typeId}/subjects`).then(r => setSubjects(extract(r))).catch(() => {});
-  }, []);
+    setTopics([]); setSubtopics([]);
+    if (!typeId) { loadAllSubjects(); return; }
+    api.get(`/catalog/types/${typeId}/subjects`)
+      .then(r => setSubjects(extract(r)))
+      .catch(() => setSubjects([]));
+  }, [loadAllSubjects]);
 
   const loadTopics = useCallback((subjectId) => {
     setTopics([]); setSubtopics([]);
@@ -92,12 +106,16 @@ function useMeta() {
 // ── Per-file metadata form ────────────────────────────────────────────────────
 function MetaForm({ file, onSave, onDismiss }) {
   const [form, setForm] = useState({
-    title:      file.title || '',
-    examTypeId: '',
-    subjectId:  '',
-    topicId:    '',
-    subtopicId: '',
-    pushType:   'learning_material',
+    title:       file.title || '',
+    examTypeId:  '',
+    subjectId:   '',
+    topicId:     '',
+    subtopicId:  '',
+    pushType:    'learning_material',
+    // Whether this file should be shown to students as a downloadable
+    // resource ("learning_material") or its questions extracted by AI
+    // and surfaced as quiz/practice questions ("question_bank").
+    contentKind: 'learning_material',
   });
   const [saving, setSaving] = useState(false);
   const [msg,    setMsg]    = useState('');
@@ -118,11 +136,12 @@ function MetaForm({ file, onSave, onDismiss }) {
     setSaving(true); setMsg('');
     try {
       await api.put(`/resources/${file.id}/assign-meta`, {
-        title:      form.title.trim() || file.title,
-        topic_id:   form.topicId   || null,
-        subtopic_id:form.subtopicId || null,
-        subject_id: form.subjectId  || null,
-        push_type:  form.pushType   || 'learning_material',
+        title:        form.title.trim() || file.title,
+        topic_id:     form.topicId    || null,
+        subtopic_id:  form.subtopicId  || null,
+        subject_id:   form.subjectId   || null,
+        push_type:    form.pushType    || 'learning_material',
+        content_kind: form.contentKind || 'learning_material',
       });
       onSave(file.id);
     } catch (err) {
@@ -131,7 +150,9 @@ function MetaForm({ file, onSave, onDismiss }) {
     }
   };
 
-  const sel = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:bg-gray-50 disabled:text-gray-400';
+  // Dropdowns are always enabled — when the parent list is empty we surface
+  // a clearly-worded placeholder option instead of locking the field.
+  const sel = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-300';
 
   return (
     <div className="border-t border-gray-100 bg-gray-50 px-4 py-4 space-y-3">
@@ -152,26 +173,69 @@ function MetaForm({ file, onSave, onDismiss }) {
         })}
       </select>
 
-      {/* Subject */}
-      <select value={form.subjectId} onChange={e => set('subjectId', e.target.value)}
-        disabled={!form.examTypeId} className={sel}>
-        <option value="">Select Subject…</option>
-        {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+      {/* Subject — always enabled. With no Exam Type, lists ALL subjects. */}
+      <select value={form.subjectId} onChange={e => set('subjectId', e.target.value)} className={sel}>
+        <option value="">
+          {form.examTypeId ? 'Select Subject…' : 'Select Subject (showing all)…'}
+        </option>
+        {subjects.map(s => (
+          <option key={s.id} value={s.id}>
+            {s.name}{s.exam_board_code ? ` · ${s.exam_board_code}` : ''}
+          </option>
+        ))}
       </select>
 
-      {/* Topic */}
-      <select value={form.topicId} onChange={e => set('topicId', e.target.value)}
-        disabled={!form.subjectId || topics.length === 0} className={sel}>
-        <option value="">Select Topic (optional)…</option>
+      {/* Topic — always enabled once a Subject is picked. Empty list → clear hint. */}
+      <select value={form.topicId} onChange={e => set('topicId', e.target.value)} className={sel}>
+        {!form.subjectId ? (
+          <option value="">Pick a Subject first…</option>
+        ) : topics.length === 0 ? (
+          <option value="">No topics defined for this subject — leave blank</option>
+        ) : (
+          <option value="">Select Topic (optional)…</option>
+        )}
         {topics.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
       </select>
 
-      {/* Subtopic */}
-      <select value={form.subtopicId} onChange={e => set('subtopicId', e.target.value)}
-        disabled={!form.topicId || subtopics.length === 0} className={sel}>
-        <option value="">Select Subtopic (optional)…</option>
+      {/* Subtopic — always enabled once a Topic is picked. Empty list → clear hint. */}
+      <select value={form.subtopicId} onChange={e => set('subtopicId', e.target.value)} className={sel}>
+        {!form.topicId ? (
+          <option value="">Pick a Topic first…</option>
+        ) : subtopics.length === 0 ? (
+          <option value="">No subtopics for this topic — leave blank</option>
+        ) : (
+          <option value="">Select Subtopic (optional)…</option>
+        )}
         {subtopics.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
       </select>
+
+      {/* Content Kind — what this file actually IS for students */}
+      <div>
+        <p className="text-[10px] font-semibold text-gray-500 uppercase mb-1.5">Content Kind</p>
+        <div className="flex gap-2 flex-wrap">
+          <button type="button" onClick={() => set('contentKind', 'learning_material')}
+            className={`px-2.5 py-1 text-xs font-medium rounded-lg border transition-colors ${
+              form.contentKind === 'learning_material'
+                ? 'bg-emerald-500 border-emerald-500 text-white'
+                : 'bg-white border-gray-200 text-gray-600 hover:border-emerald-300'
+            }`}>
+            📖 Learning Material
+          </button>
+          <button type="button" onClick={() => set('contentKind', 'question_bank')}
+            className={`px-2.5 py-1 text-xs font-medium rounded-lg border transition-colors ${
+              form.contentKind === 'question_bank'
+                ? 'bg-purple-600 border-purple-600 text-white'
+                : 'bg-white border-gray-200 text-gray-600 hover:border-purple-300'
+            }`}>
+            ❓ Question Bank (extract with AI)
+          </button>
+        </div>
+        <p className="text-[10px] text-gray-500 mt-1.5 leading-snug">
+          {form.contentKind === 'question_bank'
+            ? 'On save, AI will read this file and create reviewable quiz questions for the chosen subject/topic. Students will see them as practice/quiz questions — not as a download.'
+            : 'Students will see this as a downloadable resource (PDF, video, slides, etc.).'}
+        </p>
+      </div>
 
       {/* Push type */}
       <div>
@@ -439,6 +503,11 @@ function ResourceLibrarySection() {
                         {file.push_type && (
                           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-600">
                             {file.push_type}
+                          </span>
+                        )}
+                        {file.content_kind === 'question_bank' && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700">
+                            ❓ Question Bank
                           </span>
                         )}
                       </div>
