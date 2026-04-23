@@ -8,7 +8,7 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     allowedHosts: true,
-    hmr: { clientPort: 443 },
+    hmr: { clientPort: 5173, protocol: 'wss' },
     proxy: {
       '/api': {
         target: 'http://localhost:5000',
