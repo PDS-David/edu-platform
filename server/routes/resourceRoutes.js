@@ -9,6 +9,7 @@ const { QueryTypes } = require('sequelize');
 
 const sequelize = require('../config/database');
 const { protect, authorize } = require('../middleware/auth');
+const r2 = require('../utils/r2Storage');
 
 /* ================================
    UPLOAD DIRECTORY
@@ -24,7 +25,7 @@ if (!fs.existsSync(UPLOADS_DIR)) {
    MULTER CONFIG
    ================================ */
 
-const storage = multer.diskStorage({
+const diskStorage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
   filename: (_req, file, cb) => {
     const unique = `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
@@ -32,8 +33,10 @@ const storage = multer.diskStorage({
   }
 });
 
+// When R2 is configured, hold the file in memory just long enough to push
+// it to object storage. Otherwise persist to local disk like before.
 const upload = multer({
-  storage,
+  storage: r2.isR2Enabled() ? multer.memoryStorage() : diskStorage,
   limits: { fileSize: 500 * 1024 * 1024 } // 500 MB
 });
 
@@ -168,7 +171,19 @@ router.post(
 
       for (const f of files) {
         try {
-          const fileUrl = `/uploads/resources/${path.basename(f.path)}`;
+          let fileUrl;
+          if (r2.isR2Enabled()) {
+            // Memory storage → push buffer to Cloudflare R2
+            const { url } = await r2.uploadBuffer({
+              buffer: f.buffer,
+              originalname: f.originalname,
+              mimetype: f.mimetype,
+            });
+            fileUrl = url;
+          } else {
+            // Local disk fallback (Render ephemeral)
+            fileUrl = `/uploads/resources/${path.basename(f.path)}`;
+          }
           const title = path.parse(f.originalname).name || f.originalname;
           const resourceType = guessResourceType(f.originalname);
 
@@ -482,9 +497,14 @@ router.delete(
       );
 
       if (rows[0].file_url) {
-        const filename = path.basename(rows[0].file_url);
-        const full = path.join(UPLOADS_DIR, filename);
-        fs.unlink(full, () => { /* ignore */ });
+        if (/^https?:\/\//.test(rows[0].file_url)) {
+          // Remote (R2) — best-effort delete from bucket
+          r2.deleteByUrl(rows[0].file_url).catch(() => {});
+        } else {
+          const filename = path.basename(rows[0].file_url);
+          const full = path.join(UPLOADS_DIR, filename);
+          fs.unlink(full, () => { /* ignore */ });
+        }
       }
 
       return res.json({ success: true, id });
