@@ -276,8 +276,11 @@ function UploadTab({ showToast }) {
           ))}
         </select>
         {form.subject_id && topics.length === 0 && (
-          <p className="text-xs text-gray-400 mt-1">
-            No topics created for this subject yet. Create topics in the Content section.
+          <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+            No topics yet for this subject.{' '}
+            <Link to="/teacher/content" className="underline font-semibold hover:text-amber-800">
+              Add topics in Content Manager →
+            </Link>
           </p>
         )}
       </div>
