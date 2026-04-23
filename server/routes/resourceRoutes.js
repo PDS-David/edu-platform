@@ -271,23 +271,47 @@ router.get('/staged', async (_req, res) => {
 router.get('/', async (req, res) => {
   try {
     await ensureExtraColumns();
+    await ensureResourceAssignments();
 
-    const { q } = req.query;
-    const replacements = {};
-    let where = `WHERE is_active = true AND (is_staged = false OR is_staged IS NULL)`;
+    const { q, subject_id, topic_id, subtopic_id } = req.query;
+    const role = req.user?.role;
+    const replacements = { user_id: req.user?.id || null };
 
-    if (q && String(q).trim()) {
-      where += ` AND title ILIKE :q`;
-      replacements.q = `%${String(q).trim()}%`;
+    let where = `WHERE r.is_active = true AND (r.is_staged = false OR r.is_staged IS NULL)`;
+
+    if (q && String(q).trim())     { where += ` AND r.title ILIKE :q`;            replacements.q          = `%${String(q).trim()}%`; }
+    if (subject_id  && /^\d+$/.test(subject_id))   { where += ` AND r.subject_id  = :subject_id`;   replacements.subject_id  = parseInt(subject_id,  10); }
+    if (topic_id    && /^\d+$/.test(topic_id))     { where += ` AND r.topic_id    = :topic_id`;     replacements.topic_id    = parseInt(topic_id,    10); }
+    if (subtopic_id && /^\d+$/.test(subtopic_id))  { where += ` AND r.subtopic_id = :subtopic_id`;  replacements.subtopic_id = parseInt(subtopic_id, 10); }
+
+    // Students see ONLY resources assigned to them (directly, or via a class they belong to).
+    // Admins/teachers see everything.
+    if (role === 'student') {
+      where += `
+        AND (
+          EXISTS (SELECT 1 FROM resource_assignments      ra WHERE ra.resource_id = r.id AND ra.student_id = :user_id)
+          OR EXISTS (SELECT 1 FROM resource_user_assignments rua WHERE rua.resource_id = r.id AND rua.user_id   = :user_id)
+          OR EXISTS (
+            SELECT 1
+              FROM resource_assignments ra
+              JOIN class_memberships cm ON cm.class_id = ra.class_id
+             WHERE ra.resource_id = r.id AND cm.student_id = :user_id
+          )
+        )`;
     }
 
     const rows = await sequelize.query(
-      `SELECT id, title, resource_type, file_url, file_size_bytes,
-              original_filename, mime_type, is_staged, is_active,
-              uploaded_by, created_at, updated_at
-         FROM resources
+      `SELECT r.id, r.title, r.resource_type, r.file_url, r.file_size_bytes,
+              r.original_filename, r.mime_type, r.is_staged, r.is_active,
+              r.uploaded_by, r.subject_id, r.topic_id, r.subtopic_id, r.push_type,
+              r.created_at, r.updated_at,
+              s.name AS subject_name, t.name AS topic_name, st.name AS subtopic_name
+         FROM resources r
+         LEFT JOIN subjects  s ON s.id = r.subject_id
+         LEFT JOIN topics    t ON t.id = r.topic_id
+         LEFT JOIN subtopics st ON st.id = r.subtopic_id
          ${where}
-        ORDER BY created_at DESC
+        ORDER BY r.created_at DESC
         LIMIT 1000`,
       { replacements, type: QueryTypes.SELECT }
     );
@@ -295,6 +319,54 @@ router.get('/', async (req, res) => {
     return res.json({ success: true, data: rows, count: rows.length });
   } catch (err) {
     console.error('[list resources]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/* ================================
+   MY ASSIGNMENTS  (GET /api/resources/my-assignments)
+   Returns every resource that has been pushed to the current user,
+   either individually, by direct student assignment, or via a class.
+   ================================ */
+router.get('/my-assignments', async (req, res) => {
+  try {
+    await ensureExtraColumns();
+    await ensureResourceAssignments();
+
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ success: false, error: 'Not authenticated' });
+
+    const rows = await sequelize.query(
+      `SELECT DISTINCT
+              r.id, r.title, r.resource_type, r.file_url, r.file_size_bytes,
+              r.original_filename, r.mime_type, r.push_type,
+              r.subject_id, r.topic_id, r.subtopic_id,
+              r.created_at, r.updated_at,
+              s.name AS subject_name, t.name AS topic_name, st.name AS subtopic_name
+         FROM resources r
+         LEFT JOIN subjects  s  ON s.id  = r.subject_id
+         LEFT JOIN topics    t  ON t.id  = r.topic_id
+         LEFT JOIN subtopics st ON st.id = r.subtopic_id
+        WHERE r.is_active = true
+          AND (r.is_staged = false OR r.is_staged IS NULL)
+          AND (
+            EXISTS (SELECT 1 FROM resource_assignments      ra  WHERE ra.resource_id  = r.id AND ra.student_id = :uid)
+            OR EXISTS (SELECT 1 FROM resource_user_assignments rua WHERE rua.resource_id = r.id AND rua.user_id   = :uid)
+            OR EXISTS (
+              SELECT 1
+                FROM resource_assignments ra
+                JOIN class_memberships cm ON cm.class_id = ra.class_id
+               WHERE ra.resource_id = r.id AND cm.student_id = :uid
+            )
+          )
+        ORDER BY r.created_at DESC
+        LIMIT 1000`,
+      { replacements: { uid: userId }, type: QueryTypes.SELECT }
+    );
+
+    return res.json({ success: true, data: rows, count: rows.length });
+  } catch (err) {
+    console.error('[my-assignments]', err.message);
     return res.status(500).json({ success: false, error: err.message });
   }
 });
