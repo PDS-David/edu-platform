@@ -165,6 +165,10 @@ if (dashboardRoutes)        app.use('/api/dashboard',        protect, dashboardR
 if (replayRoutes)           app.use('/api/replay',            protect, replayRoutes);
 
 // HEALTH
+app.get('/', (_req, res) => {
+  res.status(200).json({ status: 'ok', service: 'eac-api' });
+});
+
 app.get('/health', (_req, res) => {
   return success(res, { data: { status: 'ok', timestamp: new Date().toISOString() } });
 });
