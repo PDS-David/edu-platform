@@ -5,7 +5,22 @@ const router = express.Router();
 const { QueryTypes } = require('sequelize');
 const sequelize = require('../config/database');
 const { protect } = require('../middleware/auth');
-const { computeSubtopicCompletion } = require('../services/progressEngine');
+function computeSubtopicCompletion(st) {
+  const flags = {
+    resources_completed: !!st.resources_completed,
+    practice_completed:  !!st.practice_completed,
+    quiz_completed:      !!st.quiz_completed,
+    notes_viewed:        !!st.notes_viewed,
+    video_watched:       !!st.video_watched,
+  };
+  const total = Object.keys(flags).length;
+  const done  = Object.values(flags).filter(Boolean).length;
+  return {
+    ...flags,
+    completed: done === total,
+    completion_score: total ? Math.round((done / total) * 100) : 0,
+  };
+}
 
 function isValidInt(v) {
   return Number.isInteger(Number(v));

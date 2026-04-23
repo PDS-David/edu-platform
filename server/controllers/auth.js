@@ -198,7 +198,7 @@ exports.getMe = async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
-      user: rows[0]
+      user: safeUser(rows[0])
     });
 
   } catch (err) {
