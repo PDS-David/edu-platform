@@ -255,7 +255,8 @@ function PracticeTab({ subtopicId, subjectId, onComplete }) {
     setPhase('quiz');
     try {
       const params = { count: 8, question_sub_type: type };
-      if (subjectId) params.subject_id = subjectId;
+      if (subtopicId) params.subtopic_id = subtopicId;
+      if (subjectId)  params.subject_id  = subjectId;
       const r = await api.get('/questions/random', { params });
       setQuestions(r.data || []);
     } catch {
