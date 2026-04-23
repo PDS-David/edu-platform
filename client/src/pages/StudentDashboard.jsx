@@ -434,57 +434,6 @@ export default function StudentDashboard() {
                 </p>
               </div>
 
-              {/* ── MY SUBJECTS: list rows, not cards ── */}
-              <section>
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider">My Subjects</h2>
-                  <button onClick={() => navigate("/student/subjects")}
-                    className="text-xs text-blue-600 hover:underline font-medium">
-                    View all →
-                  </button>
-                </div>
-                {loadingSubjects ? (
-                  <div className="space-y-2">
-                    {[0,1,2].map(i => <div key={i} className="h-12 rounded-lg bg-gray-100 animate-pulse" />)}
-                  </div>
-                ) : subjects.length === 0 ? (
-                  <div className="text-center py-8 border border-dashed border-gray-200 rounded-xl">
-                    <BookOpen size={22} className="text-gray-200 mx-auto mb-2" />
-                    <p className="text-sm text-gray-400">No subjects enrolled yet</p>
-                    <button onClick={() => navigate("/subjects")} className="mt-2 text-xs text-blue-600 hover:underline font-medium">Browse subjects →</button>
-                  </div>
-                ) : (
-                  <div className="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden bg-white">
-                    {subjects.slice(0, 6).map(subject => {
-                      const pct = subjectProgress[subject.id] ?? null;
-                      return (
-                        <button key={subject.id}
-                          onClick={() => navigate(`/student/subject/${subject.id}`)}
-                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-blue-50 transition-colors text-left group">
-                          <span className="text-lg shrink-0 w-7 text-center">{subject.icon_emoji || "📚"}</span>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-800 truncate group-hover:text-blue-700">{subject.name}</p>
-                            <div className="flex items-center gap-2 mt-0.5">
-                              <div className="flex-1 h-1 bg-gray-100 rounded-full overflow-hidden max-w-[120px]">
-                                <div className="h-full bg-blue-400 rounded-full" style={{ width: `${pct ?? 0}%` }} />
-                              </div>
-                              <span className="text-[10px] text-gray-400 font-mono">{pct !== null ? `${pct}%` : "Not started"}</span>
-                            </div>
-                          </div>
-                          <span className="text-[10px] text-gray-300 group-hover:text-blue-400 font-semibold shrink-0">›</span>
-                        </button>
-                      );
-                    })}
-                    {subjects.length > 6 && (
-                      <button onClick={() => navigate("/student/subjects")}
-                        className="w-full text-center text-xs text-blue-500 hover:text-blue-700 py-2.5 font-medium hover:bg-blue-50 transition-colors">
-                        +{subjects.length - 6} more subjects →
-                      </button>
-                    )}
-                  </div>
-                )}
-              </section>
-
               {/* ── FOCUS AREAS: only after student has quiz history ── */}
               {weakTopics.length > 0 && (
                 <section>

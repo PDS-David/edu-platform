@@ -29,10 +29,24 @@ export default function SubjectPage() {
       api.get('/topics', { params: { subject_id: subjectId } }),
     ])
       .then(([subRes, topicRes]) => {
-        setSubject(subRes.data || subRes);
-        const list = topicRes.data?.topics || topicRes.data || [];
+        // apiClient interceptor: { data: res.data?.data ?? res.data, success, count }
+        // Server sends: { success, count, topics: [...] }
+        // So topicRes.data = { success, count, topics: [...] }
+        // But interceptor does data: res.data?.data ?? res.data
+        // res.data.data is undefined → topicRes.data = { success, count, topics }
+        // Therefore topicRes.data.topics is the array ✅
+        // Belt-and-suspenders: try every possible shape
+        const subjectRaw = subRes.data || subRes;
+        setSubject(subjectRaw);
+
+        const topicRaw = topicRes.data;
+        const list =
+          Array.isArray(topicRaw)           ? topicRaw :
+          Array.isArray(topicRaw?.topics)   ? topicRaw.topics :
+          Array.isArray(topicRes?.topics)   ? topicRes.topics :
+          [];
         setTopics(list);
-        if (list.length > 0) setExpandedId(list[0].id); // auto-expand first topic
+        if (list.length > 0) setExpandedId(list[0].id);
       })
       .catch(err => console.error('SubjectPage load error:', err))
       .finally(() => setLoading(false));
