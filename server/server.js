@@ -139,7 +139,7 @@ if (resourceRoutes)         app.use('/api/resources',         protect, resourceR
 if (analyticsRoutes)        app.use('/api/analytics',         protect, analyticsRoutes);
 if (progressRoutes)         app.use('/api/progress',          protect, progressRoutes);
 if (progressSummaryBulk)    app.use('/api/progress-summary',  protect, progressSummaryBulk);
-if (subtopicProgressRoutes) app.use('/api/subtopics/progress',protect, subtopicProgressRoutes);
+if (subtopicProgressRoutes) app.use('/api/subtopics',        protect, subtopicProgressRoutes);
 if (notesRoutes)            app.use('/api/notes',             protect, notesRoutes);
 if (notificationRoutes)     app.use('/api/notifications',     protect, notificationRoutes);
 if (pastPaperRoutes)        app.use('/api/past-papers',               pastPaperRoutes);
