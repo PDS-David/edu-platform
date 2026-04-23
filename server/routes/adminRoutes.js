@@ -460,20 +460,6 @@ router.delete('/teacher-subjects/:id', protect, adminOnly, async (req, res) => {
   }
 });
 
-// ── POST /api/admin/run-seed ──────────────────────────────────────────────────
-// Seeds demo content (exam boards, subjects, topics, subtopics, questions,
-// resources). Admin-only. Safe to call multiple times.
-router.post('/run-seed', protect, adminOnly, async (req, res) => {
-  try {
-    const runSeed = require('../seeds/seedDemoContent');
-    await runSeed(sequelize);          // uses the server's live connection — no child process
-    return res.json({ success: true, message: 'Seed completed! Demo content is now live.' });
-  } catch (err) {
-    console.error('[POST /admin/run-seed]', err.message);
-    return res.status(500).json({ success: false, error: err.message });
-  }
-});
-
 module.exports = router;
 
 // ── POST /api/admin/generate-topics ──────────────────────────────────────────
