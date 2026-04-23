@@ -106,39 +106,107 @@ function useMeta() {
 // ── Per-file metadata form ────────────────────────────────────────────────────
 function MetaForm({ file, onSave, onDismiss }) {
   const [form, setForm] = useState({
-    title:       file.title || '',
-    examTypeId:  '',
-    subjectId:   '',
-    topicId:     '',
-    subtopicId:  '',
-    pushType:    'learning_material',
-    // Whether this file should be shown to students as a downloadable
-    // resource ("learning_material") or its questions extracted by AI
-    // and surfaced as quiz/practice questions ("question_bank").
-    contentKind: 'learning_material',
+    title:        file.title || '',
+    examTypeId:   '',
+    subjectId:    '',
+    // Topic & subtopic are now free-text combo fields. We track BOTH the
+    // chosen id (when the typed name matches an existing entry exactly) and
+    // the raw name (so brand-new topics/subtopics can be created on save).
+    topicId:      '',
+    topicName:    '',
+    subtopicId:   '',
+    subtopicName: '',
+    pushType:     'learning_material',
+    contentKind:  'learning_material',
   });
   const [saving, setSaving] = useState(false);
   const [msg,    setMsg]    = useState('');
   const { examTypes, subjects, topics, subtopics, loadSubjects, loadTopics, loadSubtopics } = useMeta();
 
+  // Resolve a free-text topic/subtopic name against the loaded list so that
+  // an exact match still ends up linked to the existing row instead of
+  // duplicating it.
+  const matchByName = (list, name) => {
+    if (!name) return '';
+    const needle = name.trim().toLowerCase();
+    const hit = list.find(x => (x.name || '').trim().toLowerCase() === needle);
+    return hit ? hit.id : '';
+  };
+
   const set = (field, val) => {
     setForm(f => {
       const next = { ...f, [field]: val };
-      if (field === 'examTypeId') { next.subjectId = ''; next.topicId = ''; next.subtopicId = ''; loadSubjects(val); }
-      if (field === 'subjectId')  { next.topicId = ''; next.subtopicId = ''; loadTopics(val); }
-      if (field === 'topicId')    { next.subtopicId = ''; loadSubtopics(val); }
+      if (field === 'examTypeId') {
+        next.subjectId = ''; next.topicId = ''; next.topicName = '';
+        next.subtopicId = ''; next.subtopicName = '';
+        loadSubjects(val);
+      }
+      if (field === 'subjectId') {
+        next.topicId = ''; next.topicName = '';
+        next.subtopicId = ''; next.subtopicName = '';
+        loadTopics(val);
+      }
+      if (field === 'topicName') {
+        next.topicId = matchByName(topics, val);
+        // Subtopic options depend on the selected topic id; clear them when
+        // the typed name no longer matches a known topic.
+        if (!next.topicId) { next.subtopicId = ''; }
+        else loadSubtopics(next.topicId);
+      }
+      if (field === 'subtopicName') {
+        next.subtopicId = matchByName(subtopics, val);
+      }
       return next;
     });
   };
 
   const handleSave = async () => {
-    if (!form.subjectId && !form.topicId) { setMsg('Please select at least a subject or topic.'); return; }
+    if (!form.subjectId && !form.topicName.trim()) {
+      setMsg('Please pick at least a subject or type a topic.');
+      return;
+    }
     setSaving(true); setMsg('');
     try {
+      // 1) If the admin typed a brand-new topic, create it now and grab its id.
+      let topicId = form.topicId;
+      const topicName = form.topicName.trim();
+      if (!topicId && topicName && form.subjectId) {
+        try {
+          const r = await api.post('/teacher/topics', {
+            subject_id: form.subjectId,
+            name:       topicName,
+          });
+          topicId = r?.data?.id || '';
+        } catch (err) {
+          setMsg(err?.error || 'Could not create the new topic.');
+          setSaving(false);
+          return;
+        }
+      }
+
+      // 2) Same for subtopic — but only if we have a parent topic id.
+      let subtopicId = form.subtopicId;
+      const subtopicName = form.subtopicName.trim();
+      if (!subtopicId && subtopicName && topicId) {
+        try {
+          const r = await api.post('/teacher/subtopics', {
+            topic_id:   topicId,
+            subject_id: form.subjectId || null,
+            name:       subtopicName,
+          });
+          subtopicId = r?.data?.id || '';
+        } catch (err) {
+          setMsg(err?.error || 'Could not create the new subtopic.');
+          setSaving(false);
+          return;
+        }
+      }
+
+      // 3) Save the resource metadata.
       await api.put(`/resources/${file.id}/assign-meta`, {
         title:        form.title.trim() || file.title,
-        topic_id:     form.topicId    || null,
-        subtopic_id:  form.subtopicId  || null,
+        topic_id:     topicId    || null,
+        subtopic_id:  subtopicId || null,
         subject_id:   form.subjectId   || null,
         push_type:    form.pushType    || 'learning_material',
         content_kind: form.contentKind || 'learning_material',
@@ -185,29 +253,57 @@ function MetaForm({ file, onSave, onDismiss }) {
         ))}
       </select>
 
-      {/* Topic — always enabled once a Subject is picked. Empty list → clear hint. */}
-      <select value={form.topicId} onChange={e => set('topicId', e.target.value)} className={sel}>
-        {!form.subjectId ? (
-          <option value="">Pick a Subject first…</option>
-        ) : topics.length === 0 ? (
-          <option value="">No topics defined for this subject — leave blank</option>
-        ) : (
-          <option value="">Select Topic (optional)…</option>
+      {/* Topic — type to create a new one, or pick from the suggestions list. */}
+      <div>
+        <input
+          list={`topic-suggestions-${file.id}`}
+          value={form.topicName}
+          onChange={e => set('topicName', e.target.value)}
+          placeholder={
+            !form.subjectId
+              ? 'Pick a Subject first…'
+              : topics.length === 0
+                ? 'Type a topic name (none defined yet)'
+                : 'Type a topic — or pick from suggestions'
+          }
+          disabled={!form.subjectId}
+          className={sel + ' disabled:bg-gray-50 disabled:text-gray-400'}
+        />
+        <datalist id={`topic-suggestions-${file.id}`}>
+          {topics.map(t => <option key={t.id} value={t.name} />)}
+        </datalist>
+        {form.subjectId && form.topicName.trim() && !form.topicId && (
+          <p className="text-[10px] text-emerald-600 mt-1 ml-1">
+            ✨ New topic — will be created on save
+          </p>
         )}
-        {topics.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-      </select>
+      </div>
 
-      {/* Subtopic — always enabled once a Topic is picked. Empty list → clear hint. */}
-      <select value={form.subtopicId} onChange={e => set('subtopicId', e.target.value)} className={sel}>
-        {!form.topicId ? (
-          <option value="">Pick a Topic first…</option>
-        ) : subtopics.length === 0 ? (
-          <option value="">No subtopics for this topic — leave blank</option>
-        ) : (
-          <option value="">Select Subtopic (optional)…</option>
+      {/* Subtopic — same combobox pattern. Requires a topic name first. */}
+      <div>
+        <input
+          list={`subtopic-suggestions-${file.id}`}
+          value={form.subtopicName}
+          onChange={e => set('subtopicName', e.target.value)}
+          placeholder={
+            !form.topicName.trim()
+              ? 'Type a Topic first…'
+              : subtopics.length === 0
+                ? 'Type a subtopic name (optional)'
+                : 'Type a subtopic — or pick from suggestions'
+          }
+          disabled={!form.topicName.trim()}
+          className={sel + ' disabled:bg-gray-50 disabled:text-gray-400'}
+        />
+        <datalist id={`subtopic-suggestions-${file.id}`}>
+          {subtopics.map(s => <option key={s.id} value={s.name} />)}
+        </datalist>
+        {form.topicId && form.subtopicName.trim() && !form.subtopicId && (
+          <p className="text-[10px] text-emerald-600 mt-1 ml-1">
+            ✨ New subtopic — will be created on save
+          </p>
         )}
-        {subtopics.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-      </select>
+      </div>
 
       {/* Content Kind — what this file actually IS for students */}
       <div>
