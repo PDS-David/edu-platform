@@ -513,8 +513,11 @@ export default function AdminBulkUploadPanel() {
     pendingFiles.forEach(f => fd.append('files', f));
 
     try {
-      const rawBase = import.meta.env.VITE_API_URL || '';
-      const apiBase = rawBase.endsWith('/api') ? rawBase : (rawBase ? `${rawBase}/api` : '/api');
+      // Use same fallback as apiClient.js so XHR never hits the wrong server
+      const rawBase = import.meta.env.VITE_API_URL || 'https://aischoolonair-api.onrender.com';
+      const apiBase = rawBase.replace(/\/$/, '').endsWith('/api')
+        ? rawBase.replace(/\/$/, '')
+        : rawBase.replace(/\/$/, '') + '/api';
       const token   = localStorage.getItem('token') || '';
 
       const res = await new Promise((resolve, reject) => {
