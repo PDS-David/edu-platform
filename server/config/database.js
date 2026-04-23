@@ -12,8 +12,9 @@ const isProduction = process.env.NODE_ENV === 'production';
 // by checking if DATABASE_URL contains sslmode=disable.
 const dbUrl = process.env.DATABASE_URL || '';
 const sslDisabled = process.env.DB_SSL === 'false' || dbUrl.includes('sslmode=disable');
+const sslForced = process.env.DB_SSL === 'true' || /render\.com|amazonaws\.com|neon\.tech|supabase\.co/.test(dbUrl);
 
-const dialectOptions = (isProduction && !sslDisabled)
+const dialectOptions = ((isProduction || sslForced) && !sslDisabled)
   ? {
       ssl: {
         require: true,
