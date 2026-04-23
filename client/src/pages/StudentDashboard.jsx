@@ -305,19 +305,20 @@ export default function StudentDashboard() {
   // ── Sidebar items — all wired ─────────────────────────────────────────────
   const sidebarItems = [
     { label: "Dashboard",   icon: BarChart2,    path: "/student/dashboard"  },
-    { label: "Resources",   icon: BookOpen,     path: "/student/subjects"   },
+    { label: "Subjects",    icon: GraduationCap, path: "/student/subjects"  },
+    { label: "Resources",   icon: BookOpen,     path: "/student/resources"  },
     { label: "Practice",    icon: Zap,          path: "/student/practice"   },
     { label: "Past Papers", icon: FileText,     path: "/past-papers"        },
     { label: "Mock Exam",   icon: ClipboardList,path: null, onClick: () => setShowMockPicker(true) },
     { label: "Analytics",   icon: TrendingUp,   path: "/student/analytics"  },
-    { label: "Files",       icon: Download,     path: "/student/files"      },
-    { label: "Exam Types",  icon: GraduationCap, path: "/student/exam-types"  },
+    { label: "Exam Types",  icon: Download,     path: "/student/exam-types" },
   ];
 
   const isActive = (item) => {
     if (!item.path) return false;
     if (item.label === "Dashboard") return location.pathname === item.path || location.pathname === "/student" || location.pathname === "/student/";
-    if (item.label === "Resources") return location.pathname.startsWith("/student/subjects") || location.pathname.startsWith("/student/subject");
+    if (item.label === "Subjects")  return location.pathname.startsWith("/student/subjects") || location.pathname.startsWith("/student/subject/");
+    if (item.label === "Resources") return location.pathname.startsWith("/student/resources") || location.pathname.startsWith("/student/files");
     return location.pathname.startsWith(item.path);
   };
 
