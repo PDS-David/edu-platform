@@ -54,7 +54,12 @@ async function ensureExtraColumns() {
     `ALTER TABLE resources ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true`,
     `ALTER TABLE resources ADD COLUMN IF NOT EXISTS original_filename VARCHAR(255)`,
     `ALTER TABLE resources ADD COLUMN IF NOT EXISTS mime_type VARCHAR(120)`,
-    `ALTER TABLE resources ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()`
+    `ALTER TABLE resources ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()`,
+    // Distinguishes downloadable material from a file whose questions should
+    // be extracted by AI and surfaced as quiz/practice questions to students.
+    // Values: 'learning_material' | 'question_bank'
+    `ALTER TABLE resources ADD COLUMN IF NOT EXISTS content_kind VARCHAR(32) DEFAULT 'learning_material'`,
+    `ALTER TABLE resources ADD COLUMN IF NOT EXISTS questions_extracted_at TIMESTAMPTZ`
   ];
 
   for (const sql of alters) {
@@ -261,6 +266,7 @@ router.get('/staged', async (_req, res) => {
     const rows = await sequelize.query(
       `SELECT id, title, resource_type, file_url, file_size_bytes,
               original_filename, mime_type, is_staged, is_active,
+              content_kind, questions_extracted_at,
               uploaded_by, created_at, updated_at
          FROM resources
         WHERE is_staged = true
@@ -319,6 +325,7 @@ router.get('/', async (req, res) => {
       `SELECT r.id, r.title, r.resource_type, r.file_url, r.file_size_bytes,
               r.original_filename, r.mime_type, r.is_staged, r.is_active,
               r.uploaded_by, r.subject_id, r.topic_id, r.subtopic_id, r.push_type,
+              r.content_kind, r.questions_extracted_at,
               r.created_at, r.updated_at,
               s.name AS subject_name, t.name AS topic_name, st.name AS subtopic_name
          FROM resources r
@@ -410,7 +417,8 @@ router.put(
         topic_id = null,
         subtopic_id = null,
         subject_id = null,
-        push_type = 'learning_material'
+        push_type = 'learning_material',
+        content_kind = 'learning_material'
       } = req.body || {};
 
       // At least one of subject/topic must be present, per the UI contract.
@@ -421,18 +429,22 @@ router.put(
         });
       }
 
+      const safeKind = content_kind === 'question_bank' ? 'question_bank' : 'learning_material';
+
       const [rows] = await sequelize.query(
         `UPDATE resources
-            SET title       = COALESCE(:title, title),
-                subject_id  = COALESCE(:subject_id::int,  subject_id),
-                topic_id    = COALESCE(:topic_id::int,    topic_id),
-                subtopic_id = COALESCE(:subtopic_id::int, subtopic_id),
-                push_type   = COALESCE(:push_type, push_type),
-                is_staged   = false,
-                updated_at  = NOW()
+            SET title        = COALESCE(:title, title),
+                subject_id   = COALESCE(:subject_id::int,  subject_id),
+                topic_id     = COALESCE(:topic_id::int,    topic_id),
+                subtopic_id  = COALESCE(:subtopic_id::int, subtopic_id),
+                push_type    = COALESCE(:push_type, push_type),
+                content_kind = :content_kind,
+                is_staged    = false,
+                updated_at   = NOW()
           WHERE id = :id
           RETURNING id, title, resource_type, subject_id, topic_id, subtopic_id,
-                    push_type, is_staged, is_active, file_url, created_at, updated_at`,
+                    push_type, content_kind, is_staged, is_active, file_url,
+                    created_at, updated_at`,
         {
           replacements: {
             id,
@@ -440,7 +452,8 @@ router.put(
             subject_id: subject_id || null,
             topic_id: topic_id || null,
             subtopic_id: subtopic_id || null,
-            push_type
+            push_type,
+            content_kind: safeKind
           }
         }
       );
@@ -449,7 +462,30 @@ router.put(
         return res.status(404).json({ success: false, error: 'Resource not found' });
       }
 
-      return res.json({ success: true, data: rows[0], resource: rows[0] });
+      // Question Bank kind → fire-and-forget AI extraction. Generated questions
+      // land in `questions` with status='pending' so they show up in the
+      // existing teacher/admin question-review queue before going live.
+      if (safeKind === 'question_bank') {
+        try {
+          const extractor = require('../services/resourceQuestionExtractor');
+          extractor.extractFromResource(rows[0], req.user?.id)
+            .then((info) => {
+              console.log('[assign-meta] question extraction complete', info);
+            })
+            .catch((e) => {
+              console.error('[assign-meta] extraction failed', e.message);
+            });
+        } catch (e) {
+          console.error('[assign-meta] extractor unavailable', e.message);
+        }
+      }
+
+      return res.json({
+        success: true,
+        data: rows[0],
+        resource: rows[0],
+        extraction_queued: safeKind === 'question_bank'
+      });
     } catch (err) {
       console.error('[assign-meta]', err.message);
       return res.status(500).json({ success: false, error: err.message });
