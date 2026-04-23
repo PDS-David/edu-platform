@@ -293,10 +293,13 @@ const TeacherAssignmentPanel = () => {
   const [loading,     setLoading]     = useState(true);
   const [loadingSubjects, setLoadingSubjects] = useState(false);
   const [showModal,   setShowModal]   = useState(false);
+  const [showCreateTeacher, setShowCreateTeacher] = useState(false);
   const [saving,      setSaving]      = useState(false);
+  const [creatingTeacher, setCreatingTeacher] = useState(false);
   const [toast,       setToast]       = useState(null);
   const [selectedSubjectIds, setSelectedSubjectIds] = useState([]);
   const [form, setForm] = useState({ teacher_id: '', exam_type_id: '' });
+  const [teacherForm, setTeacherForm] = useState({ first_name: '', last_name: '', email: '', password: '' });
   const { examTypes, loadingTypes, fetchSubjectsForType, invalidateCache } = useCatalog();
 
   const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
@@ -349,38 +352,132 @@ const TeacherAssignmentPanel = () => {
     catch { showToast('Failed to remove', 'error'); }
   };
 
+  const handleCreateTeacher = async () => {
+    const { first_name, last_name, email, password } = teacherForm;
+    if (!first_name.trim() || !email.trim() || !password.trim()) { showToast('First name, email and password are required', 'error'); return; }
+    setCreatingTeacher(true);
+    try {
+      await api.post('/auth/register', { first_name: first_name.trim(), last_name: last_name.trim(), email: email.trim(), password, role: 'teacher' });
+      showToast(`Teacher account created for ${email}`);
+      setShowCreateTeacher(false);
+      setTeacherForm({ first_name: '', last_name: '', email: '', password: '' });
+      fetchAll();
+    } catch (err) { showToast(err?.message || err?.error || 'Failed to create teacher', 'error'); }
+    finally { setCreatingTeacher(false); }
+  };
+
+  // Group assignments by teacher for a cleaner view
+  const byTeacher = assignments.reduce((acc, a) => {
+    const key = a.teacher_id || a.teacher_name;
+    if (!acc[key]) acc[key] = { name: a.teacher_name, email: a.email, rows: [] };
+    acc[key].rows.push(a);
+    return acc;
+  }, {});
+
   if (loading) return <div className="flex items-center justify-center py-12"><Loader2 className="w-7 h-7 text-violet-400 animate-spin mr-3" /><span className="text-gray-500">Loading…</span></div>;
 
   return (
     <div>
       {toast && <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white ${toast.type === 'error' ? 'bg-red-500' : 'bg-violet-600'}`}>{toast.msg}</div>}
       <div className="flex items-center justify-between mb-5">
-        <div><h2 className="text-xl font-bold text-gray-900">Teacher Assignment</h2><p className="text-sm text-gray-500 mt-0.5">Assign teachers to subjects and exam types</p></div>
+        <div><h2 className="text-xl font-bold text-gray-900">Teacher Management</h2><p className="text-sm text-gray-500 mt-0.5">Create teachers and assign them to subjects</p></div>
         <div className="flex gap-2">
           <button onClick={fetchAll} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 px-3 py-2 border border-gray-200 rounded-xl"><RefreshCw size={14} /> Refresh</button>
+          <button onClick={() => setShowCreateTeacher(true)} className="flex items-center gap-1.5 text-sm border border-violet-300 text-violet-700 hover:bg-violet-50 px-4 py-2 rounded-xl font-semibold"><Plus size={14} /> Create Teacher</button>
           <button onClick={() => { setForm({ teacher_id: '', exam_type_id: '' }); setSelectedSubjectIds([]); setFilteredSubjects([]); setShowModal(true); }} className="flex items-center gap-1.5 text-sm bg-violet-600 hover:bg-violet-700 text-white px-4 py-2 rounded-xl font-semibold"><Plus size={14} /> Add Assignment</button>
         </div>
       </div>
 
-      {assignments.length === 0 ? (
-        <div className="text-center py-12 text-gray-400"><UserCheck className="w-10 h-10 mx-auto mb-3 opacity-30" /><p className="text-sm">No assignments yet.</p></div>
+      {Object.keys(byTeacher).length === 0 ? (
+        <div className="text-center py-12 text-gray-400">
+          <UserCheck className="w-10 h-10 mx-auto mb-3 opacity-30" />
+          <p className="text-sm font-medium mb-1">No teacher assignments yet.</p>
+          <p className="text-xs">Create a teacher account first, then assign them to subjects.</p>
+        </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead><tr className="border-b border-gray-100 text-left"><th className="pb-3 font-semibold text-gray-600">Teacher</th><th className="pb-3 font-semibold text-gray-600">Email</th><th className="pb-3 font-semibold text-gray-600">Subject</th><th className="pb-3 font-semibold text-gray-600">Exam Type</th><th className="pb-3 font-semibold text-gray-600">Status</th><th className="pb-3 font-semibold text-gray-600">Actions</th></tr></thead>
-            <tbody>
-              {assignments.map(a => (
-                <tr key={a.id} className="border-b border-gray-50 hover:bg-gray-50">
-                  <td className="py-3 font-medium text-gray-800">{a.teacher_name}</td>
-                  <td className="py-3 text-gray-500 text-xs">{a.email}</td>
-                  <td className="py-3 text-gray-700">{a.subject_name}</td>
-                  <td className="py-3 text-gray-500">{a.exam_board_code || '—'}</td>
-                  <td className="py-3"><span className={`text-xs font-semibold px-2 py-1 rounded-full ${a.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>{a.is_active ? 'Active' : 'Inactive'}</span></td>
-                  <td className="py-3">{a.is_active && <button onClick={() => handleRemove(a.id)} className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1"><Trash2 size={12} /> Remove</button>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="space-y-4">
+          {Object.values(byTeacher).map(teacher => (
+            <div key={teacher.email} className="border border-gray-100 rounded-xl overflow-hidden bg-white">
+              {/* Teacher header row */}
+              <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center text-sm font-bold text-violet-700 shrink-0">
+                    {(teacher.name || teacher.email || '?')[0].toUpperCase()}
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">{teacher.name || '—'}</p>
+                    <p className="text-xs text-gray-400">{teacher.email}</p>
+                  </div>
+                </div>
+                <span className="text-xs text-gray-400">{teacher.rows.length} assignment{teacher.rows.length !== 1 ? 's' : ''}</span>
+              </div>
+              {/* Subject chips */}
+              <div className="px-4 py-3 flex flex-wrap gap-2">
+                {teacher.rows.map(a => (
+                  <span key={a.id}
+                    className="inline-flex items-center gap-1.5 text-xs font-medium bg-violet-50 text-violet-700 border border-violet-100 px-2.5 py-1 rounded-full">
+                    {a.subject_name}
+                    {a.exam_board_code && <span className="text-violet-400">· {a.exam_board_code}</span>}
+                    {a.is_active && (
+                      <button onClick={() => handleRemove(a.id)}
+                        className="ml-0.5 text-violet-300 hover:text-red-500 transition-colors" title="Remove">
+                        ×
+                      </button>
+                    )}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Create Teacher Modal */}
+      {showCreateTeacher && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white border border-gray-200 rounded-xl shadow-2xl w-full max-w-sm p-6">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-bold text-gray-900">Create Teacher Account</h3>
+              <button onClick={() => setShowCreateTeacher(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+            </div>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">First Name *</label>
+                  <input value={teacherForm.first_name} onChange={e => setTeacherForm(f => ({...f, first_name: e.target.value}))}
+                    placeholder="Ada" className={inputCls} />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Last Name</label>
+                  <input value={teacherForm.last_name} onChange={e => setTeacherForm(f => ({...f, last_name: e.target.value}))}
+                    placeholder="Obi" className={inputCls} />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Email *</label>
+                <input type="email" value={teacherForm.email} onChange={e => setTeacherForm(f => ({...f, email: e.target.value}))}
+                  placeholder="teacher@school.com" className={inputCls} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Password *</label>
+                <input type="password" value={teacherForm.password} onChange={e => setTeacherForm(f => ({...f, password: e.target.value}))}
+                  placeholder="Min 8 characters" className={inputCls} />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button onClick={handleCreateTeacher} disabled={creatingTeacher}
+                className="flex-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2">
+                {creatingTeacher ? <><Loader2 size={14} className="animate-spin" /> Creating…</> : <><Plus size={14} /> Create Teacher</>}
+              </button>
+              <button onClick={() => setShowCreateTeacher(false)}
+                className="flex-1 border border-gray-200 text-gray-600 hover:bg-gray-50 font-semibold py-2.5 rounded-xl text-sm">
+                Cancel
+              </button>
+            </div>
+            <p className="text-[11px] text-gray-400 mt-3 text-center">
+              Teacher will be able to log in immediately. Share credentials with them.
+            </p>
+          </div>
         </div>
       )}
 
