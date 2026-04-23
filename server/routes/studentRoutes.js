@@ -383,7 +383,58 @@ router.get('/my-subjects', protect, async (req, res) => {
       if (!merged.has(s.id)) merged.set(s.id, s);
     });
 
-    return res.status(200).json({ success: true, data: [...merged.values()] });
+    let result = [...merged.values()];
+
+    // If student has no subjects at all, auto-enroll them in all active seeded subjects
+    // (subjects that have at least one topic) so they see content immediately
+    if (result.length === 0) {
+      try {
+        // Ensure table exists
+        await sequelize.query(
+          `CREATE TABLE IF NOT EXISTS student_subjects (
+             id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+             student_id UUID        NOT NULL,
+             subject_id INTEGER     NOT NULL,
+             is_active  BOOLEAN     NOT NULL DEFAULT true,
+             enrolled_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+             UNIQUE (student_id, subject_id)
+           )`,
+          { type: QueryTypes.RAW }
+        ).catch(() => {});
+
+        // Enroll in subjects that have topics
+        await sequelize.query(
+          `INSERT INTO student_subjects (student_id, subject_id, is_active)
+           SELECT :studentId, s.id, true
+           FROM subjects s
+           WHERE s.is_active = true
+             AND EXISTS (SELECT 1 FROM topics t WHERE t.subject_id = s.id)
+           ON CONFLICT (student_id, subject_id) DO NOTHING`,
+          { replacements: { studentId }, type: QueryTypes.INSERT }
+        );
+
+        // Re-fetch
+        ownSubjects = await sequelize.query(
+          `SELECT DISTINCT
+             s.id, s.name, s.code, s.level, s.icon_emoji, s.is_active,
+             eb.code  AS exam_board_code,
+             eb.name  AS exam_board_name,
+             eb.id    AS exam_board_id,
+             'own'    AS source
+           FROM student_subjects ss
+           JOIN subjects   s  ON s.id  = ss.subject_id
+           JOIN exam_boards eb ON eb.id = s.exam_board_id
+           WHERE ss.student_id = :studentId AND ss.is_active = true AND s.is_active = true
+           ORDER BY s.name`,
+          { replacements: { studentId }, type: QueryTypes.SELECT }
+        );
+        result = ownSubjects;
+      } catch (e) {
+        // Non-fatal — return empty list
+      }
+    }
+
+    return res.status(200).json({ success: true, data: result });
   } catch (err) {
     console.error('[GET /students/my-subjects]', err.message);
     return res.status(500).json({ success: false, error: err.message });
