@@ -616,6 +616,40 @@ async function run(externalSequelize) {
       console.log('  ✓ All resources assigned to active students');
     }
 
+    // 7. Enroll all existing active students in the seeded subjects
+    console.log('\n🎓 Enrolling students in seeded subjects...');
+    try {
+      // Ensure student_subjects table exists
+      await raw(`
+        CREATE TABLE IF NOT EXISTS student_subjects (
+          id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+          student_id  UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          subject_id  INTEGER     NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+          is_active   BOOLEAN     NOT NULL DEFAULT true,
+          enrolled_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          UNIQUE (student_id, subject_id)
+        )
+      `).catch(() => {});
+
+      // Get all seeded subject IDs
+      const seededSubjectIds = Object.values(subjectIds);
+      if (seededSubjectIds.length > 0) {
+        // Enroll every active student in every seeded subject (if not already enrolled)
+        for (const subjId of seededSubjectIds) {
+          await raw(`
+            INSERT INTO student_subjects (student_id, subject_id, is_active, enrolled_at)
+            SELECT u.id, :subjId, true, NOW()
+            FROM users u
+            WHERE u.role = 'student' AND u.is_active = true
+            ON CONFLICT (student_id, subject_id) DO NOTHING
+          `, { subjId }).catch(() => {});
+        }
+        console.log(`  ✓ All students enrolled in ${seededSubjectIds.length} seeded subjects`);
+      }
+    } catch (e) {
+      console.log(`  ⚠️  Enrollment: ${e.message.slice(0, 60)}`);
+    }
+
     // Summary
     const [t, s, q2, r] = await Promise.all([
       sel(`SELECT COUNT(*)::int AS n FROM topics`),
