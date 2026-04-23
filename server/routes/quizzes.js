@@ -47,7 +47,7 @@ router.post('/attempt', protect, async (req, res) => {
     // Fetch questions with correct answers
     const questionRows = await sequelize.query(
       `SELECT id, question_text, marks, explanation, correct_answer, options, type
-       FROM questions WHERE id = ANY(:ids::int[]) AND is_active = true`,
+       FROM questions WHERE id = ANY(ARRAY[:ids]::int[]) AND is_active = true`,
       { replacements: { ids: questionIds }, type: QueryTypes.SELECT }
     );
     const questionMap = Object.fromEntries(questionRows.map(q => [String(q.id), q]));

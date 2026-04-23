@@ -15,9 +15,9 @@ const requestId = require('./middleware/requestId');
 const requestLogger = require('./middleware/requestLogger');
 
 // ENV
-if (process.env.NODE_ENV !== 'production') {
-  require('dotenv').config({ path: path.join(__dirname, '.env') });
-}
+// Always load .env if present, and let it override platform-injected values
+// (e.g. Replit auto-sets DATABASE_URL to its built-in Helium DB which we don't want).
+require('dotenv').config({ path: path.join(__dirname, '.env'), override: true });
 
 // ─────────────────────────────────────────────
 // SAFE REQUIRE (FIX FOR YOUR CRASH)

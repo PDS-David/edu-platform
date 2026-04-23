@@ -234,8 +234,6 @@ async function ensureResourceAssignments() {
   `).catch(() => {});
   raEnsured = true;
 }
-  raEnsured = true;
-}
 
 /* ================================
    GET RESOURCES  (teacher — own uploads only)
