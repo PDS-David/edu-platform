@@ -97,7 +97,7 @@ function MetaForm({ file, onSave, onDismiss }) {
     subjectId:  '',
     topicId:    '',
     subtopicId: '',
-    pushType:   'lecture_material',
+    pushType:   'learning_material',
   });
   const [saving, setSaving] = useState(false);
   const [msg,    setMsg]    = useState('');
@@ -177,10 +177,7 @@ function MetaForm({ file, onSave, onDismiss }) {
       <div>
         <p className="text-[10px] font-semibold text-gray-500 uppercase mb-1.5">Resource Type</p>
         <div className="flex gap-2 flex-wrap">
-          {[
-            { value: 'lecture_material',  label: '📖 Lecture Material'  },
-            { value: 'question_material', label: '❓ Question Material' },
-          ].map(pt => (
+          {PUSH_TYPES.map(pt => (
             <button key={pt.value} type="button" onClick={() => set('pushType', pt.value)}
               className={`px-2.5 py-1 text-xs font-medium rounded-lg border transition-colors ${
                 form.pushType === pt.value
@@ -210,11 +207,13 @@ function MetaForm({ file, onSave, onDismiss }) {
   );
 }
 
-// ── Push-type options (A) ─────────────────────────────────────────────────────
-// Two canonical resource types: lecture material or question/practice material.
+// ── Push-type options ─────────────────────────────────────────────────────────
+// Canonical vocabulary, shared with TeacherResourcesPage.jsx and the student
+// categorizer in StudentFilesPage.jsx. Adding new values? Update all three.
 const PUSH_TYPES = [
-  { value: 'lecture_material',  label: '📖 Lecture Material'  },
-  { value: 'question_material', label: '❓ Question Material' },
+  { value: 'learning_material', label: '📚 Learning Material' },
+  { value: 'practice_test',     label: '📝 Practice Test'     },
+  { value: 'quiz',              label: '⚡ Quiz'               },
 ];
 
 // ── Per-file assign-users form ────────────────────────────────────────────────
@@ -224,7 +223,7 @@ function AssignUsersForm({ file, onDone, onDismiss }) {
   const [selected,      setSelected]      = useState([]);
   const [selectedClass, setSelectedClass] = useState([]);
   const [assignAll,     setAssignAll]     = useState(false);
-  const [pushType,      setPushType]      = useState('lecture_material');
+  const [pushType,      setPushType]      = useState('learning_material');
   const [search,        setSearch]        = useState('');
   const [saving,        setSaving]        = useState(false);
   const [msg,           setMsg]           = useState('');
