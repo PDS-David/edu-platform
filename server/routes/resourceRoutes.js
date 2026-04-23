@@ -316,7 +316,7 @@ router.get('/my-assignments', protect, async (req, res) => {
              s.name AS subject_name
       FROM resource_assignments ra
       JOIN resources r ON r.id = ra.resource_id
-      JOIN users    u ON u.id = ra.assigned_by
+      LEFT JOIN users    u ON u.id = ra.assigned_by
       LEFT JOIN subtopics st ON st.id = r.subtopic_id
       LEFT JOIN topics     t  ON t.id  = st.topic_id
       LEFT JOIN subjects   s  ON s.id  = t.subject_id
