@@ -362,12 +362,24 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
 router.get('/teacher-assignments', protect, adminOnly, async (req, res) => {
   try {
     const rows = await sequelize.query(
-      `SELECT ts.id, u.email, u.first_name, u.last_name, s.name AS subject
+      `SELECT ts.id,
+              u.id         AS teacher_id,
+              u.email,
+              u.first_name || ' ' || u.last_name AS teacher_name,
+              u.first_name,
+              u.last_name,
+              s.id         AS subject_id,
+              s.name       AS subject_name,
+              eb.code      AS exam_board_code,
+              eb.name      AS exam_board_name,
+              ts.is_active,
+              ts.assigned_at
        FROM teacher_subjects ts
-       JOIN users    u ON u.id = ts.teacher_id
-       JOIN subjects s ON s.id = ts.subject_id
+       JOIN users       u  ON u.id  = ts.teacher_id
+       JOIN subjects    s  ON s.id  = ts.subject_id
+       LEFT JOIN exam_boards eb ON eb.id = s.exam_board_id
        WHERE ts.is_active = true
-       ORDER BY u.email, s.name`,
+       ORDER BY u.last_name ASC, s.name ASC`,
       { type: QueryTypes.SELECT }
     );
     return success(res, rows);
