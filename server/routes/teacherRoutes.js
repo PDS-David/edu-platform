@@ -7,10 +7,11 @@
 
 const express        = require('express');
 const router         = express.Router();
-const crypto         = require('crypto');
 const { QueryTypes } = require('sequelize');
 const sequelize      = require('../config/database');
 const { protect }    = require('../middleware/auth');
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const teacherOnly = (req, res, next) => {
   if (!['teacher', 'admin'].includes(req.user?.role))
@@ -208,10 +209,16 @@ async function ensureClassTables() {
         id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         teacher_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         name       VARCHAR(255) NOT NULL,
-        join_code  VARCHAR(20)  NOT NULL UNIQUE,
+        join_code  VARCHAR(20),
         created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
       )
     `);
+    // Migrate legacy schema: join codes are no longer used; the column may
+    // have been NOT NULL with a UNIQUE constraint. Make it nullable so new
+    // classes can be created without one. (Existing rows are left intact.)
+    await sequelize.query(
+      `ALTER TABLE classes ALTER COLUMN join_code DROP NOT NULL`
+    ).catch(() => {});
     await sequelize.query(`
       CREATE TABLE IF NOT EXISTS class_memberships (
         id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -284,33 +291,156 @@ router.get('/classes', protect, teacherOnly, async (req, res) => {
 });
 
 // ── POST /api/teacher/classes ─────────────────────────────────────────────────
+// Create a class by naming it and selecting students directly.
+// Body: { name: string, student_ids?: UUID[] }
+// Join codes are no longer generated — teachers add students from the picker.
 router.post('/classes', protect, teacherOnly, async (req, res) => {
   await ensureClassTables();
-  const { name } = req.body;
-  if (!name) return res.status(400).json({ success: false, error: 'name is required' });
-  const joinCode = crypto.randomBytes(3).toString('hex').toUpperCase();
+  const { name, student_ids = [] } = req.body || {};
+  if (!name || !String(name).trim()) {
+    return res.status(400).json({ success: false, error: 'name is required' });
+  }
+  const cleanIds = Array.isArray(student_ids)
+    ? student_ids.filter((id) => typeof id === 'string' && UUID_REGEX.test(id))
+    : [];
+
   try {
-    const result = await sequelize.query(
-      `INSERT INTO classes (teacher_id, name, join_code, created_at) VALUES (:teacherId, :name, :joinCode, NOW()) RETURNING id, name, join_code`,
-      { replacements: { teacherId: req.user.id, name, joinCode }, type: QueryTypes.SELECT }
+    const created = await sequelize.query(
+      `INSERT INTO classes (teacher_id, name, created_at)
+       VALUES (:teacherId, :name, NOW())
+       RETURNING id, name, created_at`,
+      {
+        replacements: { teacherId: req.user.id, name: String(name).trim() },
+        type: QueryTypes.SELECT,
+      }
     );
-    return res.status(201).json({ success: true, data: result[0] });
+    const cls = created[0];
+
+    let added = 0;
+    for (const sid of cleanIds) {
+      try {
+        await sequelize.query(
+          `INSERT INTO class_memberships (class_id, student_id, joined_at)
+           VALUES (:cid, :sid, NOW())
+           ON CONFLICT (class_id, student_id) DO NOTHING`,
+          { replacements: { cid: cls.id, sid }, type: QueryTypes.INSERT }
+        );
+        added++;
+      } catch (err) {
+        console.warn('[create class membership]', err.message);
+      }
+    }
+
+    return res.status(201).json({
+      success: true,
+      data: { ...cls, student_count: added },
+    });
   } catch (err) {
-    if (err.message.includes('classes') || err.message.includes('does not exist')) return res.status(503).json({ success: false, error: 'Class system not yet active. Contact admin.' });
+    if (err.message.includes('classes') || err.message.includes('does not exist')) {
+      return res.status(503).json({ success: false, error: 'Class system not yet active. Contact admin.' });
+    }
     return res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// ── POST /api/teacher/class/:classId/invite ───────────────────────────────────
-router.post('/class/:classId/invite', protect, teacherOnly, async (req, res) => {
-  const newCode = crypto.randomBytes(3).toString('hex').toUpperCase();
+// ── GET /api/teacher/students-directory ───────────────────────────────────────
+// Returns ALL active students for the class-creation picker. Supports an
+// optional ?q= search across name + email so large rosters stay manageable.
+router.get('/students-directory', protect, teacherOnly, async (req, res) => {
+  const q = String(req.query.q || '').trim();
+  const replacements = {};
+  let where = `role = 'student' AND is_active = true`;
+  if (q) {
+    where += ` AND (
+      LOWER(first_name) LIKE :q OR
+      LOWER(last_name)  LIKE :q OR
+      LOWER(email)      LIKE :q OR
+      LOWER(first_name || ' ' || last_name) LIKE :q
+    )`;
+    replacements.q = `%${q.toLowerCase()}%`;
+  }
   try {
-    await sequelize.query(
-      `UPDATE classes SET join_code=:code WHERE id=:id AND teacher_id=:teacherId`,
-      { replacements: { code: newCode, id: req.params.classId, teacherId: req.user.id }, type: QueryTypes.UPDATE }
+    const rows = await sequelize.query(
+      `SELECT id, first_name, last_name, email
+         FROM users
+        WHERE ${where}
+        ORDER BY first_name, last_name
+        LIMIT 500`,
+      { replacements, type: QueryTypes.SELECT }
     );
-    return res.json({ success: true, join_code: newCode });
-  } catch (err) { return res.status(500).json({ success: false, error: err.message }); }
+    return res.json({ success: true, data: rows });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── PUT /api/teacher/class/:classId/members ───────────────────────────────────
+// Replace the full member list of a class with student_ids[].
+// Used by the "Manage" panel on the teacher dashboard.
+router.put('/class/:classId/members', protect, teacherOnly, async (req, res) => {
+  await ensureClassTables();
+  const { classId } = req.params;
+  const { student_ids = [] } = req.body || {};
+  if (!UUID_REGEX.test(classId)) {
+    return res.status(400).json({ success: false, error: 'Invalid class id' });
+  }
+  const cleanIds = Array.isArray(student_ids)
+    ? student_ids.filter((id) => typeof id === 'string' && UUID_REGEX.test(id))
+    : [];
+
+  try {
+    const owns = await sequelize.query(
+      `SELECT 1 FROM classes WHERE id = :cid AND teacher_id = :tid`,
+      { replacements: { cid: classId, tid: req.user.id }, type: QueryTypes.SELECT }
+    );
+    if (!owns.length) {
+      return res.status(403).json({ success: false, error: 'Not your class' });
+    }
+
+    await sequelize.query(
+      `DELETE FROM class_memberships WHERE class_id = :cid`,
+      { replacements: { cid: classId }, type: QueryTypes.DELETE }
+    );
+    let added = 0;
+    for (const sid of cleanIds) {
+      try {
+        await sequelize.query(
+          `INSERT INTO class_memberships (class_id, student_id, joined_at)
+           VALUES (:cid, :sid, NOW())
+           ON CONFLICT (class_id, student_id) DO NOTHING`,
+          { replacements: { cid: classId, sid }, type: QueryTypes.INSERT }
+        );
+        added++;
+      } catch (err) {
+        console.warn('[update class members]', err.message);
+      }
+    }
+    return res.json({ success: true, data: { class_id: classId, student_count: added } });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── GET /api/teacher/class/:classId/members ───────────────────────────────────
+router.get('/class/:classId/members', protect, teacherOnly, async (req, res) => {
+  const { classId } = req.params;
+  if (!UUID_REGEX.test(classId)) {
+    return res.status(400).json({ success: false, error: 'Invalid class id' });
+  }
+  try {
+    const rows = await sequelize.query(
+      `SELECT u.id, u.first_name, u.last_name, u.email
+         FROM class_memberships cm
+         JOIN users u ON u.id = cm.student_id
+         JOIN classes c ON c.id = cm.class_id
+        WHERE cm.class_id = :cid AND c.teacher_id = :tid
+        ORDER BY u.first_name, u.last_name`,
+      { replacements: { cid: classId, tid: req.user.id }, type: QueryTypes.SELECT }
+    );
+    return res.json({ success: true, data: rows });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // ── GET /api/teacher/class/:classId/analytics ────────────────────────────────

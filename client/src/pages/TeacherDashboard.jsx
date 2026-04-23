@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link, Outlet, useLocation } from 'react-router-dom';
 import api from '../services/apiClient';
 import {
-  Users, Plus, Copy, CheckCircle, Loader2, AlertTriangle,
+  Users, Plus, CheckCircle, Loader2, AlertTriangle,
   BarChart2, X, PenTool, BookOpen, Upload, Send,
-  ChevronDown, AlertCircle,
+  ChevronDown, AlertCircle, Search, UserPlus, Settings,
 } from 'lucide-react';
 import TopNav from '../components/TopNav';
 import { useAuth } from '../context/AuthContext';
@@ -34,14 +34,154 @@ function Toast({ msg, type, onClose }) {
 
 const inp = 'w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:border-violet-400 focus:ring-1 focus:ring-violet-200';
 
+/* ── Student Picker (shared by Create + Manage) ──────────────────────────── */
+// Searchable, multi-select list of all active students. Controlled component:
+// the parent owns the Set of selected ids.
+function StudentPicker({ selected, onChange, label = 'Students' }) {
+  const [students, setStudents] = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [query,    setQuery]    = useState('');
+
+  // Debounced server-side search so big rosters stay snappy.
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    const t = setTimeout(() => {
+      api.get('/teacher/students-directory', { params: query.trim() ? { q: query.trim() } : {} })
+        .then(r => { if (!cancelled) setStudents(Array.isArray(r?.data) ? r.data : []); })
+        .catch(() => { if (!cancelled) setStudents([]); })
+        .finally(() => { if (!cancelled) setLoading(false); });
+    }, 250);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [query]);
+
+  const toggle = (id) => {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    onChange(next);
+  };
+
+  const visibleIds = students.map(s => s.id);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => selected.has(id));
+  const toggleAllVisible = () => {
+    const next = new Set(selected);
+    if (allVisibleSelected) visibleIds.forEach(id => next.delete(id));
+    else visibleIds.forEach(id => next.add(id));
+    onChange(next);
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold text-gray-700">
+          {label} <span className="text-gray-400 font-mono">· {selected.size} selected</span>
+        </p>
+        {students.length > 0 && (
+          <button type="button" onClick={toggleAllVisible}
+            className="text-[11px] font-semibold text-violet-600 hover:text-violet-700">
+            {allVisibleSelected ? 'Clear visible' : 'Select visible'}
+          </button>
+        )}
+      </div>
+
+      <div className="relative">
+        <Search size={13} className="absolute left-3 top-3 text-gray-300" />
+        <input value={query} onChange={e => setQuery(e.target.value)}
+          placeholder="Search students by name or email"
+          className={inp + ' pl-8'} />
+      </div>
+
+      <div className="border border-gray-200 rounded-xl bg-white max-h-64 overflow-y-auto divide-y divide-gray-50">
+        {loading ? (
+          <div className="flex justify-center py-6"><Loader2 size={16} className="animate-spin text-violet-300" /></div>
+        ) : students.length === 0 ? (
+          <p className="text-center text-xs text-gray-400 py-6">
+            {query ? 'No students match that search.' : 'No students found.'}
+          </p>
+        ) : students.map(s => {
+          const checked = selected.has(s.id);
+          const name = `${s.first_name || ''} ${s.last_name || ''}`.trim() || s.email;
+          return (
+            <label key={s.id} className={`flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50 ${checked ? 'bg-violet-50/40' : ''}`}>
+              <input type="checkbox" checked={checked} onChange={() => toggle(s.id)}
+                className="rounded border-gray-300 text-violet-600 focus:ring-violet-400" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-gray-800 truncate">{name}</p>
+                <p className="text-[11px] text-gray-400 truncate font-mono">{s.email}</p>
+              </div>
+              {checked && <CheckCircle size={13} className="text-violet-500 shrink-0" />}
+            </label>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ── Manage Class Modal ──────────────────────────────────────────────────── */
+function ManageClassModal({ cls, onClose, onSaved, showToast }) {
+  const [selected, setSelected] = useState(new Set());
+  const [loading,  setLoading]  = useState(true);
+  const [saving,   setSaving]   = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    api.get(`/teacher/class/${cls.id}/members`)
+      .then(r => setSelected(new Set((r?.data || []).map(s => s.id))))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [cls.id]);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await api.put(`/teacher/class/${cls.id}/members`, { student_ids: [...selected] });
+      showToast(`Updated "${cls.name}" — ${selected.size} student${selected.size !== 1 ? 's' : ''}.`);
+      onSaved();
+      onClose();
+    } catch (err) {
+      showToast(err?.error || 'Failed to update members.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-40 bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-5 space-y-4" onClick={e => e.stopPropagation()}>
+        <div className="flex items-start justify-between">
+          <div>
+            <h3 className="font-bold text-gray-900">Manage students</h3>
+            <p className="text-xs text-gray-500 mt-0.5">{cls.name}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700"><X size={16} /></button>
+        </div>
+        {loading ? (
+          <div className="flex justify-center py-10"><Loader2 size={20} className="animate-spin text-violet-300" /></div>
+        ) : (
+          <StudentPicker selected={selected} onChange={setSelected} />
+        )}
+        <div className="flex justify-end gap-2">
+          <button onClick={onClose} className="text-xs font-semibold text-gray-500 hover:text-gray-700 px-3 py-2">Cancel</button>
+          <button onClick={save} disabled={saving || loading}
+            className="bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold px-4 py-2 rounded-lg disabled:opacity-40 flex items-center gap-1.5">
+            {saving ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />} Save changes
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Classes Tab ─────────────────────────────────────────────────────────── */
 function ClassesTab() {
   const [classes,    setClasses]    = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [newName,    setNewName]    = useState('');
+  const [newSelected,setNewSelected]= useState(new Set());
   const [creating,   setCreating]   = useState(false);
-  const [copied,     setCopied]     = useState(null);
+  const [managing,   setManaging]   = useState(null); // class being managed
   const [toast,      setToast]      = useState(null);
 
   const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
@@ -55,12 +195,28 @@ function ClassesTab() {
   const createClass = async () => {
     if (!newName.trim()) return;
     setCreating(true);
-    try { await api.post('/teacher/classes', { name: newName.trim() }); setNewName(''); setShowCreate(false); showToast('Class created!'); load(); }
-    catch (err) { showToast(err?.error || 'Failed to create class.', 'error'); }
-    finally { setCreating(false); }
+    try {
+      await api.post('/teacher/classes', {
+        name: newName.trim(),
+        student_ids: [...newSelected],
+      });
+      setNewName('');
+      setNewSelected(new Set());
+      setShowCreate(false);
+      showToast(`Class created with ${newSelected.size} student${newSelected.size !== 1 ? 's' : ''}.`);
+      load();
+    } catch (err) {
+      showToast(err?.error || 'Failed to create class.', 'error');
+    } finally {
+      setCreating(false);
+    }
   };
 
-  const copyCode = code => { navigator.clipboard.writeText(code).catch(() => {}); setCopied(code); setTimeout(() => setCopied(null), 2000); };
+  const cancelCreate = () => {
+    setShowCreate(false);
+    setNewName('');
+    setNewSelected(new Set());
+  };
 
   return (
     <div className="space-y-3">
@@ -73,13 +229,22 @@ function ClassesTab() {
       </div>
 
       {showCreate && (
-        <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 flex gap-2">
-          <input value={newName} onChange={e => setNewName(e.target.value)} onKeyDown={e => e.key === 'Enter' && createClass()}
-            placeholder="e.g. WAEC Biology 2025" autoFocus className={inp + ' flex-1'} />
-          <button onClick={createClass} disabled={creating || !newName.trim()} className="bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-40">
-            {creating ? <Loader2 size={13} className="animate-spin" /> : 'Create'}
-          </button>
-          <button onClick={() => { setShowCreate(false); setNewName(''); }} className="text-gray-400 hover:text-gray-600 px-1"><X size={14} /></button>
+        <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 space-y-3">
+          <div>
+            <p className="text-xs font-semibold text-gray-700 mb-1.5">Class name</p>
+            <input value={newName} onChange={e => setNewName(e.target.value)}
+              placeholder="e.g. WAEC Biology 2025" autoFocus className={inp} />
+          </div>
+          <StudentPicker selected={newSelected} onChange={setNewSelected} label="Add students" />
+          <div className="flex justify-end gap-2 pt-1">
+            <button onClick={cancelCreate}
+              className="text-xs font-semibold text-gray-500 hover:text-gray-700 px-3 py-2">Cancel</button>
+            <button onClick={createClass} disabled={creating || !newName.trim()}
+              className="bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold px-4 py-2 rounded-lg disabled:opacity-40 flex items-center gap-1.5">
+              {creating ? <Loader2 size={12} className="animate-spin" /> : <UserPlus size={12} />}
+              Create class ({newSelected.size})
+            </button>
+          </div>
         </div>
       )}
 
@@ -89,7 +254,7 @@ function ClassesTab() {
         <div className="text-center py-14 border border-dashed border-gray-200 rounded-xl">
           <Users size={28} className="mx-auto mb-2 text-gray-200" />
           <p className="text-sm text-gray-400">No classes yet</p>
-          <p className="text-xs text-gray-300 mt-1">Create a class to start managing students</p>
+          <p className="text-xs text-gray-300 mt-1">Create a class and add students from the directory.</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -102,20 +267,23 @@ function ClassesTab() {
                     {cls.student_count ?? 0} student{cls.student_count !== 1 ? 's' : ''} · {fmtDate(cls.created_at)}
                   </p>
                 </div>
-                <button className="flex items-center gap-1.5 text-xs text-violet-600 border border-violet-200 hover:bg-violet-50 px-3 py-1.5 rounded-lg font-semibold transition-colors">
-                  <BarChart2 size={12} /> Manage
-                </button>
-              </div>
-              <div className="mt-3 flex items-center gap-2">
-                <span className="text-xs text-gray-400 font-mono">JOIN CODE</span>
-                <span className="font-mono font-bold text-violet-600 tracking-widest text-sm">{cls.join_code}</span>
-                <button onClick={() => copyCode(cls.join_code)} className="text-gray-400 hover:text-gray-700 transition-colors ml-1" title="Copy">
-                  {copied === cls.join_code ? <CheckCircle size={13} className="text-emerald-500" /> : <Copy size={13} />}
+                <button onClick={() => setManaging(cls)}
+                  className="flex items-center gap-1.5 text-xs text-violet-600 border border-violet-200 hover:bg-violet-50 px-3 py-1.5 rounded-lg font-semibold transition-colors">
+                  <Settings size={12} /> Manage students
                 </button>
               </div>
             </div>
           ))}
         </div>
+      )}
+
+      {managing && (
+        <ManageClassModal
+          cls={managing}
+          onClose={() => setManaging(null)}
+          onSaved={load}
+          showToast={showToast}
+        />
       )}
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
     </div>

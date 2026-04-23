@@ -577,6 +577,32 @@ router.put(
     } = req.body || {};
 
     try {
+      // ── Guard: a resource must be fully assigned (out of staging, with at
+      // least a subject or topic) before it can be pushed to anyone. This
+      // protects against direct API calls bypassing the staging UI.
+      const guardRows = await sequelize.query(
+        `SELECT id, is_staged, subject_id, topic_id, subtopic_id, title
+           FROM resources
+          WHERE id = :rid`,
+        { replacements: { rid: resourceId }, type: QueryTypes.SELECT }
+      );
+      if (!guardRows || guardRows.length === 0) {
+        return res.status(404).json({ success: false, error: 'Resource not found' });
+      }
+      const meta = guardRows[0];
+      if (meta.is_staged) {
+        return res.status(400).json({
+          success: false,
+          error: 'This file is still in the staging tray. Assign a subject/topic first, then push it.'
+        });
+      }
+      if (!meta.subject_id && !meta.topic_id && !meta.subtopic_id) {
+        return res.status(400).json({
+          success: false,
+          error: 'This file has no subject or topic assigned yet. Assign curriculum metadata before pushing.'
+        });
+      }
+
       let studentIds = [...user_ids];
 
       if (assign_all) {
