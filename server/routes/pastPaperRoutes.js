@@ -11,9 +11,12 @@ const multer   = require('multer');
 const { QueryTypes } = require('sequelize');
 const sequelize = require('../config/database');
 const { protect } = require('../middleware/auth');
+const r2 = require('../utils/r2Storage');
 
-// ── Multer — save to uploads/past-papers/ ────────────────────────────────────
-const storage = multer.diskStorage({
+// ── Multer ───────────────────────────────────────────────────────────────────
+// When R2 is configured, hold the file in memory and push to object storage.
+// Otherwise persist to local disk (Render ephemeral) as a fallback.
+const diskStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     const dir = path.join(__dirname, '../uploads/past-papers');
     fs.mkdirSync(dir, { recursive: true });
@@ -25,7 +28,7 @@ const storage = multer.diskStorage({
   },
 });
 const upload = multer({
-  storage,
+  storage: r2.isR2Enabled() ? multer.memoryStorage() : diskStorage,
   limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
   fileFilter: (req, file, cb) => {
     if (file.mimetype === 'application/pdf') cb(null, true);
@@ -93,7 +96,23 @@ router.post('/', protect, teacherOrAdmin, upload.single('file'), async (req, res
   const { subject_id, exam_board, year, paper_type, title } = req.body;
   if (!title) return res.status(400).json({ success: false, error: 'title is required' });
 
-  const fileUrl = `/uploads/past-papers/${req.file.filename}`;
+  let fileUrl;
+  try {
+    if (r2.isR2Enabled()) {
+      const { url } = await r2.uploadBuffer({
+        buffer:      req.file.buffer,
+        originalname: req.file.originalname,
+        mimetype:    req.file.mimetype || 'application/pdf',
+      });
+      fileUrl = url;
+    } else {
+      fileUrl = `/uploads/past-papers/${req.file.filename}`;
+    }
+  } catch (err) {
+    console.error('[POST /api/past-papers] upload error:', err.message);
+    return res.status(500).json({ success: false, error: 'Upload failed: ' + err.message });
+  }
+
   try {
     const result = await sequelize.query(
       `INSERT INTO past_papers (subject_id, exam_board, year, paper_type, title, file_url, file_size_bytes, created_by, created_at)
@@ -131,10 +150,17 @@ router.delete('/:id', protect, (req, res, next) => {
       `DELETE FROM past_papers WHERE id = :id RETURNING file_url`,
       { replacements: { id: req.params.id }, type: QueryTypes.DELETE }
     );
-    // Optionally delete the file from disk
-    if (rows?.[0]?.[0]?.file_url) {
-      const filePath = path.join(__dirname, '..', rows[0][0].file_url);
-      fs.unlink(filePath, () => {}); // fire and forget
+
+    const fileUrl = rows?.[0]?.[0]?.file_url;
+    if (fileUrl) {
+      if (/^https?:\/\//i.test(fileUrl)) {
+        // R2-hosted: best-effort remote delete
+        r2.deleteByUrl(fileUrl).catch(() => {});
+      } else {
+        // Local disk fallback
+        const filePath = path.join(__dirname, '..', fileUrl);
+        fs.unlink(filePath, () => {}); // fire and forget
+      }
     }
     return res.json({ success: true });
   } catch (err) {

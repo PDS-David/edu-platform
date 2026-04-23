@@ -29,32 +29,51 @@ function FileIcon({ type }) {
 function InlineViewer({ file }) {
   const url  = resolveUrl(file.file_url);
   const type = (file.resource_type || file.type || '').toLowerCase();
+
   if (type === 'video') return <video src={url} controls className="w-full rounded-xl mt-2 max-h-60 bg-black" />;
   if (type === 'audio') return <audio src={url} controls className="w-full mt-2" />;
   if (type === 'image') return <img src={url} alt={file.title} className="w-full rounded-xl mt-2 max-h-60 object-contain bg-gray-100" />;
+
+  // PDFs render natively in browsers. Office files (docx/pptx/xlsx) need Google Docs Viewer.
+  const isPdf = type === 'pdf' || /\.pdf(\?|$)/i.test(url);
+  const previewSrc = isPdf
+    ? url
+    : `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
+
   return (
     <div className="mt-2 rounded-xl overflow-hidden border border-gray-200">
       <iframe
-        src={`https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`}
+        src={previewSrc}
         title={file.title}
         className="w-full"
         style={{ height: 380 }}
       />
       <div className="py-2 text-center bg-gray-50 border-t border-gray-100">
-        <a href={url} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline">
-          Open in new tab if preview doesn't load ↗
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          download={!isPdf ? (file.original_filename || file.title || true) : undefined}
+          className="text-xs text-blue-600 hover:underline"
+        >
+          {isPdf ? 'Open in new tab if preview doesn\'t load ↗' : 'Download file ↓'}
         </a>
       </div>
     </div>
   );
 }
 
-// A resource is treated as "Questions" if its push_type or resource_type
-// looks question-y. Everything else is "Learning".
+// Canonical push_type vocabulary (shared by teacher + admin upload UIs):
+//   'learning_material' → Learning Resources tab
+//   'practice_test'     → Questions tab
+//   'quiz'              → Questions tab
+// Legacy values from older records still map correctly via the fallback regex.
+const QUESTION_PUSH_TYPES = new Set(['practice_test', 'quiz', 'question_material']);
 const isQuestionResource = (r) => {
   const p = String(r.push_type || '').toLowerCase();
-  const t = String(r.resource_type || '').toLowerCase();
-  return /(question|quiz|practice|exam|paper)/.test(p) || /(question|quiz)/.test(t);
+  if (QUESTION_PUSH_TYPES.has(p)) return true;
+  // Backwards-compat for any pre-standardization values still in the DB.
+  return /(question|quiz|practice|exam|paper)/.test(p);
 };
 
 export default function StudentFilesPage() {
