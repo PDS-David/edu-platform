@@ -243,9 +243,50 @@ async function ensureResourceAssignments() {
 
 router.get('/', protect, async (req, res) => {
   await ensureExtraColumns();
+  const { subtopic_id, topic_id, subject_id } = req.query;
+  const role = req.user.role;
+
   try {
-    // Teachers see only their own; admins see all
-    const isAdmin = req.user.role === 'admin';
+    if (role === 'student') {
+      // Students see resources assigned to them OR publicly attached to this subtopic/topic
+      const filters = [`COALESCE(r.is_active, true) = true`, `COALESCE(r.is_staged, false) = false`];
+      const replacements = { studentId: req.user.id };
+
+      if (subtopic_id) {
+        filters.push('r.subtopic_id = :subtopic_id');
+        replacements.subtopic_id = parseInt(subtopic_id);
+      } else if (topic_id) {
+        filters.push('r.topic_id = :topic_id');
+        replacements.topic_id = parseInt(topic_id);
+      } else if (subject_id) {
+        filters.push('(t.subject_id = :subject_id OR s.id = :subject_id)');
+        replacements.subject_id = subject_id;
+      } else {
+        // No filter — return all resources assigned to this student
+        filters.push(`EXISTS (
+          SELECT 1 FROM resource_assignments ra
+          WHERE ra.resource_id = r.id AND ra.student_id = :studentId
+        )`);
+      }
+
+      const rows = await sequelize.query(`
+        SELECT DISTINCT r.id, r.title, r.file_url, r.resource_type AS type,
+               r.resource_type, r.file_size_bytes, r.original_filename,
+               r.subtopic_id, r.topic_id, r.created_at,
+               s.name AS subject_name, st.name AS subtopic_name
+        FROM resources r
+        LEFT JOIN subtopics st ON st.id = r.subtopic_id
+        LEFT JOIN topics     t  ON t.id  = COALESCE(r.topic_id, st.topic_id)
+        LEFT JOIN subjects   s  ON s.id  = t.subject_id
+        WHERE ${filters.join(' AND ')}
+        ORDER BY r.created_at DESC
+      `, { replacements, type: QueryTypes.SELECT });
+
+      return res.json({ success: true, data: rows });
+    }
+
+    // Teachers see only their own uploads; admins see all
+    const isAdmin = role === 'admin';
     const rows = await sequelize.query(`
       SELECT r.id, r.title, r.file_url, r.resource_type AS type, r.resource_type,
              r.file_size_bytes, r.original_filename, r.is_staged, r.push_type,
