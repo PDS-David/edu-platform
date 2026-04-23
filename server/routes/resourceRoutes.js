@@ -300,6 +300,77 @@ router.get('/', async (req, res) => {
 });
 
 /* ================================
+   ASSIGN METADATA  (PUT /api/resources/:id/assign-meta)
+   Saves Exam Type / Subject / Topic / Subtopic on a staged file
+   and marks it as published (is_staged = false) so it appears in
+   the Resource Library.
+   ================================ */
+
+router.put(
+  '/:id/assign-meta',
+  authorize('admin', 'teacher'),
+  async (req, res) => {
+    try {
+      await ensureExtraColumns();
+
+      const id = req.params.id;
+      if (!id) {
+        return res.status(400).json({ success: false, error: 'Invalid resource id' });
+      }
+
+      const {
+        title,
+        topic_id = null,
+        subtopic_id = null,
+        subject_id = null,
+        push_type = 'learning_material'
+      } = req.body || {};
+
+      // At least one of subject/topic must be present, per the UI contract.
+      if (!subject_id && !topic_id) {
+        return res.status(400).json({
+          success: false,
+          error: 'Please provide at least a subject_id or topic_id.'
+        });
+      }
+
+      const [rows] = await sequelize.query(
+        `UPDATE resources
+            SET title       = COALESCE(:title, title),
+                subject_id  = COALESCE(:subject_id::uuid, subject_id),
+                topic_id    = COALESCE(:topic_id::int,    topic_id),
+                subtopic_id = COALESCE(:subtopic_id::int, subtopic_id),
+                push_type   = COALESCE(:push_type, push_type),
+                is_staged   = false,
+                updated_at  = NOW()
+          WHERE id = :id
+          RETURNING id, title, resource_type, subject_id, topic_id, subtopic_id,
+                    push_type, is_staged, is_active, file_url, created_at, updated_at`,
+        {
+          replacements: {
+            id,
+            title: title && String(title).trim() ? String(title).trim() : null,
+            subject_id: subject_id || null,
+            topic_id: topic_id || null,
+            subtopic_id: subtopic_id || null,
+            push_type
+          }
+        }
+      );
+
+      if (!rows || rows.length === 0) {
+        return res.status(404).json({ success: false, error: 'Resource not found' });
+      }
+
+      return res.json({ success: true, data: rows[0], resource: rows[0] });
+    } catch (err) {
+      console.error('[assign-meta]', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+);
+
+/* ================================
    DELETE STAGED FILE  (DELETE /api/resources/:id)
    ================================ */
 
