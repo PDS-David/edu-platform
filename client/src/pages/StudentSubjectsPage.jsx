@@ -50,7 +50,7 @@ export default function StudentSubjectsPage() {
             </p>
           </div>
           <button
-            onClick={() => navigate('/subjects')}
+            onClick={() => navigate('/student/exam-types')}
             className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-semibold border border-blue-200 hover:border-blue-400 px-3 py-1.5 rounded-lg transition-colors">
             <Plus size={12} /> Add Subject
           </button>
@@ -66,7 +66,7 @@ export default function StudentSubjectsPage() {
             <BookOpen size={32} className="text-gray-200 mx-auto mb-3" />
             <p className="text-sm font-semibold text-gray-600 mb-1">No subjects enrolled yet</p>
             <p className="text-xs text-gray-400 mb-4">Browse subjects and enroll to start studying.</p>
-            <button onClick={() => navigate('/subjects')}
+            <button onClick={() => navigate('/student/exam-types')}
               className="text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors">
               Browse Subjects
             </button>
