@@ -554,3 +554,283 @@ Rules:
     return res.status(500).json({ success: false, error: 'Topic generation failed: ' + err.message });
   }
 });
+
+// ─────────────────────────────────────────────
+// GET /api/admin/health
+// One-shot smoke check of the 15-step onboarding workflow.
+//   ?full=1 → in addition to schema/seed checks, runs a live walkthrough
+//             (creates throw-away exam type, subject, topic, subtopic,
+//              question, resource and a synthetic student) to verify every
+//              step end-to-end. Cleans up after itself.
+// Always admin-only.
+// ─────────────────────────────────────────────
+router.get('/health', protect, adminOnly, async (req, res) => {
+  const checks = [];
+  const t0 = Date.now();
+  const ok = (name, info = '') => checks.push({ name, ok: true, info });
+  const ko = (name, info = '') => checks.push({ name, ok: false, info });
+
+  // ── 1. DB connectivity ────────────────────────────────────────
+  try {
+    await sequelize.authenticate();
+    ok('db.connect');
+  } catch (e) {
+    ko('db.connect', e.message);
+    return res.status(503).json({ success: false, checks, duration_ms: Date.now() - t0 });
+  }
+
+  // ── 2. Required tables present ────────────────────────────────
+  const requiredTables = [
+    'users', 'exam_boards', 'subjects', 'teacher_subjects',
+    'topics', 'subtopics', 'resources', 'questions',
+    'student_subjects', 'student_exam_types',
+    'subtopic_progress', 'practice_attempts', 'quiz_attempts',
+  ];
+  const present = new Set();
+  for (const t of requiredTables) {
+    const r = await sequelize.query(
+      `SELECT to_regclass(:fq) IS NOT NULL AS exists`,
+      { replacements: { fq: `public.${t}` }, type: QueryTypes.SELECT }
+    );
+    if (r[0]?.exists) { present.add(t); ok(`schema.table.${t}`); }
+    else ko(`schema.table.${t}`, 'missing');
+  }
+
+  // ── 3. Critical columns we rely on ────────────────────────────
+  const requiredColumns = [
+    ['users',              'pending_exam_board_ids'],
+    ['users',              'last_activity_date'],
+    ['subtopic_progress',  'last_accessed'],
+    ['practice_attempts',  'student_id'],
+    ['student_exam_types', 'student_id'],
+  ];
+  for (const [table, column] of requiredColumns) {
+    const r = await sequelize.query(
+      `SELECT data_type FROM information_schema.columns
+        WHERE table_name = :table AND column_name = :column`,
+      { replacements: { table, column }, type: QueryTypes.SELECT }
+    );
+    if (!r.length) ko(`schema.column.${table}.${column}`, 'missing');
+    else ok(`schema.column.${table}.${column}`, r[0].data_type);
+  }
+
+  // student_id columns above must be uuid (we rebuilt them)
+  for (const t of ['practice_attempts', 'student_exam_types']) {
+    const r = await sequelize.query(
+      `SELECT data_type FROM information_schema.columns
+        WHERE table_name = :t AND column_name = 'student_id'`,
+      { replacements: { t }, type: QueryTypes.SELECT }
+    );
+    if (r[0]?.data_type === 'uuid') ok(`schema.${t}.student_id is uuid`);
+    else ko(`schema.${t}.student_id is uuid`, `got ${r[0]?.data_type || 'missing'}`);
+  }
+
+  // ── 4. Seed data sanity ──────────────────────────────────────
+  const counts = {};
+  for (const tbl of ['exam_boards', 'subjects', 'questions']) {
+    if (!present.has(tbl)) continue;
+    const r = await sequelize.query(
+      `SELECT COUNT(*)::int AS n FROM ${tbl}`, { type: QueryTypes.SELECT }
+    );
+    counts[tbl] = r[0].n;
+    r[0].n > 0 ? ok(`seed.${tbl}`, `${r[0].n} rows`) : ko(`seed.${tbl}`, '0 rows');
+  }
+
+  // ── 5. Optional: live 15-step walkthrough (?full=1) ──────────
+  let walkthrough = null;
+  if (req.query.full === '1') {
+    walkthrough = { steps: [], passed: 0, failed: 0 };
+    const stamp = Date.now();
+    const created = { boardId: null, subjectId: null, topicId: null,
+                      subtopicId: null, questionId: null, studentId: null };
+    const w = (name, okFlag, info = '') => {
+      walkthrough.steps.push({ name, ok: okFlag, info });
+      okFlag ? walkthrough.passed++ : walkthrough.failed++;
+    };
+    const adminId = req.user.id;
+    try {
+      // 1. exam type
+      const [b] = await sequelize.query(
+        `INSERT INTO exam_boards (name, code, country, is_active, created_at, updated_at)
+         VALUES (:n, :c, 'Nigeria', true, NOW(), NOW()) RETURNING id`,
+        { replacements: { n: `HEALTH-${stamp}`, c: `HC${stamp.toString().slice(-6)}` },
+          type: QueryTypes.SELECT });
+      created.boardId = b.id;
+      w('1. create exam type', true, `id=${b.id}`);
+
+      // 2. subject
+      const [s] = await sequelize.query(
+        `INSERT INTO subjects (exam_board_id, name, code, is_active, created_at, updated_at)
+         VALUES (:b, :n, :c, true, NOW(), NOW()) RETURNING id`,
+        { replacements: { b: created.boardId, n: `Health Subj ${stamp}`,
+                          c: `HS${stamp.toString().slice(-6)}` }, type: QueryTypes.SELECT });
+      created.subjectId = s.id;
+      w('2. create subject', true, `id=${s.id}`);
+
+      // 3-4. find a teacher and assign
+      const [teacher] = await sequelize.query(
+        `SELECT id FROM users WHERE role='teacher' AND is_active=true LIMIT 1`,
+        { type: QueryTypes.SELECT });
+      if (!teacher) throw new Error('no active teacher exists');
+      await sequelize.query(
+        `INSERT INTO teacher_subjects (teacher_id, subject_id, exam_board_id,
+            assigned_by, assigned_at, is_active)
+         VALUES (:t, :s, :b, :a, NOW(), true)
+         ON CONFLICT (teacher_id, subject_id) DO UPDATE SET is_active = true`,
+        { replacements: { t: teacher.id, s: created.subjectId,
+                          b: created.boardId, a: adminId }, type: QueryTypes.INSERT });
+      w('4. assign teacher → subject', true, `teacher=${teacher.id}`);
+
+      // 5. topic
+      const [tp] = await sequelize.query(
+        `INSERT INTO topics (subject_id, name, description, order_index, is_active, created_at, updated_at)
+         VALUES (:s, 'Health Topic', 'health check', 0, true, NOW(), NOW()) RETURNING id`,
+        { replacements: { s: created.subjectId }, type: QueryTypes.SELECT });
+      created.topicId = tp.id;
+      w('5. create topic', true, `id=${tp.id}`);
+
+      // 6. subtopic
+      const [st] = await sequelize.query(
+        `INSERT INTO subtopics (topic_id, subject_id, name, description, order_index,
+            is_active, created_at, updated_at)
+         VALUES (:t, :s, 'Health Sub', 'health check', 0, true, NOW(), NOW()) RETURNING id`,
+        { replacements: { t: created.topicId, s: created.subjectId },
+          type: QueryTypes.SELECT });
+      created.subtopicId = st.id;
+      w('6. create subtopic', true, `id=${st.id}`);
+
+      // 7. resource (mirror real upload route — only topic/subtopic FK)
+      const [rs] = await sequelize.query(
+        `INSERT INTO resources (title, resource_type, file_url, is_active, is_free,
+            uploaded_by, subtopic_id, topic_id, created_at, updated_at)
+         VALUES (:title, 'pdf', '/uploads/resources/_health.pdf', true, true,
+                 :uploader, :sub, :top, NOW(), NOW()) RETURNING id`,
+        { replacements: { title: `health-${stamp}`, uploader: teacher.id,
+                          sub: created.subtopicId, top: created.topicId },
+          type: QueryTypes.SELECT });
+      w('7. create resource', true, `id=${rs.id}`);
+
+      // 8. question (mirror real teacher question route)
+      const [q] = await sequelize.query(
+        `INSERT INTO questions (subtopic_id, submitted_by, question_text,
+            options, correct_answer, explanation, difficulty, type, marks,
+            is_active, created_at, updated_at)
+         VALUES (:sub, :creator, 'Health: 1+1=?',
+                 '[{"option_text":"1","is_correct":false},{"option_text":"2","is_correct":true}]'::jsonb,
+                 '2', 'basic', 'easy', 'mcq', 1, true, NOW(), NOW()) RETURNING id`,
+        { replacements: { sub: created.subtopicId, creator: teacher.id },
+          type: QueryTypes.SELECT });
+      created.questionId = q.id;
+      w('8. create question', true, `id=${q.id}`);
+
+      // 9. synthetic student
+      const bcrypt = require('bcryptjs');
+      const hash = await bcrypt.hash('Healthcheck1!', 10);
+      const [u] = await sequelize.query(
+        `INSERT INTO users (email, password, first_name, last_name, role,
+            is_active, is_verified, subscription_status, pending_exam_board_ids,
+            created_at, updated_at)
+         VALUES (:email, :pw, 'Health', 'Check', 'student',
+                 true, true, 'free_trial', ARRAY[:board]::integer[], NOW(), NOW())
+         RETURNING id`,
+        { replacements: { email: `health-${stamp}@check.local`, pw: hash,
+                          board: created.boardId }, type: QueryTypes.SELECT });
+      created.studentId = u.id;
+      w('9. register student', true, `id=${u.id}`);
+
+      // 10. enrol
+      await sequelize.query(
+        `INSERT INTO student_subjects (student_id, subject_id, is_active)
+         VALUES (:s, :sub, true)
+         ON CONFLICT (student_id, subject_id) DO UPDATE SET is_active=true`,
+        { replacements: { s: created.studentId, sub: created.subjectId },
+          type: QueryTypes.INSERT });
+      await sequelize.query(
+        `INSERT INTO student_exam_types (student_id, exam_board_id, is_active)
+         VALUES (:s, :b, true)
+         ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active=true`,
+        { replacements: { s: created.studentId, b: created.boardId },
+          type: QueryTypes.INSERT });
+      w('10. enrol student → subject', true);
+
+      // 11. visibility
+      const [enr] = await sequelize.query(
+        `SELECT 1 FROM student_subjects WHERE student_id=:s AND subject_id=:sub`,
+        { replacements: { s: created.studentId, sub: created.subjectId },
+          type: QueryTypes.SELECT });
+      w('11. student sees enrolled subject', !!enr);
+
+      // 12. mark resources complete
+      await sequelize.query(
+        `INSERT INTO subtopic_progress (student_id, subtopic_id, resources_completed,
+            last_accessed, created_at, updated_at)
+         VALUES (:s, :sub, true, NOW(), NOW(), NOW())
+         ON CONFLICT (student_id, subtopic_id) DO UPDATE SET
+           resources_completed=true, last_accessed=NOW(), updated_at=NOW()`,
+        { replacements: { s: created.studentId, sub: created.subtopicId },
+          type: QueryTypes.INSERT });
+      w('12. mark resources completed', true);
+
+      // 13. practice attempt
+      await sequelize.query(
+        `INSERT INTO practice_attempts (student_id, question_id, is_correct,
+            time_taken_seconds, attempted_at)
+         VALUES (:s, :q, true, 5, NOW())`,
+        { replacements: { s: created.studentId, q: created.questionId },
+          type: QueryTypes.INSERT });
+      w('13. record practice attempt', true);
+
+      // 14. quiz pass
+      await sequelize.query(
+        `UPDATE subtopic_progress SET quiz_completed=true, updated_at=NOW()
+         WHERE student_id=:s AND subtopic_id=:sub`,
+        { replacements: { s: created.studentId, sub: created.subtopicId },
+          type: QueryTypes.UPDATE });
+      w('14. record quiz completion', true);
+
+      // 15. dashboard math
+      const [dash] = await sequelize.query(
+        `SELECT
+           (SELECT COUNT(*)::int FROM practice_attempts WHERE student_id=:s) AS attempts,
+           (SELECT COUNT(*)::int FROM subtopic_progress
+              WHERE student_id=:s AND quiz_completed=true) AS quizzes`,
+        { replacements: { s: created.studentId }, type: QueryTypes.SELECT });
+      w('15. dashboard reflects activity',
+        dash.attempts >= 1 && dash.quizzes >= 1,
+        `attempts=${dash.attempts} quizzes=${dash.quizzes}`);
+    } catch (err) {
+      w('walkthrough error', false, err.message);
+    } finally {
+      // cleanup — order matters for FKs
+      try {
+        if (created.studentId)  await sequelize.query(`DELETE FROM users      WHERE id=:id`, { replacements: { id: created.studentId },  type: QueryTypes.DELETE });
+        if (created.questionId) await sequelize.query(`DELETE FROM questions  WHERE id=:id`, { replacements: { id: created.questionId }, type: QueryTypes.DELETE });
+        if (created.subtopicId) await sequelize.query(`DELETE FROM resources  WHERE subtopic_id=:id`, { replacements: { id: created.subtopicId }, type: QueryTypes.DELETE });
+        if (created.subtopicId) await sequelize.query(`DELETE FROM subtopics  WHERE id=:id`, { replacements: { id: created.subtopicId }, type: QueryTypes.DELETE });
+        if (created.topicId)    await sequelize.query(`DELETE FROM topics     WHERE id=:id`, { replacements: { id: created.topicId },    type: QueryTypes.DELETE });
+        if (created.subjectId)  await sequelize.query(`DELETE FROM teacher_subjects WHERE subject_id=:id`, { replacements: { id: created.subjectId }, type: QueryTypes.DELETE });
+        if (created.subjectId)  await sequelize.query(`DELETE FROM subjects   WHERE id=:id`, { replacements: { id: created.subjectId },  type: QueryTypes.DELETE });
+        if (created.boardId)    await sequelize.query(`DELETE FROM exam_boards WHERE id=:id`, { replacements: { id: created.boardId },   type: QueryTypes.DELETE });
+      } catch (cleanupErr) {
+        walkthrough.cleanup_warning = cleanupErr.message;
+      }
+    }
+  }
+
+  const failedSchema = checks.filter(c => !c.ok).length;
+  const overall = failedSchema === 0 && (!walkthrough || walkthrough.failed === 0);
+  return res.status(overall ? 200 : 503).json({
+    success: overall,
+    summary: {
+      schema_checks: checks.length,
+      schema_failed: failedSchema,
+      walkthrough_run: !!walkthrough,
+      walkthrough_passed: walkthrough?.passed ?? null,
+      walkthrough_failed: walkthrough?.failed ?? null,
+      seed_counts: counts,
+    },
+    checks,
+    walkthrough,
+    duration_ms: Date.now() - t0,
+  });
+});
