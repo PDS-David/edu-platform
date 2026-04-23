@@ -201,4 +201,15 @@ const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
+
+  // Auto-seed demo content on startup (idempotent — safe every boot)
+  setImmediate(async () => {
+    try {
+      const runSeed = require('./seeds/seedDemoContent');
+      await runSeed(require('./config/database'));
+      console.log('✅ Auto-seed complete');
+    } catch (e) {
+      console.warn('⚠️  Auto-seed skipped:', e.message?.slice(0, 120));
+    }
+  });
 });
