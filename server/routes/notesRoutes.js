@@ -33,6 +33,10 @@ router.get('/', protect, async (req, res) => {
     );
     return res.json({ success: true, data: rows });
   } catch (err) {
+    // revision_notes table may not exist yet — return empty gracefully
+    if (err.message && err.message.includes('revision_notes')) {
+      return res.json({ success: true, data: [] });
+    }
     return res.status(500).json({ success: false, error: err.message });
   }
 });
