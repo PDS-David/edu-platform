@@ -93,7 +93,7 @@ async function ensureResourceAssignments() {
     await sequelize.query(`
       CREATE TABLE IF NOT EXISTS resource_assignments (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        resource_id UUID NOT NULL REFERENCES resources(id) ON DELETE CASCADE,
+        resource_id INTEGER NOT NULL REFERENCES resources(id) ON DELETE CASCADE,
         assigned_by UUID NOT NULL REFERENCES users(id),
         student_id UUID REFERENCES users(id) ON DELETE CASCADE,
         class_id UUID REFERENCES classes(id) ON DELETE CASCADE,
@@ -164,7 +164,7 @@ router.post(
       }
 
       const inserted = [];
-      const failed = [];
+      const failures = [];
 
       for (const f of files) {
         try {
@@ -172,15 +172,16 @@ router.post(
           const title = path.parse(f.originalname).name || f.originalname;
           const resourceType = guessResourceType(f.originalname);
 
+          // sequelize.query without QueryTypes returns [rows, meta]
           const [rows] = await sequelize.query(
             `INSERT INTO resources
                (title, resource_type, file_url, file_size_bytes,
                 original_filename, mime_type, is_staged, is_active,
-                uploaded_by, created_at, updated_at)
+                uploaded_by, created_at, updated_at, uploaded_at)
              VALUES
                (:title, :rtype, :fileUrl, :size,
                 :origName, :mime, true, true,
-                :uploadedBy, NOW(), NOW())
+                :uploadedBy, NOW(), NOW(), NOW())
              RETURNING id, title, resource_type, file_url,
                        file_size_bytes, original_filename, mime_type,
                        is_staged, is_active, created_at`,
@@ -193,30 +194,41 @@ router.post(
                 origName: f.originalname,
                 mime: f.mimetype,
                 uploadedBy: req.user && req.user.id ? req.user.id : null
-              },
-              type: QueryTypes.INSERT
+              }
             }
           );
 
           inserted.push(rows[0]);
         } catch (err) {
           console.error('[bulk-upload insert]', err.message);
-          failed.push({ filename: f.originalname, error: err.message });
+          failures.push({ filename: f.originalname, error: err.message });
         }
       }
 
+      const message =
+        inserted.length === 0
+          ? 'Upload failed — no files were saved.'
+          : failures.length === 0
+            ? `Uploaded ${inserted.length} file(s) successfully.`
+            : `Uploaded ${inserted.length} file(s); ${failures.length} failed.`;
+
+      // Frontend reads: result.uploaded, result.failed, result.message, result.failures
       return res.status(inserted.length ? 201 : 500).json({
         success: inserted.length > 0,
-        uploaded_count: inserted.length,
-        failed_count: failed.length,
-        resources: inserted,
-        failures: failed
+        uploaded: inserted.length,
+        failed: failures.length,
+        message,
+        data: inserted,
+        failures
       });
     } catch (err) {
       console.error('[bulk-upload]', err);
       return res.status(500).json({
         success: false,
-        error: err.message || 'Upload failed'
+        uploaded: 0,
+        failed: req.files ? req.files.length : 0,
+        message: err.message || 'Upload failed',
+        failures: []
       });
     }
   }
@@ -243,17 +255,47 @@ router.get('/staged', async (_req, res) => {
       { type: QueryTypes.SELECT }
     );
 
-    return res.json({
-      success: true,
-      count: rows.length,
-      resources: rows
-    });
+    // Frontend's extract(r) accepts either array or { data: [...] }
+    return res.json({ success: true, data: rows, count: rows.length });
   } catch (err) {
     console.error('[staged]', err.message);
-    return res.status(500).json({
-      success: false,
-      error: err.message
-    });
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/* ================================
+   LIST PUBLISHED RESOURCES  (GET /api/resources)
+   Powers the "Resource Library" panel.
+   ================================ */
+
+router.get('/', async (req, res) => {
+  try {
+    await ensureExtraColumns();
+
+    const { q } = req.query;
+    const replacements = {};
+    let where = `WHERE is_active = true AND (is_staged = false OR is_staged IS NULL)`;
+
+    if (q && String(q).trim()) {
+      where += ` AND title ILIKE :q`;
+      replacements.q = `%${String(q).trim()}%`;
+    }
+
+    const rows = await sequelize.query(
+      `SELECT id, title, resource_type, file_url, file_size_bytes,
+              original_filename, mime_type, is_staged, is_active,
+              uploaded_by, created_at, updated_at
+         FROM resources
+         ${where}
+        ORDER BY created_at DESC
+        LIMIT 1000`,
+      { replacements, type: QueryTypes.SELECT }
+    );
+
+    return res.json({ success: true, data: rows, count: rows.length });
+  } catch (err) {
+    console.error('[list resources]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 
