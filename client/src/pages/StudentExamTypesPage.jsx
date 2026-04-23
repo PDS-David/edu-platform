@@ -69,7 +69,7 @@ export default function StudentExamTypesPage() {
     if (enrolled.has(sid) || enrolling.has(sid)) return;
     setEnrolling(prev => new Set([...prev, sid]));
     try {
-      await api.post('/students/enrol', { subject_id: subject.id });
+      await api.post('/students/subjects', { subject_id: subject.id });
       setEnrolled(prev => new Set([...prev, sid]));
       showToast(`Enrolled in ${subject.name}`);
     } catch (err) {
