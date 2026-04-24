@@ -1,79 +1,44 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# docker-compose.yml  —  AISchoolonair production stack on Hetzner
+# AISchoolonair — Hetzner Production Stack (Architecture B)
 #
 # Services:
-#   postgres  — PostgreSQL 16 (internal only, not exposed to internet)
-#   redis     — Redis 7       (internal only)
-#   server    — Node.js/Express API
-#   client    — React SPA served by nginx (internal only)
-#   nginx     — Main reverse proxy (the only container that talks to internet)
+#   caddy  — Reverse proxy + automatic Let's Encrypt SSL (ports 80+443)
+#   api    — Node/Express backend (internal, port 5000)
+#   web    — React SPA served by nginx (internal, port 80)
+#   redis  — Session / rate-limit cache (internal)
+#
+# Database: Render-managed Postgres (external) — just point DATABASE_URL at it.
+# Storage:  Cloudflare R2 (already wired — no local upload volume needed).
 #
 # Usage:
-#   cp .env.production.example .env.production   # then fill in values
-#   docker compose up -d --build
+#   cp api.env.example api.env   # fill in all values
+#   docker compose pull && docker compose up -d
+#   docker compose logs -f
 # ─────────────────────────────────────────────────────────────────────────────
 
 services:
 
-  # ── PostgreSQL ──────────────────────────────────────────────────────────────
-  postgres:
-    image: postgres:16-alpine
-    container_name: edu_postgres
-    restart: always
-    environment:
-      POSTGRES_USER:     ${DB_USER:-eduuser}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB:       ${DB_NAME:-edu_platform}
+  caddy:
+    image: caddy:2-alpine
+    container_name: aischool_caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
     volumes:
-      - pgdata:/var/lib/postgresql/data
-    networks:
-      - app
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-eduuser} -d ${DB_NAME:-edu_platform}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [web]
+    depends_on: [api, web]
 
-  # ── Redis ───────────────────────────────────────────────────────────────────
-  redis:
-    image: redis:7-alpine
-    container_name: edu_redis
-    restart: always
-    command: redis-server --save 60 1 --loglevel warning
-    volumes:
-      - redisdata:/data
-    networks:
-      - app
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # ── Node.js API server ──────────────────────────────────────────────────────
-  server:
-    build:
-      context: ./server
-      dockerfile: Dockerfile
-    container_name: edu_server
-    restart: always
-    env_file: .env.production
-    environment:
-      # Override DB/Redis URLs to point to Docker-internal services
-      DATABASE_URL: postgresql://${DB_USER:-eduuser}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-edu_platform}
-      REDIS_URL:    redis://redis:6379
-      NODE_ENV:     production
-      PORT:         5000
-    volumes:
-      # Persistent uploads shared with nginx (nginx reads, server writes)
-      - uploads:/app/uploads
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - app
+  api:
+    image: ghcr.io/pds-david/edu-platform-api:latest
+    container_name: aischool_api
+    restart: unless-stopped
+    env_file: ./api.env
+    networks: [web]
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:5000/health || exit 1"]
       interval: 30s
@@ -81,55 +46,30 @@ services:
       start_period: 20s
       retries: 3
 
-  # ── React SPA (served by nginx inside this container) ───────────────────────
-  client:
-    build:
-      context: ./client
-      dockerfile: Dockerfile
-      args:
-        # VITE_API_URL is baked into the JS bundle at build time.
-        # Set this to your public domain. Image must be rebuilt if domain changes.
-        VITE_API_URL: ${VITE_API_URL:-https://aischoolonair.com}
-    container_name: edu_client
-    restart: always
-    networks:
-      - app
+  web:
+    image: ghcr.io/pds-david/edu-platform-web:latest
+    container_name: aischool_web
+    restart: unless-stopped
+    networks: [web]
 
-  # ── Nginx reverse proxy (the only public-facing container) ─────────────────
-  nginx:
-    image: nginx:1.27-alpine
-    container_name: edu_nginx
-    restart: always
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      # Uploads served directly by nginx (no Node overhead for file downloads)
-      - uploads:/var/www/uploads:ro
-      # Let's Encrypt SSL certificates (created by certbot on the host)
-      - /etc/letsencrypt:/etc/letsencrypt:ro
-      # Certbot ACME webroot challenges
-      - certbot_webroot:/var/www/certbot:ro
-    depends_on:
-      - server
-      - client
-    networks:
-      - app
+  redis:
+    image: redis:7-alpine
+    container_name: aischool_redis
+    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel warning
+    volumes: [redisdata:/data]
+    networks: [web]
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost/health.txt || exit 1"]
-      interval: 30s
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
       timeout: 5s
-      retries: 3
+      retries: 5
 
-# ── Volumes ──────────────────────────────────────────────────────────────────
 volumes:
-  pgdata:       # PostgreSQL data — survives container restarts and rebuilds
-  redisdata:    # Redis snapshots
-  uploads:      # User-uploaded files (resources, past-papers, videos)
-  certbot_webroot:
+  caddy_data:
+  caddy_config:
+  redisdata:
 
-# ── Networks ─────────────────────────────────────────────────────────────────
 networks:
-  app:
+  web:
     driver: bridge

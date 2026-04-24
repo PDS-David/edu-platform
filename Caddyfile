@@ -1,0 +1,31 @@
+# AISchoolonair — Caddy reverse proxy config
+# Caddy auto-issues and renews Let's Encrypt SSL. No certbot needed.
+
+# ── Redirect bare domain → www ─────────────────────────────────────────────
+aischoolonair.ng {
+    redir https://www.aischoolonair.ng{uri} permanent
+}
+
+# ── Main web app ───────────────────────────────────────────────────────────
+www.aischoolonair.ng {
+    reverse_proxy web:80
+    encode gzip
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options    nosniff
+        X-Frame-Options           SAMEORIGIN
+        Referrer-Policy           strict-origin-when-cross-origin
+    }
+}
+
+# ── API ────────────────────────────────────────────────────────────────────
+# api subdomain: DNS-only in Cloudflare (grey cloud) so Caddy can issue SSL
+api.aischoolonair.ng {
+    reverse_proxy api:5000 {
+        transport http {
+            read_timeout  120s
+            write_timeout 120s
+        }
+    }
+    header Strict-Transport-Security "max-age=31536000"
+}
