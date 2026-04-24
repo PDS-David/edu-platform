@@ -62,4 +62,4 @@ coverage/
 *.bak
 *.swp
 
-!ai-ready-dump.txt
+!ai-ready-dump.txtapi.env

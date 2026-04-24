@@ -209,7 +209,7 @@ router.get('/types/:id/subjects', async (req, res) => {
 // ---------------------------------------------------------------------------
 router.post('/types/:id/subjects', protect, async (req, res) => {
   const typeId = req.params.id;
-  const { name, code, description, level } = req.body;
+  const { name, code, description, level, icon_emoji } = req.body;
   if (!name || !code) return res.status(400).json({ success: false, error: 'name and code are required' });
 
   try {
@@ -226,11 +226,11 @@ router.post('/types/:id/subjects', protect, async (req, res) => {
     if (dup.length) return res.status(409).json({ success: false, error: `Code '${code}' already exists in this exam type` });
 
     const result = await sequelize.query(
-      `INSERT INTO subjects (exam_board_id, name, code, description, level, is_active, created_at, updated_at)
-       VALUES (:typeId, :name, UPPER(:code), :description, :level, true, NOW(), NOW())
+      `INSERT INTO subjects (exam_board_id, name, code, description, level, icon_emoji, is_active, created_at, updated_at)
+       VALUES (:typeId, :name, UPPER(:code), :description, :level, :icon_emoji, true, NOW(), NOW())
        RETURNING *`,
       {
-        replacements: { typeId, name, code, description: description || null, level: level || null },
+        replacements: { typeId, name, code, description: description || null, level: level || null, icon_emoji: icon_emoji || null },
         type: QueryTypes.SELECT,
       }
     );
@@ -246,13 +246,14 @@ router.post('/types/:id/subjects', protect, async (req, res) => {
 // ---------------------------------------------------------------------------
 router.put('/subjects/:id', protect, async (req, res) => {
   const { id } = req.params;
-  const { name, description, level, is_active } = req.body;
+  const { name, description, level, icon_emoji, is_active } = req.body;
   try {
     await sequelize.query(
       `UPDATE subjects SET
          name        = COALESCE(:name,        name),
          description = COALESCE(:description, description),
          level       = COALESCE(:level,       level),
+         icon_emoji  = COALESCE(:icon_emoji,  icon_emoji),
          is_active   = COALESCE(:is_active,   is_active),
          updated_at  = NOW()
        WHERE id = :id`,
@@ -262,6 +263,7 @@ router.put('/subjects/:id', protect, async (req, res) => {
           name:        name        ?? null,
           description: description ?? null,
           level:       level       ?? null,
+          icon_emoji:  icon_emoji  ?? null,
           is_active:   is_active   != null ? is_active : null,
         },
         type: QueryTypes.UPDATE,
