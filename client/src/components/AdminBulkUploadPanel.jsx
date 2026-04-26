@@ -382,9 +382,17 @@ function MetaForm({ file, onSave, onDismiss, onSuccess }) {
 
       {msg && <p className="text-xs text-red-600">{msg}</p>}
 
+      {/* Enforce subject requirement before allowing publish */}
+      {!form.subjectId && (
+        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          ⚠️ A <strong>Subject</strong> is required before publishing. Files without a subject cannot be found by students.
+        </p>
+      )}
+
       <div className="flex gap-2">
-        <button onClick={handleSave} disabled={saving}
-          className="flex-1 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white text-xs font-semibold py-2 rounded-lg flex items-center justify-center gap-1.5">
+        <button onClick={handleSave} disabled={saving || !form.subjectId}
+          title={!form.subjectId ? 'Select a Subject first' : ''}
+          className="flex-1 bg-blue-500 hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold py-2 rounded-lg flex items-center justify-center gap-1.5">
           {saving ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />}
           Save & Publish
         </button>
@@ -575,11 +583,12 @@ function AssignUsersForm({ file, onDone, onDismiss, onSuccess }) {
 // RESOURCE LIBRARY — lets admin re-push any published resource (#9)
 // ══════════════════════════════════════════════════════════════════════════════
 function ResourceLibrarySection() {
-  const [resources,  setResources]  = useState([]);
-  const [loading,    setLoading]    = useState(false);
-  const [open,       setOpen]       = useState(false);
-  const [pushing,    setPushing]    = useState(null); // resource id
-  const [search,     setSearch]     = useState('');
+  const [resources,     setResources]     = useState([]);
+  const [loading,       setLoading]       = useState(false);
+  const [open,          setOpen]          = useState(false);
+  const [pushing,       setPushing]       = useState(null); // resource id
+  const [assigningMeta, setAssigningMeta] = useState(null); // resource id
+  const [search,        setSearch]        = useState('');
   const { toasts, show: showToast } = useToast();
 
   const load = useCallback(() => {
@@ -661,19 +670,32 @@ function ResourceLibrarySection() {
                       </div>
                     </div>
                     <button
-                      onClick={() => hasMetadata && setPushing(pushing === file.id ? null : file.id)}
-                      disabled={!hasMetadata}
+                      onClick={() => {
+                        if (!hasMetadata) {
+                          setAssigningMeta(assigningMeta === file.id ? null : file.id);
+                          setPushing(null);
+                        } else {
+                          setPushing(pushing === file.id ? null : file.id);
+                          setAssigningMeta(null);
+                        }
+                      }}
+                      disabled={hasMetadata ? false : false}
                       title={!hasMetadata ? 'Assign a subject or topic before pushing' : 'Push to students'}
                       className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
                         !hasMetadata
-                          ? 'border-gray-200 text-gray-300 cursor-not-allowed bg-gray-50'
+                          ? assigningMeta === file.id
+                            ? 'bg-orange-500 text-white border-orange-500'
+                            : 'border-orange-300 text-orange-600 hover:bg-orange-50'
                           : pushing === file.id
                             ? 'bg-indigo-600 text-white border-indigo-600'
                             : 'border-indigo-200 text-indigo-600 hover:bg-indigo-50'
                       }`}
                     >
                       <Users size={11} />
-                      {pushing === file.id ? 'Cancel' : 'Push'}
+                      {!hasMetadata
+                        ? (assigningMeta === file.id ? 'Cancel' : 'Assign First')
+                        : (pushing === file.id ? 'Cancel' : 'Push')
+                      }
                     </button>
                     <button
                       onClick={async () => {
@@ -687,12 +709,25 @@ function ResourceLibrarySection() {
                     </button>
                   </div>
 
-                  {!hasMetadata && (
+                  {!hasMetadata && assigningMeta !== file.id && (
                     <div className="px-4 pb-3">
                       <p className="text-xs text-orange-600 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
-                        ⚠️ This file has no subject or topic assigned. Go to <strong>Staged Files</strong> or use the Assign button to add curriculum metadata before pushing to students.
+                        ⚠️ No subject or topic assigned. Click <strong>Assign First</strong> above to add curriculum metadata, then you can push to students.
                       </p>
                     </div>
+                  )}
+
+                  {assigningMeta === file.id && (
+                    <MetaForm
+                      file={file}
+                      onSave={(fileId) => {
+                        setAssigningMeta(null);
+                        // Refresh the library so the updated metadata shows
+                        load();
+                        showToast(`✅ "${file.title}" metadata saved. You can now push it to students.`, 'success');
+                      }}
+                      onDismiss={() => setAssigningMeta(null)}
+                    />
                   )}
 
                   {pushing === file.id && (
