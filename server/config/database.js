@@ -6,6 +6,20 @@ const isProduction = process.env.NODE_ENV === 'production';
 
 const dbUrl = process.env.DATABASE_URL || '';
 
+// In production we must not silently fall back to local/default credentials.
+// Render injects DATABASE_URL from the managed Postgres service. If it's missing,
+// the deployment is misconfigured.
+if (isProduction && !dbUrl) {
+  // Keep the message extremely actionable for Render users.
+  // eslint-disable-next-line no-console
+  console.error(
+    '❌ DATABASE_URL is missing in production. ' +
+    'On Render, set env var DATABASE_URL (from your Postgres connectionString) ' +
+    'and remove/avoid DB_USER/DB_PASSWORD fallbacks.'
+  );
+  process.exit(1);
+}
+
 const sslDisabled = process.env.DB_SSL === 'false' || dbUrl.includes('sslmode=disable');
 const sslForced =
   process.env.DB_SSL === 'true' ||

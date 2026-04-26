@@ -15,10 +15,15 @@ const requestId = require('./middleware/requestId');
 const requestLogger = require('./middleware/requestLogger');
 
 // ENV
-require('dotenv').config({
-  path: path.join(__dirname, '.env'),
-  override: true
-});
+// In production, rely on platform-provided environment variables (Render/Hetzner).
+// Only load a local `server/.env` file for local development, and never override
+// existing environment variables.
+if (process.env.NODE_ENV !== 'production') {
+  const envPath = path.join(__dirname, '.env');
+  if (fs.existsSync(envPath)) {
+    require('dotenv').config({ path: envPath, override: false });
+  }
+}
 
 // SAFE REQUIRE
 const safeRequire = (modulePath) => {
@@ -35,26 +40,33 @@ const app = express();
 app.set('trust proxy', 1);
 
 // ─────────────────────────────────────────────
-// CORS (GLOBAL FIRST LAYER)
+// CORS
 // ─────────────────────────────────────────────
-app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,x-request-id');
+// IMPORTANT: Do NOT allow credentials for every origin.
+// Configure an allow-list via env vars.
+const corsAllowList = new Set(
+  [
+    process.env.CLIENT_URL,
+    process.env.PROD_CLIENT_URL,
+    process.env.VITE_API_URL,
+  ].filter(Boolean)
+);
 
-  if (req.method === 'OPTIONS') return res.sendStatus(204);
-  next();
-});
-
-app.use(cors({
-  origin: (origin, cb) => cb(null, true),
+const corsOptions = {
+  origin: (origin, cb) => {
+    // Non-browser clients (no Origin header): allow.
+    if (!origin) return cb(null, true);
+    // Allow explicitly configured origins only.
+    if (corsAllowList.has(origin)) return cb(null, true);
+    return cb(new Error(`CORS blocked for origin: ${origin}`));
+  },
   credentials: true,
-  methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
-  allowedHeaders: ['Content-Type','Authorization','x-request-id'],
-}));
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-request-id'],
+};
 
-app.options('*', cors());
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 // STATIC FILES
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

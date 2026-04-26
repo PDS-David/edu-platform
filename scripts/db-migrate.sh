@@ -20,7 +20,18 @@
 set -e
 
 # ── Source (Render) ───────────────────────────────────────────────────────────
-RENDER_DB_URL="postgresql://eduuser:FCE9kxx9a8baqrn38PPAeobPvwY7mOTd@dpg-d7auo44hg0os73a462og-a.frankfurt-postgres.render.com/edu_platform_3kh7"
+# IMPORTANT: never hardcode database credentials in this repo.
+# Provide it at runtime:
+#   RENDER_DB_URL="postgresql://USER:PASSWORD@HOST:5432/DB?sslmode=require" ./scripts/db-migrate.sh
+RENDER_DB_URL="${RENDER_DB_URL:-}"
+if [[ -z "$RENDER_DB_URL" ]]; then
+  echo ""
+  echo "ERROR: RENDER_DB_URL is not set."
+  echo "Set it like:"
+  echo "  RENDER_DB_URL=\"postgresql://USER:PASSWORD@HOST:5432/DB?sslmode=require\" ./scripts/db-migrate.sh"
+  echo ""
+  exit 1
+fi
 
 # ── Target (local Docker Postgres) ───────────────────────────────────────────
 LOCAL_DB_USER="eduuser"
