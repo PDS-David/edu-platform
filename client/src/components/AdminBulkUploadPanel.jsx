@@ -600,6 +600,7 @@ function ResourceLibrarySection() {
   return (
     <div>
       <Toast toasts={toasts} />
+      <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <BookOpen size={16} className="text-indigo-500" />
           <h3 className="text-sm font-bold text-gray-900">Resource Library</h3>
