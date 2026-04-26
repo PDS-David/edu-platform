@@ -1,6 +1,7 @@
 'use strict';
 
-require('dotenv').config({ path: require('path').join(__dirname, '..', '.env'), override: true });
+// Local-only convenience; never override environment variables.
+require('dotenv').config({ path: require('path').join(__dirname, '..', '.env'), override: false });
 const fs = require('fs');
 const path = require('path');
 const sequelize = require('../config/database');

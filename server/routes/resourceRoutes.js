@@ -37,7 +37,18 @@ const diskStorage = multer.diskStorage({
 // it to object storage. Otherwise persist to local disk like before.
 const upload = multer({
   storage: r2.isR2Enabled() ? multer.memoryStorage() : diskStorage,
-  limits: { fileSize: 500 * 1024 * 1024 } // 500 MB
+  limits: { fileSize: 500 * 1024 * 1024 }, // 500 MB
+  fileFilter: (_req, file, cb) => {
+    // Block high-risk web-executable types that would be dangerous to serve from /uploads.
+    const blocked = new Set([
+      'text/html',
+      'application/javascript',
+      'text/javascript',
+      'image/svg+xml',
+    ]);
+    if (blocked.has(file.mimetype)) return cb(new Error('File type not allowed'));
+    cb(null, true);
+  }
 });
 
 /* ================================
