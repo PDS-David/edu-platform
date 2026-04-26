@@ -747,9 +747,8 @@ export default function AdminBulkUploadPanel() {
 
     try {
       // Use same fallback as apiClient.js so XHR never hits the wrong server
-      const CORRECT_API = 'https://aischoolonair-api.onrender.com';
       const envBase = import.meta.env.VITE_API_URL || '';
-      const rawBase = (!envBase || envBase.includes('eacbuddy-api')) ? CORRECT_API : envBase;
+      const rawBase = envBase || 'https://eacbuddy-api.onrender.com';
       const apiBase = rawBase.replace(/\/$/, '').endsWith('/api')
         ? rawBase.replace(/\/$/, '')
         : rawBase.replace(/\/$/, '') + '/api';
