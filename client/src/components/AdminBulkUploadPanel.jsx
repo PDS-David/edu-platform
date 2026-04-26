@@ -25,6 +25,35 @@ import {
   ChevronDown, Users, Tag, RefreshCw, Inbox, BookOpen, Trash2,
 } from 'lucide-react';
 
+/* ── Toast notification ───────────────────────────────────────────────────── */
+function Toast({ toasts }) {
+  return (
+    <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none">
+      {toasts.map(t => (
+        <div
+          key={t.id}
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium transition-all duration-300
+            ${t.type === 'success' ? 'bg-green-600 text-white' : t.type === 'error' ? 'bg-red-600 text-white' : 'bg-gray-800 text-white'}`}
+        >
+          {t.type === 'success' && <CheckCircle size={16} className="shrink-0" />}
+          {t.type === 'error'   && <AlertTriangle size={16} className="shrink-0" />}
+          <span>{t.message}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function useToast() {
+  const [toasts, setToasts] = useState([]);
+  const show = useCallback((message, type = 'success', duration = 4000) => {
+    const id = Date.now() + Math.random();
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), duration);
+  }, []);
+  return { toasts, show };
+}
+
 // Shared delete helper
 async function deleteResource(id) {
   if (!window.confirm('Delete this file permanently? This also removes any student assignments to it.')) return false;
@@ -104,7 +133,7 @@ function useMeta() {
 }
 
 // ── Per-file metadata form ────────────────────────────────────────────────────
-function MetaForm({ file, onSave, onDismiss, showToast }) {
+function MetaForm({ file, onSave, onDismiss, onSuccess }) {
   const [form, setForm] = useState({
     title:        file.title || '',
     examTypeId:   '',
@@ -203,7 +232,7 @@ function MetaForm({ file, onSave, onDismiss, showToast }) {
       }
 
       // 3) Save the resource metadata.
-      const res = await api.put(`/resources/${file.id}/assign-meta`, {
+      await api.put(`/resources/${file.id}/assign-meta`, {
         title:        form.title.trim() || file.title,
         topic_id:     topicId    || null,
         subtopic_id:  subtopicId || null,
@@ -211,7 +240,7 @@ function MetaForm({ file, onSave, onDismiss, showToast }) {
         push_type:    form.pushType    || 'learning_material',
         content_kind: form.contentKind || 'learning_material',
       });
-      showToast?.(res?.message || 'Saved & published.');
+      if (onSuccess) onSuccess(`✅ "${form.title.trim() || file.title}" saved & published successfully.`);
       onSave(file.id);
     } catch (err) {
       setMsg(err?.error || 'Save failed.');
@@ -378,7 +407,7 @@ const PUSH_TYPES = [
 ];
 
 // ── Per-file assign-users form ────────────────────────────────────────────────
-function AssignUsersForm({ file, onDone, onDismiss, showToast }) {
+function AssignUsersForm({ file, onDone, onDismiss, onSuccess }) {
   const [students,      setStudents]      = useState([]);
   const [classes,       setClasses]       = useState([]);
   const [selected,      setSelected]      = useState([]);
@@ -421,13 +450,25 @@ function AssignUsersForm({ file, onDone, onDismiss, showToast }) {
     }
     setSaving(true); setMsg('');
     try {
-      const res = await api.put(`/resources/${file.id}/assign-users`, {
+      const result = await api.put(`/resources/${file.id}/assign-users`, {
         assign_all: assignTarget === 'students' && assignAll,
         user_ids:   assignTarget === 'students' && !assignAll ? selected : [],
         class_ids:  assignTarget === 'class' ? selectedClass : [],
         push_type:  pushType,
       });
-      showToast?.(res?.message || 'Resource pushed successfully!');
+
+      // Build a friendly summary message
+      let summary = `✅ "${file.title}" pushed successfully.`;
+      if (result?.student_count > 0 && result?.class_count > 0) {
+        summary = `✅ "${file.title}" pushed to ${result.student_count} student(s) and ${result.class_count} class(es).`;
+      } else if (result?.student_count > 0) {
+        summary = assignAll
+          ? `✅ "${file.title}" pushed to all active students.`
+          : `✅ "${file.title}" pushed to ${result.student_count} student(s).`;
+      } else if (result?.class_count > 0) {
+        summary = `✅ "${file.title}" pushed to ${result.class_count} class(es).`;
+      }
+      if (onSuccess) onSuccess(summary);
       onDone(file.id);
     } catch (err) {
       setMsg(err?.message || err?.error || 'Assignment failed.');
@@ -533,12 +574,13 @@ function AssignUsersForm({ file, onDone, onDismiss, showToast }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // RESOURCE LIBRARY — lets admin re-push any published resource (#9)
 // ══════════════════════════════════════════════════════════════════════════════
-function ResourceLibrarySection({ showToast }) {
+function ResourceLibrarySection() {
   const [resources,  setResources]  = useState([]);
   const [loading,    setLoading]    = useState(false);
   const [open,       setOpen]       = useState(false);
   const [pushing,    setPushing]    = useState(null); // resource id
   const [search,     setSearch]     = useState('');
+  const { toasts, show: showToast } = useToast();
 
   const load = useCallback(() => {
     setLoading(true);
@@ -557,7 +599,7 @@ function ResourceLibrarySection({ showToast }) {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-3">
+      <Toast toasts={toasts} />
         <div className="flex items-center gap-2">
           <BookOpen size={16} className="text-indigo-500" />
           <h3 className="text-sm font-bold text-gray-900">Resource Library</h3>
@@ -638,7 +680,7 @@ function ResourceLibrarySection({ showToast }) {
                       file={file}
                       onDone={() => setPushing(null)}
                       onDismiss={() => setPushing(null)}
-                      showToast={showToast}
+                      onSuccess={(msg) => showToast(msg, 'success')}
                     />
                   )}
                 </div>
@@ -655,6 +697,7 @@ function ResourceLibrarySection({ showToast }) {
 // MAIN PANEL
 // ══════════════════════════════════════════════════════════════════════════════
 export default function AdminBulkUploadPanel() {
+  const { toasts, show: showToast } = useToast();
   // ── Dropzone state ───────────────────────────────────────────────────────────
   const [pendingFiles, setPendingFiles] = useState([]);   // FileList objects not yet uploaded
   const [dragOver,     setDragOver]     = useState(false);
@@ -672,13 +715,6 @@ export default function AdminBulkUploadPanel() {
 
   // ── Upload result ────────────────────────────────────────────────────────────
   const [result, setResult] = useState(null); // { uploaded, failed, message, failures }
-
-  // ── Toast (lightweight) ──────────────────────────────────────────────────────
-  const [toast, setToast] = useState(null); // { msg, ok }
-  const showToast = (msg, ok = true) => {
-    setToast({ msg, ok });
-    setTimeout(() => setToast(null), 3200);
-  };
 
   // ── Load staged files on mount ───────────────────────────────────────────────
   const loadStaged = useCallback(() => {
@@ -710,7 +746,9 @@ export default function AdminBulkUploadPanel() {
 
     try {
       // Use same fallback as apiClient.js so XHR never hits the wrong server
-      const rawBase = import.meta.env.VITE_API_URL || 'https://aischoolonair-api.onrender.com';
+      const CORRECT_API = 'https://aischoolonair-api.onrender.com';
+      const envBase = import.meta.env.VITE_API_URL || '';
+      const rawBase = (!envBase || envBase.includes('eacbuddy-api')) ? CORRECT_API : envBase;
       const apiBase = rawBase.replace(/\/$/, '').endsWith('/api')
         ? rawBase.replace(/\/$/, '')
         : rawBase.replace(/\/$/, '') + '/api';
@@ -747,15 +785,12 @@ export default function AdminBulkUploadPanel() {
   const handleMetaSaved = (fileId) => {
     setAssigningMeta(null);
     setStaged(prev => prev.filter(f => f.id !== fileId));
-    // Optionally move to "assigned" list — for now just remove from staged
-    showToast('Published: resource is now visible to students.');
   };
 
   // ── After users assigned ──────────────────────────────────────────────────────
   const handleUsersDone = (fileId) => {
     setAssigningUsers(null);
-    // File is still staged until metadata is also set — just close the form
-    showToast('Push completed.');
+    // File stays in staged until metadata is also set — just close the form
   };
 
   // ── MIME guesser from filename extension ─────────────────────────────────────
@@ -771,15 +806,7 @@ export default function AdminBulkUploadPanel() {
   // ─────────────────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
-
-      {/* Toast */}
-      {toast && (
-        <div className={`rounded-xl border px-4 py-3 text-sm font-semibold ${
-          toast.ok ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'
-        }`}>
-          {toast.msg}
-        </div>
-      )}
+      <Toast toasts={toasts} />
 
       {/* ── Section header ── */}
       <div>
@@ -967,7 +994,7 @@ export default function AdminBulkUploadPanel() {
                     file={file}
                     onSave={handleMetaSaved}
                     onDismiss={() => setAssigningMeta(null)}
-                    showToast={showToast}
+                    onSuccess={(msg) => showToast(msg, 'success')}
                   />
                 )}
 
@@ -977,7 +1004,7 @@ export default function AdminBulkUploadPanel() {
                     file={file}
                     onDone={handleUsersDone}
                     onDismiss={() => setAssigningUsers(null)}
-                    showToast={showToast}
+                    onSuccess={(msg) => showToast(msg, 'success')}
                   />
                 )}
               </div>
@@ -987,7 +1014,7 @@ export default function AdminBulkUploadPanel() {
       </div>
 
       {/* ══ RESOURCE LIBRARY — push any published resource ═════════════════ */}
-      <ResourceLibrarySection showToast={showToast} />
+      <ResourceLibrarySection />
     </div>
   );
 }
