@@ -8,18 +8,10 @@ import axios from "axios";
  */
 
 // VITE_API_URL must point to the live API server.
-// Render service name: AISchoolonair-api → https://aischoolonair-api.onrender.com
-// Fallback hardcoded so login works even if env var is wrong/missing.
-const CORRECT_API = "https://aischoolonair-api.onrender.com";
-
-const RAW_BASE = (() => {
-  const env = import.meta.env.VITE_API_URL || "";
-  // Guard: if the env var still points at the old decommissioned hostname,
-  // ignore it and use the correct one. This prevents a stale Render dashboard
-  // env var from breaking auth after a service rename.
-  if (!env || env.includes("eacbuddy-api")) return CORRECT_API;
-  return env;
-})();
+// Set this in the Render dashboard → aischoolonair (frontend) → Environment.
+const RAW_BASE =
+  import.meta.env.VITE_API_URL ||
+  "https://eacbuddy-api.onrender.com";
 
 // Strip trailing slash, then ensure /api suffix (don't double-add)
 const normalised = RAW_BASE.replace(/\/$/, "");
