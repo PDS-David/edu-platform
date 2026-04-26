@@ -1,11 +1,14 @@
+# Do not copy these into the Docker build context
 node_modules
-npm-debug.log*
 .env
 .env.*
-!.env.example
-uploads/
 *.log
+logs/
+uploads/
 .git
 .gitignore
+*.md
 tests/
-coverage/
+tools/
+debug-jwt.js
+scripts/

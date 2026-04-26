@@ -1,4 +1,13 @@
-# ── Stage 1: build the React app ─────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════════
+# AISchoolonair — Client (React/Vite) production image
+#
+# VITE_API_URL is baked into the JS bundle at build time.
+# Pass it as a Docker build-arg (docker-compose handles this automatically).
+# We use /api (relative path) so the SPA always calls the same origin — no
+# CORS config needed and it works behind any domain.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ── Stage 1: build React app ──────────────────────────────────────────────────
 FROM node:22-alpine AS builder
 
 WORKDIR /app
@@ -6,27 +15,19 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
-# Copy source
 COPY . .
 
-# VITE_API_URL is baked in at build time.
-# Pass it via --build-arg when running docker build, or set it in docker-compose.
-# Example: --build-arg VITE_API_URL=https://yourdomain.com
 ARG VITE_API_URL=/api
 ENV VITE_API_URL=$VITE_API_URL
 
 RUN npm run build
 
-# ── Stage 2: serve with nginx ─────────────────────────────────────────────────
+# ── Stage 2: serve built assets with nginx ────────────────────────────────────
 FROM nginx:1.27-alpine AS runner
 
-# Remove default nginx config
 RUN rm /etc/nginx/conf.d/default.conf
 
-# Copy our nginx config for the React SPA
 COPY nginx-spa.conf /etc/nginx/conf.d/default.conf
-
-# Copy built React app
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 EXPOSE 80
