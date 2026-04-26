@@ -174,6 +174,22 @@ router.post(
     try {
       await ensureExtraColumns();
 
+      // Render's filesystem is ephemeral. If R2 is not configured, uploaded files
+      // can disappear on restarts/redeploys, leading to "Cannot GET /uploads/..."
+      // errors in the student preview. Allow local uploads in production ONLY
+      // when explicitly enabled (e.g., on Hetzner with persistent volumes).
+      const isProd = process.env.NODE_ENV === 'production';
+      const allowLocal = process.env.ALLOW_LOCAL_UPLOADS === 'true';
+      if (isProd && !allowLocal && !r2.isR2Enabled()) {
+        return res.status(503).json({
+          success: false,
+          error:
+            'File uploads are disabled until durable storage is configured. ' +
+            'Please configure Cloudflare R2 (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, R2_PUBLIC_BASE_URL) ' +
+            'or set ALLOW_LOCAL_UPLOADS=true when using persistent disk (e.g., Hetzner).'
+        });
+      }
+
       const files = Array.isArray(req.files) ? req.files : [];
       if (files.length === 0) {
         return res.status(400).json({
@@ -701,7 +717,11 @@ router.put(
       return res.json({
         success: true,
         student_count: insertedStudents,
-        class_count: insertedClasses
+        class_count: insertedClasses,
+        message:
+          insertedStudents || insertedClasses
+            ? `Pushed to ${insertedStudents} student(s) and ${insertedClasses} class(es).`
+            : 'No new assignments were created (they may already be assigned).'
       });
     } catch (err) {
       console.error('[assign-users]', err.message);
