@@ -188,7 +188,10 @@ exports.login = async (req, res, next) => {
 exports.getMe = async (req, res, next) => {
   try {
     const rows = await db.query(
-      `SELECT * FROM users WHERE id = :id LIMIT 1`,
+      `SELECT id, email, first_name, last_name, role, avatar_url,
+              subscription_status, subscription_expires_at,
+              email_verified, created_at, updated_at
+       FROM users WHERE id = :id LIMIT 1`,
       { replacements: { id: req.user.id }, type: QueryTypes.SELECT }
     );
 
@@ -266,7 +269,9 @@ exports.forgotPassword = async (req, res, next) => {
     );
 
     // Email sending is handled by the route wrapper (registerWithEmail pattern)
-    return res.status(200).json({ success: true, message: 'If that email exists, a reset link has been sent.', resetToken: token });
+    // NOTE: resetToken is intentionally NOT returned in the response — it is
+    // delivered only via the password-reset email so that email access is required.
+    return res.status(200).json({ success: true, message: 'If that email exists, a reset link has been sent.' });
   } catch (err) {
     console.error('[forgotPassword]', err.message);
     next(err);
