@@ -23,7 +23,8 @@ const aiLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { success: false, error: 'AI request limit exceeded' }\n});
+  message: { success: false, error: 'AI request limit exceeded' }
+});
 
 // Strict limiter for login / register / password-reset endpoints
 const authLimiter = rateLimit({
