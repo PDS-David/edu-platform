@@ -16,6 +16,7 @@ const {
   forgotPassword, resetPassword, verifyEmail,
 } = require('../controllers/auth');
 const { protect } = require('../middleware/auth');
+const { authLimiter } = require('../middleware/rateLimiter');
 
 let sendWelcomeEmail = () => Promise.resolve();
 try {
@@ -91,10 +92,10 @@ const loginWithSubscription = async (req, res, next) => {
 };
 
 // Public routes — no auth required
-router.post('/register',        registerWithEmail);
-router.post('/login',           loginWithSubscription);
-router.post('/forgot-password', forgotPassword);
-router.post('/reset-password',  resetPassword);
+router.post('/register',        authLimiter, registerWithEmail);
+router.post('/login',           authLimiter, loginWithSubscription);
+router.post('/forgot-password', authLimiter, forgotPassword);
+router.post('/reset-password',  authLimiter, resetPassword);
 router.post('/verify-email',    verifyEmail);
 
 // Protected routes — JWT required

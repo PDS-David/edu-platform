@@ -64,3 +64,13 @@ coverage/
 *.swp
 
 !ai-ready-dump.txtapi.env
+
+# ── Secrets & credentials ──────────────────────────────
+*credentials*.txt
+*CREDENTIALS*.txt
+*recovery-codes*.txt
+*paystack*.txt
+*.env
+.env.*
+!.env.example
+!api.env.example

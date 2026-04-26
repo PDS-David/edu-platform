@@ -23,7 +23,15 @@ const aiLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { success: false, error: 'AI request limit exceeded' }
+  message: { success: false, error: 'AI request limit exceeded' }\n});
+
+// Strict limiter for login / register / password-reset endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,                   // 20 attempts per window per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'Too many authentication attempts, please try again later.' }
 });
 
-module.exports = { analyticsLimiter, globalLimiter, aiLimiter };
+module.exports = { analyticsLimiter, globalLimiter, aiLimiter, authLimiter };

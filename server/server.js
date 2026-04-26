@@ -79,11 +79,26 @@ if (fs.existsSync(clientDist)) {
 
 // MIDDLEWARES
 app.use(requestId);
-app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: false }));
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc:  ["'self'"],
+      scriptSrc:   ["'self'"],
+      styleSrc:    ["'self'", "'unsafe-inline'"],
+      imgSrc:      ["'self'", 'data:', 'blob:'],
+      connectSrc:  ["'self'"],
+      fontSrc:     ["'self'"],
+      objectSrc:   ["'none'"],
+      frameSrc:    ["'none'"],
+      upgradeInsecureRequests: [],
+    },
+  },
+  crossOriginResourcePolicy: { policy: 'same-site' },
+}));
 app.use(globalLimiter);
 
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(requestLogger);
 
 // DB
