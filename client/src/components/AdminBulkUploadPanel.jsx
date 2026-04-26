@@ -629,7 +629,9 @@ function ResourceLibrarySection() {
             <p className="text-sm text-gray-400 text-center py-4">No published resources found.</p>
           ) : (
             <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
-              {filtered.map(file => (
+              {filtered.map(file => {
+                const hasMetadata = !!(file.subject_id || file.topic_id || file.subtopic_id);
+                return (
                 <div key={file.id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
                   <div className="flex items-center gap-3 px-4 py-3">
                     <FileIcon type={file.resource_type} size={16} />
@@ -651,14 +653,23 @@ function ResourceLibrarySection() {
                             ❓ Question Bank
                           </span>
                         )}
+                        {!hasMetadata && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700">
+                            ⚠️ No subject/topic
+                          </span>
+                        )}
                       </div>
                     </div>
                     <button
-                      onClick={() => setPushing(pushing === file.id ? null : file.id)}
+                      onClick={() => hasMetadata && setPushing(pushing === file.id ? null : file.id)}
+                      disabled={!hasMetadata}
+                      title={!hasMetadata ? 'Assign a subject or topic before pushing' : 'Push to students'}
                       className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
-                        pushing === file.id
-                          ? 'bg-indigo-600 text-white border-indigo-600'
-                          : 'border-indigo-200 text-indigo-600 hover:bg-indigo-50'
+                        !hasMetadata
+                          ? 'border-gray-200 text-gray-300 cursor-not-allowed bg-gray-50'
+                          : pushing === file.id
+                            ? 'bg-indigo-600 text-white border-indigo-600'
+                            : 'border-indigo-200 text-indigo-600 hover:bg-indigo-50'
                       }`}
                     >
                       <Users size={11} />
@@ -676,6 +687,14 @@ function ResourceLibrarySection() {
                     </button>
                   </div>
 
+                  {!hasMetadata && (
+                    <div className="px-4 pb-3">
+                      <p className="text-xs text-orange-600 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
+                        ⚠️ This file has no subject or topic assigned. Go to <strong>Staged Files</strong> or use the Assign button to add curriculum metadata before pushing to students.
+                      </p>
+                    </div>
+                  )}
+
                   {pushing === file.id && (
                     <AssignUsersForm
                       file={file}
@@ -685,7 +704,8 @@ function ResourceLibrarySection() {
                     />
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
