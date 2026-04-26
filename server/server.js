@@ -69,7 +69,18 @@ app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 
 // STATIC FILES
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+  setHeaders: (res) => {
+    // Allow embedding file previews (PDF/office viewers) from the frontend domain.
+    // Without this, browsers may block iframe previews with "refused to connect".
+    res.setHeader('X-Frame-Options', 'ALLOWALL');
+    const a = [process.env.CLIENT_URL, process.env.PROD_CLIENT_URL]
+      .filter(Boolean)
+      .map((u) => u.replace(/\/+$/, ''));
+    const frameAncestors = a.length ? a.join(' ') : '*';
+    res.setHeader('Content-Security-Policy', `frame-ancestors ${frameAncestors}`);
+  },
+}));
 
 // CLIENT BUILD
 const clientDist = path.join(__dirname, '..', 'client', 'dist');
