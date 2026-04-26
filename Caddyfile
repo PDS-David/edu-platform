@@ -1,31 +1,133 @@
-# AISchoolonair — Caddy reverse proxy config
-# Caddy auto-issues and renews Let's Encrypt SSL. No certbot needed.
+# ═══════════════════════════════════════════════════════════════════════════════
+# AISchoolonair — Caddy reverse-proxy  (production + staging)
+#
+# How Caddy auto-TLS works:
+#   • Port 80 → ACME HTTP-01 challenge + permanent redirect to HTTPS
+#   • Port 443 → TLS terminated here; traffic forwarded to Docker services
+#   • Certificates are stored in the caddy_data Docker volume (persists restarts)
+#
+# DNS required BEFORE first boot:
+#   A  aischoolonair.ng          → <HETZNER_IP>
+#   A  www.aischoolonair.ng      → <HETZNER_IP>
+#   A  staging.aischoolonair.ng  → <HETZNER_IP>
+# ═══════════════════════════════════════════════════════════════════════════════
 
-# ── Redirect bare domain → www ─────────────────────────────────────────────
+# ── Global options ─────────────────────────────────────────────────────────────
+{
+    # Production ACME endpoint. While testing DNS, swap to the staging URL below
+    # to avoid Let's Encrypt rate limits, then remove when going live:
+    # acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+
+    email admin@aischoolonair.ng
+    admin off   # disable Caddy admin API (no exposed port 2019 on prod)
+
+    servers {
+        trusted_proxies static private_ranges
+    }
+}
+
+# ── Shared security headers (imported by each vhost) ──────────────────────────
+(security_headers) {
+    header {
+        Strict-Transport-Security  "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options     "nosniff"
+        X-Frame-Options            "SAMEORIGIN"
+        Referrer-Policy            "strict-origin-when-cross-origin"
+        Permissions-Policy         "camera=(), microphone=(), geolocation=(), payment=()"
+        Content-Security-Policy    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' wss://www.aischoolonair.ng wss://staging.aischoolonair.ng https://api.paystack.co; frame-src 'none'; object-src 'none'; upgrade-insecure-requests"
+        -Server
+    }
+}
+
+# ── Redirect bare domain → www ─────────────────────────────────────────────────
 aischoolonair.ng {
     redir https://www.aischoolonair.ng{uri} permanent
 }
 
-# ── Main web app ───────────────────────────────────────────────────────────
+# ── Production — www.aischoolonair.ng ─────────────────────────────────────────
 www.aischoolonair.ng {
-    reverse_proxy web:80
-    encode gzip
-    header {
-        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
-        X-Content-Type-Options    nosniff
-        X-Frame-Options           SAMEORIGIN
-        Referrer-Policy           strict-origin-when-cross-origin
+    import security_headers
+
+    # Paystack webhook — raw body passthrough (HMAC verification in app)
+    @webhook path /api/payments/webhook
+    route @webhook {
+        reverse_proxy api:5000 {
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Real-IP       {remote_host}
+        }
+    }
+
+    # Socket.IO WebSocket upgrade (realtimeEngine)
+    @ws { header Upgrade websocket }
+    route @ws {
+        reverse_proxy api:5000 {
+            transport http {
+                read_timeout  0
+                write_timeout 0
+            }
+        }
+    }
+
+    # REST API
+    @api path /api/*
+    route @api {
+        reverse_proxy api:5000 {
+            transport http {
+                read_timeout  120s
+                write_timeout 120s
+            }
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Real-IP       {remote_host}
+        }
+    }
+
+    # File uploads proxied through API container
+    @uploads path /uploads/*
+    route @uploads {
+        reverse_proxy api:5000 {
+            transport http { read_timeout 60s }
+        }
+    }
+
+    # React SPA — served by nginx inside the web container
+    route {
+        reverse_proxy web:80
+        encode gzip zstd
     }
 }
 
-# ── API ────────────────────────────────────────────────────────────────────
-# api subdomain: DNS-only in Cloudflare (grey cloud) so Caddy can issue SSL
-api.aischoolonair.ng {
-    reverse_proxy api:5000 {
-        transport http {
-            read_timeout  120s
-            write_timeout 120s
+# ── Staging — staging.aischoolonair.ng ────────────────────────────────────────
+staging.aischoolonair.ng {
+    import security_headers
+
+    @webhook_stg path /api/payments/webhook
+    route @webhook_stg {
+        reverse_proxy api_staging:5000 {
+            header_up X-Forwarded-For {remote_host}
         }
     }
-    header Strict-Transport-Security "max-age=31536000"
+
+    @ws_stg { header Upgrade websocket }
+    route @ws_stg {
+        reverse_proxy api_staging:5000 {
+            transport http { read_timeout 0; write_timeout 0 }
+        }
+    }
+
+    @api_stg path /api/*
+    route @api_stg {
+        reverse_proxy api_staging:5000 {
+            transport http { read_timeout 120s; write_timeout 120s }
+        }
+    }
+
+    @uploads_stg path /uploads/*
+    route @uploads_stg {
+        reverse_proxy api_staging:5000
+    }
+
+    route {
+        reverse_proxy web_staging:80
+        encode gzip zstd
+    }
 }

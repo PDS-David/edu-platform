@@ -1,23 +1,28 @@
-# ─────────────────────────────────────────────────────────────────────────────
-# AISchoolonair — Hetzner Production Stack (Architecture B)
+# ═══════════════════════════════════════════════════════════════════════════════
+# AISchoolonair — Hetzner CX23 Production Stack
 #
-# Services:
-#   caddy  — Reverse proxy + automatic Let's Encrypt SSL (ports 80+443)
-#   api    — Node/Express backend (internal, port 5000)
-#   web    — React SPA served by nginx (internal, port 80)
-#   redis  — Session / rate-limit cache (internal)
+# Architecture:
+#   caddy       → TLS termination + reverse proxy (ports 80 / 443)
+#   api         → Node/Express backend  (internal :5000)
+#   web         → React SPA via nginx   (internal :80)
+#   redis       → BullMQ queues + rate-limit store (internal :6379)
+#   api_staging / web_staging — mirror services for staging.aischoolonair.ng
 #
-# Database: Render-managed Postgres (external) — just point DATABASE_URL at it.
-# Storage:  Cloudflare R2 (already wired — no local upload volume needed).
+# Database: Render-managed Postgres — set DATABASE_URL in api.env / api.staging.env
+# Storage:  Local uploads volume (swap to R2 later — see DEPLOYMENT.md §Storage)
 #
-# Usage:
-#   cp api.env.example api.env   # fill in all values
-#   docker compose pull && docker compose up -d
-#   docker compose logs -f
-# ─────────────────────────────────────────────────────────────────────────────
+# First-time setup:
+#   cp api.env.example api.env && nano api.env
+#   cp api.staging.env.example api.staging.env && nano api.staging.env
+#   docker compose build && docker compose up -d
+#
+# Routine update:
+#   git pull && docker compose build api web && docker compose up -d --no-deps api web
+# ═══════════════════════════════════════════════════════════════════════════════
 
 services:
 
+  # ── Caddy (reverse proxy + TLS) ─────────────────────────────────────────────
   caddy:
     image: caddy:2-alpine
     container_name: aischool_caddy
@@ -25,51 +30,131 @@ services:
     ports:
       - "80:80"
       - "443:443"
-      - "443:443/udp"
+      - "443:443/udp"   # HTTP/3 QUIC
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
+      - caddy_data:/data         # Let's Encrypt certs live here — never delete
       - caddy_config:/config
     networks: [web]
-    depends_on: [api, web]
+    depends_on: [api, web, api_staging, web_staging]
+    logging:
+      driver: "json-file"
+      options: { max-size: "10m", max-file: "3" }
 
+  # ── Production API ───────────────────────────────────────────────────────────
   api:
-    image: ghcr.io/pds-david/edu-platform-api:latest
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    image: aischool_api:latest
     container_name: aischool_api
     restart: unless-stopped
-    env_file: ./api.env
+    env_file: ./api.env           # NEVER commit this file
+    volumes:
+      - uploads_data:/app/uploads # local file uploads (swap to R2 via env later)
     networks: [web]
+    depends_on:
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:5000/health || exit 1"]
       interval: 30s
       timeout: 10s
-      start_period: 20s
+      start_period: 25s
       retries: 3
+    logging:
+      driver: "json-file"
+      options: { max-size: "20m", max-file: "5" }
 
+  # ── Production Web (React SPA) ───────────────────────────────────────────────
   web:
-    image: ghcr.io/pds-david/edu-platform-web:latest
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+      args:
+        # VITE_API_URL is baked into the JS bundle at build time.
+        # Using /api (relative) means the frontend always hits the same
+        # origin — no cross-origin cookie issues regardless of domain.
+        VITE_API_URL: /api
+    image: aischool_web:latest
     container_name: aischool_web
     restart: unless-stopped
     networks: [web]
+    logging:
+      driver: "json-file"
+      options: { max-size: "5m", max-file: "3" }
 
+  # ── Staging API ──────────────────────────────────────────────────────────────
+  api_staging:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    image: aischool_api_staging:latest
+    container_name: aischool_api_staging
+    restart: unless-stopped
+    env_file: ./api.staging.env   # separate env — uses test Paystack keys
+    volumes:
+      - uploads_staging:/app/uploads
+    networks: [web]
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:5000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 25s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options: { max-size: "10m", max-file: "3" }
+
+  # ── Staging Web ──────────────────────────────────────────────────────────────
+  web_staging:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /api
+    image: aischool_web_staging:latest
+    container_name: aischool_web_staging
+    restart: unless-stopped
+    networks: [web]
+    logging:
+      driver: "json-file"
+      options: { max-size: "5m", max-file: "3" }
+
+  # ── Redis (shared by prod + staging — different key namespaces) ──────────────
   redis:
     image: redis:7-alpine
     container_name: aischool_redis
     restart: unless-stopped
-    command: redis-server --save 60 1 --loglevel warning
-    volumes: [redisdata:/data]
+    command: >
+      redis-server
+        --save 60 1
+        --loglevel warning
+        --maxmemory 256mb
+        --maxmemory-policy allkeys-lru
+    volumes: [redis_data:/data]
     networks: [web]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+    logging:
+      driver: "json-file"
+      options: { max-size: "5m", max-file: "3" }
 
+# ── Named volumes ─────────────────────────────────────────────────────────────
 volumes:
-  caddy_data:
+  caddy_data:     # TLS certs — treat as permanent
   caddy_config:
-  redisdata:
+  uploads_data:   # production file uploads
+  uploads_staging:
+  redis_data:
 
+# ── Network ───────────────────────────────────────────────────────────────────
 networks:
   web:
     driver: bridge

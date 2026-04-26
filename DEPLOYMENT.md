@@ -1,435 +1,454 @@
-# AISchoolonair — Migration to Hetzner CX22
-## Complete step-by-step guide (written for Windows users)
+# AISchoolonair — Hetzner CX23 Deployment Runbook
+
+> **Audience:** Windows developer with basic terminal experience.  
+> **Goal:** Migrate from Render (frontend + backend) → Hetzner CX23 Docker stack, keeping Render Postgres.
 
 ---
 
-## What we did / what this sets up
+## Table of Contents
 
-### Current state (Render)
-| Service | URL |
-|---------|-----|
-| Frontend (React) | https://aischoolonair.onrender.com |
-| Backend (Node.js API) | https://eacbuddy-api.onrender.com |
-| Database | PostgreSQL on Render (Frankfurt) |
-
-### Target state (Hetzner CX22)
-Everything runs in Docker containers on **one Hetzner server**, behind a single domain.
-
-```
-Internet
-   │
-   ▼
- nginx (ports 80 + 443)          ← only container exposed to internet
-   │
-   ├── /api/*       → server (Node.js :5000)
-   ├── /socket.io/* → server (WebSocket)
-   ├── /uploads/*   → files served directly from disk (no Node overhead)
-   └── /*           → client (React SPA)
-
- postgres  (internal — no internet access)
- redis     (internal — no internet access)
-```
-
-### Files added to the repo
-
-| File | Purpose |
-|------|---------|
-| `server/Dockerfile` | Builds the Node.js API image (node:22, ffmpeg included) |
-| `server/.dockerignore` | Excludes node_modules, .env, uploads from build |
-| `client/Dockerfile` | Multi-stage: builds React with Vite, serves with nginx |
-| `client/nginx-spa.conf` | SPA routing inside the client container |
-| `client/.dockerignore` | Excludes dist, node_modules from build |
-| `nginx/nginx.conf` | Main reverse proxy config |
-| `docker-compose.yml` | Defines all 5 containers + volumes + networking |
-| `.env.production.example` | Template for your secrets — copy and fill in |
-| `deploy.sh` | One-command deploy/update script |
-| `scripts/setup-hetzner.sh` | One-time server setup (Docker, firewall, SSL tools) |
-| `scripts/db-migrate.sh` | Copies database from Render to local Postgres |
+1. [Architecture Overview](#1-architecture-overview)
+2. [Pre-flight Checklist](#2-pre-flight-checklist)
+3. [Provision Hetzner Server](#3-provision-hetzner-server)
+4. [Bootstrap the Server](#4-bootstrap-the-server)
+5. [Deploy the Application](#5-deploy-the-application)
+6. [DNS & Caddy TLS](#6-dns--caddy-tls)
+7. [Staging Validation](#7-staging-validation)
+8. [Paystack Cutover Checklist](#8-paystack-cutover-checklist)
+9. [Production Cutover](#9-production-cutover)
+10. [Post-Cutover Checklist](#10-post-cutover-checklist)
+11. [Operations Reference](#11-operations-reference)
+12. [Rollback Plan](#12-rollback-plan)
+13. [Storage Migration (R2 — Future)](#13-storage-migration-r2--future)
 
 ---
 
-## Prerequisites on your Windows PC
+## 1. Architecture Overview
 
-You need these installed **once** on your PC:
+```
+Browser
+  │
+  ▼
+Caddy (port 80/443, TLS auto via Let's Encrypt)
+  ├── www.aischoolonair.ng
+  │     ├── /api/*         → api:5000       (Node/Express)
+  │     ├── /uploads/*     → api:5000
+  │     └── /*             → web:80         (nginx serving React SPA)
+  │
+  └── staging.aischoolonair.ng
+        ├── /api/*         → api_staging:5000
+        └── /*             → web_staging:80
 
-### 1. Windows Terminal (or Git Bash)
-- Windows 10/11 already has SSH built into PowerShell
-- Download **Windows Terminal** from the Microsoft Store (recommended, it's free)
-- Or install **Git for Windows** (https://git-scm.com) which includes Git Bash
+api / api_staging → Redis (internal BullMQ + rate limit)
+api / api_staging → Render Postgres (external, DATABASE_URL)
+```
 
-### 2. SSH key (to log into the server securely)
-Open **PowerShell** or **Windows Terminal** and run:
+**CX23 specs:** 2 vCPU / 4 GB RAM / 40 GB SSD — sufficient for production.
+
+---
+
+## 2. Pre-flight Checklist
+
+Complete these before touching the server:
+
+- [ ] You have a Hetzner account and can create a server
+- [ ] You have an SSH key pair (see §3 if not)
+- [ ] You have the Render Postgres **External Connection String** (Render dashboard → database → Info tab → "External Database URL")
+- [ ] You know your Gmail App Password (or other SMTP credentials) for transactional email
+- [ ] You have your Gemini API key
+- [ ] You have your Paystack **test** secret key and webhook secret (Dashboard → Settings → API Keys & Webhooks)
+- [ ] Your domain registrar / DNS provider allows editing A records for `aischoolonair.ng`
+- [ ] Git repo is clean and pushed to GitHub main branch
+
+---
+
+## 3. Provision Hetzner Server
+
+### 3a. Create SSH key (Windows PowerShell — skip if you already have one)
+
 ```powershell
-ssh-keygen -t ed25519 -C "your_email@example.com"
+ssh-keygen -t ed25519 -C "aischoolonair-hetzner" -f "$env:USERPROFILE\.ssh\hetzner_aischool"
+# Press Enter twice for no passphrase (or set one)
+# Public key is at: C:\Users\<you>\.ssh\hetzner_aischool.pub
 ```
-- Press Enter at every prompt (or choose a passphrase)
-- This creates two files:
-  - `C:\Users\YourName\.ssh\id_ed25519`       ← your **private** key (never share)
-  - `C:\Users\YourName\.ssh\id_ed25519.pub`   ← your **public** key (goes on server)
 
-To see your public key (you'll need to paste it into Hetzner):
+### 3b. Create server in Hetzner Cloud Console
+
+1. Go to [console.hetzner.cloud](https://console.hetzner.cloud)
+2. **New Server**
+   - Location: **Nuremberg** or **Helsinki** (lowest latency to Nigeria: Frankfurt/Nuremberg)
+   - Image: **Ubuntu 24.04**
+   - Type: **CX23** (Shared vCPU, 4 GB RAM)
+   - SSH Keys: paste the content of `hetzner_aischool.pub`
+   - Name: `aischoolonair-prod`
+3. Click **Create & Buy**
+4. Note the server's **public IPv4** address (shown in dashboard)
+
+---
+
+## 4. Bootstrap the Server
+
+### 4a. Upload and run bootstrap script (Windows PowerShell)
+
 ```powershell
-cat $HOME\.ssh\id_ed25519.pub
+# Replace 1.2.3.4 with your actual Hetzner IP
+$IP = "1.2.3.4"
+
+# Upload bootstrap script
+scp -i "$env:USERPROFILE\.ssh\hetzner_aischool" hetzner-bootstrap.sh root@${IP}:/root/
+
+# Run it (takes ~2-3 minutes)
+ssh -i "$env:USERPROFILE\.ssh\hetzner_aischool" root@${IP} "bash /root/hetzner-bootstrap.sh"
 ```
 
----
+The script:
+- Updates Ubuntu packages
+- Installs Docker CE (latest), UFW, fail2ban, git
+- Opens firewall ports 22/80/443 only
+- Creates `deploy` user with Docker access
+- Copies your SSH key to deploy user
+- Disables root SSH and password auth
+- Creates `/opt/aischoolonair`
 
-## Step 1 — Create a Hetzner account and server
+### 4b. Verify you can SSH as deploy user
 
-1. Go to **https://hetzner.com** → Sign up (requires credit card)
-2. In the Hetzner Cloud console: **New Project** → name it `aischoolonair`
-3. Click **Add Server**:
-   - **Location**: Nuremberg (Germany) — good latency to Nigeria via undersea cables
-   - **Image**: Ubuntu 24.04 LTS
-   - **Type**: CX22 (2 vCPU, 4 GB RAM, 40 GB SSD) — ~€3.79/month
-   - **SSH Keys**: Click "Add SSH Key" → paste your **public key** (from `id_ed25519.pub`)
-   - **Firewall**: Create new → Allow TCP 22, 80, 443
-   - Click **Create & Buy Now**
-
-4. Note the **server IP address** (e.g., `95.217.100.123`)
-
----
-
-## Step 2 — Point your domain to the server
-
-> If you don't have a domain yet, you can use a free one from https://freedns.afraid.org
-> or buy one from Namecheap/Cloudflare for ~$10/year.
-
-In your domain registrar's DNS settings, add:
-```
-A   @              95.217.100.123    (replace with your server IP)
-A   www            95.217.100.123
-```
-
-DNS changes take 5–30 minutes to propagate. You can check with:
 ```powershell
-nslookup aischoolonair.com
+ssh -i "$env:USERPROFILE\.ssh\hetzner_aischool" deploy@${IP}
 ```
+
+You should land at a bash prompt. Exit with `exit`.
 
 ---
 
-## Step 3 — Connect to the server from Windows
+## 5. Deploy the Application
 
-Open **PowerShell** or **Windows Terminal** and run:
-```powershell
-ssh root@YOUR_SERVER_IP
-```
-
-Example:
-```powershell
-ssh root@95.217.100.123
-```
-
-Type `yes` when asked about the fingerprint. You are now inside the Hetzner server.
-
----
-
-## Step 4 — Run the one-time server setup script
-
-This installs Docker, configures the firewall, and creates a deploy user.
-Run this on the server (you're still SSH'd in):
+### 5a. Clone the repo on the server
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/PDS-David/edu-platform/main/scripts/setup-hetzner.sh | bash
+# On the Hetzner server (as deploy user):
+cd /opt/aischoolonair
+git clone https://github.com/PDS-David/edu-platform.git .
 ```
 
-This takes about 2 minutes. When done you'll see:
-```
-✅  Server setup complete!
-```
+### 5b. Create environment files
 
----
-
-## Step 5 — Switch to the deploy user and clone the repo
+**Production env:**
 
 ```bash
-su - deploy
-git clone https://github.com/PDS-David/edu-platform.git
-cd edu-platform
+cp api.env.example api.env
+nano api.env
 ```
 
----
+Fill in every `REPLACE_ME` value. The critical ones:
 
-## Step 6 — Create and fill in your production environment file
+| Variable | Where to get it |
+|---|---|
+| `DATABASE_URL` | Render dashboard → DB → Info → External Database URL |
+| `JWT_SECRET` | `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"` |
+| `SESSION_SECRET` | Same command, run again |
+| `PAYSTACK_SECRET_KEY` | Paystack Dashboard → Settings → API Keys → **Live** secret key |
+| `PAYSTACK_WEBHOOK_SECRET` | Paystack Dashboard → Settings → Webhooks → Webhook secret |
+| `EMAIL_USER` / `EMAIL_PASS` | Your Gmail + App Password |
+| `GEMINI_API_KEY` | Google AI Studio |
+| `CLIENT_URL` | `https://www.aischoolonair.ng` |
+| `PROD_CLIENT_URL` | `https://aischoolonair.ng` |
+
+**Staging env** (use test Paystack keys here):
 
 ```bash
-cp .env.production.example .env.production
-nano .env.production
+cp api.env.example api.staging.env
+nano api.staging.env
 ```
 
-In the editor, fill in every line marked `[CHANGE ME]`:
+Change in `api.staging.env`:
+- `PAYSTACK_SECRET_KEY=sk_test_...` ← your test key
+- `CLIENT_URL=https://staging.aischoolonair.ng`
+- `PROD_CLIENT_URL=https://staging.aischoolonair.ng`
+- `SERVER_BASE_URL=https://staging.aischoolonair.ng`
 
-| Variable | What to put |
-|----------|-------------|
-| `VITE_API_URL` | `https://aischoolonair.com` (your domain) |
-| `DB_PASSWORD` | Run `openssl rand -hex 32` and paste the output |
-| `JWT_SECRET` | Run `openssl rand -hex 64` and paste the output |
-| `GEMINI_API_KEY` | Your Google AI key |
-| `PAYSTACK_SECRET_KEY` | Your Paystack live key |
-| `EMAIL_USER` | info@eac.edu.ng |
-| `EMAIL_PASS` | Your Gmail App Password (see below) |
-| `CLIENT_URL` | https://aischoolonair.com |
-| `PROD_CLIENT_URL` | https://aischoolonair.com |
-| `SERVER_BASE_URL` | https://aischoolonair.com |
-
-**Gmail App Password**: Go to myaccount.google.com → Security → 2-Step Verification → App Passwords → Create one named "AISchoolonair". Use that 16-character password, not your real Gmail password.
-
-Save and exit: `Ctrl+X`, then `Y`, then `Enter`
-
----
-
-## Step 7 — Update nginx.conf with your real domain
+### 5c. Build and start (first time — takes 5-10 minutes)
 
 ```bash
-nano nginx/nginx.conf
-```
-
-Find every line with `aischoolonair.com` and replace with your actual domain.
-There are 4 places (2 in the `server_name` directives, 2 in SSL cert paths).
-
-Save and exit.
-
----
-
-## Step 8 — Deploy the stack (first time)
-
-> **Important**: Before deploying, you need to temporarily disable the HTTPS
-> redirect in nginx.conf because you don't have an SSL certificate yet.
-
-Edit `nginx/nginx.conf`:
-```bash
-nano nginx/nginx.conf
-```
-
-Comment out the entire HTTPS server block (lines starting with `server {` for port 443)
-by adding `#` to each line — and in the HTTP server block, **remove** the redirect
-line and instead add:
-```nginx
-location / {
-    proxy_pass http://frontend;
-}
-location /api/ {
-    proxy_pass http://backend;
-}
-```
-
-Then start everything:
-```bash
+cd /opt/aischoolonair
 ./deploy.sh
 ```
 
-This builds all Docker images and starts the containers. **First run takes 5–10 minutes.**
-
-Check it's working:
-```bash
-docker compose ps
-```
-All containers should show `Up` or `healthy`.
+> **Note:** Caddy will NOT issue TLS certs until DNS is pointed at this server (§6).
+> The site runs fine internally; you can test with `curl http://localhost:3000` (not needed — see §6).
 
 ---
 
-## Step 9 — Get a free SSL certificate (HTTPS)
+## 6. DNS & Caddy TLS
 
-```bash
-sudo certbot certonly --webroot \
-  -w /var/www/certbot \
-  -d aischoolonair.com \
-  -d www.aischoolonair.com \
-  --email your@email.com \
-  --agree-tos \
-  --non-interactive
-```
+### 6a. Add DNS A records
 
-When done:
-1. Edit `nginx/nginx.conf` back to the full HTTPS version (undo Step 8 changes)
-2. Restart nginx: `docker compose restart nginx`
-3. Visit https://aischoolonair.com — you should see the app with a padlock 🔒
+In your DNS provider (Cloudflare, Namecheap, etc.), add:
 
-**SSL auto-renewal** (set this up once):
-```bash
-crontab -e
-```
-Add this line:
-```
-0 3 * * * certbot renew --quiet && docker compose -f /home/deploy/edu-platform/docker-compose.yml restart nginx
-```
-This checks for renewal every day at 3am and restarts nginx if the cert was renewed.
+| Type | Name | Value | TTL |
+|---|---|---|---|
+| A | `@` (or `aischoolonair.ng`) | `<HETZNER_IP>` | 300 |
+| A | `www` | `<HETZNER_IP>` | 300 |
+| A | `staging` | `<HETZNER_IP>` | 300 |
 
----
+If using Cloudflare: **set proxy to DNS-only (grey cloud)** while testing, then enable proxy after TLS is verified.
 
-## Step 10 — Migrate the database from Render
+### 6b. Wait for DNS propagation
 
-Run this once to copy all your data from Render to the local Postgres:
-
-```bash
-# Install pg_dump if not already there (setup script should have done this)
-sudo apt-get install -y postgresql-client
-
-# Run the migration
-chmod +x scripts/db-migrate.sh
-./scripts/db-migrate.sh
-```
-
-This:
-1. Dumps all data from the Render Postgres
-2. Drops and recreates the local database
-3. Restores all tables and data into local Postgres
-4. Verifies table count
-
----
-
-## Step 11 — Verify everything is working
-
-```bash
-# All containers running?
-docker compose ps
-
-# Check the API is responding:
-curl https://aischoolonair.com/api/health
-
-# Check the frontend loads:
-curl -I https://aischoolonair.com
-```
-
-Visit the site in your browser. Log in, check admin dashboard, test AI generate, etc.
-
----
-
-## Ongoing deployment (after code changes)
-
-Whenever you push new code to GitHub, on the server run:
-
-```bash
-cd /home/deploy/edu-platform
-./deploy.sh
-```
-
-That's it — pulls latest code, rebuilds changed images, restarts containers.
-
----
-
-## Monitoring — how to watch the app
-
-### From your Windows PC (remote SSH)
 ```powershell
-# Connect to server
-ssh root@YOUR_SERVER_IP
+# Windows — check propagation
+nslookup www.aischoolonair.ng
+# Should return your Hetzner IP
+```
 
-# Then on the server:
-cd /home/deploy/edu-platform
+DNS can take 1-60 minutes. When it resolves correctly, Caddy will automatically request Let's Encrypt certificates on the first HTTPS request.
 
-# Live logs — all containers
+### 6c. Verify TLS
+
+```bash
+# On the server:
+docker compose logs -f caddy
+# Look for: "certificate obtained successfully"
+```
+
+Or from your browser: `https://staging.aischoolonair.ng` — should show the app with a valid padlock.
+
+---
+
+## 7. Staging Validation
+
+Before touching production DNS, validate everything on staging:
+
+```bash
+# Health check
+curl -s https://staging.aischoolonair.ng/health | python3 -m json.tool
+# Expected: {"status":"ok","timestamp":"..."}
+
+# API
+curl -s https://staging.aischoolonair.ng/api/auth/me
+# Expected: 401 Unauthorized (correct — not logged in)
+```
+
+**Manual test checklist (do these in the browser):**
+
+- [ ] Homepage loads, no console errors
+- [ ] Register a new account → welcome email received
+- [ ] Log in
+- [ ] Navigate to a subject/quiz page
+- [ ] WebSocket connection live (check browser DevTools → Network → WS tab)
+- [ ] `/api/payments/plans` returns subscription plans
+- [ ] Initiate a test payment using Paystack test card `4084 0840 8408 4081`, CVV 408, expiry any future date
+- [ ] Payment success → subscription activated in DB
+- [ ] Paystack test webhook fires correctly (check staging API logs)
+
+---
+
+## 8. Paystack Cutover Checklist
+
+Paystack requires exact URL registration — payments will fail silently if URLs are wrong.
+
+### 8a. While on staging (test mode)
+
+In **Paystack Dashboard → Settings → API Keys & Webhooks**:
+
+- [ ] Webhook URL set to: `https://staging.aischoolonair.ng/api/payments/webhook`
+- [ ] Allowed callback domains include: `staging.aischoolonair.ng`
+- [ ] Test a payment end-to-end (see §7 checklist above)
+
+### 8b. Before production cutover (live mode)
+
+- [ ] Update Paystack webhook URL to: `https://www.aischoolonair.ng/api/payments/webhook`
+- [ ] Update allowed callback domains to include: `www.aischoolonair.ng`, `aischoolonair.ng`
+- [ ] In `api.env` on the server, confirm `PAYSTACK_SECRET_KEY=sk_live_...` (live key, not test)
+- [ ] Restart API to pick up live key: `docker compose up -d --no-deps api`
+
+### 8c. After production cutover
+
+- [ ] In Render dashboard, update `CLIENT_URL` and `SERVER_BASE_URL` env vars if Render backend still runs
+- [ ] Make a real ₦100 test payment on production to confirm end-to-end
+- [ ] Confirm webhook receipt in Paystack Dashboard → Logs
+
+> **Payment downtime window:** Paystack webhook URL changes take effect immediately.  
+> Change the webhook URL AFTER DNS switches to Hetzner, not before, to avoid a gap.
+
+---
+
+## 9. Production Cutover
+
+### 9a. Final pre-cutover checks
+
+```bash
+# On staging, confirm no errors in the last hour:
+docker compose logs --since 1h api | grep -i error | wc -l
+# Aim for 0 (or investigate any errors)
+
+# Confirm prod env is correct:
+grep "PAYSTACK_SECRET_KEY" api.env   # should show sk_live_...
+grep "CLIENT_URL" api.env            # should show www.aischoolonair.ng
+```
+
+### 9b. Change DNS A records
+
+In your DNS provider, update:
+
+| Type | Name | Old value | New value |
+|---|---|---|---|
+| A | `@` | Render IP | `<HETZNER_IP>` |
+| A | `www` | Render IP | `<HETZNER_IP>` |
+
+Set TTL to 60 seconds 5 minutes before cutover for faster propagation.
+
+### 9c. Update Paystack webhook URL
+
+Immediately after DNS update:
+
+1. Paystack Dashboard → Settings → Webhooks
+2. Change URL from old Render URL → `https://www.aischoolonair.ng/api/payments/webhook`
+
+### 9d. Monitor the cutover
+
+```bash
+# Watch Caddy issue the production cert (happens within seconds of DNS resolving):
+docker compose logs -f caddy
+
+# Watch API traffic come in:
+docker compose logs -f api
+```
+
+---
+
+## 10. Post-Cutover Checklist
+
+- [ ] `https://www.aischoolonair.ng` loads correctly (valid SSL cert)
+- [ ] `https://aischoolonair.ng` redirects to `www.` (301)
+- [ ] Login works on production
+- [ ] `/health` returns `{"status":"ok"}`
+- [ ] Paystack webhook URL updated to production domain
+- [ ] DNS TTL restored to 3600 after confirming stability
+- [ ] Old Render web service suspended (don't delete yet — keep for 7-day rollback)
+- [ ] Render API service suspended (optional — DB stays up regardless)
+- [ ] Set up monitoring (see §11)
+
+---
+
+## 11. Operations Reference
+
+### Viewing logs
+
+```bash
+# All services, follow:
 docker compose logs -f
 
-# Live logs — just the API server
-docker compose logs -f server
+# Specific service:
+docker compose logs -f api
+docker compose logs -f caddy
 
-# Live logs — just nginx (see incoming requests)
-docker compose logs -f nginx
+# Last 100 lines:
+docker compose logs --tail=100 api
 
-# CPU and RAM usage per container (press q to quit)
-docker stats
+# Search for errors:
+docker compose logs api 2>&1 | grep -i "error\|warn" | tail -50
+```
 
-# Container status
+### Container management
+
+```bash
+# Status:
 docker compose ps
+
+# Restart a single service (no downtime for others):
+docker compose restart api
+
+# Rebuild + redeploy single service:
+docker compose build api && docker compose up -d --no-deps api
+
+# Shell into API container:
+docker compose exec api sh
+
+# Resource usage:
+docker stats
 ```
 
-### Built-in health checks
-Each container has a health check. `docker compose ps` shows:
-- `healthy` — container is up and responding
-- `unhealthy` — something is wrong (check logs)
-- `starting` — just launched, not ready yet
-
-### Install Uptime Kuma (free, self-hosted monitoring dashboard)
-This gives you a web dashboard that alerts you when the site goes down:
+### Updating the app
 
 ```bash
-# On the server, add this to docker-compose.yml under services:
-#   uptime-kuma:
-#     image: louislam/uptime-kuma:1
-#     volumes:
-#       - uptime_data:/app/data
-#     ports:
-#       - "3001:3001"
-#     restart: always
+cd /opt/aischoolonair
+./deploy.sh   # pulls git, rebuilds, restarts
+```
 
-docker run -d --name uptime-kuma \
+### Backups (uploads volume)
+
+```bash
+# Backup uploads to home directory:
+docker run --rm -v aischoolonair_uploads_data:/data -v ~/:/backup \
+  alpine tar czf /backup/uploads-$(date +%Y%m%d).tar.gz -C /data .
+
+# List backups:
+ls -lh ~/uploads-*.tar.gz
+```
+
+### Monitoring with Uptime Kuma (optional but recommended)
+
+```bash
+# Add to docker-compose.yml services section, or run standalone:
+docker run -d \
+  --name uptime-kuma \
+  --restart unless-stopped \
   -p 3001:3001 \
-  -v uptime_kuma:/app/data \
-  --restart always \
+  -v uptime-kuma:/app/data \
   louislam/uptime-kuma:1
+
+# Access at http://<HETZNER_IP>:3001 (configure your own admin password)
+# Add monitor: https://www.aischoolonair.ng/health  (expected: "ok")
 ```
 
-Then visit `http://YOUR_SERVER_IP:3001` to set up monitors for:
-- `https://aischoolonair.com` (frontend)
-- `https://aischoolonair.com/api/health` (backend)
+### Disk usage
 
-It can send alerts via email, Telegram, Slack, etc.
-
-### Hetzner's built-in monitoring
-In the Hetzner Cloud console → your server → **Graphs** tab:
-- CPU usage over time
-- Network bandwidth
-- Disk I/O
-
-You can also set **alerts** (email when CPU > 90% for 5 minutes, etc.) under **Alerts**.
-
----
-
-## Disk space and backups
-
-### Check disk usage
 ```bash
-df -h          # overall disk
-du -sh /home/deploy/edu-platform/  # repo + uploads
-docker system df  # Docker images and volumes
-```
-
-### Backup database
-```bash
-# Run manually or add to cron
-docker exec edu_postgres pg_dump -U eduuser edu_platform \
-  | gzip > ~/backups/db_$(date +%Y%m%d).sql.gz
-```
-
-### Clean up old Docker images (to save disk space)
-```bash
-docker system prune -f
+df -h                          # overall disk
+docker system df               # Docker volumes/images
+docker system prune -f         # remove stopped containers + dangling images
 ```
 
 ---
 
-## Troubleshooting
+## 12. Rollback Plan
 
-| Problem | Command |
-|---------|---------|
-| App not loading | `docker compose ps` — check all are `healthy` |
-| 502 Bad Gateway | `docker compose logs server` — Node crashed |
-| SSL error | `sudo certbot certificates` — check expiry |
-| Out of memory | `docker stats` — see which container is eating RAM |
-| DB connection error | `docker compose logs postgres` |
-| Rebuild just one service | `docker compose build server && docker compose up -d server` |
+If something goes wrong after DNS cutover, you can be back on Render within ~5 minutes.
+
+### DNS rollback (fastest — 5 minutes)
+
+1. In your DNS provider, revert A records for `@` and `www` back to Render's IP
+2. Set TTL 60 if possible
+3. Re-enable the Render services (they should still be running / can be restarted in 1 click)
+4. Update Paystack webhook URL back to the Render API URL
+5. Monitor: DNS propagation takes 1-60 minutes; existing sessions on Hetzner will time out gracefully
+
+### Where to find Render's IP
+
+Render uses Cloudflare as a CDN, so they don't publish a stable IP.  
+**Before cutover:** run `nslookup your-render-app.onrender.com` and note the IP, or keep the Render URL in a note.
+
+Alternatively, **don't delete the Render services for 7 days** — just suspend them.  
+To rollback: unsuspend → wait 1-2 min → revert DNS.
+
+### Partial rollback (API only on Render, frontend on Hetzner)
+
+Not recommended, but possible if the Render API is fine and only the Docker setup has issues:
+- Revert DNS for `www` only (front-end) back to Render
+- Keep Hetzner running for diagnosis
 
 ---
 
-## Cost estimate (Hetzner CX22)
+## 13. Storage Migration (R2 — Future)
 
-| Item | Monthly cost |
-|------|-------------|
-| Hetzner CX22 server | ~€3.79 |
-| Domain (if needed) | ~€1/month |
-| **Total** | **~€5/month** |
+Currently file uploads are stored in a Docker named volume (`uploads_data`).  
+To migrate to Cloudflare R2:
 
-Compare: Render free tier goes to sleep after 15 minutes of inactivity.
-Render paid (to avoid sleeping) starts at $7/service/month = $14+ for front+back.
+1. Uncomment the R2 variables in `api.env`
+2. The server already imports `@aws-sdk/client-s3` — wire upload endpoints to use the SDK
+3. Migrate existing files: `rclone copy local:/opt/aischoolonair/uploads r2:aischoolonair-uploads`
+4. Set `R2_PUBLIC_BASE_URL` so the frontend can access files via CDN URL
 
 ---
 
-## What's still on Render vs what moved to Hetzner
-
-After migration:
-- ✅ Render frontend → **Hetzner**
-- ✅ Render backend API → **Hetzner**
-- ✅ Render Postgres → **Hetzner** (after running db-migrate.sh)
-- ⚠️  Upstash Redis → **Hetzner** (docker-compose.yml includes local Redis — just remove the `REDIS_URL` override in .env.production)
-- ✅ Uploaded files (videos, resources) → **Hetzner** (Docker volume — persistent)
+*Last updated: 2025 — maintained by PDS-David*

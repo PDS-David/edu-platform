@@ -74,3 +74,7 @@ coverage/
 .env.*
 !.env.example
 !api.env.example
+
+# ── Hetzner deployment env files (never commit) ────────────────────────────
+api.env
+api.staging.env
