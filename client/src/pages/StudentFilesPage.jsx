@@ -8,12 +8,19 @@ import api from '../services/apiClient';
 import TopNav from '../components/TopNav';
 import { FileText, Video, Music, File, Download, ArrowLeft, BookOpen, Loader2, ExternalLink } from 'lucide-react';
 
-const BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/api$/, '');
+// Use the same fallback as apiClient.js so the URL is always the live server.
+const BASE_URL = (
+  import.meta.env.VITE_API_URL ||
+  'https://aischoolonair-api.onrender.com'
+).replace(/\/$/, '').replace(/\/api$/, '');
 
 function resolveUrl(rawUrl) {
   if (!rawUrl) return '#';
   if (rawUrl.startsWith('http')) {
-    return rawUrl.replace(/https?:\/\/eacbuddy-api\.onrender\.com/, BASE_URL);
+    // Rewrite any old server hostname to the current API base
+    return rawUrl
+      .replace(/https?:\/\/eacbuddy-api\.onrender\.com/, BASE_URL)
+      .replace(/https?:\/\/aischoolonair-api\.onrender\.com/, BASE_URL);
   }
   return `${BASE_URL}${rawUrl}`;
 }
