@@ -85,6 +85,21 @@ services:
       - key: ADMIN_WHITELIST_IPS
         value: ""
 
+      # ── Cloudflare R2 (durable file storage — required, Render disk is ephemeral) ──
+      # Set these in the Render dashboard → AISchoolonair-api → Environment
+      # Steps: Cloudflare → R2 → Create bucket → Manage API Tokens → Create token
+      #        Then enable Public Access on the bucket to get R2_PUBLIC_BASE_URL
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET
+        sync: false
+      - key: R2_PUBLIC_BASE_URL
+        sync: false
+
   # ── Frontend: React/Vite Static Site ──────────────────────────────────────
   - type: web
     name: AISchoolonair-frontend

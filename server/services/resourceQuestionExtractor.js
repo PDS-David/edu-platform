@@ -33,33 +33,73 @@ const MAX_TEXT_CHARS = 12000;
 // ── Optional text extraction (works even if libs aren't installed) ──────────
 async function readFileAsText(resource) {
   const url = resource.file_url || '';
-  const ext = path.extname(url).toLowerCase();
-  // We only attempt local-disk reads for now. R2-hosted files fall back to
-  // metadata-only generation (still useful — the LLM uses subject/topic).
-  if (!url.startsWith('/uploads/') && !url.startsWith('uploads/')) return '';
+  const ext = path.extname(url.split('?')[0]).toLowerCase();
 
-  const localPath = path.join(__dirname, '..', url.replace(/^\//, ''));
-  if (!fs.existsSync(localPath)) return '';
+  // ── Case 1: Local disk path (dev / Hetzner persistent volume) ────────────
+  if (url.startsWith('/uploads/') || url.startsWith('uploads/')) {
+    const localPath = path.join(__dirname, '..', url.replace(/^\//, ''));
+    if (!fs.existsSync(localPath)) return '';
+    return extractFromBuffer(await fs.promises.readFile(localPath), ext);
+  }
 
+  // ── Case 2: R2 proxy URL served through our API ───────────────────────────
+  //   /api/resources/r2/<encoded-key>
+  if (url.startsWith('/api/resources/r2/')) {
+    try {
+      const r2 = require('../utils/r2Storage');
+      if (!r2.isR2Enabled()) return '';
+      const key = decodeURIComponent(url.slice('/api/resources/r2/'.length));
+      const obj = await r2.getObjectByKey(key);
+      const chunks = [];
+      for await (const chunk of obj.body) chunks.push(chunk);
+      return extractFromBuffer(Buffer.concat(chunks), ext);
+    } catch (err) {
+      console.warn('[resourceQuestionExtractor] R2 proxy fetch failed:', err.message);
+      return '';
+    }
+  }
+
+  // ── Case 3: Public R2 / CDN absolute URL ─────────────────────────────────
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    try {
+      const fetcher = url.startsWith('https') ? require('https') : require('http');
+      const buf = await new Promise((resolve, reject) => {
+        fetcher.get(url, (res) => {
+          const chunks = [];
+          res.on('data', (c) => chunks.push(c));
+          res.on('end', () => resolve(Buffer.concat(chunks)));
+          res.on('error', reject);
+        }).on('error', reject);
+      });
+      return extractFromBuffer(buf, ext);
+    } catch (err) {
+      console.warn('[resourceQuestionExtractor] HTTP fetch failed:', err.message);
+      return '';
+    }
+  }
+
+  return '';
+}
+
+async function extractFromBuffer(buf, ext) {
   try {
     if (ext === '.pdf') {
       const pdfParse = safeReq('pdf-parse');
       if (!pdfParse) return '';
-      const buf = fs.readFileSync(localPath);
       const data = await pdfParse(buf);
       return (data?.text || '').slice(0, MAX_TEXT_CHARS);
     }
     if (ext === '.docx') {
       const mammoth = safeReq('mammoth');
       if (!mammoth) return '';
-      const { value } = await mammoth.extractRawText({ path: localPath });
+      const { value } = await mammoth.extractRawText({ buffer: buf });
       return (value || '').slice(0, MAX_TEXT_CHARS);
     }
     if (['.txt', '.md'].includes(ext)) {
-      return fs.readFileSync(localPath, 'utf8').slice(0, MAX_TEXT_CHARS);
+      return buf.toString('utf8').slice(0, MAX_TEXT_CHARS);
     }
   } catch (err) {
-    console.warn('[resourceQuestionExtractor] file read failed:', err.message);
+    console.warn('[resourceQuestionExtractor] text extraction failed:', err.message);
   }
   return '';
 }
