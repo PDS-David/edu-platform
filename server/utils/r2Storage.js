@@ -56,6 +56,10 @@ function publicUrlFor(key) {
   return `${base}/${key}`;
 }
 
+function proxyUrlFor(key) {
+  return `/api/resources/r2/${encodeURIComponent(key)}`;
+}
+
 function buildKey(originalname) {
   const ext = path.extname(originalname || '').toLowerCase();
   const stamp = Date.now();
@@ -79,7 +83,28 @@ async function uploadBuffer({ buffer, originalname, mimetype }) {
 
   return {
     key,
-    url: publicUrlFor(key) || key,
+    // If no public base URL is configured (or the bucket is private),
+    // return an API proxy URL that streams from R2 using server credentials.
+    url: publicUrlFor(key) || proxyUrlFor(key),
+  };
+}
+
+async function getObjectByKey(key) {
+  if (!isR2Enabled()) throw new Error('R2 is not configured');
+  _S3 = _S3 || require('@aws-sdk/client-s3');
+
+  const obj = await getClient().send(new _S3.GetObjectCommand({
+    Bucket: process.env.R2_BUCKET,
+    Key: key,
+  }));
+
+  return {
+    body: obj.Body, // Node stream
+    contentType: obj.ContentType || 'application/octet-stream',
+    contentLength: obj.ContentLength,
+    contentDisposition: obj.ContentDisposition,
+    cacheControl: obj.CacheControl,
+    etag: obj.ETag,
   };
 }
 
@@ -91,6 +116,12 @@ async function deleteByUrl(fileUrl) {
   let key = null;
   if (base && fileUrl.startsWith(base + '/')) {
     key = fileUrl.slice(base.length + 1);
+  } else if (fileUrl.startsWith('/api/resources/r2/')) {
+    try {
+      key = decodeURIComponent(fileUrl.slice('/api/resources/r2/'.length));
+    } catch {
+      key = fileUrl.slice('/api/resources/r2/'.length);
+    }
   } else if (/^https?:\/\/.+\/resources\//.test(fileUrl)) {
     // Best-effort: take everything after the last "resources/"
     const m = fileUrl.match(/\/(resources\/[^?#]+)/);
@@ -111,4 +142,4 @@ async function deleteByUrl(fileUrl) {
   }
 }
 
-module.exports = { isR2Enabled, uploadBuffer, deleteByUrl };
+module.exports = { isR2Enabled, uploadBuffer, getObjectByKey, deleteByUrl };

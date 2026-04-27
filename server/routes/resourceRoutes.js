@@ -161,6 +161,41 @@ router.get('/health', (_req, res) => {
 });
 
 /* ================================
+   R2 PROXY  (GET /api/resources/r2/*)
+   Streams a file from Cloudflare R2 when the bucket is private or when
+   R2_PUBLIC_BASE_URL isn't configured.
+   ================================ */
+router.get('/r2/*', async (req, res) => {
+  try {
+    const keyRaw = req.params[0] || '';
+    const key = decodeURIComponent(keyRaw);
+    if (!key || !key.startsWith('resources/')) {
+      return res.status(400).json({ success: false, error: 'Invalid R2 key' });
+    }
+    if (!r2.isR2Enabled()) {
+      return res.status(503).json({ success: false, error: 'R2 is not configured' });
+    }
+
+    const obj = await r2.getObjectByKey(key);
+    res.setHeader('Content-Type', obj.contentType || 'application/octet-stream');
+    if (obj.contentLength) res.setHeader('Content-Length', String(obj.contentLength));
+    if (obj.cacheControl) res.setHeader('Cache-Control', obj.cacheControl);
+    if (obj.etag) res.setHeader('ETag', obj.etag);
+    // Allow inline viewing in iframes (PDF/Office viewers).
+    res.setHeader('X-Frame-Options', 'ALLOWALL');
+    res.setHeader('Content-Security-Policy', 'frame-ancestors *');
+
+    if (obj.contentDisposition) res.setHeader('Content-Disposition', obj.contentDisposition);
+
+    // obj.body is a stream from AWS SDK
+    return obj.body.pipe(res);
+  } catch (err) {
+    console.error('[r2 proxy]', err.message);
+    return res.status(404).json({ success: false, error: 'File not found' });
+  }
+});
+
+/* ================================
    BULK UPLOAD  (POST /api/resources/bulk-upload)
    Accepts multipart/form-data with field name "files" (or "file").
    Stores each file as a staged resource (is_staged = true).
