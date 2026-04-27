@@ -190,7 +190,9 @@ exports.getMe = async (req, res, next) => {
     const rows = await db.query(
       `SELECT id, email, first_name, last_name, role, avatar_url,
               subscription_status, subscription_expires_at,
-              email_verified, created_at, updated_at
+              is_verified, onboarding_complete, xp_points,
+              study_streak_days, daily_goal, last_login,
+              created_at, updated_at
        FROM users WHERE id = :id LIMIT 1`,
       { replacements: { id: req.user.id }, type: QueryTypes.SELECT }
     );

@@ -33,6 +33,19 @@ function FileIcon({ type }) {
   return <File size={18} className="text-gray-400 shrink-0" />;
 }
 
+// Detect whether the file URL is a public absolute URL that Google Docs Viewer
+// can reach, vs a relative/local path served from this Render instance.
+function isPublicUrl(url) {
+  try {
+    const u = new URL(url);
+    // Render ephemeral disk paths are served under the same origin — Google
+    // can't reach them. Only treat it as public if it's a different CDN/R2 host.
+    return u.hostname !== window.location.hostname;
+  } catch {
+    return false; // relative path
+  }
+}
+
 function InlineViewer({ file }) {
   const url  = resolveUrl(file.file_url);
   const type = (file.resource_type || file.type || '').toLowerCase();
@@ -41,29 +54,67 @@ function InlineViewer({ file }) {
   if (type === 'audio') return <audio src={url} controls className="w-full mt-2" />;
   if (type === 'image') return <img src={url} alt={file.title} className="w-full rounded-xl mt-2 max-h-60 object-contain bg-gray-100" />;
 
-  // PDFs render natively in browsers. Office files (docx/pptx/xlsx) need Google Docs Viewer.
   const isPdf = type === 'pdf' || /\.pdf(\?|$)/i.test(url);
-  const previewSrc = isPdf
-    ? url
-    : `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
 
+  if (isPdf) {
+    return (
+      <div className="mt-2 rounded-xl overflow-hidden border border-gray-200">
+        <iframe
+          src={url}
+          title={file.title}
+          className="w-full"
+          style={{ height: 480 }}
+        />
+        <div className="py-2 text-center bg-gray-50 border-t border-gray-100">
+          <a href={url} target="_blank" rel="noreferrer"
+            className="text-xs text-blue-600 hover:underline">
+            Open in new tab if preview doesn't load ↗
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  // For Office docs (docx/pptx/xlsx): Google Docs Viewer only works with
+  // publicly reachable URLs. If the file lives on the same server (Render
+  // ephemeral disk), skip the broken iframe and show a download prompt instead.
+  const canUseGoogleViewer = isPublicUrl(url);
+
+  if (canUseGoogleViewer) {
+    const previewSrc = `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
+    return (
+      <div className="mt-2 rounded-xl overflow-hidden border border-gray-200">
+        <iframe
+          src={previewSrc}
+          title={file.title}
+          className="w-full"
+          style={{ height: 420 }}
+        />
+        <div className="py-2 text-center bg-gray-50 border-t border-gray-100">
+          <a href={url} target="_blank" rel="noreferrer"
+            download={file.original_filename || file.title || true}
+            className="text-xs text-blue-600 hover:underline">
+            Download file ↓
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  // File is on the same server — just offer a direct download/open link
   return (
-    <div className="mt-2 rounded-xl overflow-hidden border border-gray-200">
-      <iframe
-        src={previewSrc}
-        title={file.title}
-        className="w-full"
-        style={{ height: 380 }}
-      />
-      <div className="py-2 text-center bg-gray-50 border-t border-gray-100">
-        <a
-          href={url}
-          target="_blank"
-          rel="noreferrer"
-          download={!isPdf ? (file.original_filename || file.title || true) : undefined}
-          className="text-xs text-blue-600 hover:underline"
-        >
-          {isPdf ? 'Open in new tab if preview doesn\'t load ↗' : 'Download file ↓'}
+    <div className="mt-2 rounded-xl border border-gray-200 bg-gray-50 p-5 text-center">
+      <p className="text-sm text-gray-500 mb-3">
+        In-browser preview is not available for this file type.
+      </p>
+      <div className="flex justify-center gap-3">
+        <a href={url} target="_blank" rel="noreferrer"
+          className="text-xs font-semibold px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors">
+          Open file ↗
+        </a>
+        <a href={url} download={file.original_filename || file.title || true}
+          className="text-xs font-semibold px-4 py-2 rounded-lg border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors">
+          Download ↓
         </a>
       </div>
     </div>
