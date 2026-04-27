@@ -834,3 +834,82 @@ router.get('/health', protect, adminOnly, async (req, res) => {
     duration_ms: Date.now() - t0,
   });
 });
+
+// ── POST /api/admin/migrate-to-r2 ────────────────────────────────────────────
+// One-time migration: uploads every resource whose file_url is a local
+// /uploads/ path to Cloudflare R2 and updates the DB row.
+// Protected: admin only. Safe to call multiple times (already-migrated rows
+// are skipped). Query param: ?dry=true to preview without making changes.
+router.post('/migrate-to-r2', protect, adminOnly, async (req, res) => {
+  const fs   = require('fs');
+  const path = require('path');
+  const mime = (() => { try { return require('mime-types'); } catch { return null; } })();
+  const r2   = require('../utils/r2Storage');
+  const dry  = req.query.dry === 'true';
+
+  if (!r2.isR2Enabled()) {
+    return res.status(503).json({
+      success: false,
+      error: 'R2 is not configured. Set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, R2_PUBLIC_BASE_URL in Render env vars.'
+    });
+  }
+
+  try {
+    const rows = await sequelize.query(
+      `SELECT id, title, file_url, original_filename, mime_type
+         FROM resources
+        WHERE file_url IS NOT NULL
+          AND (file_url LIKE '/uploads/%' OR file_url LIKE 'uploads/%')
+        ORDER BY created_at ASC`,
+      { type: QueryTypes.SELECT }
+    );
+
+    if (rows.length === 0) {
+      return res.json({ success: true, message: 'Nothing to migrate — all resources already on R2.', migrated: 0, skipped: 0, failed: 0, results: [] });
+    }
+
+    const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
+    const results = [];
+    let migrated = 0, skipped = 0, failed = 0;
+
+    for (const row of rows) {
+      const relPath  = row.file_url.replace(/^\//, '');
+      const fullPath = path.join(UPLOADS_DIR, relPath.replace(/^uploads\//, ''));
+      const filename = row.original_filename || path.basename(relPath);
+
+      if (!fs.existsSync(fullPath)) {
+        results.push({ id: row.id, title: row.title, status: 'skipped', reason: 'file not found on disk' });
+        skipped++;
+        continue;
+      }
+
+      if (dry) {
+        results.push({ id: row.id, title: row.title, status: 'would_migrate', file: relPath });
+        migrated++;
+        continue;
+      }
+
+      try {
+        const buffer   = fs.readFileSync(fullPath);
+        const mimetype = row.mime_type || (mime ? mime.lookup(fullPath) : null) || 'application/octet-stream';
+        const { url }  = await r2.uploadBuffer({ buffer, originalname: filename, mimetype });
+
+        await sequelize.query(
+          `UPDATE resources SET file_url = :url, updated_at = NOW() WHERE id = :id`,
+          { replacements: { url, id: row.id }, type: QueryTypes.UPDATE }
+        );
+
+        results.push({ id: row.id, title: row.title, status: 'migrated', url });
+        migrated++;
+      } catch (err) {
+        results.push({ id: row.id, title: row.title, status: 'failed', reason: err.message });
+        failed++;
+      }
+    }
+
+    return res.json({ success: true, dry, migrated, skipped, failed, total: rows.length, results });
+  } catch (err) {
+    console.error('[migrate-to-r2]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
