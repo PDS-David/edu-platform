@@ -33,16 +33,18 @@ function FileIcon({ type }) {
   return <File size={18} className="text-gray-400 shrink-0" />;
 }
 
-// Detect whether the file URL is a public absolute URL that Google Docs Viewer
-// can reach, vs a relative/local path served from this Render instance.
+// Detect whether the file URL is a public CDN URL that Google Docs Viewer
+// can reach. Render /uploads/ paths are served from the API server but are
+// NOT reachable by Google — exclude any *.onrender.com URL or /uploads/ path.
 function isPublicUrl(url) {
   try {
     const u = new URL(url);
-    // Render ephemeral disk paths are served under the same origin — Google
-    // can't reach them. Only treat it as public if it's a different CDN/R2 host.
-    return u.hostname !== window.location.hostname;
+    if (u.hostname.endsWith('.onrender.com')) return false;
+    if (u.pathname.startsWith('/uploads/')) return false;
+    if (u.pathname.startsWith('/api/')) return false;
+    return true;
   } catch {
-    return false; // relative path
+    return false;
   }
 }
 
