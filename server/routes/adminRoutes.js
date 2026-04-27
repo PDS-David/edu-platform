@@ -913,3 +913,46 @@ router.post('/migrate-to-r2', protect, adminOnly, async (req, res) => {
     return res.status(500).json({ success: false, error: err.message });
   }
 });
+
+// ── DELETE /api/admin/purge-all-resources ─────────────────────────────────────
+// Deletes ALL resources, their assignments (resource_assignments +
+// resource_user_assignments), and any R2 objects. Irreversible.
+// Protected: admin only. Requires header  X-Confirm: purge-all-resources
+router.delete('/purge-all-resources', protect, adminOnly, async (req, res) => {
+  if (req.headers['x-confirm'] !== 'purge-all-resources') {
+    return res.status(400).json({
+      success: false,
+      error: 'Missing confirmation header. Send X-Confirm: purge-all-resources'
+    });
+  }
+
+  try {
+    const r2 = require('../utils/r2Storage');
+
+    // Fetch all file_url values so we can delete from R2
+    const rows = await sequelize.query(
+      `SELECT id, file_url FROM resources WHERE file_url IS NOT NULL`,
+      { type: QueryTypes.SELECT }
+    );
+
+    // Best-effort R2 deletions (don't block on failures)
+    if (r2.isR2Enabled()) {
+      await Promise.allSettled(rows.map(r => r2.deleteByUrl(r.file_url)));
+    }
+
+    // Delete in FK-safe order
+    const [, raResult]  = await sequelize.query(`DELETE FROM resource_assignments`, { type: QueryTypes.DELETE });
+    const [, ruaResult] = await sequelize.query(`DELETE FROM resource_user_assignments`, { type: QueryTypes.DELETE });
+    const [, rResult]   = await sequelize.query(`DELETE FROM resources`, { type: QueryTypes.DELETE });
+
+    return res.json({
+      success: true,
+      message: 'All resources and assignments purged.',
+      r2_attempted: r2.isR2Enabled() ? rows.length : 0,
+      resources_deleted: rows.length,
+    });
+  } catch (err) {
+    console.error('[purge-all-resources]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
