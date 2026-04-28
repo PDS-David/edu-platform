@@ -96,15 +96,16 @@ app.use(helmet({
       defaultSrc:  ["'self'"],
       scriptSrc:   ["'self'"],
       styleSrc:    ["'self'", "'unsafe-inline'"],
-      imgSrc:      ["'self'", 'data:', 'blob:'],
+      imgSrc:      ["'self'", 'data:', 'blob:', 'https:'],
       connectSrc:  ["'self'"],
-      fontSrc:     ["'self'"],
+      fontSrc:     ["'self'", 'data:'],
       objectSrc:   ["'none'"],
-      frameSrc:    ["'none'"],
+      // Google Docs Viewer needed for office file previews (R2-hosted docx/pptx)
+      frameSrc:    ["'self'", 'https://docs.google.com'],
       upgradeInsecureRequests: [],
     },
   },
-  crossOriginResourcePolicy: { policy: 'same-site' },
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
 app.use(globalLimiter);
 
