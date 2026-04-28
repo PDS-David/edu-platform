@@ -1,34 +1,33 @@
 // server/middleware/subscriptionGuard.js
 //
-// Applied to: /api/questions and /api/ai routes only
-//
-// Daily limits:
-//   teacher / admin      — always unlimited, bypass immediately
-//   student (active sub) — unlimited
-//   student (free_trial) — 20 question attempts per 24 hours
-//   student (free)       — 5 question attempts per 24 hours
-//
-// Counts rows in practice_attempts for the last 24 hours.
-// On any database error the guard FAILS CLOSED (denies access) rather than
-// failing open, so a DB outage never accidentally unlocks free users.
-
-const { QueryTypes } = require('sequelize');
-const sequelize = require('../config/database');
+// MVP mode: pricing is not active. All authenticated users get unlimited access.
+// When pricing goes live, remove the MVP_FREE_ACCESS block below and uncomment
+// the full guard logic at the bottom of this file.
 
 module.exports = async (req, res, next) => {
+  // ── MVP: free access for everyone ────────────────────────────────────────
+  // Remove this block and restore the limit logic below when subscriptions go live.
+  if (!req.user) {
+    return res.status(401).json({ success: false, error: 'Not authenticated' });
+  }
+  return next();
+  // ── END MVP BLOCK ─────────────────────────────────────────────────────────
+
+  /* ── RESTORE THIS WHEN PRICING GOES LIVE ─────────────────────────────────
+
+  const { QueryTypes } = require('sequelize');
+  const sequelize = require('../config/database');
+
   try {
     if (!req.user) {
       return res.status(401).json({ success: false, error: 'Not authenticated' });
     }
 
-    if (['teacher', 'admin'].includes(req.user.role)) {
-      return next();
-    }
+    // Teachers and admins always bypass
+    if (['teacher', 'admin'].includes(req.user.role)) return next();
 
-    // Re-read from DB in case subscription changed since the JWT was issued
     const result = await sequelize.query(
-      `SELECT subscription_status, subscription_expires_at
-       FROM users WHERE id = :userId`,
+      `SELECT subscription_status, subscription_expires_at FROM users WHERE id = :userId`,
       { replacements: { userId: req.user.id }, type: QueryTypes.SELECT }
     );
 
@@ -38,39 +37,32 @@ module.exports = async (req, res, next) => {
 
     const user = result[0];
 
-    // Active paid subscription — unlimited access
+    // Active paid subscription — unlimited
     if (
       user.subscription_status === 'active' &&
       user.subscription_expires_at &&
       new Date(user.subscription_expires_at) > new Date()
-    ) {
-      return next();
-    }
+    ) return next();
 
-    // Active free trial — full unlimited access for 14 days
-    const isActiveTrial =
+    // Active free trial — unlimited for trial period
+    if (
       user.subscription_status === 'free_trial' &&
       user.subscription_expires_at &&
-      new Date(user.subscription_expires_at) > new Date();
+      new Date(user.subscription_expires_at) > new Date()
+    ) return next();
 
-    if (isActiveTrial) return next();
-
-    // Expired trial or plain free — 5 questions per day
+    // Free / expired — 5 questions per day
     const dailyLimit = 5;
-
     let attemptCount = 0;
     try {
       const countResult = await sequelize.query(
-        `SELECT COUNT(*)::INTEGER AS count
-         FROM practice_attempts
-         WHERE student_id = :userId
-           AND attempted_at > NOW() - INTERVAL '24 hours'`,
+        `SELECT COUNT(*)::INTEGER AS count FROM practice_attempts
+         WHERE student_id = :userId AND attempted_at > NOW() - INTERVAL '24 hours'`,
         { replacements: { userId: req.user.id }, type: QueryTypes.SELECT }
       );
       attemptCount = parseInt(countResult[0].count) || 0;
     } catch {
-      // practice_attempts table not yet created — allow access
-      return next();
+      return next(); // table not yet created — allow
     }
 
     if (attemptCount < dailyLimit) return next();
@@ -78,7 +70,7 @@ module.exports = async (req, res, next) => {
     return res.status(403).json({
       success: false,
       error: 'free_limit_reached',
-      message: `Your 14-day free trial has ended. Upgrade to continue learning.`,
+      message: 'Daily limit reached. Upgrade to continue learning.',
       attempts_used: attemptCount,
       attempts_allowed: dailyLimit,
       upgrade_url: '/pricing',
@@ -86,10 +78,11 @@ module.exports = async (req, res, next) => {
 
   } catch (err) {
     console.error('[subscriptionGuard] Error:', err.message);
-    // Fail closed — never grant access on a DB error
     return res.status(503).json({
       success: false,
-      error: 'Service temporarily unavailable. Please try again in a moment.',
+      error: 'Service temporarily unavailable. Please try again.',
     });
   }
+
+  ─────────────────────────────────────────────────────────────────────────── */
 };

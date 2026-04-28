@@ -439,16 +439,41 @@ Not recommended, but possible if the Render API is fine and only the Docker setu
 
 ---
 
-## 13. Storage Migration (R2 — Future)
+## 13. Cloudflare R2 Storage (Already Implemented)
 
-Currently file uploads are stored in a Docker named volume (`uploads_data`).  
-To migrate to Cloudflare R2:
+R2 is fully wired into the codebase. Set the five R2 env vars in `api.env` and new
+uploads go straight to R2 — no code changes needed.
 
-1. Uncomment the R2 variables in `api.env`
-2. The server already imports `@aws-sdk/client-s3` — wire upload endpoints to use the SDK
-3. Migrate existing files: `rclone copy local:/opt/aischoolonair/uploads r2:aischoolonair-uploads`
-4. Set `R2_PUBLIC_BASE_URL` so the frontend can access files via CDN URL
+| Variable | Where to get it |
+|---|---|
+| `R2_ACCOUNT_ID` | Cloudflare dashboard → right sidebar |
+| `R2_ACCESS_KEY_ID` | R2 → Manage R2 API Tokens → Create Account API token |
+| `R2_SECRET_ACCESS_KEY` | Same screen (shown once — copy immediately) |
+| `R2_BUCKET` | Name you give when creating the bucket |
+| `R2_PUBLIC_BASE_URL` | Bucket → Settings → Public Access → r2.dev URL |
+
+### Migrating existing local-disk files to R2
+
+If files were previously uploaded and stored in the Docker volume, run the
+one-time migration via the admin API (from your browser console while logged
+in as admin):
+
+```javascript
+// 1. Dry run first — see what would be migrated
+fetch('https://www.aischoolonair.ng/api/admin/migrate-to-r2?dry=true', {
+  method: 'POST',
+  headers: { Authorization: 'Bearer ' + localStorage.getItem('token') }
+}).then(r => r.json()).then(console.log)
+
+// 2. Run the real migration
+fetch('https://www.aischoolonair.ng/api/admin/migrate-to-r2', {
+  method: 'POST',
+  headers: { Authorization: 'Bearer ' + localStorage.getItem('token') }
+}).then(r => r.json()).then(console.log)
+```
+
+Files already on R2 (absolute https:// URLs) are skipped automatically — safe to re-run.
 
 ---
 
-*Last updated: 2025 — maintained by PDS-David*
+*Last updated: 2026 — maintained by PDS-David*

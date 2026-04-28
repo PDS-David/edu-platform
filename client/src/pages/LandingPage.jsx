@@ -83,7 +83,6 @@ export default function LandingPage() {
               <a href="#features"     className="hover:text-blue-600 transition-colors">Features</a>
               <a href="#subjects"     className="hover:text-blue-600 transition-colors">Subjects</a>
               <Link to="/past-papers" className="hover:text-blue-600 transition-colors">Past Papers</Link>
-              <Link to="/pricing"     className="hover:text-blue-600 transition-colors">Pricing</Link>
               <Link to="/login"       className="hover:text-blue-600 transition-colors">Login</Link>
               <Link to="/register" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-xl transition-colors text-sm">
                 Start Free
@@ -109,7 +108,6 @@ export default function LandingPage() {
             </a>
           ))}
           <Link to="/past-papers" onClick={() => setMenuOpen(false)} className="block text-sm font-medium text-gray-700 py-1">Past Papers</Link>
-          <Link to="/pricing"  onClick={() => setMenuOpen(false)} className="block text-sm font-medium text-gray-700 py-1">Pricing</Link>
           <Link to="/login"    onClick={() => setMenuOpen(false)} className="block text-sm font-medium text-gray-700 py-1">Login</Link>
           <Link to="/register" onClick={() => setMenuOpen(false)}
             className="block w-full text-center bg-blue-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm">
@@ -140,10 +138,10 @@ export default function LandingPage() {
                 className="flex items-center justify-center gap-2 bg-white text-[#1e3a8a] font-bold px-6 py-3 rounded-xl hover:bg-blue-50 transition-colors shadow-lg text-sm">
                 Start Free Today <ChevronRight size={16} />
               </Link>
-              <Link to="/pricing"
+              <a href="#features"
                 className="flex items-center justify-center gap-2 border-2 border-white/40 text-white font-semibold px-6 py-3 rounded-xl hover:bg-white/10 transition-colors text-sm">
-                View Pricing
-              </Link>
+                See Features
+              </a>
             </div>
             <p className="text-blue-300 text-xs">No credit card required · 5 free questions every day</p>
           </div>
@@ -331,66 +329,27 @@ export default function LandingPage() {
       </section>
 
       {/* ══════════════════════════════════════════════════════════════════════
-          6. PRICING PREVIEW
+          6. PRICING TEASER (MVP — pricing not yet live)
       ══════════════════════════════════════════════════════════════════════ */}
       <section className="bg-white py-16 px-4">
-        <div className="max-w-3xl mx-auto">
-          <p className="text-blue-600 text-xs font-bold uppercase tracking-widest text-center mb-2">Pricing</p>
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 text-center mb-10">
-            Simple, Transparent Pricing
+        <div className="max-w-xl mx-auto text-center">
+          <p className="text-blue-600 text-xs font-bold uppercase tracking-widest mb-2">Access</p>
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 mb-4">
+            Free During Launch
           </h2>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 max-w-lg mx-auto">
-
-            {/* Annual — featured */}
-            <div className="relative bg-[#1e3a8a] rounded-2xl overflow-hidden shadow-xl">
-              <div className="bg-amber-400 text-gray-900 text-[10px] font-black text-center py-1.5 tracking-wide uppercase">
-                 Save 75% — Most Popular
-              </div>
-              <div className="p-5 space-y-3">
-                <p className="text-white font-bold text-base">12 Months</p>
-                <div>
-                  <p className="text-white text-3xl font-extrabold">₦500<span className="text-sm font-medium text-blue-300">/month</span></p>
-                  <p className="text-blue-300 text-xs mt-0.5">Billed ₦6,000/year</p>
-                </div>
-                <ul className="space-y-1.5 text-blue-200 text-xs">
-                  {['All subjects','AI hints & explanations','Predicted grade','Progress tracker','Mock exams'].map(f => (
-                    <li key={f} className="flex items-center gap-1.5"><Check size={12} className="text-blue-400 shrink-0" />{f}</li>
-                  ))}
-                </ul>
-                <Link to="/register"
-                  className="block w-full text-center bg-white text-[#1e3a8a] font-bold py-2.5 rounded-xl hover:bg-blue-50 transition-colors text-sm mt-2">
-                  Get Started
-                </Link>
-              </div>
-            </div>
-
-            {/* Monthly */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-3">
-              <p className="text-gray-900 font-bold text-base">1 Month</p>
-              <div>
-                <p className="text-gray-900 text-3xl font-extrabold">₦2,000<span className="text-sm font-medium text-gray-400">/month</span></p>
-                <p className="text-gray-400 text-xs mt-0.5">Billed monthly</p>
-              </div>
-              <ul className="space-y-1.5 text-gray-600 text-xs">
-                {['All subjects','AI hints & explanations','Predicted grade','Progress tracker'].map(f => (
-                  <li key={f} className="flex items-center gap-1.5"><Check size={12} className="text-green-500 shrink-0" />{f}</li>
-                ))}
-              </ul>
-              <Link to="/register"
-                className="block w-full text-center border-2 border-blue-500 text-blue-600 font-bold py-2.5 rounded-xl hover:bg-blue-50 transition-colors text-sm mt-2">
-                Get Started
-              </Link>
-            </div>
-          </div>
-
-          <p className="text-center mt-6">
-            <Link to="/pricing" className="inline-flex items-center gap-1 text-blue-600 font-semibold text-sm hover:underline">
-              See full pricing &amp; plan details <ChevronRight size={14} />
-            </Link>
+          <p className="text-gray-500 text-sm mb-6 leading-relaxed">
+            AISchoolonair is currently free for all students during our launch period.
+            Create an account today and start practising — no payment required.
           </p>
+          <Link to="/register"
+            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-xl transition-colors text-sm shadow-md">
+            Start Free Today <ChevronRight size={15} />
+          </Link>
         </div>
       </section>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          TESTIMONIALS      </section>
 
       {/* ══════════════════════════════════════════════════════════════════════
           TESTIMONIALS
@@ -504,7 +463,7 @@ export default function LandingPage() {
           <div>
             <p className="text-white text-xs font-bold uppercase tracking-wider mb-3">Platform</p>
             <ul className="space-y-2">
-              {[['Past Papers', '/past-papers'], ['Subjects', '/subjects'], ['Pricing', '/pricing'], ['Register', '/register'], ['Login', '/login']].map(([l, h]) => (
+              {[['Past Papers', '/past-papers'], ['Subjects', '/subjects'], ['Register', '/register'], ['Login', '/login']].map(([l, h]) => (
                 <li key={l}><Link to={h} className="text-xs hover:text-white transition-colors">{l}</Link></li>
               ))}
             </ul>
