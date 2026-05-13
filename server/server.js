@@ -49,6 +49,10 @@ const corsAllowList = new Set(
     process.env.CLIENT_URL,
     process.env.PROD_CLIENT_URL,
     process.env.VITE_API_URL,
+    // Hard-coded safety net — if env vars are missing the site still works
+    'https://www.aischoolonair.ng',
+    'https://aischoolonair.ng',
+    'https://staging.aischoolonair.ng',
   ].filter(Boolean)
 );
 
