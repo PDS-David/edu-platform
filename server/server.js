@@ -218,7 +218,13 @@ if (fs.existsSync(clientDist)) {
 // ERROR HANDLER
 app.use((err, _req, res, _next) => {
   logger.error('Unhandled error', { error: err.message });
-  return error(res, { message: err.message || 'Server error' });
+  // Pass string (not object) — error() sets response.error = message
+  // Passing an object causes React error #31 when frontend renders err?.error
+  const statusCode = err.statusCode || err.status || 500;
+  return res.status(statusCode).json({
+    success: false,
+    error: err.message || 'Server error',
+  });
 });
 
 // SERVER START
