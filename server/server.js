@@ -210,47 +210,6 @@ app.get('/health', (_req, res) => {
   });
 });
 
-// ONE-TIME SETUP ENDPOINT — creates all tables via Sequelize sync
-// Protected by a secret token. Remove after first use.
-app.get('/setup-db', async (req, res) => {
-  const token = req.query.token;
-  if (token !== (process.env.SETUP_TOKEN || 'aischool-setup-2026')) {
-    return res.status(403).json({ error: 'Forbidden' });
-  }
-  try {
-    const sequelize = require('./config/database');
-    const path = require('path');
-    const modelsDir = path.join(__dirname, 'models');
-    // Models export factory functions: (sequelize) => sequelize.define(...)
-    // Must be called with the sequelize instance to register the model
-    const modelFiles = [
-      'User', 'ExamBoard', 'Subject', 'Topic', 'Subtopic',
-      'Question', 'Quiz', 'Resource', 'Video', 'PastPaper',
-      'Note', 'Concept', 'Course', 'Enrollment',
-      'SubtopicProgress', 'PracticeAttempt',
-      'AiChatSession', 'AiChatMessage',
-      'Notification', 'Payment',
-      'StudentExamType', 'TeacherSubject',
-    ];
-    const loaded = [];
-    modelFiles.forEach(name => {
-      try {
-        const factory = require(path.join(modelsDir, name + '.js'));
-        if (typeof factory === 'function') {
-          factory(sequelize); // call with sequelize instance to register
-          loaded.push(name);
-        }
-      } catch(e) { console.warn('model skip:', name, e.message.slice(0,80)); }
-    });
-    console.log('[setup-db] loaded models:', loaded.join(', '));
-    await sequelize.sync({ force: false, alter: false });
-    const tables = Object.keys(sequelize.models);
-    return res.json({ success: true, message: 'Tables created', models: tables, loaded });
-  } catch (err) {
-    console.error('[setup-db]', err.message);
-    return res.status(500).json({ success: false, error: err.message });
-  }
-});
 
 // SPA fallback
 if (fs.existsSync(clientDist)) {
