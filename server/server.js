@@ -212,9 +212,9 @@ app.get('/health', (_req, res) => {
 
 // ONE-TIME SETUP ENDPOINT — creates all tables via Sequelize sync
 // Protected by a secret token. Remove after first use.
-app.post('/setup-db', async (req, res) => {
-  const token = req.headers['x-setup-token'];
-  if (token !== process.env.SETUP_TOKEN && token !== 'aischool-setup-2026') {
+app.get('/setup-db', async (req, res) => {
+  const token = req.query.token;
+  if (token !== (process.env.SETUP_TOKEN || 'aischool-setup-2026')) {
     return res.status(403).json({ error: 'Forbidden' });
   }
   try {
