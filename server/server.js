@@ -219,8 +219,11 @@ app.get('/setup-db', async (req, res) => {
   }
   try {
     const sequelize = require('./config/database');
-    // Load models in dependency order (parents before children)
-    const modelOrder = [
+    const path = require('path');
+    const modelsDir = path.join(__dirname, 'models');
+    // Models export factory functions: (sequelize) => sequelize.define(...)
+    // Must be called with the sequelize instance to register the model
+    const modelFiles = [
       'User', 'ExamBoard', 'Subject', 'Topic', 'Subtopic',
       'Question', 'Quiz', 'Resource', 'Video', 'PastPaper',
       'Note', 'Concept', 'Course', 'Enrollment',
@@ -229,15 +232,20 @@ app.get('/setup-db', async (req, res) => {
       'Notification', 'Payment',
       'StudentExamType', 'TeacherSubject',
     ];
-    const path = require('path');
-    const modelsDir = path.join(__dirname, 'models');
-    modelOrder.forEach(name => {
-      try { require(path.join(modelsDir, name + '.js')); }
-      catch(e) { console.warn('model skip:', name, e.message.slice(0,60)); }
+    const loaded = [];
+    modelFiles.forEach(name => {
+      try {
+        const factory = require(path.join(modelsDir, name + '.js'));
+        if (typeof factory === 'function') {
+          factory(sequelize); // call with sequelize instance to register
+          loaded.push(name);
+        }
+      } catch(e) { console.warn('model skip:', name, e.message.slice(0,80)); }
     });
-    // Sync without alter first (safest — just creates missing tables)
+    console.log('[setup-db] loaded models:', loaded.join(', '));
     await sequelize.sync({ force: false, alter: false });
-    return res.json({ success: true, message: 'All tables created successfully' });
+    const tables = Object.keys(sequelize.models);
+    return res.json({ success: true, message: 'Tables created', models: tables, loaded });
   } catch (err) {
     console.error('[setup-db]', err.message);
     return res.status(500).json({ success: false, error: err.message });
