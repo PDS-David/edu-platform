@@ -210,6 +210,34 @@ app.get('/health', (_req, res) => {
   });
 });
 
+// ONE-TIME SETUP ENDPOINT — creates all tables via Sequelize sync
+// Protected by a secret token. Remove after first use.
+app.post('/setup-db', async (req, res) => {
+  const token = req.headers['x-setup-token'];
+  if (token !== process.env.SETUP_TOKEN && token !== 'aischool-setup-2026') {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  try {
+    const sequelize = require('./config/database');
+    const fs = require('fs');
+    const path = require('path');
+    const modelsDir = path.join(__dirname, 'models');
+    // Load every model file so Sequelize registers them all
+    fs.readdirSync(modelsDir)
+      .filter(f => f.endsWith('.js') && f !== 'associations.js')
+      .forEach(f => {
+        try { require(path.join(modelsDir, f)); } catch(e) { console.warn('model skip:', f, e.message); }
+      });
+    // Load associations after all models registered
+    try { require('./models/associations'); } catch(e) {}
+    await sequelize.sync({ alter: true });
+    return res.json({ success: true, message: 'All tables created/updated successfully' });
+  } catch (err) {
+    console.error('[setup-db]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // SPA fallback
 if (fs.existsSync(clientDist)) {
   app.get('*', (req, res) => {
