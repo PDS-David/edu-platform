@@ -219,19 +219,25 @@ app.get('/setup-db', async (req, res) => {
   }
   try {
     const sequelize = require('./config/database');
-    const fs = require('fs');
+    // Load models in dependency order (parents before children)
+    const modelOrder = [
+      'User', 'ExamBoard', 'Subject', 'Topic', 'Subtopic',
+      'Question', 'Quiz', 'Resource', 'Video', 'PastPaper',
+      'Note', 'Concept', 'Course', 'Enrollment',
+      'SubtopicProgress', 'PracticeAttempt',
+      'AiChatSession', 'AiChatMessage',
+      'Notification', 'Payment',
+      'StudentExamType', 'TeacherSubject',
+    ];
     const path = require('path');
     const modelsDir = path.join(__dirname, 'models');
-    // Load every model file so Sequelize registers them all
-    fs.readdirSync(modelsDir)
-      .filter(f => f.endsWith('.js') && f !== 'associations.js')
-      .forEach(f => {
-        try { require(path.join(modelsDir, f)); } catch(e) { console.warn('model skip:', f, e.message); }
-      });
-    // Load associations after all models registered
-    try { require('./models/associations'); } catch(e) {}
-    await sequelize.sync({ alter: true });
-    return res.json({ success: true, message: 'All tables created/updated successfully' });
+    modelOrder.forEach(name => {
+      try { require(path.join(modelsDir, name + '.js')); }
+      catch(e) { console.warn('model skip:', name, e.message.slice(0,60)); }
+    });
+    // Sync without alter first (safest — just creates missing tables)
+    await sequelize.sync({ force: false, alter: false });
+    return res.json({ success: true, message: 'All tables created successfully' });
   } catch (err) {
     console.error('[setup-db]', err.message);
     return res.status(500).json({ success: false, error: err.message });
