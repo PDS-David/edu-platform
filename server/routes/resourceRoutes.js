@@ -188,11 +188,13 @@ async function ensureResourceAssignments() {
     await sequelize.query(`
       CREATE INDEX IF NOT EXISTS idx_rua_resource_id ON resource_user_assignments(resource_id);
     `);
+    raEnsured = true;
   } catch (err) {
     console.error('[ensureResourceAssignments]', err.message);
+    // Do NOT set raEnsured = true on failure — allow retry on next request
+    // so transient DB errors (e.g. FK type mismatch mid-migration) self-heal
+    // once the migration completes.
   }
-
-  raEnsured = true;
 }
 
 /* ================================
