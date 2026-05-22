@@ -70,7 +70,9 @@ async function ensureExtraColumns() {
     // be extracted by AI and surfaced as quiz/practice questions to students.
     // Values: 'learning_material' | 'question_bank'
     `ALTER TABLE resources ADD COLUMN IF NOT EXISTS content_kind VARCHAR(32) DEFAULT 'learning_material'`,
-    `ALTER TABLE resources ADD COLUMN IF NOT EXISTS questions_extracted_at TIMESTAMPTZ`
+    `ALTER TABLE resources ADD COLUMN IF NOT EXISTS questions_extracted_at TIMESTAMPTZ`,
+    // push_type is used to categorise how a resource is delivered to students
+    `ALTER TABLE resources ADD COLUMN IF NOT EXISTS push_type VARCHAR(50) DEFAULT 'learning_material'`
   ];
 
   for (const sql of alters) {
@@ -109,10 +111,30 @@ async function ensureResourceAssignments() {
   if (raEnsured) return;
 
   try {
+    // ── MIGRATION: If resource_assignments.resource_id is INTEGER (wrong type
+    // from manual Supabase creation), drop and recreate both tables with UUID.
+    // This is safe because no real data is in them yet at this stage.
+    try {
+      const [cols] = await sequelize.query(
+        `SELECT data_type FROM information_schema.columns
+          WHERE table_name = 'resource_assignments'
+            AND column_name = 'resource_id'`,
+        { type: QueryTypes.SELECT }
+      );
+      if (cols && cols.data_type && cols.data_type.toLowerCase().includes('int')) {
+        console.log('[ensureResourceAssignments] Detected INTEGER resource_id — migrating to UUID...');
+        await sequelize.query(`DROP TABLE IF EXISTS resource_user_assignments CASCADE`);
+        await sequelize.query(`DROP TABLE IF EXISTS resource_assignments CASCADE`);
+        console.log('[ensureResourceAssignments] Dropped old tables, recreating with UUID...');
+      }
+    } catch (migErr) {
+      console.warn('[ensureResourceAssignments migration check]', migErr.message);
+    }
+
     await sequelize.query(`
       CREATE TABLE IF NOT EXISTS resource_assignments (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        resource_id INTEGER NOT NULL REFERENCES resources(id) ON DELETE CASCADE,
+        resource_id UUID NOT NULL REFERENCES resources(id) ON DELETE CASCADE,
         assigned_by UUID NOT NULL REFERENCES users(id),
         student_id UUID REFERENCES users(id) ON DELETE CASCADE,
         class_id UUID REFERENCES classes(id) ON DELETE CASCADE,
@@ -151,7 +173,7 @@ async function ensureResourceAssignments() {
     await sequelize.query(`
       CREATE TABLE IF NOT EXISTS resource_user_assignments (
         id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-        resource_id INTEGER     NOT NULL REFERENCES resources(id) ON DELETE CASCADE,
+        resource_id UUID        NOT NULL REFERENCES resources(id) ON DELETE CASCADE,
         user_id     UUID        NOT NULL REFERENCES users(id)     ON DELETE CASCADE,
         assigned_by UUID        REFERENCES users(id),
         push_type   VARCHAR(50) DEFAULT 'learning_material',
@@ -280,11 +302,11 @@ router.post(
             `INSERT INTO resources
                (title, resource_type, file_url, file_size_bytes,
                 original_filename, mime_type, is_staged, is_active,
-                uploaded_by, created_at, updated_at, uploaded_at)
+                uploaded_by, created_at, updated_at)
              VALUES
                (:title, :rtype, :fileUrl, :size,
                 :origName, :mime, true, true,
-                :uploadedBy, NOW(), NOW(), NOW())
+                :uploadedBy, NOW(), NOW())
              RETURNING id, title, resource_type, file_url,
                        file_size_bytes, original_filename, mime_type,
                        is_staged, is_active, created_at`,
