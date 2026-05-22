@@ -145,6 +145,27 @@ async function ensureResourceAssignments() {
       EXCEPTION WHEN duplicate_table OR duplicate_object THEN NULL;
       END $$;
     `);
+
+    // resource_user_assignments — individual user-level assignments
+    // (used alongside resource_assignments for direct per-user pushes)
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS resource_user_assignments (
+        id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+        resource_id INTEGER     NOT NULL REFERENCES resources(id) ON DELETE CASCADE,
+        user_id     UUID        NOT NULL REFERENCES users(id)     ON DELETE CASCADE,
+        assigned_by UUID        REFERENCES users(id),
+        push_type   VARCHAR(50) DEFAULT 'learning_material',
+        assigned_at TIMESTAMPTZ DEFAULT NOW(),
+        CONSTRAINT uq_rua_resource_user UNIQUE (resource_id, user_id, push_type)
+      );
+    `);
+
+    await sequelize.query(`
+      CREATE INDEX IF NOT EXISTS idx_rua_user_id     ON resource_user_assignments(user_id);
+    `);
+    await sequelize.query(`
+      CREATE INDEX IF NOT EXISTS idx_rua_resource_id ON resource_user_assignments(resource_id);
+    `);
   } catch (err) {
     console.error('[ensureResourceAssignments]', err.message);
   }
