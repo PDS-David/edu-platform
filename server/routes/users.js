@@ -57,7 +57,7 @@ router.get('/', protect, async (req, res) => {
       sequelize.query(
         `SELECT COUNT(*)::int AS total
          FROM users
-         WHERE (:role = '' OR role = :role)
+         WHERE (:role = '' OR role::text = :role)
            AND (:search = '' OR email ILIKE :search OR first_name ILIKE :search OR last_name ILIKE :search)`,
         {
           replacements: { role, search: `%${search}%` },
@@ -68,7 +68,7 @@ router.get('/', protect, async (req, res) => {
       sequelize.query(
         `SELECT id, email, first_name, last_name, role, is_active, created_at
          FROM users
-         WHERE (:role = '' OR role = :role)
+         WHERE (:role = '' OR role::text = :role)
            AND (:search = '' OR email ILIKE :search OR first_name ILIKE :search OR last_name ILIKE :search)
          ORDER BY created_at DESC
          LIMIT :limit OFFSET :offset`,
