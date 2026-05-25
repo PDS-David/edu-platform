@@ -37,16 +37,20 @@ router.get('/platform-stats', protect, adminOnly, async (req, res) => {
       FROM users
     `, { type: QueryTypes.SELECT });
 
-    // Question / attempt stats — use student_answers (has is_correct) joined to quiz_attempts
-    const [qRow] = await sequelize.query(`
-      SELECT
-        COUNT(*) FILTER (WHERE qa.created_at >= NOW() - INTERVAL '1 day')                    AS answered_today,
-        COUNT(*) FILTER (WHERE qa.created_at >= NOW() - INTERVAL '7 days')                   AS answered_this_week,
-        (SELECT COUNT(*) FROM questions
-          WHERE COALESCE(is_ai_generated, false) = true
-            AND COALESCE(status, 'pending') NOT IN ('approved','active'))::INTEGER            AS total_pending
-      FROM quiz_attempts qa
-    `, { type: QueryTypes.SELECT });
+    // Question / attempt stats (quiz_attempts may be empty initially)
+    let qRow = { answered_today: 0, answered_this_week: 0, total_pending: 0 };
+    try {
+      const [_qRow] = await sequelize.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE qa.created_at >= NOW() - INTERVAL '1 day')   AS answered_today,
+          COUNT(*) FILTER (WHERE qa.created_at >= NOW() - INTERVAL '7 days')  AS answered_this_week,
+          (SELECT COUNT(*) FROM questions
+            WHERE COALESCE(is_ai_generated, false) = true
+              AND COALESCE(status, 'pending') NOT IN ('approved','active'))::INTEGER AS total_pending
+        FROM quiz_attempts qa
+      `, { type: QueryTypes.SELECT });
+      if (_qRow) qRow = _qRow;
+    } catch (_) { /* quiz_attempts may not exist yet */ }
 
     // Revenue / subscription stats
     const [revRow] = await sequelize.query(`
@@ -58,34 +62,40 @@ router.get('/platform-stats', protect, adminOnly, async (req, res) => {
     `, { type: QueryTypes.SELECT });
 
     // Top subjects by avg accuracy (last 30 days)
-    // student_answers.is_correct joined via quiz_attempts → questions → subtopics → topics → subjects
-    const topSubjects = await sequelize.query(`
-      SELECT
-        s.name,
-        ROUND(AVG(CASE WHEN sa.is_correct THEN 100.0 ELSE 0.0 END), 1) AS avg_accuracy
-      FROM student_answers sa
-      JOIN quiz_attempts   qa ON qa.id = sa.attempt_id
-      JOIN questions        q ON q.id  = sa.question_id
-      LEFT JOIN subtopics  st ON st.id = q.subtopic_id
-      LEFT JOIN topics      t ON t.id  = st.topic_id
-      LEFT JOIN subjects    s ON s.id  = t.subject_id
-      WHERE qa.created_at >= NOW() - INTERVAL '30 days'
-        AND s.name IS NOT NULL
-      GROUP BY s.name
-      ORDER BY avg_accuracy DESC
-      LIMIT 5
-    `, { type: QueryTypes.SELECT });
+    // student_answers table may not yet exist — fall back to empty array safely
+    let topSubjects = [];
+    try {
+      topSubjects = await sequelize.query(`
+        SELECT
+          s.name,
+          ROUND(AVG(CASE WHEN sa.is_correct THEN 100.0 ELSE 0.0 END), 1) AS avg_accuracy
+        FROM student_answers sa
+        JOIN quiz_attempts   qa ON qa.id = sa.attempt_id
+        JOIN questions        q ON q.id  = sa.question_id
+        LEFT JOIN subtopics  st ON st.id = q.subtopic_id
+        LEFT JOIN topics      t ON t.id  = st.topic_id
+        LEFT JOIN subjects    s ON s.id  = t.subject_id
+        WHERE qa.created_at >= NOW() - INTERVAL '30 days'
+          AND s.name IS NOT NULL
+        GROUP BY s.name
+        ORDER BY avg_accuracy DESC
+        LIMIT 5
+      `, { type: QueryTypes.SELECT });
+    } catch (_) { /* table may not exist yet */ }
 
     // Daily activity — quiz attempt count per day for last 14 days
-    const dailyActivity = await sequelize.query(`
-      SELECT
-        TO_CHAR(created_at::DATE, 'YYYY-MM-DD') AS date,
-        COUNT(*)::INTEGER                        AS attempt_count
-      FROM quiz_attempts
-      WHERE created_at >= NOW() - INTERVAL '14 days'
-      GROUP BY created_at::DATE
-      ORDER BY created_at::DATE ASC
-    `, { type: QueryTypes.SELECT });
+    let dailyActivity = [];
+    try {
+      dailyActivity = await sequelize.query(`
+        SELECT
+          TO_CHAR(created_at::DATE, 'YYYY-MM-DD') AS date,
+          COUNT(*)::INTEGER                        AS attempt_count
+        FROM quiz_attempts
+        WHERE created_at >= NOW() - INTERVAL '14 days'
+        GROUP BY created_at::DATE
+        ORDER BY created_at::DATE ASC
+      `, { type: QueryTypes.SELECT });
+    } catch (_) { /* quiz_attempts may not exist yet */ }
 
     return res.json({
       success: true,
@@ -377,7 +387,7 @@ router.get('/teacher-assignments', protect, adminOnly, async (req, res) => {
        FROM teacher_subjects ts
        JOIN users       u  ON u.id  = ts.teacher_id
        JOIN subjects    s  ON s.id  = ts.subject_id
-       LEFT JOIN exam_boards eb ON eb.id = s.exam_board_id
+       LEFT JOIN exam_boards eb ON eb.id = s.exam_board_id::uuid
        WHERE ts.is_active = true
        ORDER BY u.last_name ASC, s.name ASC`,
       { type: QueryTypes.SELECT }

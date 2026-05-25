@@ -44,38 +44,41 @@ router.get('/', protect, async (req, res) => {
   }
 
   // Teachers may only query students
-  let role = req.query.role || '';
+  let role = (req.query.role || '').trim();
   if (isTeacher) role = 'student';
+  // Only filter by role when a valid non-empty value is given.
+  // Passing empty string to the enum column causes a Postgres type error.
+  const validRoles = ['student', 'teacher', 'admin'];
+  if (role && !validRoles.includes(role)) role = '';
 
   const search = req.query.search || '';
   const page   = Math.max(parseInt(req.query.page || '1'), 1);
   const limit  = Math.min(parseInt(req.query.limit || '50'), 200);
   const offset = (page - 1) * limit;
 
+  // Build role filter dynamically to avoid casting empty string to enum
+  const roleClause  = role ? `AND role::text = ${JSON.stringify(role)}` : '';
+
   try {
     const [countRows, users] = await Promise.all([
       sequelize.query(
         `SELECT COUNT(*)::int AS total
          FROM users
-         WHERE (:role = '' OR role::text = :role)
-           AND (:search = '' OR email ILIKE :search OR first_name ILIKE :search OR last_name ILIKE :search)`,
-        {
-          replacements: { role, search: `%${search}%` },
-          type: QueryTypes.SELECT,
-        }
+         WHERE 1=1
+           ${roleClause}
+           AND (${sequelize.escape(`%${search}%`)} = '%' OR email ILIKE ${sequelize.escape(`%${search}%`)} OR first_name ILIKE ${sequelize.escape(`%${search}%`)} OR last_name ILIKE ${sequelize.escape(`%${search}%`)})`,
+        { type: QueryTypes.SELECT }
       ),
 
       sequelize.query(
         `SELECT id, email, first_name, last_name, role, is_active, created_at
          FROM users
-         WHERE (:role = '' OR role::text = :role)
-           AND (:search = '' OR email ILIKE :search OR first_name ILIKE :search OR last_name ILIKE :search)
+         WHERE 1=1
+           ${roleClause}
+           AND (${sequelize.escape(`%${search}%`)} = '%' OR email ILIKE ${sequelize.escape(`%${search}%`)} OR first_name ILIKE ${sequelize.escape(`%${search}%`)} OR last_name ILIKE ${sequelize.escape(`%${search}%`)})
          ORDER BY created_at DESC
-         LIMIT :limit OFFSET :offset`,
-        {
-          replacements: { role, search: `%${search}%`, limit, offset },
-          type: QueryTypes.SELECT,
-        }
+         LIMIT ${limit} OFFSET ${offset}`,
+        { type: QueryTypes.SELECT }
       ),
     ]);
 
