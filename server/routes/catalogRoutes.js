@@ -69,6 +69,7 @@ router.get('/types', async (req, res) => {
          COUNT(s.id)::INTEGER AS subject_count
        FROM exam_boards eb
        LEFT JOIN subjects s ON s.exam_board_id = eb.id AND s.is_active = true
+       WHERE eb.is_active = true
        GROUP BY eb.id
        ORDER BY eb.display_order ASC NULLS LAST, eb.name ASC`,
       { type: QueryTypes.SELECT }
@@ -172,7 +173,7 @@ router.delete('/types/:id', protect, async (req, res) => {
   const { id } = req.params;
   try {
     const cnt = await sequelize.query(
-      `SELECT COUNT(*)::INTEGER AS cnt FROM subjects WHERE exam_board_id = :id::integer AND is_active = true`,
+      `SELECT COUNT(*)::INTEGER AS cnt FROM subjects WHERE exam_board_id = :id AND is_active = true`,
       { replacements: { id }, type: QueryTypes.SELECT }
     );
     if (cnt[0].cnt > 0) return res.status(409).json({ success: false, error: `${cnt[0].cnt} active subject(s) exist. Deactivate them first.` });
@@ -193,7 +194,7 @@ router.get('/types/:id/subjects', async (req, res) => {
     const subjects = await sequelize.query(
       `SELECT s.id, s.name, s.code, s.level, s.description, s.is_active, s.created_at
        FROM subjects s
-       WHERE s.exam_board_id = :id::integer
+       WHERE s.exam_board_id = :id
        ORDER BY s.name ASC`,
       { replacements: { id }, type: QueryTypes.SELECT }
     );
@@ -220,7 +221,7 @@ router.post('/types/:id/subjects', protect, async (req, res) => {
     if (!typeCheck.length) return res.status(404).json({ success: false, error: 'Exam type not found' });
 
     const dup = await sequelize.query(
-      `SELECT id FROM subjects WHERE UPPER(code) = UPPER(:code) AND exam_board_id = :typeId::integer`,
+      `SELECT id FROM subjects WHERE UPPER(code) = UPPER(:code) AND exam_board_id = :typeId`,
       { replacements: { code, typeId }, type: QueryTypes.SELECT }
     );
     if (dup.length) return res.status(409).json({ success: false, error: `Code '${code}' already exists in this exam type` });
