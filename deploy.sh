@@ -18,21 +18,29 @@ echo ""
 echo "▶ 1/4  Pulling latest code..."
 git pull origin main
 
-# 2. Run DB migrations inside the running API container
+# 2. Rebuild API + Web images
+#    NOTE: Migrations run AFTER the new container is up (step 3/4) so the
+#    running container always has the code that matches the schema.
+#    Running migrations against the *old* container before rebuild risks a
+#    schema/code mismatch if the old container crashes mid-migration.
 echo ""
-echo "▶ 2/4  Running DB migrations..."
-docker cp server/scripts/run_complete_migration.js aischool_api:/tmp/run_complete_migration.js
-docker exec aischool_api node /tmp/run_complete_migration.js
-
-# 3. Rebuild API + Web images
-echo ""
-echo "▶ 3/4  Building images..."
+echo "▶ 2/4  Building images..."
 docker compose build api web
 
-# 4. Restart with zero downtime (Caddy stays up)
+# 3. Restart with zero downtime (Caddy stays up)
 echo ""
-echo "▶ 4/4  Restarting services..."
+echo "▶ 3/4  Restarting services..."
 docker compose up -d --no-deps api web
+
+# Give the new container time to start and connect to the DB before running migrations
+echo "  Waiting 15s for containers to be ready..."
+sleep 15
+
+# 4. Run DB migrations inside the NEW running API container
+echo ""
+echo "▶ 4/4  Running DB migrations..."
+docker cp server/scripts/run_complete_migration.js aischool_api:/tmp/run_complete_migration.js
+docker exec aischool_api node /tmp/run_complete_migration.js
 
 echo ""
 echo "═══════════════════════════════════════════════════"

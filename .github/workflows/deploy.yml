@@ -1,0 +1,47 @@
+# .github/workflows/deploy.yml
+# ─────────────────────────────────────────────────────────────────────────────
+# Continuous Deployment — triggers on every push to main.
+# Connects to the Hetzner CX23 server via SSH and runs deploy.sh.
+#
+# Required GitHub Secrets (set in repo → Settings → Secrets → Actions):
+#   DEPLOY_HOST    — server IP, e.g. 178.104.51.118
+#   DEPLOY_USER    — SSH user, e.g. root
+#   DEPLOY_KEY     — private SSH key (generate with: ssh-keygen -t ed25519)
+#                    The matching public key must be in ~/.ssh/authorized_keys on server
+#   DEPLOY_PATH    — absolute path to repo on server, e.g. /opt/aischoolonair
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:  # allow manual trigger from GitHub Actions UI
+
+jobs:
+  deploy:
+    name: SSH Deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout (for reference only — actual code pulled on server)
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          port: 22
+          timeout: 600s
+          script: |
+            set -e
+            echo "── Deploying AISchoolonair ──────────────────────"
+            echo "  Server: $(hostname)"
+            echo "  Time:   $(date -u)"
+            echo "─────────────────────────────────────────────────"
+            bash ${{ secrets.DEPLOY_PATH }}/deploy.sh
+            echo "─────────────────────────────────────────────────"
+            echo "  ✅ Deploy complete"
