@@ -37,11 +37,9 @@ echo "  Waiting 15s for containers to be ready..."
 sleep 15
 
 # 4. Run DB migrations inside the NEW running API container
-# Run from /app (where node_modules lives), not /tmp
 echo ""
 echo "▶ 4/4  Running DB migrations..."
-docker cp server/scripts/run_complete_migration.js aischool_api:/app/scripts/run_complete_migration.js
-docker exec -w /app aischool_api node scripts/run_complete_migration.js
+docker exec -i aischool_api node - < server/scripts/run_complete_migration.js
 
 echo ""
 echo "═══════════════════════════════════════════════════"

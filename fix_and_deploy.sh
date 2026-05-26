@@ -42,11 +42,10 @@ else
 fi
 
 # Step 3: Run DB migrations on the currently running container
-# Copy to /app/scripts (where node_modules is accessible) not /tmp
+# Use docker exec with pipe — avoids file path issues entirely
 echo ""
 echo "▶ [3/5] Running database migrations..."
-docker cp server/scripts/run_complete_migration.js aischool_api:/app/scripts/run_complete_migration.js
-docker exec -w /app aischool_api node scripts/run_complete_migration.js
+docker exec -i aischool_api node - < server/scripts/run_complete_migration.js
 echo "✅ Migrations complete"
 
 # Step 4: Build and restart (from correct directory)
