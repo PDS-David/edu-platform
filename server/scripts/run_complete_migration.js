@@ -144,7 +144,7 @@ async function run() {
       ADD COLUMN IF NOT EXISTS ai_generation_source VARCHAR(100),
       ADD COLUMN IF NOT EXISTS concept_hint         TEXT,
       ADD COLUMN IF NOT EXISTS hints                JSONB,
-      ADD COLUMN IF NOT EXISTS exam_board_id        UUID`);
+      ADD COLUMN IF NOT EXISTS exam_board_id        INTEGER REFERENCES exam_boards(id) ON DELETE SET NULL`);
 
   await exec('questions: indexes', `
     CREATE INDEX IF NOT EXISTS idx_questions_status     ON questions(status);
@@ -235,7 +235,7 @@ async function run() {
       student_id    UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       subtopic_id   INTEGER     REFERENCES subtopics(id) ON DELETE SET NULL,
       subject_id    INTEGER     REFERENCES subjects(id)  ON DELETE SET NULL,
-      exam_board_id UUID,
+      exam_board_id INTEGER REFERENCES exam_boards(id) ON DELETE SET NULL,
       paper_type    VARCHAR(50),
       total_score   INTEGER     NOT NULL DEFAULT 0,
       max_score     INTEGER     NOT NULL DEFAULT 0,
@@ -387,7 +387,7 @@ async function run() {
       id               UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
       subject_id       INTEGER      NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
       teacher_id       UUID         NOT NULL REFERENCES users(id)    ON DELETE CASCADE,
-      exam_board_id    UUID,
+      exam_board_id    INTEGER REFERENCES exam_boards(id) ON DELETE SET NULL,
       title            VARCHAR(255) NOT NULL,
       description      TEXT,
       difficulty_level VARCHAR(20)  DEFAULT 'intermediate',
@@ -557,7 +557,7 @@ async function run() {
       id            SERIAL      PRIMARY KEY,
       teacher_id    UUID        NOT NULL REFERENCES users(id)    ON DELETE CASCADE,
       subject_id    INTEGER     NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
-      exam_board_id UUID,
+      exam_board_id INTEGER REFERENCES exam_boards(id) ON DELETE SET NULL,
       assigned_by   UUID        REFERENCES users(id) ON DELETE SET NULL,
       is_active     BOOLEAN     NOT NULL DEFAULT true,
       assigned_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -641,18 +641,19 @@ async function run() {
     CREATE INDEX IF NOT EXISTS idx_rua_uid ON resource_user_assignments(user_id);
     CREATE INDEX IF NOT EXISTS idx_rua_rid ON resource_user_assignments(resource_id)`],
 
-    ['student_exam_types (UUID)', `
+    ['student_exam_types (INTEGER exam_board_id)', `
       DO $$ DECLARE col_type TEXT; BEGIN
         SELECT data_type INTO col_type FROM information_schema.columns
         WHERE table_name='student_exam_types' AND column_name='exam_board_id';
-        IF col_type = 'integer' THEN
+        -- Drop and recreate ONLY if column was wrongly created as uuid
+        IF col_type = 'uuid' THEN
           DROP TABLE IF EXISTS student_exam_types CASCADE;
         END IF;
       EXCEPTION WHEN others THEN NULL; END $$;
       CREATE TABLE IF NOT EXISTS student_exam_types (
         id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
         student_id      UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        exam_board_id   UUID        NOT NULL,
+        exam_board_id   INTEGER     NOT NULL REFERENCES exam_boards(id) ON DELETE CASCADE,
         subscription_id UUID,
         granted_at      TIMESTAMPTZ DEFAULT NOW(),
         expires_at      TIMESTAMPTZ,
