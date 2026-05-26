@@ -60,7 +60,7 @@ echo "  ✅  Web image rebuilt"
 # ── STEP 5: Restart services ──────────────────────────────────────────────────
 echo ""
 echo "▶ 5/5  Restarting containers..."
-docker compose up -d --no-deps api web
+docker compose up -d --no-deps --force-recreate api web
 echo "  Waiting 20s for containers to be ready..."
 sleep 20
 
@@ -86,7 +86,19 @@ fi
 
 echo ""
 echo "  📋  Last 5 API log lines:"
-docker logs aischool_api --tail=5
+docker logs aischool_api --tail=8
+
+echo ""
+# Check specifically for the aiChatRoute warning
+if docker logs aischool_api 2>&1 | grep -q "aiChatRoute"; then
+  echo "  ⚠️  aiChatRoute still not loading — check: docker logs aischool_api 2>&1 | grep -i 'chat\|personality\|orchestr'"
+else
+  echo "  ✅  aiChatRoute loaded successfully — no warnings"
+fi
+
+# Check web container health
+WEB_HEALTH=$(docker inspect aischool_web --format='{{.State.Health.Status}}' 2>/dev/null || echo "unknown")
+echo "  📋  Web container health: $WEB_HEALTH"
 echo ""
 echo "  ✅  Done! https://www.aischoolonair.ng"
 echo ""
