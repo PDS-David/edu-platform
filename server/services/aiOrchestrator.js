@@ -20,7 +20,16 @@ const {
 // LLM CLIENTS
 // =========================================================================
 
-const anthropic = new Anthropic();
+// Lazy Anthropic client — only instantiated on first use so a missing
+// ANTHROPIC_API_KEY does not crash the module at require-time.
+let _anthropic = null;
+function getAnthropic() {
+  if (!_anthropic) {
+    if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not configured');
+    _anthropic = new Anthropic();
+  }
+  return _anthropic;
+}
 const CLAUDE_INTENT_MODEL = 'claude-haiku-4-5-20251001';
 
 // v2: callLLM now routes through services/ai.js central hub.
@@ -53,7 +62,8 @@ function detectIntentFallback(message) {
 
 async function detectIntent(message, context = {}) {
   try {
-    const response = await anthropic.messages.create({
+    const client = getAnthropic();
+    const response = await client.messages.create({
       model: CLAUDE_INTENT_MODEL,
       max_tokens: 20,
       system: 'Return only the intent name.',

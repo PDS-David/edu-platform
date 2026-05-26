@@ -376,11 +376,14 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
 // ─────────────────────────────────────────────
 router.get('/teachers', protect, adminOnly, async (req, res) => {
   try {
+    // Cast role to text to handle both enum (enum_users_role) and varchar role columns.
+    // Filter only our application users (first_name IS NOT NULL excludes Supabase auth rows).
     const rows = await sequelize.query(
       `SELECT id, email, first_name, last_name,
               COALESCE(is_active, true) AS is_active, created_at
        FROM users
        WHERE role::text = 'teacher'
+         AND first_name IS NOT NULL
          AND COALESCE(is_active, true) = true
        ORDER BY last_name ASC, first_name ASC`,
       { type: QueryTypes.SELECT }
