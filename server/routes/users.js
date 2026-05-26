@@ -57,12 +57,16 @@ router.get('/', protect, async (req, res) => {
   // We inject the literal string (from a strict allowlist) rather than a
   // replacement because Postgres won't cast a $1 placeholder to an enum.
   const roleClause = role ? `AND role::text = '${role}'` : '';
+  // Search clause: built conditionally in JS — avoids passing a JS boolean
+  // as a SQL parameter (Sequelize maps it to a string 'true'/'false' which
+  // Postgres may not short-circuit correctly as a boolean in a WHERE clause).
+  const searchClause = search
+    ? `AND (email ILIKE :searchLike OR first_name ILIKE :searchLike OR last_name ILIKE :searchLike)`
+    : '';
 
   try {
     const searchLike = search ? '%' + search + '%' : '%';
-    const noSearch   = !search;
-
-    const replacements = { search, searchLike };
+    const replacements = { searchLike };
 
     const [countRows, users] = await Promise.all([
       sequelize.query(
@@ -70,28 +74,18 @@ router.get('/', protect, async (req, res) => {
          FROM users
          WHERE 1=1
            ${roleClause}
-           AND (
-             :noSearch
-             OR email      ILIKE :searchLike
-             OR first_name ILIKE :searchLike
-             OR last_name  ILIKE :searchLike
-           )`,
-        { replacements: { ...replacements, noSearch }, type: QueryTypes.SELECT }
+           ${searchClause}`,
+        { replacements, type: QueryTypes.SELECT }
       ),
       sequelize.query(
         `SELECT id, email, first_name, last_name, role, is_active, created_at
          FROM users
          WHERE 1=1
            ${roleClause}
-           AND (
-             :noSearch
-             OR email      ILIKE :searchLike
-             OR first_name ILIKE :searchLike
-             OR last_name  ILIKE :searchLike
-           )
+           ${searchClause}
          ORDER BY created_at DESC
          LIMIT :limit OFFSET :offset`,
-        { replacements: { ...replacements, noSearch, limit, offset }, type: QueryTypes.SELECT }
+        { replacements: { ...replacements, limit, offset }, type: QueryTypes.SELECT }
       ),
     ]);
 

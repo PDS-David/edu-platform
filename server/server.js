@@ -161,6 +161,10 @@ const courseRoutes = safeRequire('./routes/courses');
 const curriculumRoutes = safeRequire('./routes/curriculumRoutes');
 const replayRoutes = safeRequire('./routes/eventReplayRoutes');
 const dashboardRoutes = safeRequire('./routes/dashboardRoutes');
+const aiQuestionGenRoutes = safeRequire('./routes/aiQuestionGenerationRoutes');
+const engineValidationRoutes = safeRequire('./routes/engineValidationRoutes');
+const examIntelligenceRoutes = safeRequire('./routes/examIntelligenceRoutes');
+const explanationRoutes = safeRequire('./routes/explanationRoute');
 
 // MOUNT ROUTES
 if (authRoutes) app.use('/api/auth', authRoutes);
@@ -200,6 +204,10 @@ if (recommendationRoutes) app.use('/api/recommendations', protect, recommendatio
 if (sessionRoutes) app.use('/api/sessions', protect, sessionRoutes);
 if (dashboardRoutes) app.use('/api/dashboard', protect, dashboardRoutes);
 if (replayRoutes) app.use('/api/replay', protect, replayRoutes);
+if (aiQuestionGenRoutes) app.use('/api/ai-question-gen', protect, aiQuestionGenRoutes);
+if (engineValidationRoutes) app.use('/api/engine', protect, engineValidationRoutes);
+if (examIntelligenceRoutes) app.use('/api/exam-intelligence', protect, examIntelligenceRoutes);
+if (explanationRoutes) app.use('/api/explanations', protect, explanationRoutes);
 
 // HEALTH
 app.get('/', (_req, res) => {
