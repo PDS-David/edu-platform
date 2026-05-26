@@ -74,12 +74,14 @@ router.get('/topics', protect, teacherOnly, async (req, res) => {
   if (!subject_id) return res.status(400).json({ success: false, error: 'subject_id is required' });
   try {
     const rows = await sequelize.query(
-      `SELECT t.id, t.name, t.description, t.order_index,
+      `SELECT t.id,
+              COALESCE(t.name, t.title) AS name,
+              t.description, t.order_index,
               COUNT(st.id)::INTEGER AS subtopic_count
        FROM topics t
        LEFT JOIN subtopics st ON st.topic_id = t.id AND st.is_active = true
-       WHERE t.subject_id = :subjectId AND t.is_active = true
-       GROUP BY t.id ORDER BY t.order_index ASC NULLS LAST, t.name ASC`,
+       WHERE t.subject_id = :subjectId AND (t.is_active IS NULL OR t.is_active = true)
+       GROUP BY t.id ORDER BY t.order_index ASC NULLS LAST, COALESCE(t.name, t.title) ASC`,
       { replacements: { subjectId: subject_id }, type: QueryTypes.SELECT }
     );
     return res.json({ success: true, data: rows });
@@ -94,10 +96,12 @@ router.post('/topics', protect, teacherOnly, async (req, res) => {
   const { subject_id, name, description, order_index = 0 } = req.body;
   if (!subject_id || !name?.trim()) return res.status(400).json({ success: false, error: 'subject_id and name are required' });
   try {
+    // Ensure title column exists (safe guard — migration may not have run yet)
+    await sequelize.query(`ALTER TABLE topics ADD COLUMN IF NOT EXISTS title VARCHAR(255)`, { type: QueryTypes.RAW }).catch(() => {});
     const rows = await sequelize.query(
-      `INSERT INTO topics (subject_id, name, description, order_index, is_active, created_at, updated_at)
-       VALUES (:subjectId, :name, :description, :orderIndex, true, NOW(), NOW())
-       RETURNING id, name, description, order_index`,
+      `INSERT INTO topics (subject_id, name, title, description, order_index, is_active, created_at, updated_at)
+       VALUES (:subjectId, :name, :name, :description, :orderIndex, true, NOW(), NOW())
+       RETURNING id, name, title, description, order_index`,
       {
         replacements: { subjectId: subject_id, name: name.trim(), description: description || null, orderIndex: parseInt(order_index) || 0 },
         type: QueryTypes.SELECT,

@@ -367,6 +367,28 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────
+// LIST TEACHERS (for modal dropdowns)
+// Uses role::text cast to avoid enum-not-found errors
+// ─────────────────────────────────────────────
+router.get('/teachers', protect, adminOnly, async (req, res) => {
+  try {
+    const rows = await sequelize.query(
+      `SELECT id, email, first_name, last_name,
+              COALESCE(is_active, true) AS is_active, created_at
+       FROM users
+       WHERE role::text = 'teacher'
+         AND COALESCE(is_active, true) = true
+       ORDER BY last_name ASC, first_name ASC`,
+      { type: QueryTypes.SELECT }
+    );
+    return success(res, rows);
+  } catch (err) {
+    console.error('[GET /admin/teachers]', err.message);
+    return error(res, 'Failed to fetch teachers');
+  }
+});
+
+// ─────────────────────────────────────────────
 // TEACHER ASSIGNMENTS
 // ─────────────────────────────────────────────
 router.get('/teacher-assignments', protect, adminOnly, async (req, res) => {

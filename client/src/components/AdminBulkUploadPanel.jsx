@@ -839,13 +839,23 @@ export default function AdminBulkUploadPanel() {
   // ── After metadata saved ──────────────────────────────────────────────────────
   const handleMetaSaved = (fileId) => {
     setAssigningMeta(null);
-    setStaged(prev => prev.filter(f => f.id !== fileId));
+    // Mark the file as no longer staged in local state (metadata is saved,
+    // is_staged=false on server) but keep it in the list so the admin can
+    // immediately open the Students form without it disappearing.
+    setStaged(prev => prev.map(f =>
+      f.id === fileId ? { ...f, is_staged: false, _justPublished: true } : f
+    ));
+    setAssigningUsers(fileId);
+    showToast('✅ Metadata saved — now assign it to students below.', 'success');
   };
 
   // ── After users assigned ──────────────────────────────────────────────────────
   const handleUsersDone = (fileId) => {
     setAssigningUsers(null);
-    // File stays in staged until metadata is also set — just close the form
+    // Now fully done — remove from staging tray and reload to get clean state
+    setStaged(prev => prev.filter(f => f.id !== fileId));
+    // Reload to pick up any other changes
+    loadStaged();
   };
 
   // ── MIME guesser from filename extension ─────────────────────────────────────
@@ -1002,8 +1012,15 @@ export default function AdminBulkUploadPanel() {
                       )}
                     </div>
                   </div>
-                  <StatusBadge staged={true} />
+                  <StatusBadge staged={file.is_staged !== false} />
+                  {file._justPublished && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                      ✓ Ready to push
+                    </span>
+                  )}
                   <div className="flex items-center gap-1.5 shrink-0">
+                    {/* Only show Assign button if not yet published */}
+                    {!file._justPublished && (
                     <button
                       onClick={() => {
                         setAssigningMeta(assigningMeta === file.id ? null : file.id);
@@ -1017,8 +1034,16 @@ export default function AdminBulkUploadPanel() {
                       <Tag size={12} />
                       {assigningMeta === file.id ? 'Cancel' : 'Assign'}
                     </button>
+                    )}
                     <button
                       onClick={() => {
+                        // If no metadata yet, open MetaForm first — server will block assign-users otherwise
+                        if (!file.subject_id && !file.topic_id && !file._justPublished) {
+                          setAssigningMeta(assigningMeta === file.id ? null : file.id);
+                          setAssigningUsers(null);
+                          showToast('Assign subject/topic metadata first, then push to students.', 'info');
+                          return;
+                        }
                         setAssigningUsers(assigningUsers === file.id ? null : file.id);
                         setAssigningMeta(null);
                       }}
