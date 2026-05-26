@@ -78,6 +78,41 @@ const migrations = [
   `ALTER TABLE resources ADD COLUMN IF NOT EXISTS hls_path     TEXT`,
   `ALTER TABLE resources ADD COLUMN IF NOT EXISTS content_url  TEXT`,
 
+  // 5b. topics table — MUST exist before resources FK below
+  `CREATE TABLE IF NOT EXISTS topics (
+    id          SERIAL       PRIMARY KEY,
+    subject_id  INTEGER      REFERENCES subjects(id) ON DELETE CASCADE,
+    name        VARCHAR(255) NOT NULL,
+    title       VARCHAR(255),
+    description TEXT,
+    order_index INTEGER      NOT NULL DEFAULT 0,
+    is_active   BOOLEAN      NOT NULL DEFAULT true,
+    created_by  UUID         REFERENCES users(id) ON DELETE SET NULL,
+    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_topics_subject_id ON topics(subject_id)`,
+  `ALTER TABLE topics ADD COLUMN IF NOT EXISTS title VARCHAR(255)`,
+  `ALTER TABLE topics ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id) ON DELETE SET NULL`,
+
+  // 5c. subtopics table — MUST exist before resources FK below
+  `CREATE TABLE IF NOT EXISTS subtopics (
+    id          SERIAL       PRIMARY KEY,
+    topic_id    INTEGER      REFERENCES topics(id) ON DELETE CASCADE,
+    subject_id  INTEGER      REFERENCES subjects(id) ON DELETE SET NULL,
+    name        VARCHAR(255) NOT NULL,
+    description TEXT,
+    content     TEXT,
+    order_index INTEGER      NOT NULL DEFAULT 0,
+    is_active   BOOLEAN      NOT NULL DEFAULT true,
+    created_by  UUID         REFERENCES users(id) ON DELETE SET NULL,
+    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_subtopics_topic_id   ON subtopics(topic_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_subtopics_subject_id ON subtopics(subject_id)`,
+  `ALTER TABLE subtopics ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id) ON DELETE SET NULL`,
+
   // 6. resources FK columns (safe — only adds if missing)
   `ALTER TABLE resources ADD COLUMN IF NOT EXISTS topic_id    INTEGER REFERENCES topics(id)    ON DELETE SET NULL`,
   `ALTER TABLE resources ADD COLUMN IF NOT EXISTS subtopic_id INTEGER REFERENCES subtopics(id) ON DELETE SET NULL`,
