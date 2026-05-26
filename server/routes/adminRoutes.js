@@ -26,14 +26,14 @@ const adminOnly = (req, res, next) => {
 // ─────────────────────────────────────────────
 router.get('/platform-stats', protect, adminOnly, async (req, res) => {
   try {
-    // User stats
+    // User stats — role::text cast avoids enum comparison errors on some PG versions
     const [userRow] = await sequelize.query(`
       SELECT
-        COUNT(*) FILTER (WHERE role = 'student')                                              AS students,
-        COUNT(*) FILTER (WHERE role = 'student'
-                           AND last_login >= NOW() - INTERVAL '1 day')                        AS active_today,
-        COUNT(*) FILTER (WHERE role = 'student'
-                           AND created_at >= NOW() - INTERVAL '7 days')                       AS new_this_week
+        COUNT(*) FILTER (WHERE role::text = 'student')                                              AS students,
+        COUNT(*) FILTER (WHERE role::text = 'student'
+                           AND COALESCE(last_login, created_at) >= NOW() - INTERVAL '1 day')        AS active_today,
+        COUNT(*) FILTER (WHERE role::text = 'student'
+                           AND created_at >= NOW() - INTERVAL '7 days')                             AS new_this_week
       FROM users
     `, { type: QueryTypes.SELECT });
 
@@ -53,13 +53,17 @@ router.get('/platform-stats', protect, adminOnly, async (req, res) => {
     } catch (_) { /* quiz_attempts may not exist yet */ }
 
     // Revenue / subscription stats
-    const [revRow] = await sequelize.query(`
-      SELECT
-        COUNT(*) FILTER (WHERE subscription_status = 'active')                               AS total_active_subs,
-        COUNT(*) FILTER (WHERE subscription_status = 'active'
-                           AND created_at >= NOW() - INTERVAL '30 days')                     AS new_subs_this_month
-      FROM users
-    `, { type: QueryTypes.SELECT });
+    let revRow = { total_active_subs: 0, new_subs_this_month: 0 };
+    try {
+      const [_revRow] = await sequelize.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE subscription_status::text = 'active')                               AS total_active_subs,
+          COUNT(*) FILTER (WHERE subscription_status::text = 'active'
+                             AND created_at >= NOW() - INTERVAL '30 days')                           AS new_subs_this_month
+        FROM users
+      `, { type: QueryTypes.SELECT });
+      if (_revRow) revRow = _revRow;
+    } catch (_) { /* subscription_status column may not exist */ }
 
     // Top subjects by avg accuracy (last 30 days)
     // student_answers table may not yet exist — fall back to empty array safely
