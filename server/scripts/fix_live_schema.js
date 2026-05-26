@@ -18,8 +18,17 @@ const pool = new Pool({
 });
 
 const migrations = [
-  // 1. subjects table
-  `ALTER TABLE subjects ADD COLUMN IF NOT EXISTS exam_board_id UUID REFERENCES exam_boards(id) ON DELETE SET NULL`,
+  // 1. subjects table — exam_board_id must be INTEGER (exam_boards.id is SERIAL int)
+  `DO $$ DECLARE col_type TEXT; BEGIN
+    SELECT data_type INTO col_type FROM information_schema.columns
+    WHERE table_name='subjects' AND column_name='exam_board_id';
+    IF col_type IS NULL THEN
+      ALTER TABLE subjects ADD COLUMN exam_board_id INTEGER REFERENCES exam_boards(id) ON DELETE SET NULL;
+    ELSIF col_type = 'uuid' THEN
+      ALTER TABLE subjects DROP COLUMN exam_board_id;
+      ALTER TABLE subjects ADD COLUMN exam_board_id INTEGER REFERENCES exam_boards(id) ON DELETE SET NULL;
+    END IF;
+  EXCEPTION WHEN others THEN NULL; END $$`,
   `ALTER TABLE subjects ADD COLUMN IF NOT EXISTS exam_board_code VARCHAR(20)`,
   `ALTER TABLE subjects ADD COLUMN IF NOT EXISTS icon_emoji VARCHAR(10)`,
   `ALTER TABLE subjects ADD COLUMN IF NOT EXISTS color VARCHAR(20)`,
