@@ -48,11 +48,22 @@ async function run() {
     EXCEPTION WHEN others THEN NULL; END $$`);
 
   // ── COLUMN PATCHES ────────────────────────────────────────────────────────
-  await exec('topics: add title, created_by', `
+  await exec('topics: add title, subject_id, name, is_active, created_by', `
     ALTER TABLE topics
       ADD COLUMN IF NOT EXISTS title      VARCHAR(255),
-      ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id) ON DELETE SET NULL`);
-  await exec('topics: backfill title from name', `UPDATE topics SET title=name WHERE title IS NULL`);
+      ADD COLUMN IF NOT EXISTS name       VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS subject_id INTEGER REFERENCES subjects(id) ON DELETE SET NULL,
+      ADD COLUMN IF NOT EXISTS is_active  BOOLEAN NOT NULL DEFAULT true,
+      ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ`);
+  await exec('topics: backfill title from name and vice versa', `
+    UPDATE topics SET title = name  WHERE title IS NULL AND name  IS NOT NULL;
+    UPDATE topics SET name  = title WHERE name  IS NULL AND title IS NOT NULL`);
+  await exec('topics: backfill subject_id from courses join', `
+    UPDATE topics t
+    SET subject_id = c.subject_id
+    FROM courses c
+    WHERE t.course_id = c.id AND t.subject_id IS NULL`);
 
   await exec('subtopics: add created_by', `
     ALTER TABLE subtopics ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id) ON DELETE SET NULL`);
