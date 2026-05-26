@@ -113,8 +113,8 @@ app.use(helmet({
 }));
 app.use(globalLimiter);
 
-app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 app.use(requestLogger);
 
 // DB
@@ -148,6 +148,7 @@ const notesRoutes = safeRequire('./routes/notesRoutes');
 const videosRoutes = safeRequire('./routes/videosRoutes');
 const examBoardRoutes = safeRequire('./routes/examBoardRoutes');
 const aiRoutes = safeRequire('./routes/aiRoutes');
+const aiChatRoute = safeRequire('./routes/aiChatRoute');
 const conceptRoutes = safeRequire('./routes/conceptRoutes');
 const progressRoutes = safeRequire('./routes/progressRoutes');
 const subtopicProgressRoutes = safeRequire('./routes/subtopicProgressRoutes');
@@ -174,7 +175,7 @@ if (resourceRoutes) app.use('/api/resources', protect, resourceRoutes);
 if (analyticsRoutes) app.use('/api/analytics', protect, analyticsRoutes);
 if (progressRoutes) app.use('/api/progress', protect, progressRoutes);
 if (progressSummaryBulk) app.use('/api/progress-summary', protect, progressSummaryBulk);
-if (subtopicProgressRoutes) app.use('/api/subtopics', protect, subtopicProgressRoutes);
+if (subtopicProgressRoutes) app.use('/api/subtopic-progress', protect, subtopicProgressRoutes);
 if (notesRoutes) app.use('/api/notes', protect, notesRoutes);
 if (notificationRoutes) app.use('/api/notifications', protect, notificationRoutes);
 if (pastPaperRoutes) app.use('/api/past-papers', pastPaperRoutes);
@@ -183,6 +184,7 @@ if (conceptRoutes) app.use('/api/concepts', protect, conceptRoutes);
 if (catalogRoutes) app.use('/api/catalog', protect, catalogRoutes);
 if (examBoardRoutes) app.use('/api/exam-boards', examBoardRoutes);
 if (aiRoutes) app.use('/api/ai', protect, aiRoutes);
+if (aiChatRoute) app.use('/api/ai', protect, aiChatRoute);
 if (adaptiveRoutes) app.use('/api/adaptive', protect, adaptiveRoutes);
 if (learningEventRoutes) app.use('/api/learning-events', protect, learningEventRoutes);
 if (studyPlannerRoutes) app.use('/api/study-planner', protect, studyPlannerRoutes);

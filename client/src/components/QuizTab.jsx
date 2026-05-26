@@ -616,7 +616,7 @@ function ResultsScreen({ subtopicId, subtopic, attemptId, onRevise, onQuizComple
         const r = await api.get(`/quizzes/attempt/${attemptId}`);
         setResults(r);
         // Mark quiz complete
-        await api.post(`/subtopics/${subtopicId}/progress`, { task: 'quiz' });
+        await api.post(`/subtopic-progress/${subtopicId}`, { task: 'quiz' });
         onQuizComplete?.();
       } catch {
         setResults(null);

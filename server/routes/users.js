@@ -174,4 +174,132 @@ router.delete('/:id', protect, authorize('admin'), async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /api/users/preferences
+// Called by OnboardingPage and SettingsPage.
+// Must be defined BEFORE /:id routes — Express would treat "preferences" as an ID.
+// Body: { exam_boards: ['JAMB','WAEC'], subject_ids: [1,2], daily_goal: 50,
+//         preferred_study_days: '["Mon","Tue"]', preferred_study_time: 'evening' }
+// ─────────────────────────────────────────────────────────────────────────────
+router.patch('/preferences', protect, async (req, res) => {
+  const { exam_boards, subject_ids, daily_goal,
+          preferred_study_days, preferred_study_time } = req.body;
+  // SettingsPage sends study_days as a JSON string; normalise here
+  const studyDays = preferred_study_days != null
+    ? (typeof preferred_study_days === 'string'
+        ? JSON.parse(preferred_study_days || '[]')
+        : preferred_study_days)
+    : req.body.study_days;
+  const studyTime = preferred_study_time || req.body.study_time;
+  const userId = req.user.id;
+
+  try {
+    // 1. Save exam board selections → student_exam_types
+    if (Array.isArray(exam_boards) && exam_boards.length > 0) {
+      for (const code of exam_boards) {
+        const board = await sequelize.query(
+          `SELECT id FROM exam_boards WHERE code = :code LIMIT 1`,
+          { replacements: { code: code.toUpperCase() }, type: QueryTypes.SELECT }
+        );
+        if (board[0]) {
+          await sequelize.query(
+            `INSERT INTO student_exam_types (student_id, exam_board_id, is_active)
+             VALUES (:userId, :boardId, true)
+             ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active = true`,
+            { replacements: { userId, boardId: board[0].id }, type: QueryTypes.RAW }
+          );
+        }
+      }
+    }
+
+    // 2. Save subject selections → student_subjects
+    if (Array.isArray(subject_ids) && subject_ids.length > 0) {
+      for (const sid of subject_ids) {
+        const safeId = parseInt(sid);
+        if (!safeId) continue;
+        try {
+          await sequelize.query(
+            `INSERT INTO student_subjects (student_id, subject_id, is_active)
+             VALUES (:userId, :subjectId, true)
+             ON CONFLICT (student_id, subject_id) DO UPDATE SET is_active = true`,
+            { replacements: { userId, subjectId: safeId }, type: QueryTypes.RAW }
+          );
+        } catch (_e) { /* table may not exist yet on very fresh DB */ }
+      }
+
+      // Derive and save the exam boards those subjects belong to
+      const boardRows = await sequelize.query(
+        `SELECT DISTINCT exam_board_id FROM subjects
+         WHERE id = ANY(:subjectIds::int[]) AND is_active = true AND exam_board_id IS NOT NULL`,
+        { replacements: { subjectIds: subject_ids.map(Number).filter(Boolean) }, type: QueryTypes.SELECT }
+      );
+      for (const row of boardRows) {
+        await sequelize.query(
+          `INSERT INTO student_exam_types (student_id, exam_board_id, is_active)
+           VALUES (:userId, :boardId, true)
+           ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active = true`,
+          { replacements: { userId, boardId: row.exam_board_id }, type: QueryTypes.RAW }
+        );
+      }
+    }
+
+    // 3. Persist daily goal
+    if (daily_goal != null) {
+      await sequelize.query(
+        `UPDATE users SET daily_goal = :g, updated_at = NOW() WHERE id = :userId`,
+        { replacements: { g: Number(daily_goal), userId }, type: QueryTypes.RAW }
+      );
+    }
+
+    // 4. Persist study schedule
+    if (Array.isArray(studyDays)) {
+      await sequelize.query(
+        `UPDATE users
+         SET preferred_study_days = :days,
+             preferred_study_time = :time,
+             updated_at           = NOW()
+         WHERE id = :userId`,
+        { replacements: { days: JSON.stringify(studyDays), time: studyTime || 'evening', userId }, type: QueryTypes.RAW }
+      );
+    }
+
+    // 5. Mark onboarding complete
+    await sequelize.query(
+      `UPDATE users SET onboarding_complete = true, updated_at = NOW() WHERE id = :userId`,
+      { replacements: { userId }, type: QueryTypes.RAW }
+    );
+
+    return res.status(200).json({ success: true, message: 'Preferences saved' });
+  } catch (err) {
+    console.error('[PATCH /users/preferences]', err.message);
+    return res.status(500).json({ success: false, error: 'Failed to save preferences' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/users/:id  — fetch single user detail (admin only)
+// Must stay AFTER all named sub-routes (stats, preferences).
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/:id', protect, authorize('admin'), async (req, res) => {
+  const { id } = req.params;
+  if (!id || !id.trim()) {
+    return error(res, 'User ID is required', 400);
+  }
+  try {
+    const rows = await sequelize.query(
+      `SELECT id, email, first_name, last_name, role, is_active,
+              subscription_status, subscription_expires_at, created_at,
+              last_login, xp_points, study_streak_days, onboarding_complete,
+              avatar_url, phone, country
+       FROM users WHERE id = :id`,
+      { replacements: { id }, type: QueryTypes.SELECT }
+    );
+    if (rows.length === 0) return error(res, 'User not found', 404);
+    return success(res, rows[0]);
+  } catch (err) {
+    console.error('[GET /users/:id]', err.message);
+    return error(res, 'Failed to fetch user');
+  }
+});
+
 module.exports = router;

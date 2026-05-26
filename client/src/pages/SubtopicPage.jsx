@@ -107,7 +107,7 @@ function ResourcesTab({ subtopicId, subtopic, subtopicName, onComplete }) {
   const handleOpen = async (res) => {
     setActiveRes(res);
     try {
-      await api.post(`/subtopics/${subtopicId}/progress`, { task: 'resources' });
+      await api.post(`/subtopic-progress/${subtopicId}`, { task: 'resources' });
       onComplete('resources');
     } catch { /* ignore */ }
   };
@@ -280,7 +280,7 @@ function PracticeTab({ subtopicId, subjectId, onComplete }) {
     if (current + 1 >= questions.length) {
       setPhase('done');
       try {
-        await api.post(`/subtopics/${subtopicId}/progress`, { task: 'practice' });
+        await api.post(`/subtopic-progress/${subtopicId}`, { task: 'practice' });
         onComplete('practice');
       } catch { /* ignore */ }
     } else {
@@ -660,7 +660,7 @@ export default function SubtopicPage() {
 
   useEffect(() => {
     if (!user || !subtopicId) return;
-    api.get(`/subtopics/${subtopicId}/progress`)
+    api.get(`/subtopic-progress/${subtopicId}`)
       .then(r => { if (r.success) setProgress(r.data); })
       .catch(() => {});
   }, [user, subtopicId]);
