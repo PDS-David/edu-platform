@@ -30,7 +30,9 @@ const safeRequire = (modulePath) => {
   try {
     return require(modulePath);
   } catch (err) {
-    logger.warn(`Optional module missing: ${modulePath}`);
+    // Log the real error so failures are diagnosable in production logs.
+    // e.g. "Cannot find module '@anthropic-ai/sdk'" pinpoints missing packages.
+    logger.warn(`Optional module failed to load: ${modulePath} — ${err.message}`);
     return null;
   }
 };

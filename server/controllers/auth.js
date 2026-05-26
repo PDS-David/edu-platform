@@ -81,7 +81,7 @@ exports.register = async (req, res, next) => {
         :verificationToken, :verificationTokenExpires,
         true, false, 'free_trial',
         NOW() + INTERVAL '14 days',
-        :pendingIds::uuid[],
+        :pendingIds::integer[],
         NOW(), NOW())
        RETURNING
          id, email, first_name, last_name, role,

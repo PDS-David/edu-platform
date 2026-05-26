@@ -689,7 +689,8 @@ async function run() {
         ADD COLUMN IF NOT EXISTS phone                 VARCHAR(30),
         ADD COLUMN IF NOT EXISTS country               VARCHAR(100),
         ADD COLUMN IF NOT EXISTS subscription_expires_at TIMESTAMPTZ,
-        ADD COLUMN IF NOT EXISTS subscription_status   VARCHAR(20)  DEFAULT 'free_trial'`],
+        ADD COLUMN IF NOT EXISTS subscription_status   VARCHAR(20)  DEFAULT 'free_trial',
+        ADD COLUMN IF NOT EXISTS pending_exam_board_ids  INTEGER[]    DEFAULT '{}'`],
 
     ['expire stale free trials', `
       UPDATE users SET subscription_status='expired', updated_at=NOW()
