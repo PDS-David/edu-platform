@@ -15,7 +15,7 @@ import { FileText, Download, Filter, Loader2, BookOpen, ArrowLeft } from 'lucide
 import PublicNav from '../components/PublicNav';
 
 // ── BUG 1 FIX: derive base URL from env var (strip /api suffix) ────────────────
-const BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/api$/, '');
+const BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '').replace(/\/api$/, '');
 
 const EXAM_BOARDS = [
   { code: 'JAMB',    name: ' JAMB/UTME' },

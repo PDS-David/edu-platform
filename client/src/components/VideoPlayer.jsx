@@ -101,8 +101,8 @@ export default function VideoPlayer({ videoId, onComplete }) {
 
     const video = videoRef.current;
 
-    const baseURL = (import.meta.env.VITE_API_URL || 'http://localhost:5000')
-      .replace(/\/api$/, '');
+    const baseURL = (import.meta.env.VITE_API_URL || '')
+      .replace(/\/$/, '').replace(/\/api$/, '');
 
     const streamUrl = `${baseURL}/videos/stream/${videoId}/master.m3u8`;
 
