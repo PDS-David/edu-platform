@@ -7,25 +7,31 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$REPO_DIR"
 
+# ── Self-update guard ─────────────────────────────────────────────────────────
+# If ALREADY_UPDATED is not set, pull latest code first then re-exec this
+# script from the freshly pulled version so we always run the newest logic.
+if [[ -z "${ALREADY_UPDATED:-}" ]]; then
+  echo "════════════════════════════════════════════════════"
+  echo "  AISchoolonair — Updating deploy script..."
+  echo "════════════════════════════════════════════════════"
+  # Discard any local changes (e.g. server-side edits)
+  git stash push -m "auto-stash $(date -u +%Y%m%dT%H%M%S)" 2>/dev/null || true
+  git fetch origin main
+  git reset --hard origin/main
+  echo "  ✅  Code at $(git rev-parse --short HEAD)"
+  echo "  Re-running updated deploy script..."
+  echo ""
+  exec env ALREADY_UPDATED=1 bash "${BASH_SOURCE[0]}"
+fi
+
 echo "════════════════════════════════════════════════════"
 echo "  AISchoolonair — Fix & Deploy"
 echo "  $(date -u)"
 echo "════════════════════════════════════════════════════"
 
-# ── STEP 1: Resolve local git changes on server ───────────────────────────────
+# ── STEP 1: Already done by self-update guard above ───────────────────────────
 echo ""
-echo "▶ 1/5  Syncing code with GitHub..."
-
-# Stash any local changes (e.g. direct edits to catalogRoutes.js on server)
-if ! git diff --quiet || ! git diff --cached --quiet; then
-  echo "  ⚠️  Local changes detected — stashing them..."
-  git stash push -m "auto-stash before fix_and_deploy $(date -u +%Y%m%dT%H%M%S)"
-fi
-
-# Hard reset to remote — we NEVER want server edits to persist; all fixes go via git
-git fetch origin main
-git reset --hard origin/main
-echo "  ✅  Code is at $(git rev-parse --short HEAD) ($(git log -1 --format='%s'))"
+echo "▶ 1/5  Code synced to $(git rev-parse --short HEAD) ($(git log -1 --format='%s'))"
 
 # ── STEP 2: Run DB migrations in current container (if running) ───────────────
 echo ""
