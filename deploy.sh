@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
 # deploy.sh — Full deploy for AISchoolonair on Hetzner CX23
-# Run as root from the repo directory:  bash deploy.sh
+# Run as root from anywhere:  bash /opt/aischoolonair/deploy.sh
 set -euo pipefail
+
+# Always run from the repo root so docker compose finds docker-compose.yml
+# regardless of the shell's current working directory.
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$REPO_DIR"
 
 echo "═══════════════════════════════════════════════════"
 echo "  AISchoolonair — Production Deploy"
+echo "  Repo: $REPO_DIR"
 echo "═══════════════════════════════════════════════════"
 
 # 1. Pull latest code
