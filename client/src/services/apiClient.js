@@ -11,7 +11,7 @@ import axios from "axios";
 // Set this in the Render dashboard → aischoolonair (frontend) → Environment.
 const RAW_BASE =
   import.meta.env.VITE_API_URL ||
-  "https://eacbuddy-api.onrender.com";
+  "https://aischoolonair-api.onrender.com";
 
 // Strip trailing slash, then ensure /api suffix (don't double-add)
 const normalised = RAW_BASE.replace(/\/$/, "");

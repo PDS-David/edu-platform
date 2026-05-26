@@ -25,6 +25,14 @@ import api from '../services/apiClient';
 
 const LABELS = ['01', '02', '03', '04', '05'];
 
+// Resolve file URLs for Hetzner Docker (VITE_API_URL="/api" → same origin)
+const _FILE_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '').replace(/\/api$/, '');
+const resolveFileUrl = (url) => {
+  if (!url) return '#';
+  if (url.startsWith('http') || url.startsWith('data:')) return url;
+  return `${_FILE_BASE}${url}`;
+};
+
 function TickIcon() {
   return (
     <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
@@ -177,8 +185,8 @@ function ResourcesTab({ subtopicId, subtopic, subtopicName, onComplete }) {
               </button>
             )}
             {(res.resource_type === 'document' || res.resource_type === 'pdf') && (() => {
-                const base = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/api$/, '');
-                const fullUrl = res.file_url?.startsWith('http') ? res.file_url : `${base}${res.file_url}`;
+                const base = _FILE_BASE;
+                const fullUrl = resolveFileUrl(res.file_url);
                 const isDataUri = fullUrl.startsWith('data:text/');
                 return (
                   <div className="flex gap-2">
@@ -204,11 +212,10 @@ function ResourcesTab({ subtopicId, subtopic, subtopicName, onComplete }) {
           )}
           {activeRes?.id === res.id && res.resource_type === 'audio' && (
             <audio controls className="w-full mt-2"
-              src={`${(import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/api$/, '')}${res.file_url}`} />
+              src={resolveFileUrl(res.file_url)} />
           )}
           {activeRes?.id === res.id && (res.resource_type === 'document' || res.resource_type === 'pdf') && (() => {
-            const base = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/api$/, '');
-            const fullUrl = res.file_url?.startsWith('http') ? res.file_url : `${base}${res.file_url}`;
+            const fullUrl = resolveFileUrl(res.file_url);
             if (fullUrl.startsWith('data:text/')) {
               let text = '';
               try { text = decodeURIComponent(fullUrl.replace(/^data:text\/[^;]+;charset=utf-8,/, '')); }

@@ -8,11 +8,11 @@ import api from '../services/apiClient';
 import TopNav from '../components/TopNav';
 import { FileText, Video, Music, File, Download, ArrowLeft, BookOpen, Loader2, ExternalLink } from 'lucide-react';
 
-// Use the same fallback as apiClient.js so the URL is always the live server.
-const BASE_URL = (
-  import.meta.env.VITE_API_URL ||
-  'https://aischoolonair-api.onrender.com'
-).replace(/\/$/, '').replace(/\/api$/, '');
+// Resolve the file server base URL.
+// On Hetzner Docker, VITE_API_URL="/api" (relative), so strip /api to get
+// the origin (empty string = same origin). Caddy proxies /uploads/* to the API.
+const _RAW = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '').replace(/\/api$/, '');
+const BASE_URL = _RAW.startsWith('http') ? _RAW : '';
 
 function resolveUrl(rawUrl) {
   if (!rawUrl) return '#';
@@ -38,6 +38,9 @@ function FileIcon({ type }) {
 // NOT reachable by Google — exclude any *.onrender.com URL or /uploads/ path.
 function isPublicUrl(url) {
   try {
+    // Relative URLs like /uploads/... are served from the same origin (behind Caddy)
+    // and cannot be reached by Google Docs Viewer — treat as non-public.
+    if (!url.startsWith('http')) return false;
     const u = new URL(url);
     if (u.hostname.endsWith('.onrender.com')) return false;
     if (u.pathname.startsWith('/uploads/')) return false;

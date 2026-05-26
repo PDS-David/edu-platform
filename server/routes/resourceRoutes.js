@@ -254,19 +254,20 @@ router.post(
     try {
       await ensureExtraColumns();
 
-      // Render's filesystem is ephemeral. If R2 is not configured, uploaded files
-      // can disappear on restarts/redeploys, leading to "Cannot GET /uploads/..."
-      // errors in the student preview. Allow local uploads in production ONLY
-      // when explicitly enabled (e.g., on Hetzner with persistent volumes).
+      // Storage mode: if Cloudflare R2 env vars are present, push to R2.
+      // Otherwise fall back to local disk. Local disk is acceptable on
+      // Hetzner (persistent volumes) or any server with stable storage.
+      // Set ALLOW_LOCAL_UPLOADS=true on Render ONLY if you have mounted a
+      // persistent disk at /uploads — otherwise files will vanish on redeploy.
       const isProd = process.env.NODE_ENV === 'production';
-      const allowLocal = process.env.ALLOW_LOCAL_UPLOADS === 'true';
+      const allowLocal = process.env.ALLOW_LOCAL_UPLOADS !== 'false'; // default: allow
       if (isProd && !allowLocal && !r2.isR2Enabled()) {
         return res.status(503).json({
           success: false,
           error:
-            'File uploads are disabled until durable storage is configured. ' +
-            'Please configure Cloudflare R2 (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, R2_PUBLIC_BASE_URL) ' +
-            'or set ALLOW_LOCAL_UPLOADS=true when using persistent disk (e.g., Hetzner).'
+            'File uploads are disabled. ' +
+            'Configure Cloudflare R2 (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET) ' +
+            'or set ALLOW_LOCAL_UPLOADS=false to explicitly disable local fallback.'
         });
       }
 
@@ -366,7 +367,7 @@ router.post(
    Returns resources awaiting assignment.
    ================================ */
 
-router.get('/staged', async (_req, res) => {
+router.get('/staged', authorize('admin', 'teacher'), async (_req, res) => {
   try {
     await ensureExtraColumns();
 
