@@ -126,7 +126,7 @@ const CatalogPanel = () => {
       if (editingType) { await api.put(`/catalog/types/${editingType.id}`, typeForm); showToast('Examination type updated'); }
       else { await api.post('/catalog/types', typeForm); showToast('Examination type created'); }
       setShowTypeModal(false); fetchTypes();
-    } catch (err) { showToast(err?.error || 'Failed to save', 'error'); }
+    } catch (err) { showToast(err?.message || 'Failed to save', 'error'); }
     finally { setSaving(false); }
   };
 
@@ -137,7 +137,7 @@ const CatalogPanel = () => {
       if (editingSubject) { await api.put(`/catalog/subjects/${editingSubject.id}`, subjectForm); showToast('Subject updated'); }
       else { await api.post(`/catalog/types/${activeTypeId}/subjects`, subjectForm); showToast('Subject added'); }
       setShowSubjectModal(false); fetchSubjects(activeTypeId); fetchTypes(); bustSubjectCache(activeTypeId);
-    } catch (err) { showToast(err?.error || 'Failed to save', 'error'); }
+    } catch (err) { showToast(err?.message || 'Failed to save', 'error'); }
     finally { setSaving(false); }
   };
 
@@ -146,7 +146,7 @@ const CatalogPanel = () => {
     try {
       if (showDeleteConfirm.kind === 'type') { await api.delete(`/catalog/types/${showDeleteConfirm.id}`); showToast('Examination type deactivated'); setTypeSubjects(prev => { const copy = { ...prev }; delete copy[showDeleteConfirm.id]; return copy; }); fetchTypes(); }
       else { await api.delete(`/catalog/subjects/${showDeleteConfirm.id}`); showToast('Subject deactivated'); fetchSubjects(activeTypeId); fetchTypes(); bustSubjectCache(activeTypeId); }
-    } catch (err) { showToast(err?.error || 'Failed to deactivate', 'error'); }
+    } catch (err) { showToast(err?.message || 'Failed to deactivate', 'error'); }
     finally { setShowDeleteConfirm(null); }
   };
 
@@ -309,11 +309,11 @@ const TeacherAssignmentPanel = () => {
     // Run both requests independently so a failure in one never silences the other.
     const [aRes, tRes] = await Promise.allSettled([
       api.get('/admin/teacher-assignments'),
-      api.get('/users?role=teacher'),
+      api.get('/admin/teachers'),
     ]);
     if (aRes.status === 'fulfilled' && aRes.value?.success) setAssignments(aRes.value.data || []);
     else if (aRes.status === 'rejected') console.warn('[TeacherAssignment] assignments load failed:', aRes.reason?.error ?? aRes.reason);
-    if (tRes.status === 'fulfilled' && tRes.value?.data)    setTeachers(tRes.value.data    || []);
+    if (tRes.status === 'fulfilled') setTeachers(Array.isArray(tRes.value?.data) ? tRes.value.data : []);
     else if (tRes.status === 'rejected') console.warn('[TeacherAssignment] teachers load failed:', tRes.reason?.error ?? tRes.reason);
     setLoading(false);
   };
@@ -349,7 +349,7 @@ const TeacherAssignmentPanel = () => {
       if (failed > 0) showToast(`${saved} saved, ${failed} failed — some assignments may already exist`, 'error');
       else showToast(`${saved} assignment${saved > 1 ? 's' : ''} saved`);
       setShowModal(false); setForm({ teacher_id: '', exam_type_id: '' }); setSelectedSubjectIds([]); setFilteredSubjects([]); fetchAll();
-    } catch (err) { showToast(err?.error || 'Failed to save', 'error'); }
+    } catch (err) { showToast(err?.message || 'Failed to save', 'error'); }
     finally { setSaving(false); }
   };
 
@@ -370,7 +370,7 @@ const TeacherAssignmentPanel = () => {
       setShowCreateTeacher(false);
       setTeacherForm({ first_name: '', last_name: '', email: '', password: '' });
       fetchAll();
-    } catch (err) { showToast(err?.message || err?.error || 'Failed to create teacher', 'error'); }
+    } catch (err) { showToast(err?.message || 'Failed to create teacher', 'error'); }
     finally { setCreatingTeacher(false); }
   };
 
@@ -644,7 +644,7 @@ const UserManagementPanel = () => {
   const toggleActive  = async (userId, currentActive)  => { try { await api.put(`/users/${userId}/deactivate`, { is_active: !currentActive }); showToast(!currentActive ? 'User activated' : 'User deactivated'); fetchUsers(); } catch { showToast('Failed to update user status', 'error'); } };
   const deleteUser    = async (userId, email)          => {
     if (!window.confirm(`Delete "${email}"? Cannot be undone.`)) return;
-    try { await api.delete(`/users/${userId}`); showToast(`User ${email} deleted`); fetchUsers(); } catch (err) { showToast(err?.error || 'Failed to delete', 'error'); }
+    try { await api.delete(`/users/${userId}`); showToast(`User ${email} deleted`); fetchUsers(); } catch (err) { showToast(err?.message || 'Failed to delete', 'error'); }
   };
 
   const roleBadge = (role) => ({ student: 'bg-blue-100 text-blue-700', teacher: 'bg-violet-100 text-violet-700', admin: 'bg-red-100 text-red-700' }[role] || 'bg-gray-100 text-gray-600');
@@ -732,7 +732,7 @@ const PlatformAnalyticsPanel = () => {
     if (!notifTitle.trim() || !notifMessage.trim()) { showToast('Title and message are required', 'error'); return; }
     setNotifSending(true);
     try { const res = await api.post('/admin/send-notification', { target: notifTarget, title: notifTitle.trim(), message: notifMessage.trim() }); showToast(`Notification sent to ${res.sent ?? 0} user(s)`); setNotifModal(false); setNotifTitle(''); setNotifMessage(''); setNotifTarget('all'); }
-    catch (err) { showToast(err?.error || 'Failed to send notification', 'error'); }
+    catch (err) { showToast(err?.message || 'Failed to send notification', 'error'); }
     finally { setNotifSending(false); }
   };
 
