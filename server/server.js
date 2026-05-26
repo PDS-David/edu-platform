@@ -210,6 +210,16 @@ app.get('/health', (_req, res) => {
   });
 });
 
+// Alias so Caddy-proxied requests to /api/health (the public URL) resolve correctly.
+// Caddy routes /api/* → api:5000, so the API receives the path as /api/health.
+// Without this alias, Express finds no matching route and falls through to the
+// SPA nginx container, which returns "Cannot GET /api/health".
+app.get('/api/health', (_req, res) => {
+  return success(res, {
+    data: { status: 'ok', timestamp: new Date().toISOString() }
+  });
+});
+
 
 // SPA fallback
 if (fs.existsSync(clientDist)) {
