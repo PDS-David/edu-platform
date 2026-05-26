@@ -1,43 +1,77 @@
 'use strict';
 
 /**
- * CENTRAL ROUTE REGISTRY
- * Every API route MUST be declared here.
- * This prevents silent deployment breakage.
+ * CENTRAL ROUTE REGISTRY — documentation only, not loaded at runtime.
+ *
+ * server.js mounts routes directly via safeRequire().  This file is a
+ * single-source-of-truth map for quick reference; keep it in sync whenever
+ * a route is added or removed.
+ *
+ * Format: { path: '/api/...', file: '../routes/<filename>' }
+ *
+ * If you ever switch to the loadRoutes() helper (server/config/loadRoutes.js),
+ * this registry is the array to pass it.
  */
 
 module.exports = [
-  { path: '/api/auth', file: '../routes/authRoutes' },
-  { path: '/api/exam-boards', file: '../routes/examBoardsRoutes' },
-  { path: '/api/curriculum', file: '../routes/curriculumRoutes' },
+  // ── Auth ─────────────────────────────────────────────────────────────────
+  { path: '/api/auth',               file: '../routes/authRoutes' },
 
-  { path: '/api/ai', file: '../routes/aiRoutes' },
+  // ── Users ─────────────────────────────────────────────────────────────────
+  { path: '/api/users',              file: '../routes/users' },
 
-  { path: '/api/admin', file: '../routes/adminRoutes' },
-  { path: '/api/teacher', file: '../routes/teacherRoutes' },
+  // ── Catalog / Exam boards ─────────────────────────────────────────────────
+  { path: '/api/exam-boards',        file: '../routes/examBoardRoutes' },
+  { path: '/api/catalog',            file: '../routes/catalogRoutes' },
+  { path: '/api/curriculum',         file: '../routes/curriculumRoutes' },
 
-  { path: '/api/users', file: '../routes/users' },
-  { path: '/api/subjects', file: '../routes/subjects' },
-  { path: '/api/topics', file: '../routes/topicsRoutes' },
-  { path: '/api/subtopics', file: '../routes/subtopicRoutes' },
+  // ── Content ───────────────────────────────────────────────────────────────
+  { path: '/api/subjects',           file: '../routes/subjectsRoutes' },
+  { path: '/api/topics',             file: '../routes/topicsRoutes' },
+  { path: '/api/subtopics',          file: '../routes/subtopicRoutes' },
+  { path: '/api/concepts',           file: '../routes/conceptRoutes' },
+  { path: '/api/resources',          file: '../routes/resourceRoutes' },
+  { path: '/api/courses',            file: '../routes/courses' },
+  { path: '/api/enrollments',        file: '../routes/enrollments' },
+  { path: '/api/videos',             file: '../routes/videosRoutes' },
+  { path: '/api/past-papers',        file: '../routes/pastPaperRoutes' },
+  { path: '/api/notes',              file: '../routes/notesRoutes' },
 
-  { path: '/api/resources', file: '../routes/resourceRoutes' },
-  { path: '/api/courses', file: '../routes/courses' },
-  { path: '/api/enrollments', file: '../routes/enrollments' },
+  // ── Quiz / Questions ──────────────────────────────────────────────────────
+  { path: '/api/quizzes',            file: '../routes/quizzes' },
+  { path: '/api/quiz-generator',     file: '../routes/quizGeneratorRoute' },
+  { path: '/api/questions',          file: '../routes/questionsRoutes' },
 
-  { path: '/api/quizzes', file: '../routes/quizzes' },
-  { path: '/api/questions', file: '../routes/questionsRoutes' },
+  // ── Progress / Learning ───────────────────────────────────────────────────
+  { path: '/api/progress',           file: '../routes/progressRoutes' },
+  { path: '/api/progress-summary',   file: '../routes/progressSummaryBulk' },
+  { path: '/api/subtopic-progress',  file: '../routes/subtopicProgressRoutes' },
+  { path: '/api/learning-events',    file: '../routes/learningEventRoutes' },
+  { path: '/api/adaptive',           file: '../routes/adaptiveRoutes' },
+  { path: '/api/study-planner',      file: '../routes/studyPlannerRoute' },
+  { path: '/api/weak-topics',        file: '../routes/weakTopicRoutes' },
 
-  { path: '/api/analytics', file: '../routes/analyticsRoutes' },
-  { path: '/api/notes', file: '../routes/notesRoutes' },
-  { path: '/api/videos', file: '../routes/videosRoutes' },
-  { path: '/api/past-papers', file: '../routes/pastPaperRoutes' },
+  // ── AI ────────────────────────────────────────────────────────────────────
+  { path: '/api/ai',                 file: '../routes/aiRoutes' },
+  { path: '/api/ai',                 file: '../routes/aiChatRoute' },         // co-mounted
+  { path: '/api/ai-question-gen',    file: '../routes/aiQuestionGenerationRoutes' },
+  { path: '/api/explanations',       file: '../routes/explanationRoute' },
 
-  { path: '/api/payments', file: '../routes/paymentRoutes' },
-  { path: '/api/catalog', file: '../routes/catalogRoutes' },
+  // ── Analytics / Intelligence ──────────────────────────────────────────────
+  { path: '/api/analytics',          file: '../routes/analyticsRoutes' },
+  { path: '/api/recommendations',    file: '../routes/recommendationRoutes' },
+  { path: '/api/sessions',           file: '../routes/sessionRoutes' },
+  { path: '/api/dashboard',          file: '../routes/dashboardRoutes' },
+  { path: '/api/replay',             file: '../routes/eventReplayRoutes' },
+  { path: '/api/engine',             file: '../routes/engineValidationRoutes' },
+  { path: '/api/exam-intelligence',  file: '../routes/examIntelligenceRoutes' },
 
-  { path: '/api/notifications', file: '../routes/notificationsRoutes' },
+  // ── Roles ─────────────────────────────────────────────────────────────────
+  { path: '/api/students',           file: '../routes/studentRoutes' },
+  { path: '/api/teacher',            file: '../routes/teacherRoutes' },
+  { path: '/api/admin',              file: '../routes/adminRoutes' },
 
-  { path: '/api/students', file: '../routes/studentRoutes' },
-  { path: '/api/concepts', file: '../routes/conceptRoutes' },
+  // ── Payments / Notifications ──────────────────────────────────────────────
+  { path: '/api/payments',           file: '../routes/paymentRoutes' },
+  { path: '/api/notifications',      file: '../routes/notificationsRoutes' },
 ];
