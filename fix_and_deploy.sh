@@ -1,83 +1,86 @@
-#!/bin/bash
-# ============================================================
-# AISchoolonair — Complete Fix and Deploy Script
-# Run this via SSH: bash /opt/aischoolonair/fix_and_deploy.sh
-# ============================================================
-set -e
+#!/usr/bin/env bash
+# fix_and_deploy.sh — One-shot fix for AISchoolonair on Hetzner
+# Handles: stale local git changes, Docker cache, missing migrations, aiChatRoute
+# Run as root from repo dir:  bash fix_and_deploy.sh
+set -euo pipefail
 
-# Ensure we're in the right directory
-cd /opt/aischoolonair
-echo "✅ Working directory: $(pwd)"
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$REPO_DIR"
 
-# Step 1: Pull latest fixes from GitHub
+echo "════════════════════════════════════════════════════"
+echo "  AISchoolonair — Fix & Deploy"
+echo "  $(date -u)"
+echo "════════════════════════════════════════════════════"
+
+# ── STEP 1: Resolve local git changes on server ───────────────────────────────
 echo ""
-echo "▶ [1/5] Pulling latest code from GitHub..."
-git pull origin main
-echo "✅ Code updated"
+echo "▶ 1/5  Syncing code with GitHub..."
 
-# Step 2: Check api.env has correct settings
-echo ""
-echo "▶ [2/5] Checking environment config..."
-
-# The upload logic defaults to allowing local uploads unless ALLOW_LOCAL_UPLOADS=false
-# So we just need to make sure it's NOT set to false
-if grep -q "^ALLOW_LOCAL_UPLOADS=false" api.env 2>/dev/null; then
-    sed -i 's/^ALLOW_LOCAL_UPLOADS=false/ALLOW_LOCAL_UPLOADS=true/' api.env
-    echo "✅ Fixed ALLOW_LOCAL_UPLOADS (was false, now true)"
-elif grep -q "^ALLOW_LOCAL_UPLOADS=" api.env 2>/dev/null; then
-    echo "✅ ALLOW_LOCAL_UPLOADS is already set correctly"
-else
-    echo "ALLOW_LOCAL_UPLOADS=true" >> api.env
-    echo "✅ Added ALLOW_LOCAL_UPLOADS=true to api.env"
+# Stash any local changes (e.g. direct edits to catalogRoutes.js on server)
+if ! git diff --quiet || ! git diff --cached --quiet; then
+  echo "  ⚠️  Local changes detected — stashing them..."
+  git stash push -m "auto-stash before fix_and_deploy $(date -u +%Y%m%dT%H%M%S)"
 fi
 
-# Fix staging DATABASE_URL if it still points to Render
-PROD_DB=$(grep "^DATABASE_URL=" api.env | cut -d= -f2-)
-STAGING_DB=$(grep "^DATABASE_URL=" api.staging.env 2>/dev/null | cut -d= -f2- || echo "")
-if echo "$STAGING_DB" | grep -q "render.com"; then
-    sed -i "s|^DATABASE_URL=.*|DATABASE_URL=${PROD_DB}|" api.staging.env
-    echo "✅ Fixed staging DATABASE_URL (was pointing to Render, now Supabase)"
+# Hard reset to remote — we NEVER want server edits to persist; all fixes go via git
+git fetch origin main
+git reset --hard origin/main
+echo "  ✅  Code is at $(git rev-parse --short HEAD) ($(git log -1 --format='%s'))"
+
+# ── STEP 2: Run DB migrations in current container (if running) ───────────────
+echo ""
+echo "▶ 2/5  Running DB migrations..."
+
+if docker ps --format '{{.Names}}' | grep -q "aischool_api"; then
+  docker exec -i aischool_api node - < server/scripts/run_complete_migration.js \
+    && echo "  ✅  Migrations complete" \
+    || echo "  ⚠️  Migration had warnings (check above) — continuing deploy"
 else
-    echo "✅ Staging DATABASE_URL looks OK"
+  echo "  ⚠️  aischool_api not running — migrations will run after restart"
 fi
 
-# Step 3: Run DB migrations on the currently running container
-# Use docker exec with pipe — avoids file path issues entirely
+# ── STEP 3: Rebuild API with --no-cache (forces fresh npm ci → picks up @google/genai) ──
 echo ""
-echo "▶ [3/5] Running database migrations..."
-docker exec -i aischool_api node - < server/scripts/run_complete_migration.js
-echo "✅ Migrations complete"
+echo "▶ 3/5  Rebuilding API image (no-cache to pick up new npm deps)..."
+docker compose build --no-cache api
+echo "  ✅  API image rebuilt"
 
-# Step 4: Build and restart (from correct directory)
+# ── STEP 4: Rebuild Web (normal, uses cache since no npm changes) ─────────────
 echo ""
-echo "▶ [4/5] Building and restarting containers..."
-docker compose build api web api_staging
-docker compose up -d --no-deps api web api_staging
-echo "✅ Containers restarted"
+echo "▶ 4/5  Rebuilding Web image..."
+docker compose build web
+echo "  ✅  Web image rebuilt"
 
-# Step 5: Health check
+# ── STEP 5: Restart services ──────────────────────────────────────────────────
 echo ""
-echo "▶ [5/5] Waiting 20s then checking health..."
+echo "▶ 5/5  Restarting containers..."
+docker compose up -d --no-deps api web
+echo "  Waiting 20s for containers to be ready..."
 sleep 20
 
+# ── Post-deploy: run migration in NEW container ───────────────────────────────
 echo ""
-echo "Container status:"
-docker ps --format "table {{.Names}}\t{{.Status}}" | grep aischool
+echo "▶ Post-deploy: Running migrations in new container..."
+docker exec -i aischool_api node - < server/scripts/run_complete_migration.js \
+  && echo "  ✅  Migrations applied to new container" \
+  || echo "  ⚠️  Migration warnings — check logs"
 
+# ── Health check ──────────────────────────────────────────────────────────────
 echo ""
-echo "API logs (last 5):"
-docker logs aischool_api --tail=5
-
-echo ""
-HEALTH=$(curl -sf https://www.aischoolonair.ng/api/health 2>/dev/null || echo "FAILED")
-if echo "$HEALTH" | grep -q "ok"; then
-    echo "🟢 Production API is healthy: $HEALTH"
+echo "════════════════════════════════════════════════════"
+echo "  Checking health..."
+echo "════════════════════════════════════════════════════"
+sleep 3
+if curl -sf https://www.aischoolonair.ng/api/health > /dev/null 2>&1; then
+  echo "  🟢  API is healthy"
 else
-    echo "🔴 Health check failed. Check logs: docker logs aischool_api --tail=30"
+  echo "  🔴  Health check failed — showing last 20 log lines:"
+  docker logs aischool_api --tail=20
 fi
 
 echo ""
-echo "============================================================"
-echo " ✅ Fix and deploy complete!"
-echo " Test bulk upload at: https://www.aischoolonair.ng/admin/dashboard"
-echo "============================================================"
+echo "  📋  Last 5 API log lines:"
+docker logs aischool_api --tail=5
+echo ""
+echo "  ✅  Done! https://www.aischoolonair.ng"
+echo ""
