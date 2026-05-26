@@ -9,7 +9,10 @@ export function initRealtime() {
     return socket;
   }
 
-  socket = new WebSocket(import.meta.env.VITE_WS_URL || "ws://localhost:5000");
+  // Derive WebSocket URL from the current page origin (works behind Caddy)
+  const wsUrl = import.meta.env.VITE_WS_URL ||
+    (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host;
+  socket = new WebSocket(wsUrl);
 
   socket.onopen = () => {
     console.log("[realtime] connected");
