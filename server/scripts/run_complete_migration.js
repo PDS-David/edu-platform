@@ -605,6 +605,21 @@ async function run() {
         THEN ALTER TABLE exam_boards ADD CONSTRAINT exam_boards_code_unique UNIQUE(code); END IF;
       EXCEPTION WHEN others THEN NULL; END $$`],
 
+    ['users: onboarding + study preference columns', `
+      ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS onboarding_complete   BOOLEAN      DEFAULT false,
+        ADD COLUMN IF NOT EXISTS daily_goal            INTEGER      DEFAULT 50,
+        ADD COLUMN IF NOT EXISTS preferred_study_days  JSONB        DEFAULT '[]',
+        ADD COLUMN IF NOT EXISTS preferred_study_time  VARCHAR(20)  DEFAULT 'evening',
+        ADD COLUMN IF NOT EXISTS xp_points             INTEGER      DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS study_streak_days     INTEGER      DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS last_login            TIMESTAMPTZ,
+        ADD COLUMN IF NOT EXISTS avatar_url            TEXT,
+        ADD COLUMN IF NOT EXISTS phone                 VARCHAR(30),
+        ADD COLUMN IF NOT EXISTS country               VARCHAR(100),
+        ADD COLUMN IF NOT EXISTS subscription_expires_at TIMESTAMPTZ,
+        ADD COLUMN IF NOT EXISTS subscription_status   VARCHAR(20)  DEFAULT 'free_trial'`],
+
     ['expire stale free trials', `
       UPDATE users SET subscription_status='expired', updated_at=NOW()
       WHERE subscription_status='free_trial'
