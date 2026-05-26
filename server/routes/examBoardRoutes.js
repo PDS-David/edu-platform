@@ -19,6 +19,8 @@ router.get('/', async (req, res) => {
          id,
          code,
          name,
+         full_name,
+         country,
          icon_emoji,
          display_order
        FROM exam_boards
@@ -64,6 +66,28 @@ router.get('/:code/subjects', async (req, res) => {
   } catch (err) {
     console.error(`[GET /exam-boards/${code}/subjects] Error:`, err.message);
     return res.status(500).json({ success: false, error: 'Failed to fetch subjects' });
+  }
+});
+
+
+// ─── GET /api/exam-boards/:code ──────────────────────────────────────────────
+// Returns detail for a single exam board by code. Must be AFTER /:code/subjects.
+router.get('/:code', async (req, res) => {
+  const { code } = req.params;
+  if (!/^[A-Z0-9_]{1,20}$/.test(code)) {
+    return res.status(400).json({ success: false, error: 'Invalid exam board code' });
+  }
+  try {
+    const rows = await sequelize.query(
+      `SELECT id, code, name, full_name, country, icon_emoji, display_order, is_active
+       FROM exam_boards WHERE code = :code LIMIT 1`,
+      { replacements: { code }, type: QueryTypes.SELECT }
+    );
+    if (rows.length === 0) return res.status(404).json({ success: false, error: 'Exam board not found' });
+    return res.status(200).json({ success: true, data: rows[0] });
+  } catch (err) {
+    console.error(`[GET /exam-boards/${code}]`, err.message);
+    return res.status(500).json({ success: false, error: 'Failed to fetch exam board' });
   }
 });
 

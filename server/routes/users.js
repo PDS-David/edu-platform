@@ -152,28 +152,6 @@ router.put('/:id/deactivate', protect, authorize('admin'), async (req, res) => {
   }
 });
 
-// ─────────────────────────────────────────────
-// DELETE /api/users/:id
-// ─────────────────────────────────────────────
-router.delete('/:id', protect, authorize('admin'), async (req, res) => {
-  if (req.params.id === req.user.id) {
-    return error(res, 'Cannot delete yourself', 400);
-  }
-
-  try {
-    await sequelize.query(
-      `DELETE FROM users WHERE id=:id`,
-      { replacements: { id: req.params.id }, type: QueryTypes.DELETE }
-    );
-
-    return success(res, { message: 'User deleted' });
-
-  } catch (err) {
-    console.error('[users.delete]', err.message);
-    return error(res, 'Failed to delete user');
-  }
-});
-
 // ─────────────────────────────────────────────────────────────────────────────
 // PATCH /api/users/preferences
 // Called by OnboardingPage and SettingsPage.
@@ -299,6 +277,28 @@ router.get('/:id', protect, authorize('admin'), async (req, res) => {
   } catch (err) {
     console.error('[GET /users/:id]', err.message);
     return error(res, 'Failed to fetch user');
+  }
+});
+
+// ─────────────────────────────────────────────
+// DELETE /api/users/:id
+// ─────────────────────────────────────────────
+router.delete('/:id', protect, authorize('admin'), async (req, res) => {
+  if (req.params.id === req.user.id) {
+    return error(res, 'Cannot delete yourself', 400);
+  }
+
+  try {
+    await sequelize.query(
+      `DELETE FROM users WHERE id=:id`,
+      { replacements: { id: req.params.id }, type: QueryTypes.DELETE }
+    );
+
+    return success(res, { message: 'User deleted' });
+
+  } catch (err) {
+    console.error('[users.delete]', err.message);
+    return error(res, 'Failed to delete user');
   }
 });
 
