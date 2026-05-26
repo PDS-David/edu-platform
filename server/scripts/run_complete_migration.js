@@ -57,32 +57,27 @@ async function run() {
   await exec('subtopics: add created_by', `
     ALTER TABLE subtopics ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id) ON DELETE SET NULL`);
 
-  await exec('subjects: add exam_board_id UUID', `
-    ALTER TABLE subjects ADD COLUMN IF NOT EXISTS exam_board_id UUID REFERENCES exam_boards(id) ON DELETE SET NULL`);
-
-  // If exam_board_id already existed as INTEGER (legacy schema), convert to UUID.
-  await exec('subjects: convert exam_board_id INTEGER to UUID if needed', `
+  // subjects.exam_board_id must be INTEGER (matching exam_boards.id which is SERIAL int).
+  // A previous bad migration added it as UUID — detect and correct that here.
+  await exec('subjects: ensure exam_board_id is INTEGER (fix if UUID)', `
     DO $$ DECLARE col_type TEXT; BEGIN
       SELECT data_type INTO col_type FROM information_schema.columns
       WHERE table_name='subjects' AND column_name='exam_board_id';
-      IF col_type = 'integer' THEN
+      IF col_type IS NULL THEN
+        -- Column missing entirely: add as INTEGER
+        ALTER TABLE subjects ADD COLUMN exam_board_id INTEGER REFERENCES exam_boards(id) ON DELETE SET NULL;
+      ELSIF col_type = 'uuid' THEN
+        -- Wrongly added as UUID by a previous migration: drop and re-add as INTEGER
         ALTER TABLE subjects DROP COLUMN exam_board_id;
-        ALTER TABLE subjects ADD COLUMN exam_board_id UUID REFERENCES exam_boards(id) ON DELETE SET NULL;
+        ALTER TABLE subjects ADD COLUMN exam_board_id INTEGER REFERENCES exam_boards(id) ON DELETE SET NULL;
       END IF;
+      -- If col_type is already 'integer', nothing to do.
     EXCEPTION WHEN others THEN NULL; END $$`);
 
-  // Same fix for teacher_subjects.exam_board_id
-  await exec('teacher_subjects: convert exam_board_id INTEGER to UUID if needed', `
-    DO $$ DECLARE col_type TEXT; BEGIN
-      SELECT data_type INTO col_type FROM information_schema.columns
-      WHERE table_name='teacher_subjects' AND column_name='exam_board_id';
-      IF col_type IS NULL THEN
-        ALTER TABLE teacher_subjects ADD COLUMN exam_board_id UUID;
-      ELSIF col_type = 'integer' THEN
-        ALTER TABLE teacher_subjects DROP COLUMN exam_board_id;
-        ALTER TABLE teacher_subjects ADD COLUMN exam_board_id UUID;
-      END IF;
-    EXCEPTION WHEN others THEN NULL; END $$`);
+  // teacher_subjects.exam_board_id is already INTEGER in the live DB — no change needed.
+  // Just ensure it exists if somehow missing.
+  await exec('teacher_subjects: ensure exam_board_id column exists as INTEGER', `
+    ALTER TABLE teacher_subjects ADD COLUMN IF NOT EXISTS exam_board_id INTEGER REFERENCES exam_boards(id) ON DELETE SET NULL`);
 
   // past_papers: add columns the code expects
   await exec('past_papers: add exam_board, paper_type, file_size_bytes, created_by', `
