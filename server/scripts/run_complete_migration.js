@@ -59,11 +59,7 @@ async function run() {
   await exec('topics: backfill title from name and vice versa', `
     UPDATE topics SET title = name  WHERE title IS NULL AND name  IS NOT NULL;
     UPDATE topics SET name  = title WHERE name  IS NULL AND title IS NOT NULL`);
-  await exec('topics: backfill subject_id from courses join', `
-    UPDATE topics t
-    SET subject_id = c.subject_id
-    FROM courses c
-    WHERE t.course_id = c.id AND t.subject_id IS NULL`);
+  // topics.course_id does not exist — this backfill is not applicable; skip it.
 
   await exec('subtopics: add created_by', `
     ALTER TABLE subtopics ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id) ON DELETE SET NULL`);
@@ -259,40 +255,46 @@ async function run() {
     ); CREATE INDEX IF NOT EXISTS idx_sqans_aid ON subtopic_quiz_answers(attempt_id)`],
 
     ['concepts', `CREATE TABLE IF NOT EXISTS concepts (
-      id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+      id                SERIAL      PRIMARY KEY,
       subtopic_id       INTEGER     NOT NULL REFERENCES subtopics(id) ON DELETE CASCADE,
-      name              VARCHAR(255) NOT NULL,
+      title             VARCHAR(255) NOT NULL DEFAULT '',
+      name              VARCHAR(255),
+      definition        TEXT,
+      explanation       TEXT,
       description       TEXT,
+      examples          TEXT,
+      image_url         VARCHAR(500),
       difficulty_level  INTEGER     NOT NULL DEFAULT 1 CHECK(difficulty_level BETWEEN 1 AND 5),
       estimated_minutes INTEGER     NOT NULL DEFAULT 10,
       order_index       INTEGER     NOT NULL DEFAULT 0,
+      is_active         BOOLEAN     NOT NULL DEFAULT true,
       created_by        UUID        REFERENCES users(id) ON DELETE SET NULL,
       created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
     ); CREATE INDEX IF NOT EXISTS idx_concepts_stid ON concepts(subtopic_id)`],
 
     ['concept_dependencies', `CREATE TABLE IF NOT EXISTS concept_dependencies (
-      id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      parent_concept_id UUID NOT NULL REFERENCES concepts(id) ON DELETE CASCADE,
-      child_concept_id  UUID NOT NULL REFERENCES concepts(id) ON DELETE CASCADE,
+      id                SERIAL  PRIMARY KEY,
+      parent_concept_id INTEGER NOT NULL REFERENCES concepts(id) ON DELETE CASCADE,
+      child_concept_id  INTEGER NOT NULL REFERENCES concepts(id) ON DELETE CASCADE,
       dependency_type   VARCHAR(50) NOT NULL DEFAULT 'prerequisite',
       created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       UNIQUE(parent_concept_id, child_concept_id)
     )`],
 
     ['question_concepts', `CREATE TABLE IF NOT EXISTS question_concepts (
-      id          UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
+      id          SERIAL  PRIMARY KEY,
       question_id INTEGER NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
-      concept_id  UUID    NOT NULL REFERENCES concepts(id)  ON DELETE CASCADE,
+      concept_id  INTEGER NOT NULL REFERENCES concepts(id)  ON DELETE CASCADE,
       weight      NUMERIC(3,2) NOT NULL DEFAULT 1.0,
       created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
       UNIQUE(question_id, concept_id)
     )`],
 
     ['student_concept_mastery', `CREATE TABLE IF NOT EXISTS student_concept_mastery (
-      id            UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+      id            SERIAL       PRIMARY KEY,
       student_id    UUID         NOT NULL REFERENCES users(id)    ON DELETE CASCADE,
-      concept_id    UUID         NOT NULL REFERENCES concepts(id) ON DELETE CASCADE,
+      concept_id    INTEGER      NOT NULL REFERENCES concepts(id) ON DELETE CASCADE,
       mastery_score NUMERIC(5,4) NOT NULL DEFAULT 0.5,
       attempts      INTEGER      NOT NULL DEFAULT 0,
       correct       INTEGER      NOT NULL DEFAULT 0,
@@ -384,26 +386,29 @@ async function run() {
     ); CREATE INDEX IF NOT EXISTS idx_uwt_sid ON user_weak_topics(student_id)`],
 
     ['courses', `CREATE TABLE IF NOT EXISTS courses (
-      id               UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
-      subject_id       INTEGER      NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
-      teacher_id       UUID         NOT NULL REFERENCES users(id)    ON DELETE CASCADE,
-      exam_board_id    INTEGER REFERENCES exam_boards(id) ON DELETE SET NULL,
-      title            VARCHAR(255) NOT NULL,
+      id               SERIAL       PRIMARY KEY,
+      subject_id       INTEGER      REFERENCES subjects(id) ON DELETE SET NULL,
+      title            VARCHAR(255) NOT NULL DEFAULT '',
       description      TEXT,
-      difficulty_level VARCHAR(20)  DEFAULT 'intermediate',
-      is_published     BOOLEAN      NOT NULL DEFAULT false,
-      start_date       DATE,
-      end_date         DATE,
+      price            DECIMAL(10,2) NOT NULL DEFAULT 0,
+      currency         VARCHAR(10)  NOT NULL DEFAULT 'GBP',
+      is_free          BOOLEAN      NOT NULL DEFAULT false,
+      is_premium       BOOLEAN      NOT NULL DEFAULT false,
+      thumbnail_url    VARCHAR(500),
+      level            VARCHAR(50),
+      duration_hours   DECIMAL(5,1),
+      is_active        BOOLEAN      NOT NULL DEFAULT true,
+      created_by       UUID         REFERENCES users(id) ON DELETE SET NULL,
       created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
       updated_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS idx_courses_subj ON courses(subject_id);
-    CREATE INDEX IF NOT EXISTS idx_courses_tchr ON courses(teacher_id)`],
+    CREATE INDEX IF NOT EXISTS idx_courses_cbr  ON courses(created_by)`],
 
     ['enrollments', `CREATE TABLE IF NOT EXISTS enrollments (
-      id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-      student_id          UUID        NOT NULL REFERENCES users(id)    ON DELETE CASCADE,
-      course_id           UUID        NOT NULL REFERENCES courses(id)  ON DELETE CASCADE,
+      id                  SERIAL      PRIMARY KEY,
+      student_id          UUID        NOT NULL REFERENCES users(id)   ON DELETE CASCADE,
+      course_id           INTEGER     NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
       enrollment_date     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       progress_percentage NUMERIC(5,2) NOT NULL DEFAULT 0,
       status              VARCHAR(20)  NOT NULL DEFAULT 'active',
@@ -411,26 +416,28 @@ async function run() {
     ); CREATE INDEX IF NOT EXISTS idx_enroll_sid ON enrollments(student_id)`],
 
     ['videos', `CREATE TABLE IF NOT EXISTS videos (
-      id                     UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
-      course_id              UUID         REFERENCES courses(id) ON DELETE SET NULL,
-      topic_id               INTEGER      REFERENCES topics(id)  ON DELETE SET NULL,
-      title                  VARCHAR(255) NOT NULL,
-      description            TEXT,
-      original_filename      VARCHAR(255),
-      encrypted_playlist_url TEXT,
-      encryption_key_id      UUID,
-      upload_status          VARCHAR(20)  NOT NULL DEFAULT 'pending',
-      duration_seconds       INTEGER,
-      is_free                BOOLEAN      NOT NULL DEFAULT false,
-      required_tier          VARCHAR(50)  NOT NULL DEFAULT 'active',
-      created_at             TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-      updated_at             TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      id               SERIAL       PRIMARY KEY,
+      course_id        INTEGER      REFERENCES courses(id)   ON DELETE SET NULL,
+      topic_id         INTEGER      REFERENCES topics(id)    ON DELETE SET NULL,
+      title            VARCHAR(255) NOT NULL DEFAULT '',
+      description      TEXT,
+      url              TEXT,
+      thumbnail_url    VARCHAR(500),
+      duration_seconds INTEGER,
+      is_premium       BOOLEAN      NOT NULL DEFAULT false,
+      order_index      INTEGER      NOT NULL DEFAULT 0,
+      is_active        BOOLEAN      NOT NULL DEFAULT true,
+      uploaded_by      UUID         REFERENCES users(id)     ON DELETE SET NULL,
+      provider         VARCHAR(50),
+      external_id      VARCHAR(255),
+      created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+      updated_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
     ); CREATE INDEX IF NOT EXISTS idx_videos_cid ON videos(course_id)`],
 
     ['revision_notes', `CREATE TABLE IF NOT EXISTS revision_notes (
-      id          UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
+      id          SERIAL  PRIMARY KEY,
       subtopic_id INTEGER NOT NULL REFERENCES subtopics(id) ON DELETE CASCADE,
-      title       VARCHAR(255) NOT NULL,
+      title       VARCHAR(255) NOT NULL DEFAULT '',
       content_html TEXT,
       created_by  UUID    REFERENCES users(id) ON DELETE SET NULL,
       created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -438,9 +445,9 @@ async function run() {
     ); CREATE INDEX IF NOT EXISTS idx_rn_stid ON revision_notes(subtopic_id)`],
 
     ['video_progress', `CREATE TABLE IF NOT EXISTS video_progress (
-      id                       UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+      id                       SERIAL      PRIMARY KEY,
       student_id               UUID        NOT NULL REFERENCES users(id)   ON DELETE CASCADE,
-      video_id                 UUID        NOT NULL REFERENCES videos(id)  ON DELETE CASCADE,
+      video_id                 INTEGER     NOT NULL REFERENCES videos(id)  ON DELETE CASCADE,
       current_position_seconds INTEGER     NOT NULL DEFAULT 0,
       total_watched_seconds    INTEGER     NOT NULL DEFAULT 0,
       watch_percentage         NUMERIC(5,2) NOT NULL DEFAULT 0,
