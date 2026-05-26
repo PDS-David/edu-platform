@@ -387,7 +387,7 @@ router.get('/teacher-assignments', protect, adminOnly, async (req, res) => {
        FROM teacher_subjects ts
        JOIN users       u  ON u.id  = ts.teacher_id
        JOIN subjects    s  ON s.id  = ts.subject_id
-       LEFT JOIN exam_boards eb ON eb.id = s.exam_board_id::uuid
+       LEFT JOIN exam_boards eb ON eb.id = s.exam_board_id
        WHERE ts.is_active = true
        ORDER BY u.last_name ASC, s.name ASC`,
       { type: QueryTypes.SELECT }
