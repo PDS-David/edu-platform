@@ -59,6 +59,63 @@ async function run() {
 
   await exec('subjects: add exam_board_id UUID', `
     ALTER TABLE subjects ADD COLUMN IF NOT EXISTS exam_board_id UUID REFERENCES exam_boards(id) ON DELETE SET NULL`);
+
+  // If exam_board_id already existed as INTEGER (legacy schema), convert to UUID.
+  await exec('subjects: convert exam_board_id INTEGER to UUID if needed', `
+    DO $$ DECLARE col_type TEXT; BEGIN
+      SELECT data_type INTO col_type FROM information_schema.columns
+      WHERE table_name='subjects' AND column_name='exam_board_id';
+      IF col_type = 'integer' THEN
+        ALTER TABLE subjects DROP COLUMN exam_board_id;
+        ALTER TABLE subjects ADD COLUMN exam_board_id UUID REFERENCES exam_boards(id) ON DELETE SET NULL;
+      END IF;
+    EXCEPTION WHEN others THEN NULL; END $$`);
+
+  // Same fix for teacher_subjects.exam_board_id
+  await exec('teacher_subjects: convert exam_board_id INTEGER to UUID if needed', `
+    DO $$ DECLARE col_type TEXT; BEGIN
+      SELECT data_type INTO col_type FROM information_schema.columns
+      WHERE table_name='teacher_subjects' AND column_name='exam_board_id';
+      IF col_type IS NULL THEN
+        ALTER TABLE teacher_subjects ADD COLUMN exam_board_id UUID;
+      ELSIF col_type = 'integer' THEN
+        ALTER TABLE teacher_subjects DROP COLUMN exam_board_id;
+        ALTER TABLE teacher_subjects ADD COLUMN exam_board_id UUID;
+      END IF;
+    EXCEPTION WHEN others THEN NULL; END $$`);
+
+  // past_papers: add columns the code expects
+  await exec('past_papers: add exam_board, paper_type, file_size_bytes, created_by', `
+    ALTER TABLE past_papers
+      ADD COLUMN IF NOT EXISTS exam_board       VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS paper_type       VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS question_type    VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS file_size_bytes  BIGINT,
+      ADD COLUMN IF NOT EXISTS created_by       UUID`);
+
+  // student_answers: create if missing (needed by admin platform-stats)
+  await exec('student_answers: create table if missing', `
+    CREATE TABLE IF NOT EXISTS student_answers (
+      id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      attempt_id  UUID,
+      question_id UUID,
+      answer      TEXT,
+      is_correct  BOOLEAN DEFAULT false,
+      created_at  TIMESTAMPTZ DEFAULT NOW()
+    )`);
+
+  // quiz_attempts: ensure all needed columns exist
+  await exec('quiz_attempts: add missing columns', `
+    ALTER TABLE quiz_attempts
+      ADD COLUMN IF NOT EXISTS student_id      UUID,
+      ADD COLUMN IF NOT EXISTS quiz_id         UUID,
+      ADD COLUMN IF NOT EXISTS score           INTEGER DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS total_questions INTEGER DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS percentage      NUMERIC(5,2) DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS status          VARCHAR(20) DEFAULT 'completed',
+      ADD COLUMN IF NOT EXISTS start_time      TIMESTAMPTZ DEFAULT NOW(),
+      ADD COLUMN IF NOT EXISTS end_time        TIMESTAMPTZ DEFAULT NOW(),
+      ADD COLUMN IF NOT EXISTS created_at      TIMESTAMPTZ DEFAULT NOW()`);
   await exec('subjects: add icon/color/category/image', `
     ALTER TABLE subjects
       ADD COLUMN IF NOT EXISTS exam_board_code VARCHAR(20),
