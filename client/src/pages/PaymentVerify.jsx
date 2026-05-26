@@ -12,7 +12,7 @@ import {
   CheckCircle2, XCircle, Loader2, ChevronRight, RefreshCw
 } from 'lucide-react';
 
-const _rv = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const _rv = import.meta.env.VITE_API_URL || '/api';
 const API_URL = _rv.endsWith('/api') ? _rv : `${_rv}/api`;
 
 export default function PaymentVerify() {
