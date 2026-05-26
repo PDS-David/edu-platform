@@ -361,7 +361,7 @@ const RegisterPage = () => {
       else if (user.role === 'teacher') navigate('/teacher/dashboard');
       else                              navigate('/admin/dashboard');
     } catch (err) {
-      setError(err.message || err.error || 'Registration failed. Please try again.');
+      setError(err.message || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }

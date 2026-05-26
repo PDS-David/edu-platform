@@ -32,9 +32,8 @@ const LoginPage = () => {
         navigate(redirectMap[user.role] || '/');
       }
     } catch (err) {
-      // Defensively extract string — err.error may be an object if server sends {error: {message:...}}
-      const raw = err?.error ?? err?.message ?? '';
-      setError(typeof raw === 'string' ? raw : (raw?.message || 'Invalid email or password'));
+      // apiClient normalises all errors to { message: string } — use err.message directly
+      setError(err?.message || 'Invalid email or password');
     } finally {
       setLoading(false);
     }
