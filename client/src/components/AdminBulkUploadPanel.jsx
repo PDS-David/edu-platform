@@ -61,7 +61,7 @@ async function deleteResource(id) {
     await api.delete(`/resources/${id}`);
     return true;
   } catch (err) {
-    alert(err?.error || err?.message || 'Failed to delete file.');
+    alert(err?.message || 'Failed to delete file.');
     return false;
   }
 }
@@ -207,7 +207,7 @@ function MetaForm({ file, onSave, onDismiss, onSuccess }) {
           });
           topicId = r?.data?.id || '';
         } catch (err) {
-          setMsg(err?.error || 'Could not create the new topic.');
+          setMsg(err?.message || 'Could not create the new topic.');
           setSaving(false);
           return;
         }
@@ -225,7 +225,7 @@ function MetaForm({ file, onSave, onDismiss, onSuccess }) {
           });
           subtopicId = r?.data?.id || '';
         } catch (err) {
-          setMsg(err?.error || 'Could not create the new subtopic.');
+          setMsg(err?.message || 'Could not create the new subtopic.');
           setSaving(false);
           return;
         }
@@ -243,7 +243,7 @@ function MetaForm({ file, onSave, onDismiss, onSuccess }) {
       if (onSuccess) onSuccess(`✅ "${form.title.trim() || file.title}" saved & published successfully.`);
       onSave(file.id);
     } catch (err) {
-      setMsg(err?.error || 'Save failed.');
+      setMsg(err?.message || 'Save failed.');
       setSaving(false);
     }
   };
