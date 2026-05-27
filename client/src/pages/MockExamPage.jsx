@@ -69,7 +69,7 @@ function ExamQuestion({ question, questionNumber, selected, onSelect }) {
         <div className="px-5 pb-5 space-y-2">
           {question.options?.map((opt, i) => (
             <button
-              key={opt.id}
+              key={opt.id ?? i}
               onClick={() => onSelect(opt.id)}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${
                 selected === opt.id
