@@ -6,7 +6,7 @@ import api from "../services/apiClient";
 import {
   FileText, Video, Music, File, Download,
   Zap, ClipboardList, BarChart2, BookOpen, TrendingUp,
-  Flame, Target, ChevronDown, ChevronUp, GraduationCap,
+  Flame, Target, ChevronDown, ChevronUp, GraduationCap, ScanLine,
 } from "lucide-react";
 
 // ── Push type constants ───────────────────────────────────────────────────────
@@ -311,6 +311,7 @@ export default function StudentDashboard() {
     { label: "Past Papers", icon: FileText,     path: "/past-papers"        },
     { label: "Mock Exam",   icon: ClipboardList,path: null, onClick: () => setShowMockPicker(true) },
     { label: "Analytics",   icon: TrendingUp,   path: "/student/analytics"  },
+    { label: "AI Marking",  icon: ScanLine,     path: "/student/mark-image" },
     { label: "Exam Types",  icon: Download,     path: "/student/exam-types" },
   ];
 
