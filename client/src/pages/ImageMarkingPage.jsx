@@ -103,7 +103,7 @@ export default function ImageMarkingPage() {
     if (!examBoard) return;
     setSubjectId('');
     setSubjectName('');
-    api.get('/subjects', { params: { exam_board_code: examBoard } })
+    api.get('/subjects', { params: { board: examBoard } })
       .then(r => {
         const list = Array.isArray(r) ? r : (r.data || []);
         setSubjectOptions(list);
@@ -176,7 +176,7 @@ export default function ImageMarkingPage() {
           document.getElementById('marking-result')?.scrollIntoView({ behavior: 'smooth' });
         }, 100);
       } else {
-        setError(res?.message || 'Marking failed. Please try again.');
+        setError((res && res.error) || 'Marking failed. Please try again.');
       }
     } catch (err) {
       setError(err?.error || err?.message || 'Something went wrong. Please try again.');

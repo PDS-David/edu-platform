@@ -151,7 +151,7 @@ export default function StudentTestPage() {
           </div>
           <div className="px-5 pb-5 space-y-2">
             {q.options?.map((opt, i) => (
-              <button key={opt.id ?? i}
+              <button key={opt.id}
                 onClick={() => setAnswers(prev => ({ ...prev, [q.id]: opt.id }))}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${
                   answers[q.id] === opt.id ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-blue-300'

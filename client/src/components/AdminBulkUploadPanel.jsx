@@ -61,7 +61,7 @@ async function deleteResource(id) {
     await api.delete(`/resources/${id}`);
     return true;
   } catch (err) {
-    alert(err?.message || 'Failed to delete file.');
+    alert(err?.error || err?.message || 'Failed to delete file.');
     return false;
   }
 }
@@ -207,7 +207,7 @@ function MetaForm({ file, onSave, onDismiss, onSuccess }) {
           });
           topicId = r?.data?.id || '';
         } catch (err) {
-          setMsg(err?.message || 'Could not create the new topic.');
+          setMsg(err?.error || 'Could not create the new topic.');
           setSaving(false);
           return;
         }
@@ -225,7 +225,7 @@ function MetaForm({ file, onSave, onDismiss, onSuccess }) {
           });
           subtopicId = r?.data?.id || '';
         } catch (err) {
-          setMsg(err?.message || 'Could not create the new subtopic.');
+          setMsg(err?.error || 'Could not create the new subtopic.');
           setSaving(false);
           return;
         }
@@ -243,7 +243,7 @@ function MetaForm({ file, onSave, onDismiss, onSuccess }) {
       if (onSuccess) onSuccess(`✅ "${form.title.trim() || file.title}" saved & published successfully.`);
       onSave(file.id);
     } catch (err) {
-      setMsg(err?.message || 'Save failed.');
+      setMsg(err?.error || 'Save failed.');
       setSaving(false);
     }
   };
@@ -839,23 +839,13 @@ export default function AdminBulkUploadPanel() {
   // ── After metadata saved ──────────────────────────────────────────────────────
   const handleMetaSaved = (fileId) => {
     setAssigningMeta(null);
-    // Mark the file as no longer staged in local state (metadata is saved,
-    // is_staged=false on server) but keep it in the list so the admin can
-    // immediately open the Students form without it disappearing.
-    setStaged(prev => prev.map(f =>
-      f.id === fileId ? { ...f, is_staged: false, _justPublished: true } : f
-    ));
-    setAssigningUsers(fileId);
-    showToast('✅ Metadata saved — now assign it to students below.', 'success');
+    setStaged(prev => prev.filter(f => f.id !== fileId));
   };
 
   // ── After users assigned ──────────────────────────────────────────────────────
   const handleUsersDone = (fileId) => {
     setAssigningUsers(null);
-    // Now fully done — remove from staging tray and reload to get clean state
-    setStaged(prev => prev.filter(f => f.id !== fileId));
-    // Reload to pick up any other changes
-    loadStaged();
+    // File stays in staged until metadata is also set — just close the form
   };
 
   // ── MIME guesser from filename extension ─────────────────────────────────────
@@ -1012,15 +1002,8 @@ export default function AdminBulkUploadPanel() {
                       )}
                     </div>
                   </div>
-                  <StatusBadge staged={file.is_staged !== false} />
-                  {file._justPublished && (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
-                      ✓ Ready to push
-                    </span>
-                  )}
+                  <StatusBadge staged={true} />
                   <div className="flex items-center gap-1.5 shrink-0">
-                    {/* Only show Assign button if not yet published */}
-                    {!file._justPublished && (
                     <button
                       onClick={() => {
                         setAssigningMeta(assigningMeta === file.id ? null : file.id);
@@ -1034,16 +1017,8 @@ export default function AdminBulkUploadPanel() {
                       <Tag size={12} />
                       {assigningMeta === file.id ? 'Cancel' : 'Assign'}
                     </button>
-                    )}
                     <button
                       onClick={() => {
-                        // If no metadata yet, open MetaForm first — server will block assign-users otherwise
-                        if (!file.subject_id && !file.topic_id && !file._justPublished) {
-                          setAssigningMeta(assigningMeta === file.id ? null : file.id);
-                          setAssigningUsers(null);
-                          showToast('Assign subject/topic metadata first, then push to students.', 'info');
-                          return;
-                        }
                         setAssigningUsers(assigningUsers === file.id ? null : file.id);
                         setAssigningMeta(null);
                       }}

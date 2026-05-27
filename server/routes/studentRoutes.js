@@ -358,9 +358,8 @@ router.get('/my-subjects', protect, async (req, res) => {
 
     let result = [...merged.values()];
 
-    // If student has no subjects at all, auto-enroll them in subjects matching
-    // their chosen exam boards (from pending_exam_board_ids or student_exam_types).
-    // This prevents showing all 213 subjects to a fresh student.
+    // If student has no subjects at all, auto-enroll them in all active seeded subjects
+    // (subjects that have at least one topic) so they see content immediately
     if (result.length === 0) {
       try {
         // Ensure table exists
@@ -376,39 +375,16 @@ router.get('/my-subjects', protect, async (req, res) => {
           { type: QueryTypes.RAW }
         ).catch(() => {});
 
-        // Try to get the student's exam board IDs from student_exam_types first,
-        // then fall back to pending_exam_board_ids, then enroll in nothing.
-        const boardRows = await sequelize.query(
-          `SELECT DISTINCT exam_board_id::text AS exam_board_id
-           FROM student_exam_types
-           WHERE student_id = :studentId AND is_active = true
-           UNION
-           SELECT DISTINCT unnest(pending_exam_board_ids)::text AS exam_board_id
-           FROM users
-           WHERE id = :studentId
-             AND pending_exam_board_ids IS NOT NULL
-             AND array_length(pending_exam_board_ids, 1) > 0`,
-          { replacements: { studentId }, type: QueryTypes.SELECT }
-        ).catch(() => []);
-
-        const boardIds = boardRows.map(r => r.exam_board_id).filter(Boolean);
-
-        if (boardIds.length > 0) {
-          // Enroll only in subjects belonging to the student's chosen exam boards
-          // that also have at least one topic.
-          await sequelize.query(
-            `INSERT INTO student_subjects (student_id, subject_id, is_active)
-             SELECT :studentId, s.id, true
-             FROM subjects s
-             WHERE s.is_active = true
-               AND s.exam_board_id::text = ANY(:boardIds)
-               AND EXISTS (SELECT 1 FROM topics t WHERE t.subject_id = s.id)
-             ON CONFLICT (student_id, subject_id) DO NOTHING`,
-            { replacements: { studentId, boardIds }, type: QueryTypes.INSERT }
-          );
-        }
-        // If no exam boards selected yet (brand new student), return empty —
-        // onboarding flow will prompt them to pick exam boards.
+        // Enroll in subjects that have topics
+        await sequelize.query(
+          `INSERT INTO student_subjects (student_id, subject_id, is_active)
+           SELECT :studentId, s.id, true
+           FROM subjects s
+           WHERE s.is_active = true
+             AND EXISTS (SELECT 1 FROM topics t WHERE t.subject_id = s.id)
+           ON CONFLICT (student_id, subject_id) DO NOTHING`,
+          { replacements: { studentId }, type: QueryTypes.INSERT }
+        );
 
         // Re-fetch
         ownSubjects = await sequelize.query(

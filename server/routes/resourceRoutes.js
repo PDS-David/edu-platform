@@ -526,8 +526,7 @@ router.put(
         subtopic_id = null,
         subject_id = null,
         push_type = 'learning_material',
-        content_kind = 'learning_material',
-        keep_staged = false
+        content_kind = 'learning_material'
       } = req.body || {};
 
       // At least one of subject/topic must be present, per the UI contract.
@@ -539,9 +538,6 @@ router.put(
       }
 
       const safeKind = content_kind === 'question_bank' ? 'question_bank' : 'learning_material';
-      // keep_staged=true: save metadata but leave in staging tray so admin
-      // can chain directly to the Students (assign-users) step
-      const newStagedValue = keep_staged ? true : false;
 
       const [rows] = await sequelize.query(
         `UPDATE resources

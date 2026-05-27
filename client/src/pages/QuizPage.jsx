@@ -36,17 +36,18 @@ function QuizQuestion({ question, questionNumber, submitRef, onAnswered }) {
     setSubmitting(true);
     try {
       const timeTaken = Date.now() - startTime.current;
+      // api interceptor returns response.data directly
+      // so `res` = { success, is_correct, correct_options, explanation, ... }
       const res = await api.post(`/questions/${question.id}/answer`, {
         selected_option_id: selected,
         time_taken_ms:      timeTaken,
       });
-      // apiClient normalises: res.data = the inner payload { is_correct, explanation, ... }
-      setResult(res.data ?? res);
+      setResult(res);
 
       // Fire AI explanation in background — non-blocking
       setExplainLoad(true);
       api.post('/ai/explain', { question_id: question.id, selected_option_id: selected })
-        .then(r => { if (r.success) setAiExplain(r.data?.explanation ?? r.explanation); })
+        .then(r => { if (r.success) setAiExplain(r.explanation); })
         .catch(() => {})
         .finally(() => setExplainLoad(false));
 
@@ -68,12 +69,7 @@ function QuizQuestion({ question, questionNumber, submitRef, onAnswered }) {
 
   const optStyle = (optId) => {
     if (!result) return selected === optId ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-blue-300 cursor-pointer';
-    // Backend returns correct_answer as text — match against option_text
-    const correctOpt = question?.options?.find(o =>
-      String(o.option_text || '').trim().toLowerCase() ===
-      String(result.correct_answer || '').trim().toLowerCase()
-    );
-    const isCorrect  = correctOpt ? correctOpt.id === optId : false;
+    const isCorrect  = result.correct_options?.some(c => c.id === optId);
     const isSelected = selected === optId;
     if (isCorrect)                return 'border-blue-400 bg-blue-50';
     if (isSelected && !isCorrect) return 'border-red-300 bg-red-50';
@@ -106,7 +102,7 @@ function QuizQuestion({ question, questionNumber, submitRef, onAnswered }) {
         <div className="px-5 pb-4 space-y-2">
           {question.options?.map((opt, i) => (
             <button
-              key={opt.id ?? i}
+              key={opt.id}
               onClick={() => !result && setSelected(opt.id)}
               disabled={!!result}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${optStyle(opt.id)}`}
@@ -115,10 +111,10 @@ function QuizQuestion({ question, questionNumber, submitRef, onAnswered }) {
                 {LABELS[i]}
               </span>
               <span className="text-sm text-gray-800 flex-1">{opt.option_text}</span>
-              {result && correctOpt?.id === opt.id && (
+              {result && result.correct_options?.some(c => c.id === opt.id) && (
                 <CheckCircle size={14} className="text-blue-500 shrink-0" />
               )}
-              {result && selected === opt.id && correctOpt?.id !== opt.id && (
+              {result && selected === opt.id && !result.correct_options?.some(c => c.id === opt.id) && (
                 <XCircle size={14} className="text-red-400 shrink-0" />
               )}
             </button>
@@ -218,7 +214,7 @@ export default function QuizPage() {
     })
       .then(r => setQuestions(r.data || []))
       .catch(err => {
-        if (err.message === 'free_limit_reached') setUpgradeWall(true);
+        if (err.error === 'free_limit_reached') setUpgradeWall(true);
       })
       .finally(() => setLoading(false));
   }, [subjectId, paper, examBoardName]);
@@ -246,15 +242,9 @@ export default function QuizPage() {
         total_time_ms: Date.now() - quizStartMs.current,
         answers:       answersRef.current,
       });
-      // /quizzes/attempt returns full result in res.data — no attempt_id to fetch.
-      // Pass result inline via route state so QuizResultsPage avoids a second fetch.
-      const result = res.data ?? res;
-      const attemptId = result.attempt_id || 'inline';
+      const attemptId = res.attempt_id ?? res.data?.attempt_id;
       navigate(`/student/quiz-results/${attemptId}`, {
-        state: {
-          subtopicId, subtopicName, subjectName, examBoardName,
-          inlineResult: result,
-        },
+        state: { subtopicId, subtopicName, subjectName, examBoardName },
       });
     } catch {
       alert('Failed to submit quiz. Please try again.');

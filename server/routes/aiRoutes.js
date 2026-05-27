@@ -21,10 +21,6 @@ const { QueryTypes }         = require('sequelize');
 const sequelize              = require('../config/database');
 const { generate }           = require('../services/ai');
 const { GoogleGenAI }        = require('@google/genai');
-const multer                 = require('multer');
-
-// Multer — memory storage for image marking (base64 conversion below)
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 // ── POST /api/ai/chat ─────────────────────────────────────────────────────────
 router.post('/chat', protect, async (req, res) => {
@@ -269,82 +265,48 @@ Total length: under 300 words. Plain text only — no markdown, no headers with 
 });
 
 // ── POST /api/ai/mark-image ───────────────────────────────────────────────────
-// Accepts multipart/form-data with field 'image' (file) OR JSON body image_base64.
-// Returns: { success: true, data: { marksAwarded, totalMarks, percentage, grade,
-//            feedback, strengths:[], improvements:[], modelAnswer?, readabilityNote? } }
-router.post('/mark-image', protect, upload.single('image'), async (req, res) => {
-  // Accept file upload OR raw base64
-  let image_base64 = req.body?.image_base64 || null;
-  if (req.file) image_base64 = req.file.buffer.toString('base64');
-  if (!image_base64) {
-    return res.status(400).json({ success: false, error: 'image is required (upload file or send image_base64)' });
-  }
-  image_base64 = image_base64.replace(/^data:image\/\w+;base64,/, '');
-
-  const question_text = req.body?.question_text || 'Not specified';
-  const max_marks     = parseInt(req.body?.total_marks || req.body?.max_marks) || 10;
-  const mark_scheme   = req.body?.mark_scheme || '';
+// v5: Updated to use @google/genai SDK
+router.post('/mark-image', protect, async (req, res) => {
+  const { image_base64, question_text, max_marks = 10 } = req.body;
+  if (!image_base64) return res.status(400).json({ success: false, error: 'image_base64 is required' });
 
   if (!process.env.GEMINI_API_KEY) {
-    return res.status(503).json({ success: false, error: 'AI marking not configured — GEMINI_API_KEY missing' });
+    return res.status(503).json({ success: false, error: 'AI marking not configured' });
   }
 
   try {
-    const ai     = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    const prompt = `You are a Nigerian exam marker. Mark this student\'s handwritten answer strictly.
-
-Question: "${question_text}"
+    const ai       = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const prompt   = `You are a Nigerian exam marker. Mark this student's handwritten answer.
+Question: "${question_text || 'Not specified'}"
 Maximum marks: ${max_marks}
-${mark_scheme ? `Mark scheme: "${mark_scheme}"` : ''}
-
-Return ONLY valid JSON (no markdown):
-{
-  "marks_awarded": <integer 0-${max_marks}>,
-  "feedback": "<2-3 sentence overall feedback>",
-  "strengths": ["<point 1>","<point 2>"],
-  "improvements": ["<point 1>","<point 2>"],
-  "model_answer": "<brief model answer>",
-  "readability_note": ""
-}`;
+Award marks fairly. Return ONLY valid JSON: {"marks_awarded": N, "feedback": "2-3 sentences", "strengths": "what was good", "improvements": "what to improve"}`;
 
     const response = await ai.models.generateContent({
       model:    'gemini-2.0-flash',
-      contents: [{ parts: [
-        { text: prompt },
-        { inlineData: { mimeType: req.file?.mimetype || 'image/jpeg', data: image_base64 } },
-      ]}],
+      contents: [
+        {
+          parts: [
+            { text: prompt },
+            {
+              inlineData: {
+                mimeType: 'image/jpeg',
+                data:     image_base64.replace(/^data:image\/\w+;base64,/, ''),
+              },
+            },
+          ],
+        },
+      ],
     });
 
     const raw    = response.text.replace(/```json|```/g, '').trim();
     const parsed = JSON.parse(raw);
-
-    const marksAwarded = Math.min(Math.max(parseInt(parsed.marks_awarded) || 0, 0), max_marks);
-    const percentage   = max_marks > 0 ? Math.round((marksAwarded / max_marks) * 100) : 0;
-
-    // WAEC-style grade
-    const grade = percentage >= 75 ? 'A1'
-      : percentage >= 70 ? 'B2' : percentage >= 65 ? 'B3'
-      : percentage >= 60 ? 'C4' : percentage >= 55 ? 'C5'
-      : percentage >= 50 ? 'C6' : percentage >= 45 ? 'D7'
-      : percentage >= 40 ? 'E8' : 'F9';
-
-    // Always return arrays
-    const toArr = (v) => Array.isArray(v) ? v.filter(Boolean)
-      : (typeof v === 'string' && v.trim()) ? [v.trim()] : [];
-
     return res.json({
-      success: true,
-      data: {
-        marksAwarded,
-        totalMarks:      max_marks,
-        percentage,
-        grade,
-        feedback:        parsed.feedback         || 'No feedback generated.',
-        strengths:       toArr(parsed.strengths),
-        improvements:    toArr(parsed.improvements),
-        modelAnswer:     parsed.model_answer     || '',
-        readabilityNote: parsed.readability_note || '',
-      },
+      success:       true,
+      marks_awarded: Math.min(parsed.marks_awarded || 0, max_marks),
+      max_marks,
+      feedback:      parsed.feedback || '',
+      strengths:     parsed.strengths || '',
+      improvements:  parsed.improvements || '',
     });
   } catch (err) {
     console.error('[POST /ai/mark-image]', err.message);

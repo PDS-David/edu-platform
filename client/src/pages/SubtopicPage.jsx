@@ -385,10 +385,10 @@ function MCQQuestion({ question, questionNumber, totalQuestions, onAnswer, onPre
         selected_answer:  selected,                        // option text
         time_taken_ms:    Date.now() - startTime.current,
       });
-      setResult(res.data ?? res);
+      setResult(res);
       setExplainLoad(true);
       api.post('/ai/explain', { question_id: question.id })
-        .then(r => { if (r.success) setAiExplain(r.data?.explanation ?? r.explanation); })
+        .then(r => { if (r.success) setAiExplain(r.explanation); })
         .catch(() => {})
         .finally(() => setExplainLoad(false));
     } catch { alert('Failed to submit. Try again.'); }
@@ -515,7 +515,7 @@ function OpenAnswerQuestion({ question, questionNumber, totalQuestions, dismisse
         selected_option_id: null,
         typed_answer:       answer,
       });
-      setResult(r.data?.explanation ?? r.explanation ?? 'AI feedback submitted.');
+      setResult(r.explanation || 'AI feedback submitted.');
     } catch { setResult('AI marking not available. Continue to next question.'); }
     finally  { setLoading(false); }
   };
