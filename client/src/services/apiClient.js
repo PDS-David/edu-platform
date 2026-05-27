@@ -21,7 +21,7 @@ const API_BASE_URL = normalised.endsWith("/api")
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000,
+  timeout: 90000, // 90 s — AI vision/marking calls can take up to 40 s
 });
 
 // ─────────────────────────────────────────────

@@ -265,53 +265,120 @@ Total length: under 300 words. Plain text only — no markdown, no headers with 
 });
 
 // ── POST /api/ai/mark-image ───────────────────────────────────────────────────
-// v5: Updated to use @google/genai SDK
-router.post('/mark-image', protect, async (req, res) => {
-  const { image_base64, question_text, max_marks = 10 } = req.body;
-  if (!image_base64) return res.status(400).json({ success: false, error: 'image_base64 is required' });
+// v6: Receives multipart/form-data binary file via multer (memoryStorage).
+//     Delegates to aiService.markImage() for the actual Gemini multimodal call.
+//     Returns camelCase fields matching the frontend's result shape.
+const multer = require('multer');
+const { markImage } = require('../services/aiService');
 
-  if (!process.env.GEMINI_API_KEY) {
-    return res.status(503).json({ success: false, error: 'AI marking not configured' });
-  }
+const imageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits:  { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  fileFilter: (_req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+    cb(null, allowed.includes(file.mimetype));
+  },
+}).single('image');
 
-  try {
-    const ai       = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    const prompt   = `You are a Nigerian exam marker. Mark this student's handwritten answer.
-Question: "${question_text || 'Not specified'}"
-Maximum marks: ${max_marks}
-Award marks fairly. Return ONLY valid JSON: {"marks_awarded": N, "feedback": "2-3 sentences", "strengths": "what was good", "improvements": "what to improve"}`;
+// WAEC-style grade from percentage
+function calcGrade(pct) {
+  if (pct >= 75) return 'A1';
+  if (pct >= 70) return 'B2';
+  if (pct >= 65) return 'B3';
+  if (pct >= 60) return 'C4';
+  if (pct >= 55) return 'C5';
+  if (pct >= 50) return 'C6';
+  if (pct >= 45) return 'D7';
+  if (pct >= 40) return 'E8';
+  return 'F9';
+}
 
-    const response = await ai.models.generateContent({
-      model:    'gemini-2.0-flash',
-      contents: [
-        {
-          parts: [
-            { text: prompt },
-            {
-              inlineData: {
-                mimeType: 'image/jpeg',
-                data:     image_base64.replace(/^data:image\/\w+;base64,/, ''),
-              },
-            },
-          ],
-        },
-      ],
-    });
+router.post('/mark-image', protect, (req, res) => {
+  imageUpload(req, res, async (uploadErr) => {
+    // ── Multer error (wrong type, too large, etc.)
+    if (uploadErr) {
+      console.error('[POST /ai/mark-image] Multer error:', uploadErr.message);
+      return res.status(400).json({
+        success: false,
+        error: uploadErr.code === 'LIMIT_FILE_SIZE'
+          ? 'Image must be under 10 MB.'
+          : 'Invalid image file. Please upload a JPEG, PNG, WEBP or HEIC image.',
+      });
+    }
 
-    const raw    = response.text.replace(/```json|```/g, '').trim();
-    const parsed = JSON.parse(raw);
-    return res.json({
-      success:       true,
-      marks_awarded: Math.min(parsed.marks_awarded || 0, max_marks),
-      max_marks,
-      feedback:      parsed.feedback || '',
-      strengths:     parsed.strengths || '',
-      improvements:  parsed.improvements || '',
-    });
-  } catch (err) {
-    console.error('[POST /ai/mark-image]', err.message);
-    return res.status(500).json({ success: false, error: 'Image marking failed: ' + err.message });
-  }
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No image uploaded. Send as multipart/form-data with field name "image".' });
+    }
+
+    const questionText = (req.body.question_text || '').trim();
+    const subject      = (req.body.subject       || 'General').trim();
+    const examBoard    = (req.body.exam_board     || 'WAEC').trim();
+    const totalMarks   = Math.min(Math.max(parseInt(req.body.total_marks) || 10, 1), 100);
+    const markScheme   = (req.body.mark_scheme    || '').trim() || null;
+
+    if (!questionText) {
+      return res.status(400).json({ success: false, error: 'question_text is required.' });
+    }
+
+    if (!process.env.GEMINI_API_KEY) {
+      console.error('[POST /ai/mark-image] GEMINI_API_KEY not set');
+      return res.status(503).json({ success: false, error: 'AI marking is not configured.' });
+    }
+
+    // Convert binary buffer → base64 (strip any existing data-URI prefix)
+    const imageBase64 = req.file.buffer.toString('base64');
+    const mimeType    = req.file.mimetype || 'image/jpeg';
+
+    console.log(`[POST /ai/mark-image] user=${req.user?.id} subject=${subject} board=${examBoard} marks=${totalMarks} size=${req.file.size}B mime=${mimeType}`);
+
+    try {
+      const marking = await markImage({
+        imageBase64,
+        mimeType,
+        questionText,
+        markScheme,
+        subject,
+        examBoard,
+        totalMarks,
+      });
+
+      // Normalise to the shape the frontend expects
+      const marksAwarded = Math.min(Math.max(Number(marking.marks_awarded) || 0, 0), totalMarks);
+      const percentage   = marking.percentage != null
+        ? Math.round(marking.percentage)
+        : Math.round((marksAwarded / totalMarks) * 100);
+      const grade        = marking.grade || calcGrade(percentage);
+
+      // strengths/improvements must be arrays
+      const toArray = (v) => Array.isArray(v) ? v : (v ? String(v).split(/[.;\n]+/).map(s => s.trim()).filter(Boolean) : []);
+
+      const payload = {
+        marksAwarded,
+        totalMarks,
+        percentage,
+        grade,
+        feedback:     marking.feedback     || '',
+        strengths:    toArray(marking.strengths),
+        improvements: toArray(marking.improvements),
+        modelAnswer:  marking.model_answer || marking.modelAnswer || null,
+        readabilityNote: marking.readability_note || marking.readabilityNote || null,
+      };
+
+      console.log(`[POST /ai/mark-image] done: ${marksAwarded}/${totalMarks} (${percentage}%) grade=${grade}`);
+
+      return res.json({ success: true, data: payload });
+
+    } catch (err) {
+      console.error('[POST /ai/mark-image] Gemini error:', err.message);
+      const status = err.statusCode === 503 ? 503 : 500;
+      return res.status(status).json({
+        success: false,
+        error: err.statusCode === 503
+          ? 'AI is temporarily busy. Please try again in a moment.'
+          : 'Image marking failed. Please try again.',
+      });
+    }
+  });
 });
 
 // ── GET /api/ai/predict-grade/:userId/:subjectId ──────────────────────────────
