@@ -106,7 +106,7 @@ function QuizQuestion({ question, questionNumber, submitRef, onAnswered }) {
         <div className="px-5 pb-4 space-y-2">
           {question.options?.map((opt, i) => (
             <button
-              key={opt.id}
+              key={opt.id ?? i}
               onClick={() => !result && setSelected(opt.id)}
               disabled={!!result}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${optStyle(opt.id)}`}
