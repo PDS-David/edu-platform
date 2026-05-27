@@ -429,15 +429,15 @@ router.get('/teacher-assignments', protect, adminOnly, async (req, res) => {
 });
 
 router.post('/teacher-assignments', protect, adminOnly, async (req, res) => {
-  const { teacher_id, subject_id } = req.body;
+  const { teacher_id, subject_id, exam_board_id } = req.body;
   if (!teacher_id || !subject_id) return error(res, 'teacher_id and subject_id required', 400);
 
   try {
     await sequelize.query(
-      `INSERT INTO teacher_subjects (teacher_id, subject_id, is_active)
-       VALUES (:t, :s, true)
-       ON CONFLICT (teacher_id, subject_id) DO UPDATE SET is_active = true`,
-      { replacements: { t: teacher_id, s: subject_id }, type: QueryTypes.INSERT }
+      `INSERT INTO teacher_subjects (teacher_id, subject_id, exam_board_id, is_active)
+       VALUES (:t, :s, :eb, true)
+       ON CONFLICT (teacher_id, subject_id) DO UPDATE SET is_active = true, exam_board_id = EXCLUDED.exam_board_id`,
+      { replacements: { t: teacher_id, s: subject_id, eb: exam_board_id || null }, type: QueryTypes.INSERT }
     );
     return success(res, { message: 'Assignment saved' });
   } catch (err) {

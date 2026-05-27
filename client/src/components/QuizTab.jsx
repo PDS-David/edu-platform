@@ -54,7 +54,7 @@ const TILE_COLOURS = [
 // ══════════════════════════════════════════════════════════════════════════════
 export default function QuizTab({ subtopicId, subtopic, onQuizComplete }) {
   const [phase, setPhase]           = useState('setup');   // setup | inprogress | results
-  const [attemptId, setAttemptId]   = useState(null);
+  const [quizResult, setQuizResult] = useState(null);
   const [selectedPaper, setSelectedPaper] = useState('all');
   const [attemptCount, setAttemptCount]   = useState(0);
   const navigate = useNavigate();
@@ -83,7 +83,7 @@ export default function QuizTab({ subtopicId, subtopic, onQuizComplete }) {
       subtopicId={subtopicId}
       subtopic={subtopic}
       selectedPaper={selectedPaper}
-      onFinish={(id) => { setAttemptId(id); setPhase('results'); }}
+      onFinish={(payload) => { setQuizResult(payload); setPhase('results'); }}
       navigate={navigate}
     />
   );
@@ -92,7 +92,7 @@ export default function QuizTab({ subtopicId, subtopic, onQuizComplete }) {
     <ResultsScreen
       subtopicId={subtopicId}
       subtopic={subtopic}
-      attemptId={attemptId}
+      quizResult={quizResult}
       onRevise={() => navigate(`/student/subtopic/${subtopicId}?tab=practice`)}
       onQuizComplete={onQuizComplete}
     />
@@ -270,14 +270,14 @@ function InProgressScreen({ subtopicId, subtopic, selectedPaper, onFinish, navig
         paper_type:    selectedPaper,
         total_time_ms: (TOTAL_SECS - remainingRef.current) * 1000,
         answers: questions.map((q, i) => ({
-          question_id:        q.id,
-          selected_option_id: answersRef.current[i] ?? null,
-          time_taken_ms:      0,
+          question_id:     q.id,
+          selected_answer: answersRef.current[i] ?? null,  // option_text or open text
+          time_taken_seconds: 0,
         })),
       });
-      onFinish(res.attempt_id || res.id);
+      // Pass the full result object — ResultsScreen uses it directly, no second API call
+      onFinish(res);
     } catch {
-      // fallback — pass null
       onFinish(null);
     }
   };
@@ -387,12 +387,12 @@ function InProgressScreen({ subtopicId, subtopic, selectedPaper, onFinish, navig
             {isMCQ ? (
               <div className="space-y-2">
                 {(q.options || []).map((opt, i) => {
-                  const isSelected = answersRef.current[current] === (opt.id || i);
+                  const isSelected = answersRef.current[current] === (opt.option_text || opt.text || String(i));
                   return (
                     <button
                       key={i}
                       onClick={() => {
-                        answersRef.current[current] = opt.id || i;
+                        answersRef.current[current] = opt.option_text || opt.text || String(i);
                         // force re-render
                         setCurrent(c => c); // same index triggers re-render
                         setOpenAnswers(prev => ({ ...prev }));
@@ -601,63 +601,41 @@ function HintModal({ question, onClose }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // PHASE 3 — RESULTS
 // ══════════════════════════════════════════════════════════════════════════════
-function ResultsScreen({ subtopicId, subtopic, attemptId, onRevise, onQuizComplete }) {
-  const [results,       setResults]       = useState(null);
-  const [loading,       setLoading]       = useState(true);
-  const [submitProgress,setSubmitProgress]= useState(null); // "Submitting question X of Y..."
-  const [selectedQ,     setSelectedQ]     = useState(0);
-  const [schemeOpen,    setSchemeOpen]    = useState({});
-  const [reviseToast,   setReviseToast]   = useState(true);
+function ResultsScreen({ subtopicId, subtopic, quizResult, onRevise, onQuizComplete }) {
+  const [selectedQ,  setSelectedQ]  = useState(0);
+  const [schemeOpen, setSchemeOpen] = useState({});
+  const [reviseToast,setReviseToast]= useState(true);
 
+  // Mark quiz complete once on mount
   useEffect(() => {
-    const load = async () => {
-      if (!attemptId) { setLoading(false); return; }
-      try {
-        const r = await api.get(`/quizzes/attempt/${attemptId}`);
-        setResults(r);
-        // Mark quiz complete
-        await api.post(`/subtopic-progress/${subtopicId}`, { task: 'quiz' });
-        onQuizComplete?.();
-      } catch {
-        setResults(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, [attemptId, subtopicId]);
+    if (!quizResult) return;
+    api.post(`/subtopic-progress/${subtopicId}`, { task: 'quiz' }).catch(() => {});
+    onQuizComplete?.();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (loading) return (
-    <div className="min-h-screen bg-[#0a4a3f] flex flex-col items-center justify-center gap-4 px-4">
-      <div className="w-10 h-10 border-4 border-blue-300 border-t-transparent rounded-full animate-spin" />
-      <p className="text-white/80 text-sm">
-        {submitProgress || 'Submitting your answers...'}
-      </p>
-      <div className="w-48 bg-white/20 rounded-full h-2">
-        <div className="h-2 bg-blue-400 rounded-full transition-all duration-500" style={{ width: '80%' }} />
-      </div>
-    </div>
-  );
-
-  if (!results) return (
+  if (!quizResult) return (
     <div className="min-h-screen bg-[#0a4a3f] flex items-center justify-center">
       <div className="text-white/60 text-sm">Could not load results. Please try again.</div>
     </div>
   );
 
-  const questions    = results.questions || results.answers || [];
-  const score        = results.score        ?? 0;
-  const totalMarks   = results.total_marks  ?? questions.length;
-  const timeTaken    = results.time_taken   ?? 0;
-  const accuracy     = results.accuracy     ?? (totalMarks > 0 ? Math.round((score / totalMarks) * 100) : 0);
-  const avgScore     = results.avg_score    ?? '--';
-  const avgTime      = results.avg_time     ?? '--';
-  const recommendation = results.recommendation || results.examiner_recommendation || '';
+  // Normalise field names — backend returns total_score/max_score/accuracy_pct/answers
+  const questions    = quizResult.answers  || quizResult.questions || [];
+  const score        = quizResult.total_score  ?? quizResult.score        ?? 0;
+  const totalMarks   = quizResult.max_score    ?? quizResult.total_marks  ?? questions.length;
+  const accuracy     = quizResult.accuracy_pct ?? quizResult.accuracy     ??
+                       (totalMarks > 0 ? Math.round((score / totalMarks) * 100) : 0);
+  const timeTaken    = quizResult.total_time_ms
+                       ? Math.round(quizResult.total_time_ms / 1000)
+                       : (quizResult.time_taken ?? 0);
+  const avgScore     = quizResult.avg_score ?? '--';
+  const avgTime      = quizResult.avg_time  ?? '--';
+  const recommendation = quizResult.recommendation || quizResult.examiner_recommendation || '';
 
   const tm = Math.floor(timeTaken / 60);
   const ts = timeTaken % 60;
 
-  const qData = questions[selectedQ] || {};
+  const qData     = questions[selectedQ] || {};
   const isCorrect = qData.is_correct;
 
   const STAT_CARDS = [
