@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, Component } from 'react';
+import { useState, useEffect, Component } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../services/apiClient';
@@ -126,7 +126,7 @@ const CatalogPanel = () => {
       if (editingType) { await api.put(`/catalog/types/${editingType.id}`, typeForm); showToast('Examination type updated'); }
       else { await api.post('/catalog/types', typeForm); showToast('Examination type created'); }
       setShowTypeModal(false); fetchTypes();
-    } catch (err) { showToast(err?.message || 'Failed to save', 'error'); }
+    } catch (err) { showToast(err?.error || 'Failed to save', 'error'); }
     finally { setSaving(false); }
   };
 
@@ -137,16 +137,16 @@ const CatalogPanel = () => {
       if (editingSubject) { await api.put(`/catalog/subjects/${editingSubject.id}`, subjectForm); showToast('Subject updated'); }
       else { await api.post(`/catalog/types/${activeTypeId}/subjects`, subjectForm); showToast('Subject added'); }
       setShowSubjectModal(false); fetchSubjects(activeTypeId); fetchTypes(); bustSubjectCache(activeTypeId);
-    } catch (err) { showToast(err?.message || 'Failed to save', 'error'); }
+    } catch (err) { showToast(err?.error || 'Failed to save', 'error'); }
     finally { setSaving(false); }
   };
 
   const confirmDelete = async () => {
     if (!showDeleteConfirm) return;
     try {
-      if (showDeleteConfirm.kind === 'type') { await api.delete(`/catalog/types/${showDeleteConfirm.id}`); showToast('Examination type deactivated'); setTypeSubjects(prev => { const copy = { ...prev }; delete copy[showDeleteConfirm.id]; return copy; }); fetchTypes(); }
+      if (showDeleteConfirm.kind === 'type') { await api.delete(`/catalog/types/${showDeleteConfirm.id}`); showToast('Examination type deactivated'); fetchTypes(); }
       else { await api.delete(`/catalog/subjects/${showDeleteConfirm.id}`); showToast('Subject deactivated'); fetchSubjects(activeTypeId); fetchTypes(); bustSubjectCache(activeTypeId); }
-    } catch (err) { showToast(err?.message || 'Failed to deactivate', 'error'); }
+    } catch (err) { showToast(err?.error || 'Failed to deactivate', 'error'); }
     finally { setShowDeleteConfirm(null); }
   };
 
@@ -253,7 +253,7 @@ const CatalogPanel = () => {
             <div><label className="block text-sm font-semibold text-gray-600 mb-1">Description</label><textarea value={subjectForm.description} onChange={(e) => setSubjectForm(f => ({ ...f, description: e.target.value }))} rows={2} className={inputCls + ' resize-none'} /></div>
             <div className="grid grid-cols-3 gap-3">
               <div><label className="block text-sm font-semibold text-gray-600 mb-1">Emoji</label><input type="text" value={subjectForm.icon_emoji} onChange={(e) => setSubjectForm(f => ({ ...f, icon_emoji: e.target.value }))} className={inputCls} /></div>
-              <div><label className="block text-sm font-semibold text-gray-600 mb-1">Color</label><div className="flex items-center gap-1.5"><input type="color" value={subjectForm.color} onChange={(e) => setSubjectForm(f => ({ ...f, color: e.target.value }))} className="w-9 h-9 rounded-lg border border-gray-300 cursor-pointer p-0.5" /><input type="text" value={subjectForm.color} onChange={(e) => { const v = e.target.value; const clean = v.startsWith('#') ? v : '#' + v; const valid = /^#[0-9A-Fa-f]{6}$/.test(clean); setSubjectForm(f => ({ ...f, color: valid ? clean : v })); }} placeholder="#7c3aed" className="flex-1 border border-gray-300 rounded-xl px-2 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-violet-300" /></div></div>
+              <div><label className="block text-sm font-semibold text-gray-600 mb-1">Color</label><div className="flex items-center gap-1.5"><input type="color" value={subjectForm.color} onChange={(e) => setSubjectForm(f => ({ ...f, color: e.target.value }))} className="w-9 h-9 rounded-lg border border-gray-300 cursor-pointer p-0.5" /><input type="text" value={subjectForm.color} onChange={(e) => setSubjectForm(f => ({ ...f, color: e.target.value }))} className="flex-1 border border-gray-300 rounded-xl px-2 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-violet-300" /></div></div>
               <div><label className="block text-sm font-semibold text-gray-600 mb-1">Level</label><input type="text" value={subjectForm.level} onChange={(e) => setSubjectForm(f => ({ ...f, level: e.target.value }))} placeholder="e.g. SS3" className={inputCls} /></div>
             </div>
             <div className="flex gap-3 pt-2">
@@ -306,15 +306,15 @@ const TeacherAssignmentPanel = () => {
 
   const fetchAll = async () => {
     setLoading(true);
-    // Run both requests independently so a failure in one never silences the other.
+    // Use allSettled so a failing assignments query never prevents teachers from loading
     const [aRes, tRes] = await Promise.allSettled([
       api.get('/admin/teacher-assignments'),
-      api.get('/admin/teachers'),
+      api.get('/users?role=teacher'),
     ]);
     if (aRes.status === 'fulfilled' && aRes.value?.success) setAssignments(aRes.value.data || []);
-    else if (aRes.status === 'rejected') console.warn('[TeacherAssignment] assignments load failed:', aRes.reason?.error ?? aRes.reason);
-    if (tRes.status === 'fulfilled') setTeachers(Array.isArray(tRes.value?.data) ? tRes.value.data : []);
-    else if (tRes.status === 'rejected') console.warn('[TeacherAssignment] teachers load failed:', tRes.reason?.error ?? tRes.reason);
+    else if (aRes.status === 'rejected') console.warn('[TeacherAssignment] assignments load failed:', aRes.reason?.error || aRes.reason);
+    if (tRes.status === 'fulfilled' && tRes.value?.data)    setTeachers(tRes.value.data || []);
+    else if (tRes.status === 'rejected') console.warn('[TeacherAssignment] teachers load failed:', tRes.reason?.error || tRes.reason);
     setLoading(false);
   };
   useEffect(() => { fetchAll(); }, []);
@@ -343,13 +343,10 @@ const TeacherAssignmentPanel = () => {
     if (!form.teacher_id || !form.exam_type_id || selectedSubjectIds.length === 0) { showToast('Teacher, Exam Type and at least one Subject are required', 'error'); return; }
     setSaving(true);
     try {
-      const results = await Promise.allSettled(selectedSubjectIds.map(subject_id => api.post('/admin/teacher-assignments', { teacher_id: form.teacher_id, subject_id, exam_board_id: form.exam_type_id })));
-      const saved   = results.filter(r => r.status === 'fulfilled').length;
-      const failed  = results.filter(r => r.status === 'rejected').length;
-      if (failed > 0) showToast(`${saved} saved, ${failed} failed — some assignments may already exist`, 'error');
-      else showToast(`${saved} assignment${saved > 1 ? 's' : ''} saved`);
+      await Promise.all(selectedSubjectIds.map(subject_id => api.post('/admin/teacher-assignments', { teacher_id: form.teacher_id, subject_id, exam_board_id: form.exam_type_id })));
+      showToast(`${selectedSubjectIds.length} assignment${selectedSubjectIds.length > 1 ? 's' : ''} saved`);
       setShowModal(false); setForm({ teacher_id: '', exam_type_id: '' }); setSelectedSubjectIds([]); setFilteredSubjects([]); fetchAll();
-    } catch (err) { showToast(err?.message || 'Failed to save', 'error'); }
+    } catch (err) { showToast(err?.error || 'Failed to save', 'error'); }
     finally { setSaving(false); }
   };
 
@@ -362,7 +359,6 @@ const TeacherAssignmentPanel = () => {
   const handleCreateTeacher = async () => {
     const { first_name, last_name, email, password } = teacherForm;
     if (!first_name.trim() || !email.trim() || !password.trim()) { showToast('First name, email and password are required', 'error'); return; }
-    if (password.length < 8) { showToast('Password must be at least 8 characters', 'error'); return; }
     setCreatingTeacher(true);
     try {
       await api.post('/auth/register', { first_name: first_name.trim(), last_name: last_name.trim(), email: email.trim(), password, role: 'teacher' });
@@ -370,7 +366,7 @@ const TeacherAssignmentPanel = () => {
       setShowCreateTeacher(false);
       setTeacherForm({ first_name: '', last_name: '', email: '', password: '' });
       fetchAll();
-    } catch (err) { showToast(err?.message || 'Failed to create teacher', 'error'); }
+    } catch (err) { showToast(err?.message || err?.error || 'Failed to create teacher', 'error'); }
     finally { setCreatingTeacher(false); }
   };
 
@@ -583,7 +579,7 @@ const AIGeneratePanel = () => {
     <div>
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2"><Sparkles size={18} className="text-violet-500" /><h3 className="font-bold text-gray-900">AI Question Generator</h3></div>
-        {pendingCount !== null && <Link to="/admin/questions/review" className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-100 px-3 py-1.5 rounded-full hover:bg-amber-200"><Zap size={12} />{pendingCount} pending review</Link>}
+        {pendingCount !== null && <a href="/admin/questions/review" className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-100 px-3 py-1.5 rounded-full hover:bg-amber-200"><Zap size={12} />{pendingCount} pending review</a>}
       </div>
       <form onSubmit={handleGenerate} className="space-y-4 max-w-lg">
         <div><label className="block text-xs font-semibold text-gray-600 mb-1">Exam Type *</label><select value={form.exam_type_id} onChange={e => handleExamTypeChange(e.target.value)} className={inputCls} required><option value="">Select exam type first…</option>{examTypesLoad ? <option disabled>Loading…</option> : examTypes.filter(et => et.is_active !== false).map(et => <option key={et.id} value={et.id}>{safeEmoji(et.icon_emoji) ? safeEmoji(et.icon_emoji) + ' ' : ''}{et.name} ({et.code})</option>)}</select></div>
@@ -631,20 +627,16 @@ const UserManagementPanel = () => {
 
   const fetchUsers = async () => {
     setLoading(true);
-    try { const r = await api.get('/users', { params: { search, role: roleFilter, page, limit: LIMIT } }); setUsers(r.data || []); setTotal(r.meta?.total ?? r.total ?? 0); }
+    try { const r = await api.get('/users', { params: { search, role: roleFilter, page, limit: LIMIT } }); setUsers(r.data || []); setTotal(r.total || 0); }
     catch { setUsers([]); }
     finally { setLoading(false); }
   };
 
-  const changeRole = async (userId, role) => {
-    if (!window.confirm(`Change this user's role to "${role}"? This takes effect immediately.`)) return;
-    try { await api.put(`/users/${userId}/role`, { role }); showToast(`Role updated to ${role}`); fetchUsers(); }
-    catch { showToast('Failed to update role', 'error'); }
-  };
+  const changeRole    = async (userId, role)           => { try { await api.put(`/users/${userId}/role`, { role }); showToast(`Role updated to ${role}`); fetchUsers(); } catch { showToast('Failed to update role', 'error'); } };
   const toggleActive  = async (userId, currentActive)  => { try { await api.put(`/users/${userId}/deactivate`, { is_active: !currentActive }); showToast(!currentActive ? 'User activated' : 'User deactivated'); fetchUsers(); } catch { showToast('Failed to update user status', 'error'); } };
   const deleteUser    = async (userId, email)          => {
     if (!window.confirm(`Delete "${email}"? Cannot be undone.`)) return;
-    try { await api.delete(`/users/${userId}`); showToast(`User ${email} deleted`); fetchUsers(); } catch (err) { showToast(err?.message || 'Failed to delete', 'error'); }
+    try { await api.delete(`/users/${userId}`); showToast(`User ${email} deleted`); fetchUsers(); } catch (err) { showToast(err?.error || 'Failed to delete', 'error'); }
   };
 
   const roleBadge = (role) => ({ student: 'bg-blue-100 text-blue-700', teacher: 'bg-violet-100 text-violet-700', admin: 'bg-red-100 text-red-700' }[role] || 'bg-gray-100 text-gray-600');
@@ -732,7 +724,7 @@ const PlatformAnalyticsPanel = () => {
     if (!notifTitle.trim() || !notifMessage.trim()) { showToast('Title and message are required', 'error'); return; }
     setNotifSending(true);
     try { const res = await api.post('/admin/send-notification', { target: notifTarget, title: notifTitle.trim(), message: notifMessage.trim() }); showToast(`Notification sent to ${res.sent ?? 0} user(s)`); setNotifModal(false); setNotifTitle(''); setNotifMessage(''); setNotifTarget('all'); }
-    catch (err) { showToast(err?.message || 'Failed to send notification', 'error'); }
+    catch (err) { showToast(err?.error || 'Failed to send notification', 'error'); }
     finally { setNotifSending(false); }
   };
 
@@ -835,11 +827,6 @@ const ScrapePastPapersForm = ({ onImported, showToast }) => {
   });
   const [busy, setBusy] = useState(false);
   const [lastSummary, setLastSummary] = useState(null);
-  const [examBoards, setExamBoards] = useState([]);
-
-  useEffect(() => {
-    api.get('/catalog/types').then(r => setExamBoards(Array.isArray(r.data) ? r.data : [])).catch(() => {});
-  }, []);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -898,9 +885,9 @@ const ScrapePastPapersForm = ({ onImported, showToast }) => {
           className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-violet-400"
         >
           <option value="">Exam type (optional)</option>
-          {examBoards.length > 0
-            ? examBoards.map(b => <option key={b.id} value={b.code}>{b.name} ({b.code})</option>)
-            : ['JAMB','WAEC','NECO','GCE_OL','GCE_AL','IELTS','TOEFL','SAT','JUPEB'].map(c => <option key={c} value={c}>{c}</option>)}
+          {['JAMB','WAEC','NECO','GCE_OL','GCE_AL','IELTS','TOEFL','SAT','JUPEB'].map(c => (
+            <option key={c} value={c}>{c}</option>
+          ))}
         </select>
         <input
           value={form.paper_type}
@@ -910,10 +897,8 @@ const ScrapePastPapersForm = ({ onImported, showToast }) => {
         />
         <input
           type="number"
-          min="1900"
-          max="2099"
           value={form.year_hint}
-          onChange={(e) => { const v = e.target.value; const n = parseInt(v, 10); set('year_hint', v === '' ? '' : String(Math.min(2099, Math.max(1900, n || 1900)))); }}
+          onChange={(e) => set('year_hint', e.target.value)}
           placeholder="Default year (fallback)"
           className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-violet-400"
         />
@@ -966,33 +951,15 @@ const AdminPastPapersPanel = () => {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const [filters, setFilters] = useState({ exam_board: '', year_from: '', year_to: '' });
-  // Live exam boards from the DB — so any board added in Catalog appears here too
-  const [examBoards, setExamBoards] = useState([]);
   const showToast = (message, type = 'success') => { setToast({ message, type }); setTimeout(() => setToast(null), 3500); };
 
-  // useRef so onImported callback always has the current filters without going stale
-  const filtersRef = useRef(filters);
-  useEffect(() => { filtersRef.current = filters; }, [filters]);
-
-  const fetchPapers = useCallback(async (overrideFilters) => {
+  const fetchPapers = async () => {
     setLoading(true);
-    try {
-      const f = overrideFilters ?? filtersRef.current;
-      const params = {};
-      if (f.exam_board) params.exam_board = f.exam_board;
-      if (f.year_from)  params.year_from  = f.year_from;
-      if (f.year_to)    params.year_to    = f.year_to;
-      const r = await api.get('/past-papers', { params });
-      setPapers(r.data || []);
-    } catch { }
+    try { const params = {}; if (filters.exam_board) params.exam_board = filters.exam_board; if (filters.year_from) params.year_from = filters.year_from; if (filters.year_to) params.year_to = filters.year_to; const r = await api.get('/past-papers', { params }); setPapers(r.data || []); }
+    catch { }
     finally { setLoading(false); }
-  }, []);
-
-  useEffect(() => {
-    fetchPapers();
-    // Load live exam boards for filter dropdown
-    api.get('/catalog/types').then(r => setExamBoards(r.data || [])).catch(() => {});
-  }, [fetchPapers]);
+  };
+  useEffect(() => { fetchPapers(); }, []);
 
   const handleDelete = async (id, title) => {
     if (!window.confirm(`Delete "${title}"?`)) return;
@@ -1008,21 +975,16 @@ const AdminPastPapersPanel = () => {
       <div className="flex items-center justify-between mb-5">
         <div><h2 className="text-xl font-bold text-gray-900">Past Papers</h2><p className="text-sm text-gray-400 mt-0.5">Manage past exam papers for students</p></div>
         <div className="flex gap-2">
-          <button onClick={() => fetchPapers()} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 px-3 py-2 border border-gray-200 rounded-xl"><RefreshCw size={14} /> Refresh</button>
+          <button onClick={fetchPapers} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 px-3 py-2 border border-gray-200 rounded-xl"><RefreshCw size={14} /> Refresh</button>
           <button onClick={() => navigate('/past-papers')} className="flex items-center gap-2 text-sm border border-violet-200 text-violet-700 hover:bg-violet-50 font-semibold px-4 py-2 rounded-xl"><BookOpen size={14} /> Student View</button>
         </div>
       </div>
-      <ScrapePastPapersForm onImported={() => fetchPapers(filtersRef.current)} showToast={showToast} />
+      <ScrapePastPapersForm onImported={fetchPapers} showToast={showToast} />
       <div className="flex gap-3 mb-5 flex-wrap">
-        <select value={filters.exam_board} onChange={e => setFilters(f => ({ ...f, exam_board: e.target.value }))} className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300">
-          <option value="">All Exam Types</option>
-          {examBoards.length > 0
-            ? examBoards.map(b => <option key={b.id} value={b.code}>{b.name} ({b.code})</option>)
-            : ['JAMB','WAEC','NECO','GCE_OL','GCE_AL','IELTS','TOEFL','SAT','JUPEB'].map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-        <input type="number" min="1900" max="2099" placeholder="Year from" value={filters.year_from} onChange={e => { const v = e.target.value; const n = parseInt(v,10); setFilters(f => ({ ...f, year_from: v === '' ? '' : String(Math.min(2099, Math.max(1900, n || 1900))) })); }} className="w-28 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300" />
-        <input type="number" min="1900" max="2099" placeholder="Year to" value={filters.year_to} onChange={e => { const v = e.target.value; const n = parseInt(v,10); setFilters(f => ({ ...f, year_to: v === '' ? '' : String(Math.min(2099, Math.max(1900, n || 1900))) })); }} className="w-28 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300" />
-        <button onClick={() => fetchPapers(filters)} className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold rounded-xl">Filter</button>
+        <select value={filters.exam_board} onChange={e => setFilters(f => ({ ...f, exam_board: e.target.value }))} className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"><option value="">All Exam Types</option>{['JAMB','WAEC','NECO','GCE_OL','GCE_AL','IELTS','TOEFL','SAT','JUPEB'].map(c => <option key={c} value={c}>{c}</option>)}</select>
+        <input type="number" placeholder="Year from" value={filters.year_from} onChange={e => setFilters(f => ({ ...f, year_from: e.target.value }))} className="w-28 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300" />
+        <input type="number" placeholder="Year to" value={filters.year_to} onChange={e => setFilters(f => ({ ...f, year_to: e.target.value }))} className="w-28 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300" />
+        <button onClick={fetchPapers} className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold rounded-xl">Filter</button>
       </div>
       {loading ? <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 text-violet-400 animate-spin" /></div>
         : papers.length === 0 ? <div className="text-center py-16 text-gray-400"><BookOpen className="w-10 h-10 mx-auto mb-3 opacity-30" /><p className="text-sm">No past papers found.</p></div>

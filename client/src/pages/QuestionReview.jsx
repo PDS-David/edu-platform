@@ -207,7 +207,7 @@ export default function QuestionReview() {
                 <div className="px-6 pb-4 grid grid-cols-2 gap-2">
                   {(q.options || []).map((opt, i) => (
                     <div
-                      key={opt.id ?? i}
+                      key={opt.id}
                       className={`flex items-center gap-2 p-3 rounded-xl border ${
                         opt.is_correct
                           ? 'border-green-300 bg-green-50'

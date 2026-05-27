@@ -69,7 +69,7 @@ function ExamQuestion({ question, questionNumber, selected, onSelect }) {
         <div className="px-5 pb-5 space-y-2">
           {question.options?.map((opt, i) => (
             <button
-              key={opt.id ?? i}
+              key={opt.id}
               onClick={() => onSelect(opt.id)}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${
                 selected === opt.id
@@ -126,7 +126,7 @@ export default function MockExamPage() {
     })
       .then(r => setQuestions(r.data || []))
       .catch(err => {
-        if (err.status === 403 && err.message === 'free_limit_reached') {
+        if (err.status === 403 && err.error === 'free_limit_reached') {
           setUpgradeWall(true);
         }
       })
@@ -173,7 +173,7 @@ export default function MockExamPage() {
         state: { subjectId, subjectName, examBoardName, isMock: true },
       });
     } catch (err) {
-      console.error('[MockExam] submit error:', err.message);
+      console.error('[MockExam] submit error:', err.error || err.message);
       alert('Failed to submit. Please try again.');
       setSubmitting(false);
     }

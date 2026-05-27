@@ -25,9 +25,6 @@ RUN npm run build
 # ── Stage 2: serve built assets with nginx ────────────────────────────────────
 FROM nginx:1.27-alpine AS runner
 
-# curl needed for healthcheck
-RUN apk add --no-cache curl
-
 RUN rm /etc/nginx/conf.d/default.conf
 
 COPY nginx-spa.conf /etc/nginx/conf.d/default.conf
@@ -36,6 +33,6 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 EXPOSE 80
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-  CMD curl -sf http://localhost/health.txt || exit 1
+  CMD wget -qO- http://localhost/health.txt || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]

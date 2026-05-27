@@ -19,7 +19,6 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.54.0",
     "@aws-sdk/client-s3": "^3.665.0",
     "@google/genai": "^1.48.0",
     "ajv": "^8.18.0",

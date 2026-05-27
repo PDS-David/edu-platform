@@ -1,104 +1,83 @@
-#!/usr/bin/env bash
-# fix_and_deploy.sh — One-shot fix for AISchoolonair on Hetzner
-# Handles: stale local git changes, Docker cache, missing migrations, aiChatRoute
-# Run as root from repo dir:  bash fix_and_deploy.sh
-set -euo pipefail
+#!/bin/bash
+# ============================================================
+# AISchoolonair — Complete Fix and Deploy Script
+# Run this via SSH: bash /opt/aischoolonair/fix_and_deploy.sh
+# ============================================================
+set -e
 
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$REPO_DIR"
+# Ensure we're in the right directory
+cd /opt/aischoolonair
+echo "✅ Working directory: $(pwd)"
 
-# ── Self-update guard ─────────────────────────────────────────────────────────
-# If ALREADY_UPDATED is not set, pull latest code first then re-exec this
-# script from the freshly pulled version so we always run the newest logic.
-if [[ -z "${ALREADY_UPDATED:-}" ]]; then
-  echo "════════════════════════════════════════════════════"
-  echo "  AISchoolonair — Updating deploy script..."
-  echo "════════════════════════════════════════════════════"
-  # Discard any local changes (e.g. server-side edits)
-  git stash push -m "auto-stash $(date -u +%Y%m%dT%H%M%S)" 2>/dev/null || true
-  git fetch origin main
-  git reset --hard origin/main
-  echo "  ✅  Code at $(git rev-parse --short HEAD)"
-  echo "  Re-running updated deploy script..."
-  echo ""
-  exec env ALREADY_UPDATED=1 bash "${BASH_SOURCE[0]}"
-fi
-
-echo "════════════════════════════════════════════════════"
-echo "  AISchoolonair — Fix & Deploy"
-echo "  $(date -u)"
-echo "════════════════════════════════════════════════════"
-
-# ── STEP 1: Already done by self-update guard above ───────────────────────────
+# Step 1: Pull latest fixes from GitHub
 echo ""
-echo "▶ 1/5  Code synced to $(git rev-parse --short HEAD) ($(git log -1 --format='%s'))"
+echo "▶ [1/5] Pulling latest code from GitHub..."
+git pull origin main
+echo "✅ Code updated"
 
-# ── STEP 2: Run DB migrations in current container (if running) ───────────────
+# Step 2: Check api.env has correct settings
 echo ""
-echo "▶ 2/5  Running DB migrations..."
+echo "▶ [2/5] Checking environment config..."
 
-if docker ps --format '{{.Names}}' | grep -q "aischool_api"; then
-  docker exec -i aischool_api node - < server/scripts/run_complete_migration.js \
-    && echo "  ✅  Migrations complete" \
-    || echo "  ⚠️  Migration had warnings (check above) — continuing deploy"
+# The upload logic defaults to allowing local uploads unless ALLOW_LOCAL_UPLOADS=false
+# So we just need to make sure it's NOT set to false
+if grep -q "^ALLOW_LOCAL_UPLOADS=false" api.env 2>/dev/null; then
+    sed -i 's/^ALLOW_LOCAL_UPLOADS=false/ALLOW_LOCAL_UPLOADS=true/' api.env
+    echo "✅ Fixed ALLOW_LOCAL_UPLOADS (was false, now true)"
+elif grep -q "^ALLOW_LOCAL_UPLOADS=" api.env 2>/dev/null; then
+    echo "✅ ALLOW_LOCAL_UPLOADS is already set correctly"
 else
-  echo "  ⚠️  aischool_api not running — migrations will run after restart"
+    echo "ALLOW_LOCAL_UPLOADS=true" >> api.env
+    echo "✅ Added ALLOW_LOCAL_UPLOADS=true to api.env"
 fi
 
-# ── STEP 3: Rebuild API with --no-cache (forces fresh npm ci → picks up @google/genai) ──
-echo ""
-echo "▶ 3/5  Rebuilding API image (no-cache to pick up new npm deps)..."
-docker compose build --no-cache api
-echo "  ✅  API image rebuilt"
+# Fix staging DATABASE_URL if it still points to Render
+PROD_DB=$(grep "^DATABASE_URL=" api.env | cut -d= -f2-)
+STAGING_DB=$(grep "^DATABASE_URL=" api.staging.env 2>/dev/null | cut -d= -f2- || echo "")
+if echo "$STAGING_DB" | grep -q "render.com"; then
+    sed -i "s|^DATABASE_URL=.*|DATABASE_URL=${PROD_DB}|" api.staging.env
+    echo "✅ Fixed staging DATABASE_URL (was pointing to Render, now Supabase)"
+else
+    echo "✅ Staging DATABASE_URL looks OK"
+fi
 
-# ── STEP 4: Rebuild Web (normal, uses cache since no npm changes) ─────────────
+# Step 3: Run DB migrations on the currently running container
+# Use docker exec with pipe — avoids file path issues entirely
 echo ""
-echo "▶ 4/5  Rebuilding Web image..."
-docker compose build web
-echo "  ✅  Web image rebuilt"
+echo "▶ [3/5] Running database migrations..."
+docker exec -i aischool_api node - < server/scripts/run_complete_migration.js
+echo "✅ Migrations complete"
 
-# ── STEP 5: Restart services ──────────────────────────────────────────────────
+# Step 4: Build and restart (from correct directory)
 echo ""
-echo "▶ 5/5  Restarting containers..."
-docker compose up -d --no-deps --force-recreate api web
-echo "  Waiting 20s for containers to be ready..."
+echo "▶ [4/5] Building and restarting containers..."
+docker compose build api web api_staging
+docker compose up -d --no-deps api web api_staging
+echo "✅ Containers restarted"
+
+# Step 5: Health check
+echo ""
+echo "▶ [5/5] Waiting 20s then checking health..."
 sleep 20
 
-# ── Post-deploy: run migration in NEW container ───────────────────────────────
 echo ""
-echo "▶ Post-deploy: Running migrations in new container..."
-docker exec -i aischool_api node - < server/scripts/run_complete_migration.js \
-  && echo "  ✅  Migrations applied to new container" \
-  || echo "  ⚠️  Migration warnings — check logs"
+echo "Container status:"
+docker ps --format "table {{.Names}}\t{{.Status}}" | grep aischool
 
-# ── Health check ──────────────────────────────────────────────────────────────
 echo ""
-echo "════════════════════════════════════════════════════"
-echo "  Checking health..."
-echo "════════════════════════════════════════════════════"
-sleep 3
-if curl -sf https://www.aischoolonair.ng/api/health > /dev/null 2>&1; then
-  echo "  🟢  API is healthy"
+echo "API logs (last 5):"
+docker logs aischool_api --tail=5
+
+echo ""
+HEALTH=$(curl -sf https://www.aischoolonair.ng/api/health 2>/dev/null || echo "FAILED")
+if echo "$HEALTH" | grep -q "ok"; then
+    echo "🟢 Production API is healthy: $HEALTH"
 else
-  echo "  🔴  Health check failed — showing last 20 log lines:"
-  docker logs aischool_api --tail=20
+    echo "🔴 Health check failed. Check logs: docker logs aischool_api --tail=30"
 fi
 
 echo ""
-echo "  📋  Last 5 API log lines:"
-docker logs aischool_api --tail=8
-
-echo ""
-# Check specifically for the aiChatRoute warning
-if docker logs aischool_api 2>&1 | grep -q "aiChatRoute"; then
-  echo "  ⚠️  aiChatRoute still not loading — check: docker logs aischool_api 2>&1 | grep -i 'chat\|personality\|orchestr'"
-else
-  echo "  ✅  aiChatRoute loaded successfully — no warnings"
-fi
-
-# Check web container health
-WEB_HEALTH=$(docker inspect aischool_web --format='{{.State.Health.Status}}' 2>/dev/null || echo "unknown")
-echo "  📋  Web container health: $WEB_HEALTH"
-echo ""
-echo "  ✅  Done! https://www.aischoolonair.ng"
-echo ""
+echo "============================================================"
+echo " ✅ Fix and deploy complete!"
+echo " Test bulk upload at: https://www.aischoolonair.ng/admin/dashboard"
+echo "============================================================"

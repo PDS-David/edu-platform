@@ -18,17 +18,8 @@ const pool = new Pool({
 });
 
 const migrations = [
-  // 1. subjects table — exam_board_id must be INTEGER (exam_boards.id is SERIAL int)
-  `DO $$ DECLARE col_type TEXT; BEGIN
-    SELECT data_type INTO col_type FROM information_schema.columns
-    WHERE table_name='subjects' AND column_name='exam_board_id';
-    IF col_type IS NULL THEN
-      ALTER TABLE subjects ADD COLUMN exam_board_id INTEGER REFERENCES exam_boards(id) ON DELETE SET NULL;
-    ELSIF col_type = 'uuid' THEN
-      ALTER TABLE subjects DROP COLUMN exam_board_id;
-      ALTER TABLE subjects ADD COLUMN exam_board_id INTEGER REFERENCES exam_boards(id) ON DELETE SET NULL;
-    END IF;
-  EXCEPTION WHEN others THEN NULL; END $$`,
+  // 1. subjects table
+  `ALTER TABLE subjects ADD COLUMN IF NOT EXISTS exam_board_id UUID REFERENCES exam_boards(id) ON DELETE SET NULL`,
   `ALTER TABLE subjects ADD COLUMN IF NOT EXISTS exam_board_code VARCHAR(20)`,
   `ALTER TABLE subjects ADD COLUMN IF NOT EXISTS icon_emoji VARCHAR(10)`,
   `ALTER TABLE subjects ADD COLUMN IF NOT EXISTS color VARCHAR(20)`,
@@ -77,41 +68,6 @@ const migrations = [
   `ALTER TABLE resources ADD COLUMN IF NOT EXISTS push_type    VARCHAR(50) DEFAULT 'learning_material'`,
   `ALTER TABLE resources ADD COLUMN IF NOT EXISTS hls_path     TEXT`,
   `ALTER TABLE resources ADD COLUMN IF NOT EXISTS content_url  TEXT`,
-
-  // 5b. topics table — MUST exist before resources FK below
-  `CREATE TABLE IF NOT EXISTS topics (
-    id          SERIAL       PRIMARY KEY,
-    subject_id  INTEGER      REFERENCES subjects(id) ON DELETE CASCADE,
-    name        VARCHAR(255) NOT NULL,
-    title       VARCHAR(255),
-    description TEXT,
-    order_index INTEGER      NOT NULL DEFAULT 0,
-    is_active   BOOLEAN      NOT NULL DEFAULT true,
-    created_by  UUID         REFERENCES users(id) ON DELETE SET NULL,
-    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
-  )`,
-  `CREATE INDEX IF NOT EXISTS idx_topics_subject_id ON topics(subject_id)`,
-  `ALTER TABLE topics ADD COLUMN IF NOT EXISTS title VARCHAR(255)`,
-  `ALTER TABLE topics ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id) ON DELETE SET NULL`,
-
-  // 5c. subtopics table — MUST exist before resources FK below
-  `CREATE TABLE IF NOT EXISTS subtopics (
-    id          SERIAL       PRIMARY KEY,
-    topic_id    INTEGER      REFERENCES topics(id) ON DELETE CASCADE,
-    subject_id  INTEGER      REFERENCES subjects(id) ON DELETE SET NULL,
-    name        VARCHAR(255) NOT NULL,
-    description TEXT,
-    content     TEXT,
-    order_index INTEGER      NOT NULL DEFAULT 0,
-    is_active   BOOLEAN      NOT NULL DEFAULT true,
-    created_by  UUID         REFERENCES users(id) ON DELETE SET NULL,
-    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
-  )`,
-  `CREATE INDEX IF NOT EXISTS idx_subtopics_topic_id   ON subtopics(topic_id)`,
-  `CREATE INDEX IF NOT EXISTS idx_subtopics_subject_id ON subtopics(subject_id)`,
-  `ALTER TABLE subtopics ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id) ON DELETE SET NULL`,
 
   // 6. resources FK columns (safe — only adds if missing)
   `ALTER TABLE resources ADD COLUMN IF NOT EXISTS topic_id    INTEGER REFERENCES topics(id)    ON DELETE SET NULL`,

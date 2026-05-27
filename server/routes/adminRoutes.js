@@ -26,14 +26,14 @@ const adminOnly = (req, res, next) => {
 // ─────────────────────────────────────────────
 router.get('/platform-stats', protect, adminOnly, async (req, res) => {
   try {
-    // User stats — role::text cast avoids enum comparison errors on some PG versions
+    // User stats
     const [userRow] = await sequelize.query(`
       SELECT
-        COUNT(*) FILTER (WHERE role::text = 'student')                                              AS students,
-        COUNT(*) FILTER (WHERE role::text = 'student'
-                           AND COALESCE(last_login, created_at) >= NOW() - INTERVAL '1 day')        AS active_today,
-        COUNT(*) FILTER (WHERE role::text = 'student'
-                           AND created_at >= NOW() - INTERVAL '7 days')                             AS new_this_week
+        COUNT(*) FILTER (WHERE role = 'student')                                              AS students,
+        COUNT(*) FILTER (WHERE role = 'student'
+                           AND last_login >= NOW() - INTERVAL '1 day')                        AS active_today,
+        COUNT(*) FILTER (WHERE role = 'student'
+                           AND created_at >= NOW() - INTERVAL '7 days')                       AS new_this_week
       FROM users
     `, { type: QueryTypes.SELECT });
 
@@ -53,17 +53,13 @@ router.get('/platform-stats', protect, adminOnly, async (req, res) => {
     } catch (_) { /* quiz_attempts may not exist yet */ }
 
     // Revenue / subscription stats
-    let revRow = { total_active_subs: 0, new_subs_this_month: 0 };
-    try {
-      const [_revRow] = await sequelize.query(`
-        SELECT
-          COUNT(*) FILTER (WHERE subscription_status::text = 'active')                               AS total_active_subs,
-          COUNT(*) FILTER (WHERE subscription_status::text = 'active'
-                             AND created_at >= NOW() - INTERVAL '30 days')                           AS new_subs_this_month
-        FROM users
-      `, { type: QueryTypes.SELECT });
-      if (_revRow) revRow = _revRow;
-    } catch (_) { /* subscription_status column may not exist */ }
+    const [revRow] = await sequelize.query(`
+      SELECT
+        COUNT(*) FILTER (WHERE subscription_status = 'active')                               AS total_active_subs,
+        COUNT(*) FILTER (WHERE subscription_status = 'active'
+                           AND created_at >= NOW() - INTERVAL '30 days')                     AS new_subs_this_month
+      FROM users
+    `, { type: QueryTypes.SELECT });
 
     // Top subjects by avg accuracy (last 30 days)
     // student_answers table may not yet exist — fall back to empty array safely
@@ -371,31 +367,6 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────
-// LIST TEACHERS (for modal dropdowns)
-// Uses role::text cast to avoid enum-not-found errors
-// ─────────────────────────────────────────────
-router.get('/teachers', protect, adminOnly, async (req, res) => {
-  try {
-    // Cast role to text to handle both enum (enum_users_role) and varchar role columns.
-    // Filter only our application users (first_name IS NOT NULL excludes Supabase auth rows).
-    const rows = await sequelize.query(
-      `SELECT id, email, first_name, last_name,
-              COALESCE(is_active, true) AS is_active, created_at
-       FROM users
-       WHERE role::text = 'teacher'
-         AND first_name IS NOT NULL
-         AND COALESCE(is_active, true) = true
-       ORDER BY last_name ASC, first_name ASC`,
-      { type: QueryTypes.SELECT }
-    );
-    return success(res, rows);
-  } catch (err) {
-    console.error('[GET /admin/teachers]', err.message);
-    return error(res, 'Failed to fetch teachers');
-  }
-});
-
-// ─────────────────────────────────────────────
 // TEACHER ASSIGNMENTS
 // ─────────────────────────────────────────────
 router.get('/teacher-assignments', protect, adminOnly, async (req, res) => {
@@ -404,7 +375,7 @@ router.get('/teacher-assignments', protect, adminOnly, async (req, res) => {
       `SELECT ts.id,
               u.id         AS teacher_id,
               u.email,
-              u.first_name || ' ' || u.last_name AS teacher_name,
+              u.first_name || ' ' || COALESCE(u.last_name, '') AS teacher_name,
               u.first_name,
               u.last_name,
               s.id         AS subject_id,
@@ -414,30 +385,31 @@ router.get('/teacher-assignments', protect, adminOnly, async (req, res) => {
               ts.is_active,
               ts.assigned_at
        FROM teacher_subjects ts
-       JOIN users       u  ON u.id  = ts.teacher_id
-       JOIN subjects    s  ON s.id  = ts.subject_id
-       LEFT JOIN exam_boards eb ON eb.id = s.exam_board_id
+       JOIN users       u  ON u.id::text  = ts.teacher_id::text
+       JOIN subjects    s  ON s.id::text  = ts.subject_id::text
+       LEFT JOIN exam_boards eb ON eb.id::text = s.exam_board_id::text
        WHERE ts.is_active = true
        ORDER BY u.last_name ASC, s.name ASC`,
       { type: QueryTypes.SELECT }
     );
     return success(res, rows);
   } catch (err) {
+    // Return empty list so the frontend can still render the teachers dropdown
     console.error('[GET /admin/teacher-assignments]', err.message);
-    return error(res, 'Failed to fetch assignments');
+    return success(res, []);
   }
 });
 
 router.post('/teacher-assignments', protect, adminOnly, async (req, res) => {
-  const { teacher_id, subject_id, exam_board_id } = req.body;
+  const { teacher_id, subject_id } = req.body;
   if (!teacher_id || !subject_id) return error(res, 'teacher_id and subject_id required', 400);
 
   try {
     await sequelize.query(
-      `INSERT INTO teacher_subjects (teacher_id, subject_id, exam_board_id, is_active)
-       VALUES (:t, :s, :eb, true)
-       ON CONFLICT (teacher_id, subject_id) DO UPDATE SET is_active = true, exam_board_id = EXCLUDED.exam_board_id`,
-      { replacements: { t: teacher_id, s: subject_id, eb: exam_board_id || null }, type: QueryTypes.INSERT }
+      `INSERT INTO teacher_subjects (teacher_id, subject_id, is_active)
+       VALUES (:t, :s, true)
+       ON CONFLICT (teacher_id, subject_id) DO UPDATE SET is_active = true`,
+      { replacements: { t: teacher_id, s: subject_id }, type: QueryTypes.INSERT }
     );
     return success(res, { message: 'Assignment saved' });
   } catch (err) {

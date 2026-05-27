@@ -77,7 +77,7 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
         time_taken_ms:      Date.now() - startTime.current,
         mode:               'practice',
       });
-      setResult(res.data ?? res);
+      setResult(res);
     } catch {
       alert('Failed to submit answer. Please try again.');
     } finally {
@@ -96,7 +96,7 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
         time_taken_ms:  Date.now() - startTime.current,
         mode:           'practice',
       });
-      setResult(res.data ?? res);
+      setResult(res);
     } catch {
       alert('Failed to submit answer. Please try again.');
     } finally {
@@ -110,11 +110,7 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
         ? 'border-indigo-400 bg-indigo-50'
         : 'border-gray-200 hover:border-indigo-300 hover:bg-gray-50 cursor-pointer';
     }
-    const correctOpt = question?.options?.find(o =>
-      String(o.option_text || '').trim().toLowerCase() ===
-      String(result.correct_answer || '').trim().toLowerCase()
-    );
-    const isCorrect  = correctOpt ? correctOpt.id === optId : false;
+    const isCorrect  = result.correct_options?.some(c => c.id === optId);
     const isSelected = selected === optId;
     if (isCorrect)                return 'border-green-400 bg-green-50';
     if (isSelected && !isCorrect) return 'border-red-400 bg-red-50';
@@ -200,7 +196,7 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
             <div className="px-5 pb-4 space-y-2.5">
               {question.options?.map((opt, i) => (
                 <button
-                  key={opt.id ?? i}
+                  key={opt.id}
                   onClick={() => !result && setSelected(opt.id)}
                   disabled={!!result}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${getOptionStyle(opt.id)}`}
@@ -211,10 +207,10 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
                     {LABELS[i]}
                   </span>
                   <span className="text-sm text-gray-800">{opt.option_text}</span>
-                  {result && correctOpt?.id === opt.id && (
+                  {result && result.correct_options?.some(c => c.id === opt.id) && (
                     <CheckCircle className="w-4 h-4 text-green-500 ml-auto flex-shrink-0" />
                   )}
-                  {result && selected === opt.id && correctOpt?.id !== opt.id && (
+                  {result && selected === opt.id && !result.correct_options?.some(c => c.id === opt.id) && (
                     <XCircle className="w-4 h-4 text-red-400 ml-auto flex-shrink-0" />
                   )}
                 </button>
@@ -455,7 +451,7 @@ export default function PracticeMode() {
       setScore(0);
       setPhase('quiz');
     } catch (err) {
-      if (err.message === 'free_limit_reached') {
+      if (err.error === 'free_limit_reached') {
         setErrMsg(err.message || "You've used your free questions for today. Upgrade to continue.");
       } else {
         setErrMsg('Failed to load questions. Please try again.');

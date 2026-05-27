@@ -9,5 +9,6 @@ uploads/
 .gitignore
 *.md
 tests/
-debug-js
+tools/
+debug-jwt.js
 scripts/

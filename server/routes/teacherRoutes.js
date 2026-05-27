@@ -67,24 +67,20 @@ router.get('/my-subjects', protect, teacherOnly, async (req, res) => {
   }
 });
 
-// ── GET /api/teacher/topics?subject_id=<integer> ──────────────────────────────
-// subjects.id is INTEGER — parse subject_id from query string.
+// ── GET /api/teacher/topics?subject_id=<uuid> ─────────────────────────────────
+// FIX: was parseInt(subject_id) — subject_id is a UUID foreign key
 router.get('/topics', protect, teacherOnly, async (req, res) => {
   const { subject_id } = req.query;
   if (!subject_id) return res.status(400).json({ success: false, error: 'subject_id is required' });
-  const subjectIdInt = parseInt(subject_id, 10);
-  if (!subjectIdInt) return res.status(400).json({ success: false, error: 'subject_id must be a valid integer' });
   try {
     const rows = await sequelize.query(
-      `SELECT t.id,
-              COALESCE(t.name, t.title) AS name,
-              t.description, t.order_index,
+      `SELECT t.id, t.name, t.description, t.order_index,
               COUNT(st.id)::INTEGER AS subtopic_count
        FROM topics t
        LEFT JOIN subtopics st ON st.topic_id = t.id AND st.is_active = true
-       WHERE t.subject_id = :subjectId AND (t.is_active IS NULL OR t.is_active = true)
-       GROUP BY t.id ORDER BY t.order_index ASC NULLS LAST, COALESCE(t.name, t.title) ASC`,
-      { replacements: { subjectId: subjectIdInt }, type: QueryTypes.SELECT }
+       WHERE t.subject_id = :subjectId AND t.is_active = true
+       GROUP BY t.id ORDER BY t.order_index ASC NULLS LAST, t.name ASC`,
+      { replacements: { subjectId: subject_id }, type: QueryTypes.SELECT }
     );
     return res.json({ success: true, data: rows });
   } catch (err) {
@@ -97,18 +93,13 @@ router.get('/topics', protect, teacherOnly, async (req, res) => {
 router.post('/topics', protect, teacherOnly, async (req, res) => {
   const { subject_id, name, description, order_index = 0 } = req.body;
   if (!subject_id || !name?.trim()) return res.status(400).json({ success: false, error: 'subject_id and name are required' });
-  // subjects.id is INTEGER — parse to avoid "invalid input syntax for type integer"
-  const subjectIdInt = parseInt(subject_id, 10);
-  if (!subjectIdInt) return res.status(400).json({ success: false, error: 'subject_id must be a valid integer' });
   try {
-    // Ensure title column exists (safe guard — migration may not have run yet)
-    await sequelize.query(`ALTER TABLE topics ADD COLUMN IF NOT EXISTS title VARCHAR(255)`, { type: QueryTypes.RAW }).catch(() => {});
     const rows = await sequelize.query(
-      `INSERT INTO topics (subject_id, name, title, description, order_index, is_active, created_at, updated_at)
-       VALUES (:subjectId, :name, :name, :description, :orderIndex, true, NOW(), NOW())
-       RETURNING id, name, title, description, order_index`,
+      `INSERT INTO topics (subject_id, name, description, order_index, is_active, created_at, updated_at)
+       VALUES (:subjectId, :name, :description, :orderIndex, true, NOW(), NOW())
+       RETURNING id, name, description, order_index`,
       {
-        replacements: { subjectId: subjectIdInt, name: name.trim(), description: description || null, orderIndex: parseInt(order_index) || 0 },
+        replacements: { subjectId: subject_id, name: name.trim(), description: description || null, orderIndex: parseInt(order_index) || 0 },
         type: QueryTypes.SELECT,
       }
     );
@@ -165,21 +156,17 @@ router.get('/subtopics', protect, teacherOnly, async (req, res) => {
 });
 
 // ── POST /api/teacher/subtopics ───────────────────────────────────────────────
-// topic_id and subject_id are INTEGER foreign keys — parse them to avoid
-// "invalid input syntax for type integer" errors from string form values.
+// FIX: was parseInt(topic_id) and parseInt(subject_id) — both are UUID foreign keys
 router.post('/subtopics', protect, teacherOnly, async (req, res) => {
   const { topic_id, subject_id, name, description, order_index = 0 } = req.body;
   if (!topic_id || !name?.trim()) return res.status(400).json({ success: false, error: 'topic_id and name are required' });
-  const topicIdInt   = parseInt(topic_id, 10);
-  const subjectIdInt = subject_id ? parseInt(subject_id, 10) : null;
-  if (!topicIdInt) return res.status(400).json({ success: false, error: 'topic_id must be a valid integer' });
   try {
     const rows = await sequelize.query(
       `INSERT INTO subtopics (topic_id, subject_id, name, description, order_index, is_active, created_at, updated_at)
        VALUES (:topicId, :subjectId, :name, :description, :orderIndex, true, NOW(), NOW())
        RETURNING id, name, description, order_index`,
       {
-        replacements: { topicId: topicIdInt, subjectId: subjectIdInt, name: name.trim(), description: description || null, orderIndex: parseInt(order_index) || 0 },
+        replacements: { topicId: topic_id, subjectId: subject_id || null, name: name.trim(), description: description || null, orderIndex: parseInt(order_index) || 0 },
         type: QueryTypes.SELECT,
       }
     );
