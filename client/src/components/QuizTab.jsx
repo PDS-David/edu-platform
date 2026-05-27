@@ -276,7 +276,8 @@ function InProgressScreen({ subtopicId, subtopic, selectedPaper, onFinish, navig
         })),
       });
       // Pass the full result object — ResultsScreen uses it directly, no second API call
-      onFinish(res);
+      // apiClient normalises: res.data = the inner payload (total_score, answers, etc.)
+      onFinish(res.data ?? res);
     } catch {
       onFinish(null);
     }

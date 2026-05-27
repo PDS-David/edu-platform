@@ -36,18 +36,17 @@ function QuizQuestion({ question, questionNumber, submitRef, onAnswered }) {
     setSubmitting(true);
     try {
       const timeTaken = Date.now() - startTime.current;
-      // api interceptor returns response.data directly
-      // so `res` = { success, is_correct, correct_options, explanation, ... }
       const res = await api.post(`/questions/${question.id}/answer`, {
         selected_option_id: selected,
         time_taken_ms:      timeTaken,
       });
-      setResult(res);
+      // apiClient normalises: res.data = the inner payload { is_correct, explanation, ... }
+      setResult(res.data ?? res);
 
       // Fire AI explanation in background — non-blocking
       setExplainLoad(true);
       api.post('/ai/explain', { question_id: question.id, selected_option_id: selected })
-        .then(r => { if (r.success) setAiExplain(r.explanation); })
+        .then(r => { if (r.success) setAiExplain(r.data?.explanation ?? r.explanation); })
         .catch(() => {})
         .finally(() => setExplainLoad(false));
 
