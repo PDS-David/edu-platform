@@ -142,13 +142,15 @@ router.post('/:id/answer', protect, async (req, res) => {
     awardXP(req.user.id, 'answer', { is_correct: isCorrect }).catch(() => {});
 
     return res.json({
-      success:        true,
-      is_correct:     isCorrect,
-      correct_answer: question.correct_answer,
-      explanation:    question.explanation || null,
-      marks_awarded:  marksAwarded,
-      max_marks:      question.marks || 1,
-      feedback,
+      success: true,
+      data: {
+        is_correct:     isCorrect,
+        correct_answer: question.correct_answer,
+        explanation:    question.explanation || null,
+        marks_awarded:  marksAwarded,
+        max_marks:      question.marks || 1,
+        feedback,
+      },
     });
   } catch (err) {
     console.error(`[POST /questions/${id}/answer]`, err.message);

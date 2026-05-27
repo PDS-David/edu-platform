@@ -77,7 +77,7 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
         time_taken_ms:      Date.now() - startTime.current,
         mode:               'practice',
       });
-      setResult(res);
+      setResult(res.data ?? res);
     } catch {
       alert('Failed to submit answer. Please try again.');
     } finally {
@@ -96,7 +96,7 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
         time_taken_ms:  Date.now() - startTime.current,
         mode:           'practice',
       });
-      setResult(res);
+      setResult(res.data ?? res);
     } catch {
       alert('Failed to submit answer. Please try again.');
     } finally {
