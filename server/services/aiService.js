@@ -258,15 +258,18 @@ Look at the student's handwritten answer in the image and:
 2. Identify strengths in the answer
 3. Identify what is missing or incorrect
 4. Give constructive feedback
+5. Provide a brief model answer
 
 Respond ONLY with valid JSON in this exact format (no markdown, no extra text):
 {
-  "marks_awarded": <number>,
+  "marks_awarded": <number 0-${totalMarks}>,
   "total_marks": ${totalMarks},
-  "percentage": <number>,
+  "percentage": <integer 0-100>,
   "feedback": "<2-3 sentence overall feedback>",
-  "strengths": ["<point>", "<point>"],
-  "improvements": ["<point>", "<point>"]
+  "strengths": ["<strength point>", "<strength point>"],
+  "improvements": ["<improvement point>", "<improvement point>"],
+  "model_answer": "<concise model answer or key points, 2-4 sentences>",
+  "readability_note": "<optional: note if handwriting was hard to read, or null>"
 }
 `.trim();
 
