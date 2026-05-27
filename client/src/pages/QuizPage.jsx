@@ -68,7 +68,12 @@ function QuizQuestion({ question, questionNumber, submitRef, onAnswered }) {
 
   const optStyle = (optId) => {
     if (!result) return selected === optId ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-blue-300 cursor-pointer';
-    const isCorrect  = result.correct_options?.some(c => c.id === optId);
+    // Backend returns correct_answer as text — match against option_text
+    const correctOpt = question?.options?.find(o =>
+      String(o.option_text || '').trim().toLowerCase() ===
+      String(result.correct_answer || '').trim().toLowerCase()
+    );
+    const isCorrect  = correctOpt ? correctOpt.id === optId : false;
     const isSelected = selected === optId;
     if (isCorrect)                return 'border-blue-400 bg-blue-50';
     if (isSelected && !isCorrect) return 'border-red-300 bg-red-50';
@@ -110,10 +115,10 @@ function QuizQuestion({ question, questionNumber, submitRef, onAnswered }) {
                 {LABELS[i]}
               </span>
               <span className="text-sm text-gray-800 flex-1">{opt.option_text}</span>
-              {result && result.correct_options?.some(c => c.id === opt.id) && (
+              {result && correctOpt?.id === opt.id && (
                 <CheckCircle size={14} className="text-blue-500 shrink-0" />
               )}
-              {result && selected === opt.id && !result.correct_options?.some(c => c.id === opt.id) && (
+              {result && selected === opt.id && correctOpt?.id !== opt.id && (
                 <XCircle size={14} className="text-red-400 shrink-0" />
               )}
             </button>
@@ -241,9 +246,15 @@ export default function QuizPage() {
         total_time_ms: Date.now() - quizStartMs.current,
         answers:       answersRef.current,
       });
-      const attemptId = res.attempt_id ?? res.data?.attempt_id;
+      // /quizzes/attempt returns full result in res.data — no attempt_id to fetch.
+      // Pass result inline via route state so QuizResultsPage avoids a second fetch.
+      const result = res.data ?? res;
+      const attemptId = result.attempt_id || 'inline';
       navigate(`/student/quiz-results/${attemptId}`, {
-        state: { subtopicId, subtopicName, subjectName, examBoardName },
+        state: {
+          subtopicId, subtopicName, subjectName, examBoardName,
+          inlineResult: result,
+        },
       });
     } catch {
       alert('Failed to submit quiz. Please try again.');

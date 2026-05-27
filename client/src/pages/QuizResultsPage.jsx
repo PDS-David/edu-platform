@@ -154,14 +154,17 @@ export default function QuizResultsPage() {
   const {
     subtopicId, subtopicName = '', subjectName = '',
     examBoardName = '', isMock = false,
+    inlineResult = null,            // set by QuizPage — avoids second fetch
   } = location.state || {};
 
-  const [data,    setData]    = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [data,    setData]    = useState(inlineResult);
+  const [loading, setLoading] = useState(!inlineResult);
   const [error,   setError]   = useState(null);
 
   useEffect(() => {
-    if (!attemptId) return;
+    // If we already have the result inline (passed via route state), skip fetch
+    if (inlineResult) { setLoading(false); return; }
+    if (!attemptId || attemptId === 'inline') return;
     api.get(`/quizzes/attempt/${attemptId}`)
       .then(r  => setData(r.data))
       .catch(() => setError('Could not load results. Please try again.'))
