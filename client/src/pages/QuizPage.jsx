@@ -39,8 +39,8 @@ function QuizQuestion({ question, questionNumber, submitRef, onAnswered }) {
       // api interceptor returns response.data directly
       // so `res` = { success, is_correct, correct_options, explanation, ... }
       const res = await api.post(`/questions/${question.id}/answer`, {
-        selected_option_id: selected,
-        time_taken_ms:      timeTaken,
+        selected_answer: selected,   // option text — matches correct_answer in DB
+        time_taken_ms:   timeTaken,
       });
       setResult(res);
 
@@ -52,9 +52,9 @@ function QuizQuestion({ question, questionNumber, submitRef, onAnswered }) {
         .finally(() => setExplainLoad(false));
 
       onAnswered({
-        question_id:        question.id,
-        selected_option_id: selected,
-        time_taken_ms:      timeTaken,
+        question_id:     question.id,
+        selected_answer: selected,    // option text
+        time_taken_ms:   timeTaken,
       });
     } catch {
       alert('Failed to submit answer. Please try again.');
@@ -67,10 +67,12 @@ function QuizQuestion({ question, questionNumber, submitRef, onAnswered }) {
 
   const diffBadge = { easy: 'bg-green-500', medium: 'bg-amber-500', hard: 'bg-red-500' };
 
-  const optStyle = (optId) => {
-    if (!result) return selected === optId ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-blue-300 cursor-pointer';
-    const isCorrect  = result.correct_options?.some(c => c.id === optId);
-    const isSelected = selected === optId;
+  // Comparison uses option_text (the correct_answer field is also text)
+  const optStyle = (optText) => {
+    const isCorrect  = result && String(optText).trim().toLowerCase() ===
+                       String(result.correct_answer || '').trim().toLowerCase();
+    const isSelected = selected === optText;
+    if (!result) return isSelected ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-blue-300 cursor-pointer';
     if (isCorrect)                return 'border-blue-400 bg-blue-50';
     if (isSelected && !isCorrect) return 'border-red-300 bg-red-50';
     return 'border-gray-100 opacity-60';
@@ -100,25 +102,27 @@ function QuizQuestion({ question, questionNumber, submitRef, onAnswered }) {
         </div>
 
         <div className="px-5 pb-4 space-y-2">
-          {question.options?.map((opt, i) => (
-            <button
-              key={opt.id}
-              onClick={() => !result && setSelected(opt.id)}
-              disabled={!!result}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${optStyle(opt.id)}`}
-            >
-              <span className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 bg-gray-100 text-gray-500">
-                {LABELS[i]}
-              </span>
-              <span className="text-sm text-gray-800 flex-1">{opt.option_text}</span>
-              {result && result.correct_options?.some(c => c.id === opt.id) && (
-                <CheckCircle size={14} className="text-blue-500 shrink-0" />
-              )}
-              {result && selected === opt.id && !result.correct_options?.some(c => c.id === opt.id) && (
-                <XCircle size={14} className="text-red-400 shrink-0" />
-              )}
-            </button>
-          ))}
+          {question.options?.map((opt, i) => {
+            const optText   = typeof opt === 'string' ? opt : (opt.option_text || '');
+            const isCorrect = result && String(optText).trim().toLowerCase() ===
+                              String(result.correct_answer || '').trim().toLowerCase();
+            const isSel     = selected === optText;
+            return (
+              <button
+                key={i}
+                onClick={() => !result && setSelected(optText)}
+                disabled={!!result}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${optStyle(optText)}`}
+              >
+                <span className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 bg-gray-100 text-gray-500">
+                  {LABELS[i]}
+                </span>
+                <span className="text-sm text-gray-800 flex-1">{optText}</span>
+                {result && isCorrect && <CheckCircle size={14} className="text-blue-500 shrink-0" />}
+                {result && isSel && !isCorrect && <XCircle size={14} className="text-red-400 shrink-0" />}
+              </button>
+            );
+          })}
         </div>
 
         {result && (

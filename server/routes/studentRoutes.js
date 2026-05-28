@@ -201,7 +201,7 @@ router.post('/test/:testId/submit', protect, async (req, res) => {
     const questionIds = answers.map(a => a.question_id).filter(Boolean);
     // Use correct_answer from questions table (JSONB options approach)
     const questionRows = await sequelize.query(
-      `SELECT id, correct_answer FROM questions WHERE id = ANY(:questionIds::int[])`,
+      `SELECT id, correct_answer FROM questions WHERE id::text = ANY(ARRAY[:questionIds]::text[])`,
       { replacements: { questionIds }, type: QueryTypes.SELECT }
     );
     const correctMap = {};

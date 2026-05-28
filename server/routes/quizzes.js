@@ -33,9 +33,9 @@ router.get('/attempt-count', protect, async (req, res) => {
 });
 
 // ── POST /api/quizzes/attempt ─────────────────────────────────────────────────
-// Body: { subtopic_id, answers: [{ question_id, selected_answer, time_taken_seconds }] }
+// Body: { subtopic_id, answers: [{ question_id, selected_answer|selected_option_id, time_taken_seconds }] }
 router.post('/attempt', protect, async (req, res) => {
-  const { subtopic_id, answers = [] } = req.body;
+  const { subtopic_id, subject_id, paper_type, total_time_ms, answers = [] } = req.body;
   if (!subtopic_id || !answers.length) {
     return res.status(400).json({ success: false, error: 'subtopic_id and answers required' });
   }
@@ -44,11 +44,11 @@ router.post('/attempt', protect, async (req, res) => {
     const questionIds = answers.map(a => a.question_id).filter(Boolean);
     if (!questionIds.length) return res.status(400).json({ success: false, error: 'No valid question IDs' });
 
-    // Fetch questions with correct answers
+    // Fetch questions — questions.id is UUID, use TEXT cast for ANY()
     const questionRows = await sequelize.query(
       `SELECT id, question_text, marks, explanation, correct_answer, options, type
-       FROM questions WHERE id = ANY(ARRAY[:ids]::int[]) AND is_active = true`,
-      { replacements: { ids: questionIds }, type: QueryTypes.SELECT }
+       FROM questions WHERE id::text = ANY(ARRAY[:ids]::text[]) AND is_active = true`,
+      { replacements: { ids: questionIds.map(String) }, type: QueryTypes.SELECT }
     );
     const questionMap = Object.fromEntries(questionRows.map(q => [String(q.id), q]));
 
@@ -63,7 +63,9 @@ router.post('/attempt', protect, async (req, res) => {
       const markValue  = question.marks || 1;
       maxScore        += markValue;
 
-      const isCorrect = String(answer.selected_answer || '').trim().toLowerCase() ===
+      // Accept selected_answer (option text) OR selected_option_id (also option text in JSONB schema)
+      const submittedAnswer = answer.selected_answer ?? answer.selected_option_id ?? '';
+      const isCorrect = String(submittedAnswer).trim().toLowerCase() ===
                         String(question.correct_answer || '').trim().toLowerCase();
       const marks     = isCorrect ? markValue : 0;
       totalScore     += marks;
@@ -109,9 +111,24 @@ router.post('/attempt', protect, async (req, res) => {
 
     awardXP(req.user.id, 'quiz', { score: totalScore, max: maxScore }).catch(() => {});
 
+    // Generate a stable attempt_id from the first practice_attempt row
+    // so the frontend can navigate to /quiz-results/:attemptId
+    let attemptId = null;
+    try {
+      const paRow = await sequelize.query(
+        `SELECT id FROM practice_attempts
+         WHERE student_id = :studentId AND question_id = ANY(ARRAY[:ids]::text[])
+         ORDER BY attempted_at DESC LIMIT 1`,
+        { replacements: { studentId: req.user.id, ids: questionIds.map(String) }, type: QueryTypes.SELECT }
+      );
+      attemptId = paRow[0]?.id || null;
+    } catch (_) {}
+
     return res.json({
       success:      true,
+      attempt_id:   attemptId,
       data: {
+        attempt_id,
         subtopic_id,
         total_score:  totalScore,
         max_score:    maxScore,
@@ -127,20 +144,104 @@ router.post('/attempt', protect, async (req, res) => {
 });
 
 // ── GET /api/quizzes/attempt/:attemptId ──────────────────────────────────────
-// Returns a simple practice attempt result — used by QuizResultsPage
+// Returns quiz results in the envelope QuizResultsPage expects:
+// { attempt: {...}, answers: [...], benchmark: {...}, examiner_recommendation: '' }
+//
+// attemptId is a practice_attempts.id (UUID).
+// We look up all attempts from the same session (same student, within 5 minutes of this attempt).
 router.get('/attempt/:attemptId', protect, async (req, res) => {
   try {
-    const rows = await sequelize.query(
-      `SELECT pa.id, pa.question_id, pa.is_correct, pa.attempted_at,
-              q.question_text, q.correct_answer, q.explanation, q.marks
+    // Anchor row — find the reference attempt
+    const anchor = await sequelize.query(
+      `SELECT pa.id, pa.student_id, pa.attempted_at, pa.question_id,
+              q.subtopic_id
        FROM practice_attempts pa
        JOIN questions q ON q.id = pa.question_id
-       WHERE pa.id = :id AND pa.student_id = :studentId`,
+       WHERE pa.id::text = :id AND pa.student_id = :studentId`,
       { replacements: { id: req.params.attemptId, studentId: req.user.id }, type: QueryTypes.SELECT }
     );
-    if (!rows.length) return res.status(404).json({ success: false, error: 'Attempt not found' });
-    return res.json({ success: true, data: rows[0] });
+
+    if (!anchor.length) {
+      return res.status(404).json({ success: false, error: 'Attempt not found' });
+    }
+
+    const { attempted_at, subtopic_id } = anchor[0];
+
+    // All attempts in this session window (5 min before → 30s after anchor)
+    const sessionRows = await sequelize.query(
+      `SELECT pa.id, pa.question_id, pa.is_correct,
+              pa.time_taken_seconds, pa.attempted_at,
+              q.question_text, q.correct_answer, q.explanation, q.marks, q.options
+       FROM practice_attempts pa
+       JOIN questions q ON q.id = pa.question_id
+       WHERE pa.student_id = :studentId
+         AND pa.attempted_at BETWEEN (:anchor::timestamptz - INTERVAL '5 minutes')
+                                 AND (:anchor::timestamptz + INTERVAL '30 seconds')
+       ORDER BY pa.attempted_at ASC`,
+      { replacements: { studentId: req.user.id, anchor: attempted_at }, type: QueryTypes.SELECT }
+    );
+
+    const answers = sessionRows.map(row => {
+      // Find which option text was selected — stored in options JSONB
+      const opts = Array.isArray(row.options) ? row.options : [];
+      const correctOpt = opts.find(o => o.is_correct);
+      return {
+        question_id:         row.question_id,
+        question_text:       row.question_text,
+        is_correct:          row.is_correct,
+        marks_awarded:       row.is_correct ? (row.marks || 1) : 0,
+        max_marks:           row.marks || 1,
+        correct_answer:      row.correct_answer,
+        explanation:         row.explanation,
+        selected_option_text: row.is_correct
+          ? row.correct_answer
+          : null, // we don't store what was selected — show null
+        correct_options: correctOpt
+          ? [{ id: correctOpt.option_text, option_text: correctOpt.option_text }]
+          : [],
+        ai_marking_scheme: {},
+        ai_explanation:    row.explanation || '',
+      };
+    });
+
+    const totalScore  = answers.reduce((s, a) => s + a.marks_awarded, 0);
+    const maxScore    = answers.reduce((s, a) => s + a.max_marks, 0);
+    const accuracyPct = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
+    const totalTimeMs = sessionRows.reduce((s, r) => s + (r.time_taken_seconds || 0) * 1000, 0);
+
+    // Subtopic name
+    let subtopicName = '';
+    if (subtopic_id) {
+      const stRows = await sequelize.query(
+        `SELECT st.name, s.name AS subject_name FROM subtopics st LEFT JOIN topics t ON t.id=st.topic_id LEFT JOIN subjects s ON s.id=t.subject_id WHERE st.id=:id`,
+        { replacements: { id: subtopic_id }, type: QueryTypes.SELECT }
+      ).catch(() => []);
+      subtopicName = stRows[0]?.name || '';
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        attempt: {
+          id:            req.params.attemptId,
+          subtopic_id,
+          subtopic_name: subtopicName,
+          total_score:   totalScore,
+          max_score:     maxScore,
+          accuracy_pct:  accuracyPct,
+          total_time_ms: totalTimeMs,
+        },
+        answers,
+        benchmark:                null,
+        examiner_recommendation:  accuracyPct >= 70
+          ? 'Excellent performance! You are well prepared for this topic.'
+          : accuracyPct >= 50
+          ? 'Good effort. Review the questions you missed and try again.'
+          : 'Keep practising. Focus on the explanations for incorrect answers.',
+      },
+    });
   } catch (err) {
+    console.error('[GET /quizzes/attempt/:id]', err.message);
     return res.status(500).json({ success: false, error: err.message });
   }
 });

@@ -72,10 +72,10 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
     setSubmitting(true);
     try {
       const res = await api.post(`/questions/${question.id}/answer`, {
-        selected_option_id: selected,
-        session_id:         sessionId,
-        time_taken_ms:      Date.now() - startTime.current,
-        mode:               'practice',
+        selected_answer: selected,    // option text
+        session_id:      sessionId,
+        time_taken_ms:   Date.now() - startTime.current,
+        mode:            'practice',
       });
       setResult(res);
     } catch {
@@ -104,14 +104,15 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
     }
   };
 
-  const getOptionStyle = (optId) => {
+  const getOptionStyle = (optText) => {
+    const isCorrect  = result && String(optText).trim().toLowerCase() ===
+                       String(result.correct_answer || '').trim().toLowerCase();
+    const isSelected = selected === optText;
     if (!result) {
-      return selected === optId
+      return isSelected
         ? 'border-indigo-400 bg-indigo-50'
         : 'border-gray-200 hover:border-indigo-300 hover:bg-gray-50 cursor-pointer';
     }
-    const isCorrect  = result.correct_options?.some(c => c.id === optId);
-    const isSelected = selected === optId;
     if (isCorrect)                return 'border-green-400 bg-green-50';
     if (isSelected && !isCorrect) return 'border-red-400 bg-red-50';
     return 'border-gray-100 opacity-60';
@@ -194,27 +195,30 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
           {/* ── MCQ Options ── */}
           {!isEssay && (
             <div className="px-5 pb-4 space-y-2.5">
-              {question.options?.map((opt, i) => (
+              {question.options?.map((opt, i) => {
+                const optText = typeof opt === 'string' ? opt : (opt.option_text || '');
+                return (
                 <button
-                  key={opt.id}
-                  onClick={() => !result && setSelected(opt.id)}
+                  key={i}
+                  onClick={() => !result && setSelected(optText)}
                   disabled={!!result}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${getOptionStyle(opt.id)}`}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${getOptionStyle(optText)}`}
                 >
                   <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                    selected === opt.id && !result ? 'bg-indigo-500 text-white' : 'bg-gray-100 text-gray-500'
+                    selected === optText && !result ? 'bg-indigo-500 text-white' : 'bg-gray-100 text-gray-500'
                   }`}>
                     {LABELS[i]}
                   </span>
-                  <span className="text-sm text-gray-800">{opt.option_text}</span>
-                  {result && result.correct_options?.some(c => c.id === opt.id) && (
+                  <span className="text-sm text-gray-800">{optText}</span>
+                  {result && String(optText).trim().toLowerCase() === String(result.correct_answer || '').trim().toLowerCase() && (
                     <CheckCircle className="w-4 h-4 text-green-500 ml-auto flex-shrink-0" />
                   )}
-                  {result && selected === opt.id && !result.correct_options?.some(c => c.id === opt.id) && (
+                  {result && selected === optText && String(optText).trim().toLowerCase() !== String(result.correct_answer || '').trim().toLowerCase() && (
                     <XCircle className="w-4 h-4 text-red-400 ml-auto flex-shrink-0" />
                   )}
                 </button>
-              ))}
+                );
+              })}
             </div>
           )}
 

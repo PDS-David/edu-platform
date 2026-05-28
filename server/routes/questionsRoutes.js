@@ -78,7 +78,10 @@ router.get('/random', protect, async (req, res) => {
 // ── POST /api/questions/:id/answer ───────────────────────────────────────────
 router.post('/:id/answer', protect, async (req, res) => {
   const { id } = req.params;
-  const { selected_answer, essay_response, time_taken_seconds = 0 } = req.body;
+  // Accept selected_answer (option text) OR selected_option_id (same — option text in JSONB schema)
+  const raw_answer = req.body.selected_answer ?? req.body.selected_option_id;
+  const { essay_response, time_taken_seconds = 0 } = req.body;
+  const selected_answer = raw_answer !== undefined ? String(raw_answer) : undefined;
 
   try {
     const questions = await sequelize.query(
