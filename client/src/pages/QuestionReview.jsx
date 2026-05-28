@@ -52,7 +52,7 @@ export default function QuestionReview() {
       setTotal(data.total || 0);
       setOffset(off);
     } catch (err) {
-      setError(err?.response?.data?.error || 'Failed to load pending questions');
+      setError(err?.message || err?.error || 'Failed to load pending questions');
     } finally {
       setLoading(false);
     }
