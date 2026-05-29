@@ -50,7 +50,7 @@ const GEMINI_MODEL_MAP = {
 //   1. gemini-2.5-flash            — primary (new paid API)
 //   2. gemini-2.5-flash-preview-05-20 — preview fallback
 //   3. gemini-1.5-flash            — stable fallback
-const FALLBACK_CHAIN = ['gemini-2.5-flash-preview-05-20', 'gemini-1.5-flash'];
+const FALLBACK_CHAIN = ['gemini-2.5-flash-preview-05-20', 'gemini-2.0-flash'];
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PROVIDER HELPERS

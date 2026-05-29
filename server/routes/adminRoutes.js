@@ -334,7 +334,7 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
 
     const prompt = `Generate ${count} ${difficulty} multiple-choice questions on the topic "${topic}" for the subject "${subjectRows[0].name}". Return ONLY a valid JSON array, no markdown. Each object must have: question_text (string), options (array of 4 strings), correct_answer (string matching one option), explanation (string).`;
 
-    const raw     = await generate(prompt);
+    const raw     = await generate(prompt, 'generate-questions');
     const cleaned = raw.replace(/```json|```/g, '').trim();
     const questions = JSON.parse(cleaned);
 
