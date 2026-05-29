@@ -115,7 +115,7 @@ export default function SettingsPage() {
       updateUser({ ...user, ...profile });
       showToast('Profile updated successfully');
     } catch (err) {
-      showToast(err?.error || 'Failed to update profile', 'error');
+      showToast(err?.message || 'Failed to update profile', 'error');
     } finally { setProfileSaving(false); }
   };
 
@@ -133,7 +133,7 @@ export default function SettingsPage() {
       showToast('Password updated successfully');
       setPwForm({ current_password: '', new_password: '', confirm_password: '' });
     } catch (err) {
-      showToast(err?.error || 'Incorrect current password', 'error');
+      showToast(err?.message || 'Incorrect current password', 'error');
     } finally { setPwSaving(false); }
   };
 
@@ -154,7 +154,7 @@ export default function SettingsPage() {
       updateUser({ ...user, daily_goal: studyPrefs.daily_goal });
       showToast('Study preferences saved');
     } catch (err) {
-      showToast(err?.error || 'Failed to save preferences', 'error');
+      showToast(err?.message || 'Failed to save preferences', 'error');
     } finally { setStudySaving(false); }
   };
 

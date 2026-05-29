@@ -58,7 +58,7 @@ export default function PaymentVerify() {
       } catch (err) {
         setStatus('failed');
         setMessage(
-          err?.error ||
+          err?.message ||
           'Could not verify payment. Please contact support if your account was charged.'
         );
       }

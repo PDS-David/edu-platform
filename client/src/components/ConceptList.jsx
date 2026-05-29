@@ -133,7 +133,7 @@ export default function ConceptList({ subtopic, showToast }) {
       setShowAdd(false);
       showToast('Concept added!');
     } catch (err) {
-      showToast(err?.error || 'Failed to add concept', 'error');
+      showToast(err?.message || 'Failed to add concept', 'error');
     }
   };
 
@@ -147,7 +147,7 @@ export default function ConceptList({ subtopic, showToast }) {
       setEditingId(null);
       showToast('Concept updated!');
     } catch (err) {
-      showToast(err?.error || 'Failed to update concept', 'error');
+      showToast(err?.message || 'Failed to update concept', 'error');
     }
   };
 
@@ -159,7 +159,7 @@ export default function ConceptList({ subtopic, showToast }) {
       setConcepts(prev => prev.filter(c => c.id !== confirmDel.id));
       showToast('Concept deleted.');
     } catch (err) {
-      showToast(err?.error || 'Failed to delete concept', 'error');
+      showToast(err?.message || 'Failed to delete concept', 'error');
     } finally {
       setDeleting(false);
       setConfirmDel(null);

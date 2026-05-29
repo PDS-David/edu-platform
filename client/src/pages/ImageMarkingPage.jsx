@@ -179,7 +179,7 @@ export default function ImageMarkingPage() {
         setError((res && res.error) || 'Marking failed. Please try again.');
       }
     } catch (err) {
-      setError(err?.error || err?.message || 'Something went wrong. Please try again.');
+      setError(err?.message || 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }

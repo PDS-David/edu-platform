@@ -135,7 +135,7 @@ export default function AIChatWidget({
 
       setMessages(prev => [...prev, { role: 'ai', text: res.reply, id: Date.now() + 1 }]);
     } catch (err) {
-      if (err.status === 403 && err.error === 'free_limit_reached') {
+      if (err.status === 403 && err?.message === 'free_limit_reached') {
         setUpgradeWall(true);
       } else {
         setMessages(prev => [...prev, {

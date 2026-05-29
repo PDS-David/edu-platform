@@ -455,7 +455,7 @@ export default function PracticeMode() {
       setScore(0);
       setPhase('quiz');
     } catch (err) {
-      if (err.error === 'free_limit_reached') {
+      if (err?.message === 'free_limit_reached') {
         setErrMsg(err.message || "You've used your free questions for today. Upgrade to continue.");
       } else {
         setErrMsg('Failed to load questions. Please try again.');

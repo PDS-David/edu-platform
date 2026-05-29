@@ -33,7 +33,7 @@ const LoginPage = () => {
       }
     } catch (err) {
       // Defensively extract string — err.error may be an object if server sends {error: {message:...}}
-      const raw = err?.error ?? err?.message ?? '';
+      const raw = err?.message ?? '';
       setError(typeof raw === 'string' ? raw : (raw?.message || 'Invalid email or password'));
     } finally {
       setLoading(false);

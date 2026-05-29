@@ -140,7 +140,7 @@ function ManageClassModal({ cls, onClose, onSaved, showToast }) {
       onSaved();
       onClose();
     } catch (err) {
-      showToast(err?.error || 'Failed to update members.', 'error');
+      showToast(err?.message || 'Failed to update members.', 'error');
     } finally {
       setSaving(false);
     }
@@ -206,7 +206,7 @@ function ClassesTab() {
       showToast(`Class created with ${newSelected.size} student${newSelected.size !== 1 ? 's' : ''}.`);
       load();
     } catch (err) {
-      showToast(err?.error || 'Failed to create class.', 'error');
+      showToast(err?.message || 'Failed to create class.', 'error');
     } finally {
       setCreating(false);
     }
@@ -419,21 +419,21 @@ function TestBuilderTab() {
     if (!form.title.trim()) { showToast('Title is required.', 'error'); return; }
     setCreating(true);
     try { await api.post('/teacher/tests', form); showToast('Test created!'); setForm({ title: '', duration_minutes: 60, total_marks: 100 }); setShowCreate(false); load(); }
-    catch (err) { showToast(err?.error || 'Failed.', 'error'); }
+    catch (err) { showToast(err?.message || 'Failed.', 'error'); }
     finally { setCreating(false); }
   };
 
   const publishTest = async id => {
     setPublishing(id);
     try { await api.put(`/teacher/tests/${id}/publish`); showToast('Test published!'); load(); }
-    catch (err) { showToast(err?.error || 'Publish failed.', 'error'); }
+    catch (err) { showToast(err?.message || 'Publish failed.', 'error'); }
     finally { setPublishing(null); }
   };
 
   const assignTest = async testId => {
     if (!assignClass) { showToast('Select a class first.', 'error'); return; }
     try { await api.post(`/teacher/tests/${testId}/assign`, { class_id: assignClass }); showToast('Assigned!'); setAssigning(null); setAssignClass(''); }
-    catch (err) { showToast(err?.error || 'Failed.', 'error'); }
+    catch (err) { showToast(err?.message || 'Failed.', 'error'); }
   };
 
   if (loading) return <div className="flex justify-center py-12"><Loader2 size={20} className="animate-spin text-violet-300" /></div>;

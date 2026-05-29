@@ -167,7 +167,7 @@ function SubtopicList({ topic, subjectId, showToast }) {
       setShowAdd(false);
       showToast('Subtopic added!');
     } catch (err) {
-      showToast(err?.error || err?.message || 'Failed to add subtopic', 'error');
+      showToast(err?.message || 'Failed to add subtopic', 'error');
     }
   };
 
@@ -180,7 +180,7 @@ function SubtopicList({ topic, subjectId, showToast }) {
       setEditingId(null);
       showToast('Subtopic updated!');
     } catch (err) {
-      showToast(err?.error || 'Failed to update subtopic', 'error');
+      showToast(err?.message || 'Failed to update subtopic', 'error');
     }
   };
 
@@ -192,7 +192,7 @@ function SubtopicList({ topic, subjectId, showToast }) {
       setSubtopics(prev => prev.filter(s => s.id !== confirmDel.id));
       showToast('Subtopic deleted.');
     } catch (err) {
-      showToast(err?.error || 'Failed to delete subtopic', 'error');
+      showToast(err?.message || 'Failed to delete subtopic', 'error');
     } finally {
       setDeleting(false);
       setConfirmDel(null);
@@ -386,7 +386,7 @@ export default function TeacherContentPage() {
       setShowAddTopic(false);
       showToast('Topic added!');
     } catch (err) {
-      showToast(err?.error || err?.message || 'Failed to add topic', 'error');
+      showToast(err?.message || 'Failed to add topic', 'error');
     }
   };
 
@@ -397,7 +397,7 @@ export default function TeacherContentPage() {
       setTopics(prev => prev.map(t => t.id === id ? { ...t, name: updated.name } : t));
       showToast('Topic updated!');
     } catch (err) {
-      showToast(err?.error || 'Failed to update topic', 'error');
+      showToast(err?.message || 'Failed to update topic', 'error');
     }
   };
 
@@ -409,7 +409,7 @@ export default function TeacherContentPage() {
       setTopics(prev => prev.filter(t => t.id !== confirmDel.id));
       showToast('Topic deleted.');
     } catch (err) {
-      showToast(err?.error || 'Failed to delete topic', 'error');
+      showToast(err?.message || 'Failed to delete topic', 'error');
     } finally {
       setDeleting(false);
       setConfirmDel(null);

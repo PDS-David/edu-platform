@@ -139,7 +139,7 @@ export default function ContributeQuestion() {
         alert(res.error || 'Submission failed');
       }
     } catch (err) {
-      alert(err?.error || 'Failed to submit question. Please try again.');
+      alert(err?.message || 'Failed to submit question. Please try again.');
     } finally {
       setSubmitting(false);
     }
