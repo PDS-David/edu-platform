@@ -341,16 +341,41 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
     let inserted = 0;
     for (const q of questions) {
       if (!q.question_text) continue;
+
+      // Normalise options to [{option_text, is_correct}] regardless of Gemini output format.
+      // Gemini returns ["A","B","C","D"] (strings). The platform schema expects objects.
+      const rawOptions = Array.isArray(q.options) ? q.options : [];
+      const normOptions = rawOptions.map(opt => {
+        if (typeof opt === 'string') {
+          return {
+            option_text: opt,
+            is_correct:  opt.trim().toLowerCase() === (q.correct_answer || '').trim().toLowerCase(),
+          };
+        }
+        // Already object — preserve as-is
+        return { option_text: opt.option_text || opt.text || String(opt), is_correct: !!opt.is_correct };
+      });
+
+      // If no option was flagged correct via is_correct, flag the one matching correct_answer
+      const anyCorrect = normOptions.some(o => o.is_correct);
+      if (!anyCorrect && q.correct_answer) {
+        normOptions.forEach(o => {
+          o.is_correct = o.option_text.trim().toLowerCase() === q.correct_answer.trim().toLowerCase();
+        });
+      }
+
       await sequelize.query(
         `INSERT INTO questions
-           (question_text, options, correct_answer, difficulty,
-            is_ai_generated, status, created_at, updated_at)
-         VALUES (:q, :o::jsonb, :c, :d, true, 'pending', NOW(), NOW())`,
+           (question_text, options, correct_answer, explanation, difficulty,
+            type, is_active, is_ai_generated, status, created_at, updated_at)
+         VALUES (:q, :o::jsonb, :c, :e, :d,
+                 'mcq', true, true, 'pending', NOW(), NOW())`,
         {
           replacements: {
             q: q.question_text,
-            o: JSON.stringify(q.options || []),
-            c: q.correct_answer,
+            o: JSON.stringify(normOptions),
+            c: q.correct_answer  || null,
+            e: q.explanation     || null,
             d: difficulty,
           },
           type: QueryTypes.INSERT,
