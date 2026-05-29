@@ -87,7 +87,7 @@ export default function StudentTestPage() {
     try {
       const answersArray = (test?.questions || []).map(q => ({
         question_id: q.id,
-        selected_option_id: answers[q.id] || null,
+        selected_answer:    answers[q.id] || null,  // option text string
         time_taken_ms: Math.round((Date.now() - startTime.current) / (test?.questions?.length || 1)),
       }));
       const res = await api.post(
@@ -150,16 +150,20 @@ export default function StudentTestPage() {
             <p className="text-gray-900 text-sm leading-relaxed">{q.question_text}</p>
           </div>
           <div className="px-5 pb-5 space-y-2">
-            {q.options?.map((opt, i) => (
-              <button key={opt.id}
-                onClick={() => setAnswers(prev => ({ ...prev, [q.id]: opt.id }))}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${
-                  answers[q.id] === opt.id ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-blue-300'
-                }`}>
-                <span className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 bg-gray-100 text-gray-500">{LABELS[i]}</span>
-                <span className="text-sm text-gray-800 flex-1">{opt.option_text}</span>
-              </button>
-            ))}
+            {q.options?.map((opt, i) => {
+              const optText  = typeof opt === 'string' ? opt : (opt.option_text || '');
+              const isSel    = answers[q.id] === optText;
+              return (
+                <button key={i}
+                  onClick={() => setAnswers(prev => ({ ...prev, [q.id]: optText }))}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${
+                    isSel ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-blue-300'
+                  }`}>
+                  <span className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 bg-gray-100 text-gray-500">{LABELS[i]}</span>
+                  <span className="text-sm text-gray-800 flex-1">{optText}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>

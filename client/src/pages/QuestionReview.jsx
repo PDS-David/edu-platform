@@ -205,25 +205,54 @@ export default function QuestionReview() {
 
                 {/* Options */}
                 <div className="px-6 pb-4 grid grid-cols-2 gap-2">
-                  {(q.options || []).map((opt, i) => (
-                    <div
-                      key={opt.id}
-                      className={`flex items-center gap-2 p-3 rounded-xl border ${
-                        opt.is_correct
-                          ? 'border-green-300 bg-green-50'
-                          : 'border-gray-100 bg-gray-50'
-                      }`}
-                    >
-                      <span className={`w-6 h-6 rounded text-xs font-bold flex items-center justify-center flex-shrink-0 ${
-                        opt.is_correct ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'
-                      }`}>
-                        {OPTION_LABELS[i]}
-                      </span>
-                      <span className="text-sm text-gray-800 truncate">{opt.option_text}</span>
-                      {opt.is_correct && <CheckCircle className="w-4 h-4 text-green-500 ml-auto flex-shrink-0" />}
-                    </div>
-                  ))}
+                  {(q.options || []).map((opt, i) => {
+                    // Handle both object {option_text, is_correct} and legacy string formats
+                    const optText    = typeof opt === 'string' ? opt : (opt.option_text || '');
+                    const isCorrect  = typeof opt === 'object'
+                      ? !!opt.is_correct
+                      : optText.trim().toLowerCase() === (q.correct_answer || '').trim().toLowerCase();
+                    return (
+                      <div
+                        key={i}
+                        className={`flex items-center gap-2 p-3 rounded-xl border ${
+                          isCorrect ? 'border-green-300 bg-green-50' : 'border-gray-100 bg-gray-50'
+                        }`}
+                      >
+                        <span className={`w-6 h-6 rounded text-xs font-bold flex items-center justify-center flex-shrink-0 ${
+                          isCorrect ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'
+                        }`}>
+                          {OPTION_LABELS[i]}
+                        </span>
+                        <span className="text-sm text-gray-800 truncate">{optText}</span>
+                        {isCorrect && <CheckCircle className="w-4 h-4 text-green-500 ml-auto flex-shrink-0" />}
+                      </div>
+                    );
+                  })}
                 </div>
+
+                {/* Correct answer + explanation — visible to admin only, never shown to students */}
+                {(q.correct_answer || q.explanation) && (
+                  <div className="px-6 pb-4 space-y-2">
+                    {q.correct_answer && (
+                      <div className="flex items-start gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+                        <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs font-semibold text-green-700 mb-0.5">Correct Answer</p>
+                          <p className="text-sm text-green-900">{q.correct_answer}</p>
+                        </div>
+                      </div>
+                    )}
+                    {q.explanation && (
+                      <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+                        <BookOpen className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs font-semibold text-blue-700 mb-0.5">Explanation</p>
+                          <p className="text-sm text-blue-900">{q.explanation}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Action buttons */}
                 <div className="px-6 pb-5 flex gap-3">
