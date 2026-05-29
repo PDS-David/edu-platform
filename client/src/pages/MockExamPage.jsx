@@ -126,7 +126,7 @@ export default function MockExamPage() {
     })
       .then(r => setQuestions(r.data || []))
       .catch(err => {
-        if (err.status === 403 && err.error === 'free_limit_reached') {
+        if (err.status === 403 && err?.message === 'free_limit_reached') {
           setUpgradeWall(true);
         }
       })
@@ -173,7 +173,7 @@ export default function MockExamPage() {
         state: { subjectId, subjectName, examBoardName, isMock: true },
       });
     } catch (err) {
-      console.error('[MockExam] submit error:', err.error || err.message);
+      console.error('[MockExam] submit error:', err.message);
       alert('Failed to submit. Please try again.');
       setSubmitting(false);
     }

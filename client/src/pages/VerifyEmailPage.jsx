@@ -35,7 +35,7 @@ export default function VerifyEmailPage() {
       .catch(err => {
         setStatus('error');
         setMessage(
-          err?.error ||
+          err?.message ||
           'This verification link is invalid or has expired. Please register again.'
         );
       });

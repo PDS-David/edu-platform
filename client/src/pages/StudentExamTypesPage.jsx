@@ -73,7 +73,7 @@ export default function StudentExamTypesPage() {
       setEnrolled(prev => new Set([...prev, sid]));
       showToast(`Enrolled in ${subject.name}`);
     } catch (err) {
-      showToast(err?.error || 'Enrolment failed', false);
+      showToast(err?.message || 'Enrolment failed', false);
     } finally {
       setEnrolling(prev => { const s = new Set(prev); s.delete(sid); return s; });
     }

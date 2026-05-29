@@ -218,7 +218,7 @@ export default function QuizPage() {
     })
       .then(r => setQuestions(r.data || []))
       .catch(err => {
-        if (err.error === 'free_limit_reached') setUpgradeWall(true);
+        if (err?.message === 'free_limit_reached') setUpgradeWall(true);
       })
       .finally(() => setLoading(false));
   }, [subjectId, paper, examBoardName]);

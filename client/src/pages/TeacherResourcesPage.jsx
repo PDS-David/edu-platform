@@ -380,7 +380,7 @@ function ResourcesTab({ showToast }) {
       setResources(prev => prev.filter(r => r.id !== id));
       showToast('Resource deleted.');
     } catch (err) {
-      showToast(err?.error || 'Failed to delete.', 'error');
+      showToast(err?.message || 'Failed to delete.', 'error');
     } finally {
       setDeleting(null);
     }
@@ -400,7 +400,7 @@ function ResourcesTab({ showToast }) {
       showToast(res?.message || 'Resource pushed successfully!');
       setPushing(null);
     } catch (err) {
-      showToast(err?.error || 'Push failed.', 'error');
+      showToast(err?.message || 'Push failed.', 'error');
     } finally {
       setPushSaving(false);
     }
@@ -655,7 +655,7 @@ function QuestionsTab({ showToast }) {
         ],
       }));
     } catch (err) {
-      showToast(err?.error || err?.message || 'Failed to submit question.', 'error');
+      showToast(err?.message || 'Failed to submit question.', 'error');
     } finally {
       setSaving(false);
     }
