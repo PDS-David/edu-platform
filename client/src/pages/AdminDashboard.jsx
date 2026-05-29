@@ -897,9 +897,11 @@ const ScrapePastPapersForm = ({ onImported, showToast }) => {
         />
         <input
           type="number"
+          min="1900"
+          max="2099"
           value={form.year_hint}
           onChange={(e) => set('year_hint', e.target.value)}
-          placeholder="Default year (fallback)"
+          placeholder={new Date().getFullYear().toString()}
           className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-violet-400"
         />
       </div>
@@ -982,8 +984,8 @@ const AdminPastPapersPanel = () => {
       <ScrapePastPapersForm onImported={fetchPapers} showToast={showToast} />
       <div className="flex gap-3 mb-5 flex-wrap">
         <select value={filters.exam_board} onChange={e => setFilters(f => ({ ...f, exam_board: e.target.value }))} className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"><option value="">All Exam Types</option>{['JAMB','WAEC','NECO','GCE_OL','GCE_AL','IELTS','TOEFL','SAT','JUPEB'].map(c => <option key={c} value={c}>{c}</option>)}</select>
-        <input type="number" placeholder="Year from" value={filters.year_from} onChange={e => setFilters(f => ({ ...f, year_from: e.target.value }))} className="w-28 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300" />
-        <input type="number" placeholder="Year to" value={filters.year_to} onChange={e => setFilters(f => ({ ...f, year_to: e.target.value }))} className="w-28 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300" />
+        <input type="number" min="1900" max="2099" placeholder="Year from" value={filters.year_from} onChange={e => setFilters(f => ({ ...f, year_from: e.target.value }))} className="w-28 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300" />
+        <input type="number" min="1900" max="2099" placeholder="Year to" value={filters.year_to} onChange={e => setFilters(f => ({ ...f, year_to: e.target.value }))} className="w-28 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300" />
         <button onClick={fetchPapers} className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold rounded-xl">Filter</button>
       </div>
       {loading ? <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 text-violet-400 animate-spin" /></div>
