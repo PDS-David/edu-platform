@@ -326,7 +326,7 @@ const RegisterPage = () => {
     formData.email.trim().length > 0 &&
     formData.phone.trim().length > 0 &&
     formData.password.length >= 8 &&
-    (formData.role === 'teacher' || (selectedCurriculum !== null && selectedGrade !== '')) &&
+    (selectedCurriculum !== null && selectedGrade !== '') &&
     termsAccepted;
 
   const handleSubmit = async (e) => {
@@ -555,7 +555,6 @@ const RegisterPage = () => {
                   <div className="flex gap-2 pt-1">
                     {[
                       { value: 'student', label: ' Student', desc: 'Access lessons & practice exams' },
-                      { value: 'teacher', label: ' Teacher', desc: 'Upload resources & teach subjects' },
                     ].map(opt => (
                       <button
                         key={opt.value}
