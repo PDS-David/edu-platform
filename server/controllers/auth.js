@@ -48,8 +48,8 @@ exports.register = async (req, res, next) => {
       return res.status(400).json({ success: false, error: 'Password must be at least 8 characters' });
     }
 
-    const allowedRoles = ['student', 'teacher'];
-    const assignedRole = allowedRoles.includes(role) ? role : 'student';
+    // Self-registration is student-only. Teachers are created via POST /api/admin/create-teacher.
+    const assignedRole = 'student';
 
     const existing = await db.query(
       `SELECT id FROM users WHERE email = :email LIMIT 1`,

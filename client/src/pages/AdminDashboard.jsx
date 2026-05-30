@@ -361,7 +361,7 @@ const TeacherAssignmentPanel = () => {
     if (!first_name.trim() || !email.trim() || !password.trim()) { showToast('First name, email and password are required', 'error'); return; }
     setCreatingTeacher(true);
     try {
-      await api.post('/auth/register', { first_name: first_name.trim(), last_name: last_name.trim(), email: email.trim(), password, role: 'teacher' });
+      await api.post('/admin/create-teacher', { first_name: first_name.trim(), last_name: last_name.trim(), email: email.trim(), password });
       showToast(`Teacher account created for ${email}`);
       setShowCreateTeacher(false);
       setTeacherForm({ first_name: '', last_name: '', email: '', password: '' });
