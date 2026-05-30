@@ -186,7 +186,7 @@ function ResourcesTab({ subtopicId, subtopic, subtopicName, onComplete }) {
             )}
             {(res.resource_type === 'document' || res.resource_type === 'pdf') && (() => {
                 const base = _FILE_BASE;
-                const fullUrl = resolveFileUrl(res.file_url);
+                const fullUrl = (res.id ? `/api/resources/${res.id}/download` : resolveFileUrl(res.file_url));
                 const isDataUri = fullUrl.startsWith('data:text/');
                 return (
                   <div className="flex gap-2">
@@ -212,10 +212,10 @@ function ResourcesTab({ subtopicId, subtopic, subtopicName, onComplete }) {
           )}
           {activeRes?.id === res.id && res.resource_type === 'audio' && (
             <audio controls className="w-full mt-2"
-              src={resolveFileUrl(res.file_url)} />
+              src={(res.id ? `/api/resources/${res.id}/download` : resolveFileUrl(res.file_url))} />
           )}
           {activeRes?.id === res.id && (res.resource_type === 'document' || res.resource_type === 'pdf') && (() => {
-            const fullUrl = resolveFileUrl(res.file_url);
+            const fullUrl = (res.id ? `/api/resources/${res.id}/download` : resolveFileUrl(res.file_url));
             if (fullUrl.startsWith('data:text/')) {
               let text = '';
               try { text = decodeURIComponent(fullUrl.replace(/^data:text\/[^;]+;charset=utf-8,/, '')); }

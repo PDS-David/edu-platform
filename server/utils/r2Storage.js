@@ -142,4 +142,18 @@ async function deleteByUrl(fileUrl) {
   }
 }
 
-module.exports = { isR2Enabled, uploadBuffer, getObjectByKey, deleteByUrl };
+
+async function getSignedDownloadUrl(key, expiresIn = 60) {
+  if (!isR2Enabled()) throw new Error('R2 is not configured');
+  _S3 = _S3 || require('@aws-sdk/client-s3');
+  const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+
+  const command = new _S3.GetObjectCommand({
+    Bucket: process.env.R2_BUCKET,
+    Key:    key,
+  });
+
+  return getSignedUrl(getClient(), command, { expiresIn });
+}
+
+module.exports = { isR2Enabled, uploadBuffer, getObjectByKey, deleteByUrl, getSignedDownloadUrl };
