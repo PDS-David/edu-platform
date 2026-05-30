@@ -20,6 +20,72 @@ const adminOnly = (req, res, next) => {
 };
 
 // ─────────────────────────────────────────────
+// POST /api/admin/create-teacher
+// Admin-only. Creates a teacher account directly (no email verification required).
+// Body: { email, password, first_name, last_name }
+// ─────────────────────────────────────────────
+router.post('/create-teacher', protect, adminOnly, async (req, res) => {
+  const bcrypt = require('bcryptjs');
+  const crypto = require('crypto');
+
+  const { email, password, first_name = '', last_name = '' } = req.body;
+
+  if (!email || !password) {
+    return error(res, 'email and password are required', 400);
+  }
+  if (password.length < 8) {
+    return error(res, 'Password must be at least 8 characters', 400);
+  }
+
+  try {
+    const existing = await sequelize.query(
+      `SELECT id FROM users WHERE email = :email LIMIT 1`,
+      { replacements: { email: email.toLowerCase().trim() }, type: QueryTypes.SELECT }
+    );
+    if (existing.length > 0) {
+      return error(res, 'An account with that email already exists', 409);
+    }
+
+    const salt   = await bcrypt.genSalt(12);
+    const hashed = await bcrypt.hash(password, salt);
+    const verificationToken        = crypto.randomBytes(32).toString('hex');
+    const verificationTokenExpires = new Date(Date.now() + 86400000);
+
+    const rows = await sequelize.query(
+      `INSERT INTO users
+         (email, password, first_name, last_name, role,
+          verification_token, verification_token_expires,
+          is_active, is_verified, subscription_status,
+          subscription_expires_at, pending_exam_board_ids,
+          created_at, updated_at)
+       VALUES
+         (:email, :password, :first_name, :last_name, 'teacher',
+          :verificationToken, :verificationTokenExpires,
+          true, true, 'free_trial',
+          NOW() + INTERVAL '14 days', '{}',
+          NOW(), NOW())
+       RETURNING id, email, first_name, last_name, role, is_active, created_at`,
+      {
+        replacements: {
+          email:                   email.toLowerCase().trim(),
+          password:                hashed,
+          first_name:              first_name.trim(),
+          last_name:               last_name.trim(),
+          verificationToken,
+          verificationTokenExpires,
+        },
+        type: QueryTypes.SELECT,
+      }
+    );
+
+    return success(res, { user: rows[0] }, null, 201);
+  } catch (err) {
+    console.error('[POST /admin/create-teacher]', err.message);
+    return error(res, 'Failed to create teacher account');
+  }
+});
+
+// ─────────────────────────────────────────────
 // GET /api/admin/platform-stats
 // Powers PlatformAnalyticsPanel in AdminDashboard.
 // Returns: { users, questions, revenue, top_subjects, daily_activity }
