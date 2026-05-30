@@ -154,6 +154,7 @@ export default function QuizResultsPage() {
   const {
     subtopicId, subtopicName = '', subjectName = '',
     examBoardName = '', isMock = false,
+    inlineResult = null,
   } = location.state || {};
 
   const [data,    setData]    = useState(null);
@@ -161,12 +162,36 @@ export default function QuizResultsPage() {
   const [error,   setError]   = useState(null);
 
   useEffect(() => {
-    if (!attemptId) return;
+    // inlineResult from QuizPage/MockExamPage — avoids broken GET /quizzes/attempt/undefined
+    if (inlineResult) {
+      const r = inlineResult;
+      setData({
+        attempt: {
+          total_score:   r.total_score  ?? r.score   ?? 0,
+          max_score:     r.max_score    ?? r.max      ?? 0,
+          accuracy_pct:  r.accuracy_pct ?? r.accuracy ?? 0,
+          total_time_ms: r.total_time_ms ?? 0,
+          subtopic_id:   r.subtopic_id  ?? subtopicId,
+          subject_id:    r.subject_id,
+          subtopic_name: subtopicName,
+        },
+        answers:                 r.answers ?? [],
+        examiner_recommendation: r.examiner_recommendation ?? null,
+        benchmark:               r.benchmark ?? null,
+      });
+      setLoading(false);
+      return;
+    }
+    if (!attemptId || attemptId === 'inline') {
+      setError('No results data available.');
+      setLoading(false);
+      return;
+    }
     api.get(`/quizzes/attempt/${attemptId}`)
       .then(r  => setData(r.data))
       .catch(() => setError('Could not load results. Please try again.'))
       .finally(() => setLoading(false));
-  }, [attemptId]);
+  }, [attemptId]); // eslint-disable-line
 
   if (loading) return (
     <div className="min-h-screen bg-[#0a4a3f] flex flex-col items-center justify-center gap-4">
