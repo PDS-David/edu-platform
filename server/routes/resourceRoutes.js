@@ -10,6 +10,7 @@ const { QueryTypes } = require('sequelize');
 const sequelize = require('../config/database');
 const { protect, authorize } = require('../middleware/auth');
 const r2 = require('../utils/r2Storage');
+const { getSignedDownloadUrl } = r2;
 
 /* ================================
    UPLOAD DIRECTORY
@@ -210,7 +211,7 @@ router.get('/health', (_req, res) => {
    Streams a file from Cloudflare R2 when the bucket is private or when
    R2_PUBLIC_BASE_URL isn't configured.
    ================================ */
-router.get('/r2/*', async (req, res) => {
+router.get('/r2/*', protect, async (req, res) => {
   try {
     const keyRaw = req.params[0] || '';
     const key = decodeURIComponent(keyRaw);
@@ -285,14 +286,16 @@ router.post(
       for (const f of files) {
         try {
           let fileUrl;
+          let r2Key = null;
           if (r2.isR2Enabled()) {
             // Memory storage → push buffer to Cloudflare R2
-            const { url } = await r2.uploadBuffer({
+            const { url, key } = await r2.uploadBuffer({
               buffer: f.buffer,
               originalname: f.originalname,
               mimetype: f.mimetype,
             });
             fileUrl = url;
+            r2Key = key;
           } else {
             // Local disk fallback (Render ephemeral)
             fileUrl = `/uploads/resources/${path.basename(f.path)}`;
@@ -303,14 +306,14 @@ router.post(
           // sequelize.query without QueryTypes returns [rows, meta]
           const [rows] = await sequelize.query(
             `INSERT INTO resources
-               (title, resource_type, file_url, file_size_bytes,
+               (title, resource_type, file_url, r2_key, file_size_bytes,
                 original_filename, mime_type, is_staged, is_active,
                 uploaded_by, created_at, updated_at)
              VALUES
-               (:title, :rtype, :fileUrl, :size,
+               (:title, :rtype, :fileUrl, :r2Key, :size,
                 :origName, :mime, true, true,
                 :uploadedBy, NOW(), NOW())
-             RETURNING id, title, resource_type, file_url,
+             RETURNING id, title, resource_type, file_url, r2_key,
                        file_size_bytes, original_filename, mime_type,
                        is_staged, is_active, created_at`,
             {
@@ -318,6 +321,7 @@ router.post(
                 title,
                 rtype: resourceType,
                 fileUrl,
+                r2Key: r2Key || null,
                 size: f.size,
                 origName: f.originalname,
                 mime: f.mimetype,
@@ -600,6 +604,95 @@ router.put(
     }
   }
 );
+
+
+/* ================================
+   AUTHENTICATED DOWNLOAD  (GET /api/resources/:id/download)
+   Generates a 60-second signed R2 URL and redirects to it.
+   Students may only download resources assigned to them.
+   Teachers and admins may download any resource.
+   ================================ */
+
+router.get('/:id/download', protect, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const role    = req.user.role;
+    const userId  = req.user.id;
+
+    // ── 1. Fetch resource ───────────────────────────────────────────────
+    const rows = await sequelize.query(
+      `SELECT id, title, file_url, r2_key, mime_type, original_filename, is_active
+         FROM resources WHERE id = :id LIMIT 1`,
+      { replacements: { id }, type: QueryTypes.SELECT }
+    );
+
+    if (!rows.length || !rows[0].is_active) {
+      return res.status(404).json({ success: false, error: 'Resource not found' });
+    }
+
+    const resource = rows[0];
+
+    // ── 2. Enforce visibility for students ─────────────────────────────
+    if (role === 'student') {
+      const access = await sequelize.query(
+        `SELECT 1 FROM resources r
+          WHERE r.id = :id
+            AND (
+              EXISTS (SELECT 1 FROM resource_assignments ra
+                       WHERE ra.resource_id = r.id AND ra.student_id = :uid)
+              OR EXISTS (SELECT 1 FROM resource_user_assignments rua
+                          WHERE rua.resource_id = r.id AND rua.user_id = :uid)
+              OR EXISTS (
+                SELECT 1 FROM resource_assignments ra
+                  JOIN class_memberships cm ON cm.class_id = ra.class_id
+                 WHERE ra.resource_id = r.id AND cm.student_id = :uid
+              )
+            )
+          LIMIT 1`,
+        { replacements: { id, uid: userId }, type: QueryTypes.SELECT }
+      );
+
+      if (!access.length) {
+        return res.status(403).json({ success: false, error: 'Access denied' });
+      }
+    }
+
+    // ── 3. Resolve the R2 object key ───────────────────────────────────
+    let key = resource.r2_key || null;
+
+    // Back-fill from file_url if r2_key not yet populated
+    if (!key && resource.file_url) {
+      const base = (process.env.R2_PUBLIC_BASE_URL || '').replace(/\/+$/, '');
+      if (base && resource.file_url.startsWith(base + '/')) {
+        key = resource.file_url.slice(base.length + 1);
+      } else if (resource.file_url.startsWith('/api/resources/r2/')) {
+        try { key = decodeURIComponent(resource.file_url.slice('/api/resources/r2/'.length)); }
+        catch { key = resource.file_url.slice('/api/resources/r2/'.length); }
+      } else {
+        // Match anything that looks like resources/<filename>
+        const m = resource.file_url.match(/\/(resources\/[^?#]+)/);
+        if (m) key = m[1];
+      }
+    }
+
+    // ── 4. Serve the file ──────────────────────────────────────────────
+    if (key && r2.isR2Enabled()) {
+      // R2 path: generate a 60-second signed URL
+      const signedUrl = await getSignedDownloadUrl(key, 60);
+      return res.redirect(302, signedUrl);
+    }
+
+    // Local disk fallback: file_url is a relative /uploads/... path
+    if (resource.file_url && !resource.file_url.startsWith('http')) {
+      return res.redirect(302, resource.file_url);
+    }
+
+    return res.status(502).json({ success: false, error: 'File storage not configured' });
+  } catch (err) {
+    console.error('[GET /resources/:id/download]', err.message);
+    return res.status(500).json({ success: false, error: 'Download failed' });
+  }
+});
 
 /* ================================
    DELETE STAGED FILE  (DELETE /api/resources/:id)

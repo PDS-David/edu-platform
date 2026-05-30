@@ -66,7 +66,7 @@ function resolveFileUrl(rawUrl) {
 
 // ── Inline file viewer ────────────────────────────────────────────────────────
 function InlineViewer({ file }) {
-  const url  = resolveFileUrl(file.file_url);
+  const url  = file.id ? `/api/resources/${file.id}/download` : resolveFileUrl(file.file_url);
   const type = (file.type || file.resource_type || "").toLowerCase();
   const ext  = url.split("?")[0].split(".").pop().toLowerCase();
   const [broken, setBroken] = useState(false);
@@ -182,7 +182,7 @@ function AssignedFilesSection({ resources, loading, totalResources, navigate }) 
                       const isOpen   = openFile === `${file.id}-${pt}`;
                       const isPractice = pt === "practice_test" || pt === "quiz";
                       // Always use resolveFileUrl so old eacbuddy URLs are rewritten
-                      const resolvedUrl = resolveFileUrl(file.file_url);
+                      const resolvedUrl = file.id ? `/api/resources/${file.id}/download` : resolveFileUrl(file.file_url);
                       return (
                         <div key={`${file.id}-${pt}`} className="border border-gray-100 rounded-xl overflow-hidden bg-white hover:border-blue-200 transition-colors">
                           <div className="p-3 flex items-center gap-3">

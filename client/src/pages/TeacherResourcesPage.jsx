@@ -466,7 +466,7 @@ function ResourcesTab({ showToast }) {
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <a href={r.url || r.file_url} target="_blank" rel="noreferrer"
+              <a href={r.id ? `/api/resources/${r.id}/download` : (r.url || r.file_url)} target="_blank" rel="noreferrer"
                 className="text-xs text-blue-600 hover:text-blue-800 font-medium px-3 py-1.5 border border-blue-200 rounded-lg transition-colors">
                 View
               </a>
