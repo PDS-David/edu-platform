@@ -94,7 +94,7 @@ export default function StudentTestPage() {
         `/student/test/${testId}/submit`,
         { answers: answersArray, total_time_ms: Date.now() - startTime.current }
       );
-      setResult(res);
+      setResult(res.data ?? res);
     } catch (err) {
       alert('Submission failed. Please try again.');
       setSubmitting(false);

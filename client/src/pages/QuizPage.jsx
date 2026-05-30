@@ -238,7 +238,8 @@ export default function QuizPage() {
     setSubmitting(true);
     try {
       // api interceptor returns response.data directly
-      // so `res` = { success, attempt_id, total_score, ... }
+      // res = { subtopic_id, total_score, max_score, accuracy_pct, passed, answers }
+      // There is no attempt_id — pass full result as inlineResult to QuizResultsPage
       const res = await api.post('/quizzes/attempt', {
         subtopic_id:   subtopicId,
         subject_id:    subjectId,
@@ -246,9 +247,11 @@ export default function QuizPage() {
         total_time_ms: Date.now() - quizStartMs.current,
         answers:       answersRef.current,
       });
-      const attemptId = res.attempt_id ?? res.data?.attempt_id;
-      navigate(`/student/quiz-results/${attemptId}`, {
-        state: { subtopicId, subtopicName, subjectName, examBoardName },
+      navigate('/student/quiz-results/inline', {
+        state: {
+          subtopicId, subtopicName, subjectName, examBoardName,
+          inlineResult: res,
+        },
       });
     } catch {
       alert('Failed to submit quiz. Please try again.');

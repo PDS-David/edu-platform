@@ -691,6 +691,85 @@ async function run() {
       WHERE subscription_status='free_trial'
         AND subscription_expires_at IS NOT NULL
         AND subscription_expires_at < NOW()`],
+
+    // ── FORENSIC AUDIT FIXES ─────────────────────────────────────────────────
+
+    // C-1: practice_attempts — core analytics table, may never have been created
+    ['practice_attempts (C-1: core analytics table)', `CREATE TABLE IF NOT EXISTS practice_attempts (
+      id                 SERIAL      PRIMARY KEY,
+      student_id         UUID        NOT NULL REFERENCES users(id)     ON DELETE CASCADE,
+      question_id        INTEGER     NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+      is_correct         BOOLEAN,
+      answer_given       TEXT,
+      time_taken_seconds INTEGER     NOT NULL DEFAULT 0,
+      attempted_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_pa_student_id   ON practice_attempts(student_id);
+    CREATE INDEX IF NOT EXISTS idx_pa_question_id  ON practice_attempts(question_id);
+    CREATE INDEX IF NOT EXISTS idx_pa_student_date ON practice_attempts(student_id, attempted_at DESC)`],
+
+    // C-2: subtopic_progress column divergence between model and migration
+    ['subtopic_progress: ensure all 5 task columns exist (C-2)', `
+      ALTER TABLE subtopic_progress
+        ADD COLUMN IF NOT EXISTS resources_completed BOOLEAN NOT NULL DEFAULT false,
+        ADD COLUMN IF NOT EXISTS practice_completed  BOOLEAN NOT NULL DEFAULT false,
+        ADD COLUMN IF NOT EXISTS notes_viewed        BOOLEAN NOT NULL DEFAULT false,
+        ADD COLUMN IF NOT EXISTS video_watched       BOOLEAN NOT NULL DEFAULT false`],
+
+    // C-3: resource_assignments CHECK constraint missing from migration path
+    ['resource_assignments: add target CHECK constraint (C-3)', `
+      DO $$ BEGIN
+        ALTER TABLE resource_assignments
+          ADD CONSTRAINT ra_target_check
+          CHECK (student_id IS NOT NULL OR class_id IS NOT NULL);
+      EXCEPTION WHEN duplicate_object THEN NULL; END $$`],
+
+    // H-1: Remove permanently-NULL FK to unpopulated answer_options table
+    ['student_answers: drop broken answer_options FK (H-1)', `
+      ALTER TABLE student_answers
+        DROP CONSTRAINT IF EXISTS student_answers_selected_option_id_fkey`],
+    ['subtopic_quiz_answers: drop broken answer_options FK (H-1)', `
+      ALTER TABLE subtopic_quiz_answers
+        DROP CONSTRAINT IF EXISTS subtopic_quiz_answers_selected_option_id_fkey`],
+
+    // H-2: Missing indexes on core FK columns (every subject/topic/question query)
+    ['core table FK indexes (H-2)', `
+      CREATE INDEX IF NOT EXISTS idx_topics_subject_id      ON topics(subject_id);
+      CREATE INDEX IF NOT EXISTS idx_subtopics_topic_id     ON subtopics(topic_id);
+      CREATE INDEX IF NOT EXISTS idx_subtopics_subject_id   ON subtopics(subject_id);
+      CREATE INDEX IF NOT EXISTS idx_questions_subtopic_id  ON questions(subtopic_id);
+      CREATE INDEX IF NOT EXISTS idx_past_papers_subject_id ON past_papers(subject_id);
+      CREATE INDEX IF NOT EXISTS idx_pa_student_question    ON practice_attempts(student_id, question_id)`],
+
+    // H-5: test_assignments missing class_id column
+    ['test_assignments: add class_id column (H-5)', `
+      ALTER TABLE test_assignments
+        ADD COLUMN IF NOT EXISTS class_id UUID REFERENCES classes(id) ON DELETE SET NULL;
+      CREATE INDEX IF NOT EXISTS idx_ta_class_id ON test_assignments(class_id)`],
+
+    // M-2: idx_questions_subject_id indexes unused column — replace with useful one
+    ['questions: replace unused subject_id_uuid index with subtopic_id index (M-2)', `
+      DROP INDEX IF EXISTS idx_questions_subject_id;
+      CREATE INDEX IF NOT EXISTS idx_questions_subtopic_id ON questions(subtopic_id)`],
+
+    // M-3: Performance indexes for analytics queries
+    ['subtopic_quiz_attempts: analytics performance indexes (M-3)', `
+      CREATE INDEX IF NOT EXISTS idx_sqa_exam_board   ON subtopic_quiz_attempts(exam_board_id)
+        WHERE exam_board_id IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_sqa_completed_at ON subtopic_quiz_attempts(student_id, completed_at DESC)`],
+
+    // M-4: Notifications unread query performance
+    ['notifications: partial index for unread count queries (M-4)', `
+      CREATE INDEX IF NOT EXISTS idx_notif_unread ON notifications(user_id, is_read)
+        WHERE is_read = false`],
+
+    // M-6: Consistent indexes on dual resource assignment tables
+    ['resource_assignments: consistent assignment lookup indexes (M-6)', `
+      CREATE INDEX IF NOT EXISTS idx_ra_student_resource ON resource_assignments(student_id, resource_id)
+        WHERE student_id IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_rua_user_resource   ON resource_user_assignments(user_id, resource_id)`],
   ];
 
   for (const [label, sql] of tables) {
@@ -709,9 +788,27 @@ async function run() {
         (SELECT COUNT(*) FROM users)::int                              AS users,
         (SELECT COUNT(*) FROM resources)::int                          AS resources,
         (SELECT COUNT(*) FROM subscription_plans)::int                 AS subscription_plans,
-        (SELECT COUNT(*) FROM notifications)::int                      AS notifications
+        (SELECT COUNT(*) FROM notifications)::int                      AS notifications,
+        (SELECT COUNT(*) FROM practice_attempts)::int                  AS practice_attempts,
+        (SELECT COUNT(*) FROM information_schema.columns
+          WHERE table_name='subtopic_progress'
+            AND column_name IN ('resources_completed','practice_completed','notes_viewed','video_watched')
+        )::int                                                         AS subtopic_progress_cols,
+        (SELECT COUNT(*) FROM information_schema.columns
+          WHERE table_name='test_assignments' AND column_name='class_id')::int AS test_assignments_class_id,
+        (SELECT COUNT(*) FROM pg_indexes WHERE tablename='topics'
+          AND indexname='idx_topics_subject_id')::int                  AS idx_topics_subject_id
     `);
     console.table(rows[0]);
+    const r = rows[0];
+    if (r.practice_attempts !== undefined)       console.log('  ✅  practice_attempts table exists');
+    else                                         console.log('  ❌  practice_attempts table MISSING');
+    if (parseInt(r.subtopic_progress_cols) >= 4) console.log('  ✅  subtopic_progress all 4 task columns present');
+    else                                         console.log(`  ⚠️   subtopic_progress only ${r.subtopic_progress_cols}/4 task columns`);
+    if (parseInt(r.test_assignments_class_id) === 1) console.log('  ✅  test_assignments.class_id exists');
+    else                                             console.log('  ❌  test_assignments.class_id MISSING');
+    if (parseInt(r.idx_topics_subject_id) === 1) console.log('  ✅  Core FK indexes present');
+    else                                          console.log('  ⚠️   Core FK indexes may be missing');
   } catch (e) {
     console.log('  (verification query failed:', e.message, ')');
   }

@@ -70,7 +70,7 @@ function ExamQuestion({ question, questionNumber, selected, onSelect }) {
           {question.options?.map((opt, i) => (
             <button
               key={opt.id}
-              onClick={() => onSelect(opt.id)}
+              onClick={() => onSelect(opt.option_text || opt.text || String(opt.id ?? ''))}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${
                 selected === opt.id
                   ? 'border-blue-400 bg-blue-50'
@@ -110,7 +110,7 @@ export default function MockExamPage() {
 
   const [questions,   setQuestions]   = useState([]);
   const [current,     setCurrent]     = useState(0);
-  const [answers,     setAnswers]     = useState({}); // { [questionId]: optionId }
+  const [answers,     setAnswers]     = useState({}); // { [questionId]: optionText }
   const [loading,     setLoading]     = useState(true);
   const [submitting,  setSubmitting]  = useState(false);
   const [upgradeWall, setUpgradeWall] = useState(false);
@@ -154,10 +154,11 @@ export default function MockExamPage() {
     clearInterval(timerRef.current);
     setSubmitting(true);
     try {
+      // answers[q.id] stores option text (set by onSelect below)
       const answersArray = questions.map(q => ({
-        question_id:        q.id,
-        selected_option_id: answers[q.id] || null,
-        time_taken_ms:      Math.round((Date.now() - startTime.current) / questions.length),
+        question_id:     q.id,
+        selected_answer: answers[q.id] || null,
+        time_taken_seconds: Math.round((Date.now() - startTime.current) / 1000 / questions.length),
       }));
 
       const res = await api.post('/quizzes/attempt', {
@@ -168,9 +169,8 @@ export default function MockExamPage() {
           answers:       answersArray,
         });
 
-      const attemptId = res.attempt_id ?? res.data?.attempt_id;
-      navigate(`/student/quiz-results/${attemptId}`, {
-        state: { subjectId, subjectName, examBoardName, isMock: true },
+      navigate('/student/quiz-results/inline', {
+        state: { subjectId, subjectName, examBoardName, isMock: true, inlineResult: res },
       });
     } catch (err) {
       console.error('[MockExam] submit error:', err.message);
