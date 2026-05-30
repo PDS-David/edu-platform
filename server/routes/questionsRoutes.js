@@ -22,7 +22,7 @@ router.get('/random', protect, async (req, res) => {
   const { count = '10', subject_id, subtopic_id, board, difficulty } = req.query;
   const limit = Math.min(Math.max(parseInt(count) || 10, 1), 50);
 
-  const filters      = ['q.is_active = true'];
+  const filters      = ["q.is_active = true", "COALESCE(q.status, 'approved') IN ('approved', 'active')"];
   const replacements = { limit };
 
   if (subtopic_id) {

@@ -47,7 +47,8 @@ router.post('/attempt', protect, async (req, res) => {
     // Fetch questions — questions.id is UUID, use TEXT cast for ANY()
     const questionRows = await sequelize.query(
       `SELECT id, question_text, marks, explanation, correct_answer, options, type
-       FROM questions WHERE id::text = ANY(ARRAY[:ids]::text[]) AND is_active = true`,
+       FROM questions WHERE id::text = ANY(ARRAY[:ids]::text[]) AND is_active = true
+         AND COALESCE(status, 'approved') IN ('approved', 'active')`,
       { replacements: { ids: questionIds.map(String) }, type: QueryTypes.SELECT }
     );
     const questionMap = Object.fromEntries(questionRows.map(q => [String(q.id), q]));
