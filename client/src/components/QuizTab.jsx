@@ -275,7 +275,7 @@ function InProgressScreen({ subtopicId, subtopic, selectedPaper, onFinish, navig
           time_taken_ms:      0,
         })),
       });
-      onFinish(res.attempt_id || res.id);
+      onFinish(res.data?.attempt_id ?? res.attempt_id ?? res.id ?? null);
     } catch {
       // fallback — pass null
       onFinish(null);

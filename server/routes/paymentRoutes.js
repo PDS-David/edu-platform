@@ -81,6 +81,10 @@ router.post('/initialize', protect, async (req, res) => {
     return res.status(400).json({ success: false, error: 'plan_code is required' });
   }
 
+  if (!process.env.PAYSTACK_SECRET_KEY) {
+    return res.status(503).json({ success: false, error: 'Payment service is not configured. Please contact support.' });
+  }
+
   try {
     // ── 1. Fetch plan from DB ─────────────────────────────────────────────────
     const plans = await sequelize.query(
@@ -192,6 +196,10 @@ router.post('/initialize', protect, async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/verify/:reference', protect, async (req, res) => {
   const { reference } = req.params;
+
+  if (!process.env.PAYSTACK_SECRET_KEY) {
+    return res.status(503).json({ success: false, error: 'Payment service is not configured. Please contact support.' });
+  }
 
   try {
     // ── 1. Fetch transaction from our DB ─────────────────────────────────────

@@ -17,7 +17,7 @@ const getSecret = () => {
 
 const generateToken = (payload) => {
   return jwt.sign(payload, getSecret(), {
-    expiresIn: '7d',
+    expiresIn: process.env.JWT_EXPIRE || '7d',
     issuer:    ISSUER,
   });
 };

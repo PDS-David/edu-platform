@@ -47,7 +47,7 @@ function QuizQuestion({ question, questionNumber, submitRef, onAnswered }) {
       // Fire AI explanation in background — non-blocking
       setExplainLoad(true);
       api.post('/ai/explain', { question_id: question.id, selected_option_id: selected })
-        .then(r => { if (r.success) setAiExplain(r.explanation); })
+        .then(r => { if (r.success) setAiExplain(r.data?.explanation ?? r.explanation); })
         .catch(() => {})
         .finally(() => setExplainLoad(false));
 
