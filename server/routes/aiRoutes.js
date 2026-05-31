@@ -15,12 +15,49 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 const express  = require('express');
+const multer   = require('multer');
 const router   = express.Router();
 const { protect }            = require('../middleware/auth');
 const { QueryTypes }         = require('sequelize');
 const sequelize              = require('../config/database');
 const { generate }           = require('../services/ai');
 const { GoogleGenAI }        = require('@google/genai');
+
+// multer: memory storage for AI image uploads (no disk write needed)
+const imageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  fileFilter: (_req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+    if (!allowed.includes(file.mimetype)) {
+      return cb(new Error('Only JPEG, PNG, WEBP or HEIC images are accepted'));
+    }
+    cb(null, true);
+  },
+});
+
+// ── Grade calculator (WAEC A1–F9 scale) ──────────────────────────────────────
+function calcGrade(pct) {
+  if (pct >= 75) return 'A1';
+  if (pct >= 70) return 'B2';
+  if (pct >= 65) return 'B3';
+  if (pct >= 60) return 'C4';
+  if (pct >= 55) return 'C5';
+  if (pct >= 50) return 'C6';
+  if (pct >= 45) return 'D7';
+  if (pct >= 40) return 'E8';
+  return 'F9';
+}
+
+// ── Normalise Gemini string-or-array fields to arrays ────────────────────────
+function toArray(val) {
+  if (Array.isArray(val)) return val.filter(Boolean);
+  if (typeof val === 'string' && val.trim()) {
+    // Split on newlines or semicolons so a multi-sentence string becomes bullet points
+    return val.split(/[\n;]/).map(s => s.trim()).filter(Boolean);
+  }
+  return [];
+}
 
 // ── POST /api/ai/chat ─────────────────────────────────────────────────────────
 router.post('/chat', protect, async (req, res) => {
@@ -45,7 +82,7 @@ Give concise, curriculum-aligned answers suited for WAEC/JAMB/NECO preparation.`
       reply = await generate(`${system}\n\nStudent: ${message}\nAISchoolonair:`, 'chat');
     }
 
-    return res.status(200).json({ success: true, reply });
+    return res.status(200).json({ success: true, data: { reply } });
   } catch (err) {
     console.error('[POST /ai/chat]', err.message);
     return res.status(500).json({ success: false, error: 'AI chat failed' });
@@ -80,13 +117,13 @@ router.post('/explain', protect, async (req, res) => {
     const q = questions[0];
 
     if (q?.explanation && !typed_answer) {
-      return res.status(200).json({ success: true, explanation: q.explanation });
+      return res.status(200).json({ success: true, data: { explanation: q.explanation } });
     }
 
     if (!process.env.GEMINI_API_KEY) {
       return res.status(200).json({
-        success:     true,
-        explanation: q?.explanation || 'No explanation available.',
+        success: true,
+        data: { explanation: q?.explanation || 'No explanation available.' },
       });
     }
 
@@ -126,7 +163,7 @@ Be concise and curriculum-aligned.`;
       ).catch(() => {});
     }
 
-    return res.status(200).json({ success: true, explanation });
+    return res.status(200).json({ success: true, data: { explanation } });
   } catch (err) {
     console.error('[POST /ai/explain]', err.message);
     return res.status(500).json({ success: false, error: 'Failed to generate explanation' });
@@ -154,14 +191,13 @@ router.post('/hint', protect, async (req, res) => {
     if (q?.concept_hint && hint_level === 1) {
       return res.status(200).json({
         success: true,
-        hint:    q.concept_hint,
-        hints:   [q.concept_hint],
+        data: { hint: q.concept_hint, hints: [q.concept_hint] },
       });
     }
 
     if (!process.env.GEMINI_API_KEY) {
       const fallback = 'Think carefully about the key concepts in this question. Re-read it slowly.';
-      return res.status(200).json({ success: true, hint: fallback, hints: [fallback] });
+      return res.status(200).json({ success: true, data: { hint: fallback, hints: [fallback] } });
     }
 
     const prompt = `You are a helpful tutor for Nigerian secondary school students.

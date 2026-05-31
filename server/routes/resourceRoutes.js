@@ -782,7 +782,7 @@ router.put(
       // least a subject or topic) before it can be pushed to anyone. This
       // protects against direct API calls bypassing the staging UI.
       const guardRows = await sequelize.query(
-        `SELECT id, is_staged, subject_id, topic_id, subtopic_id, title
+        `SELECT id, is_staged, subject_id, topic_id, subtopic_id, title, push_type
            FROM resources
           WHERE id = :rid`,
         { replacements: { rid: resourceId }, type: QueryTypes.SELECT }
@@ -804,31 +804,100 @@ router.put(
         });
       }
 
-      let studentIds = [...user_ids];
+      // ── 1. Push-type corruption guard ──────────────────────────────────
+      // resource.push_type is authoritative. Reject mismatches so callers
+      // cannot corrupt the stored classification.
+      const resourcePushType = meta.push_type || 'learning_material';
+      if (push_type !== resourcePushType) {
+        return res.status(400).json({
+          success: false,
+          error: `push_type mismatch: resource is "${resourcePushType}", request sent "${push_type}". Use the resource's push_type.`
+        });
+      }
+
+      // ── 2. Teacher subject validation ───────────────────────────────────
+      // Teachers may only push resources that belong to a subject they are
+      // actively assigned to. Admins bypass this check.
+      if (req.user.role === 'teacher') {
+        if (!meta.subject_id) {
+          return res.status(403).json({
+            success: false,
+            error: 'This resource has no subject assigned. Only resources with a subject can be pushed by teachers.'
+          });
+        }
+        const teacherSubjectRows = await sequelize.query(
+          `SELECT 1 FROM teacher_subjects
+            WHERE teacher_id = :tid
+              AND subject_id  = :sid
+              AND is_active   = true
+            LIMIT 1`,
+          {
+            replacements: { tid: req.user.id, sid: meta.subject_id },
+            type: QueryTypes.SELECT
+          }
+        );
+        if (!teacherSubjectRows.length) {
+          return res.status(403).json({
+            success: false,
+            error: 'You are not assigned to the subject of this resource.'
+          });
+        }
+      }
+
+      // ── 3. Collect candidate student IDs ────────────────────────────────
+      let candidateIds = [...user_ids];
 
       if (assign_all) {
         const students = await sequelize.query(
-          `SELECT id FROM users WHERE role='student' AND is_active=true`,
+          `SELECT id FROM users WHERE role = 'student' AND is_active = true`,
           { type: QueryTypes.SELECT }
         );
-        studentIds = students.map((s) => s.id);
+        candidateIds = students.map((s) => s.id);
       }
 
       if (class_ids.length > 0) {
         const members = await sequelize.query(
           `SELECT student_id FROM class_memberships
             WHERE class_id = ANY(:classIds)`,
+          { replacements: { classIds: class_ids }, type: QueryTypes.SELECT }
+        );
+        const fromClasses = members.map((m) => m.student_id);
+        candidateIds = [...new Set([...candidateIds, ...fromClasses])];
+      }
+
+      // ── 4. Student subject eligibility filter ───────────────────────────
+      // Only students enrolled in the resource's subject receive assignments.
+      // If the resource has no subject_id, all candidates are eligible.
+      let eligibleIds = candidateIds;
+      if (meta.subject_id && candidateIds.length > 0) {
+        const enrolledRows = await sequelize.query(
+          `SELECT student_id FROM student_subjects
+            WHERE subject_id = :sid
+              AND is_active   = true
+              AND student_id  = ANY(:cids)`,
           {
-            replacements: { classIds: class_ids },
+            replacements: { sid: meta.subject_id, cids: candidateIds },
             type: QueryTypes.SELECT
           }
         );
-        const ids = members.map((m) => m.student_id);
-        studentIds = [...new Set([...studentIds, ...ids])];
+        const enrolledSet = new Set(enrolledRows.map((r) => r.student_id));
+        eligibleIds = candidateIds.filter((id) => enrolledSet.has(id));
       }
 
+      // ── 5. Structured log ───────────────────────────────────────────────
+      console.log('[assign-users]', JSON.stringify({
+        resource_id:        resourceId,
+        resource_subject_id: meta.subject_id,
+        resource_push_type: resourcePushType,
+        teacher_id:         req.user.role === 'teacher' ? req.user.id : null,
+        requested_students: candidateIds.length,
+        eligible_students:  eligibleIds.length,
+        class_ids_count:    class_ids.length,
+      }));
+
+      // ── 6. Insert student assignments ───────────────────────────────────
       let insertedStudents = 0;
-      for (const sid of studentIds) {
+      for (const sid of eligibleIds) {
         try {
           await sequelize.query(
             `INSERT INTO resource_assignments
@@ -839,9 +908,9 @@ router.put(
             {
               replacements: {
                 rid: resourceId,
-                by: req.user.id,
+                by:  req.user.id,
                 sid,
-                pt: push_type
+                pt:  resourcePushType,
               },
               type: QueryTypes.INSERT
             }
@@ -852,6 +921,7 @@ router.put(
         }
       }
 
+      // ── 7. Insert class assignments ─────────────────────────────────────
       let insertedClasses = 0;
       for (const cid of class_ids) {
         try {
@@ -864,9 +934,9 @@ router.put(
             {
               replacements: {
                 rid: resourceId,
-                by: req.user.id,
+                by:  req.user.id,
                 cid,
-                pt: push_type
+                pt:  resourcePushType,
               },
               type: QueryTypes.INSERT
             }
@@ -877,7 +947,15 @@ router.put(
         }
       }
 
-      // After successful assignment, mark resource as no longer staged
+      // ── 8. Final log with assigned count ────────────────────────────────
+      console.log('[assign-users]', JSON.stringify({
+        resource_id:       resourceId,
+        assigned_students: insertedStudents,
+        assigned_classes:  insertedClasses,
+        skipped_students:  candidateIds.length - eligibleIds.length,
+      }));
+
+      // ── 9. Unstage ──────────────────────────────────────────────────────
       try {
         await sequelize.query(
           `UPDATE resources SET is_staged = false, updated_at = NOW()
@@ -891,7 +969,8 @@ router.put(
       return res.json({
         success: true,
         student_count: insertedStudents,
-        class_count: insertedClasses,
+        class_count:   insertedClasses,
+        skipped_count: candidateIds.length - eligibleIds.length,
         message:
           insertedStudents || insertedClasses
             ? `Pushed to ${insertedStudents} student(s) and ${insertedClasses} class(es).`
