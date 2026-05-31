@@ -385,6 +385,10 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 
   // ── Verify Paystack signature ─────────────────────────────────────────────
   const webhookSecret = process.env.PAYSTACK_WEBHOOK_SECRET || PAYSTACK_SECRET;
+  if (!webhookSecret) {
+    console.error('[Webhook] PAYSTACK_WEBHOOK_SECRET and PAYSTACK_SECRET_KEY are both unset — cannot verify webhook');
+    return res.status(503).send('Webhook signing secret not configured');
+  }
   const hash = crypto
     .createHmac('sha512', webhookSecret)
     .update(req.body)
