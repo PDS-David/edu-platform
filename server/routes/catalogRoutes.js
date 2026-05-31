@@ -10,7 +10,7 @@ const express    = require('express');
 const router     = express.Router();
 const { QueryTypes } = require('sequelize');
 const sequelize  = require('../config/database');
-const { protect } = require('../middleware/auth');
+const { protect, authorize } = require('../middleware/auth');
 
 // ---------------------------------------------------------------------------
 // GET /api/catalog/stats  — admin dashboard summary cards (public, no auth)
@@ -83,7 +83,7 @@ router.get('/types', async (req, res) => {
 // ---------------------------------------------------------------------------
 // POST /api/catalog/types — create exam type
 // ---------------------------------------------------------------------------
-router.post('/types', protect, async (req, res) => {
+router.post('/types', protect, authorize('admin'), async (req, res) => {
   const { code, name, full_name, description, country, icon_emoji, display_order } = req.body;
   if (!code || !name) return res.status(400).json({ success: false, error: 'code and name are required' });
 
@@ -129,7 +129,7 @@ router.post('/types', protect, async (req, res) => {
 // ---------------------------------------------------------------------------
 // PUT /api/catalog/types/:id — update exam type
 // ---------------------------------------------------------------------------
-router.put('/types/:id', protect, async (req, res) => {
+router.put('/types/:id', protect, authorize('admin'), async (req, res) => {
   const { id } = req.params;
   const { name, full_name, description, country, icon_emoji, display_order, is_active } = req.body;
   try {
@@ -168,7 +168,7 @@ router.put('/types/:id', protect, async (req, res) => {
 // ---------------------------------------------------------------------------
 // DELETE /api/catalog/types/:id — soft-delete exam type
 // ---------------------------------------------------------------------------
-router.delete('/types/:id', protect, async (req, res) => {
+router.delete('/types/:id', protect, authorize('admin'), async (req, res) => {
   const { id } = req.params;
   try {
     const cnt = await sequelize.query(
@@ -207,7 +207,7 @@ router.get('/types/:id/subjects', async (req, res) => {
 // ---------------------------------------------------------------------------
 // POST /api/catalog/types/:id/subjects — add subject under exam type
 // ---------------------------------------------------------------------------
-router.post('/types/:id/subjects', protect, async (req, res) => {
+router.post('/types/:id/subjects', protect, authorize('admin'), async (req, res) => {
   const typeId = req.params.id;
   const { name, code, description, level, icon_emoji } = req.body;
   if (!name || !code) return res.status(400).json({ success: false, error: 'name and code are required' });
@@ -244,7 +244,7 @@ router.post('/types/:id/subjects', protect, async (req, res) => {
 // ---------------------------------------------------------------------------
 // PUT /api/catalog/subjects/:id — update subject
 // ---------------------------------------------------------------------------
-router.put('/subjects/:id', protect, async (req, res) => {
+router.put('/subjects/:id', protect, authorize('admin'), async (req, res) => {
   const { id } = req.params;
   const { name, description, level, icon_emoji, is_active } = req.body;
   try {
@@ -279,7 +279,7 @@ router.put('/subjects/:id', protect, async (req, res) => {
 // ---------------------------------------------------------------------------
 // DELETE /api/catalog/subjects/:id — soft-delete subject
 // ---------------------------------------------------------------------------
-router.delete('/subjects/:id', protect, async (req, res) => {
+router.delete('/subjects/:id', protect, authorize('admin'), async (req, res) => {
   const { id } = req.params;
   try {
     await sequelize.query(`UPDATE subjects SET is_active = false, updated_at = NOW() WHERE id = :id`, { replacements: { id }, type: QueryTypes.UPDATE });
@@ -293,7 +293,7 @@ router.delete('/subjects/:id', protect, async (req, res) => {
 // ---------------------------------------------------------------------------
 // GET /api/catalog/teachers — all teachers with subject count
 // ---------------------------------------------------------------------------
-router.get('/teachers', protect, async (req, res) => {
+router.get('/teachers', protect, authorize('admin'), async (req, res) => {
   try {
     // teacher_subjects may not exist yet — graceful fallback
     let teachers;
@@ -324,7 +324,7 @@ router.get('/teachers', protect, async (req, res) => {
 // ---------------------------------------------------------------------------
 // GET /api/catalog/teachers/:teacherId/subjects
 // ---------------------------------------------------------------------------
-router.get('/teachers/:teacherId/subjects', protect, async (req, res) => {
+router.get('/teachers/:teacherId/subjects', protect, authorize('admin'), async (req, res) => {
   const { teacherId } = req.params;
   try {
     const subjects = await sequelize.query(
@@ -348,7 +348,7 @@ router.get('/teachers/:teacherId/subjects', protect, async (req, res) => {
 // ---------------------------------------------------------------------------
 // POST /api/catalog/teachers/:teacherId/assign
 // ---------------------------------------------------------------------------
-router.post('/teachers/:teacherId/assign', protect, async (req, res) => {
+router.post('/teachers/:teacherId/assign', protect, authorize('admin'), async (req, res) => {
   const { teacherId } = req.params;
   const { subject_ids } = req.body;
   if (!subject_ids?.length) return res.status(400).json({ success: false, error: 'subject_ids required' });
@@ -385,7 +385,7 @@ router.post('/teachers/:teacherId/assign', protect, async (req, res) => {
 // ---------------------------------------------------------------------------
 // DELETE /api/catalog/teachers/:teacherId/subjects/:subjectId
 // ---------------------------------------------------------------------------
-router.delete('/teachers/:teacherId/subjects/:subjectId', protect, async (req, res) => {
+router.delete('/teachers/:teacherId/subjects/:subjectId', protect, authorize('admin'), async (req, res) => {
   const { teacherId, subjectId } = req.params;
   try {
     await sequelize.query(

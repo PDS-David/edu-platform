@@ -384,7 +384,9 @@ router.post('/send-notification', protect, adminOnly, async (req, res) => {
 // AI QUESTION GENERATION
 // ─────────────────────────────────────────────
 router.post('/generate-questions', protect, adminOnly, async (req, res) => {
-  const { subject_id, topic, count = 10, difficulty = 'medium' } = req.body;
+  const rawCount = req.body.count;
+  const count = Math.min(Math.max(parseInt(rawCount) || 10, 1), 50);
+  const { subject_id, topic, difficulty = 'medium' } = req.body;
 
   if (!subject_id || !topic) {
     return error(res, 'subject_id and topic are required', 400);
