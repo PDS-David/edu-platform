@@ -51,16 +51,52 @@ function isPublicUrl(url) {
   }
 }
 
+// Detect Office document MIME types that Microsoft Office Online Viewer supports.
+// Checks both mime_type (from upload metadata) and file extension as fallback.
+function isOfficeMime(file) {
+  const mime = (file.mime_type || '').toLowerCase();
+  const url  = (file.file_url || '').toLowerCase();
+  return (
+    mime.includes('wordprocessingml')   || // .docx
+    mime.includes('presentationml')     || // .pptx
+    mime.includes('spreadsheetml')      || // .xlsx
+    mime.includes('msword')             || // .doc (legacy)
+    mime.includes('ms-powerpoint')      || // .ppt (legacy)
+    mime.includes('ms-excel')           || // .xls (legacy)
+    /\.(docx?|pptx?|xlsx?)(\?|$)/.test(url)
+  );
+}
+
+// Microsoft Office Online Viewer works with any publicly reachable URL —
+// including http:// — but NOT with localhost or private-network addresses.
+// Files served from /uploads/ behind Caddy are NOT publicly reachable
+// by Microsoft's servers, so we fall back to download UI for those.
+function isPubliclyReachable(url) {
+  try {
+    if (!url.startsWith('http')) return false;          // relative path
+    const u = new URL(url);
+    if (u.hostname === 'localhost')                return false;
+    if (u.hostname.match(/^192\.168\.|^10\.|^172\.(1[6-9]|2\d|3[01])\./)) return false;
+    if (u.hostname.endsWith('.onrender.com'))       return false;
+    if (u.pathname.startsWith('/uploads/'))         return false;
+    if (u.pathname.startsWith('/api/'))             return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function InlineViewer({ file }) {
   const url  = file.id ? `/api/resources/${file.id}/download` : resolveUrl(file.file_url);
   const type = (file.resource_type || file.type || '').toLowerCase();
 
+  // ── Video / Audio / Image ─────────────────────────────────────────────────
   if (type === 'video') return <video src={url} controls className="w-full rounded-xl mt-2 max-h-60 bg-black" />;
   if (type === 'audio') return <audio src={url} controls className="w-full mt-2" />;
   if (type === 'image') return <img src={url} alt={file.title} className="w-full rounded-xl mt-2 max-h-60 object-contain bg-gray-100" />;
 
+  // ── PDF ───────────────────────────────────────────────────────────────────
   const isPdf = type === 'pdf' || /\.pdf(\?|$)/i.test(url);
-
   if (isPdf) {
     return (
       <div className="mt-2 rounded-xl overflow-hidden border border-gray-200">
@@ -80,33 +116,62 @@ function InlineViewer({ file }) {
     );
   }
 
-  // For Office docs (docx/pptx/xlsx): Google Docs Viewer only works with
-  // publicly reachable URLs. If the file lives on the same server (Render
-  // ephemeral disk), skip the broken iframe and show a download prompt instead.
-  const canUseGoogleViewer = isPublicUrl(url);
+  // ── Office Documents (.docx / .pptx / .xlsx and legacy .doc/.ppt/.xls) ───
+  // Use Microsoft Office Online Viewer when the file is an Office format.
+  // Falls back to download UI when the file is not publicly reachable
+  // (e.g. served from the same server behind Caddy).
+  if (isOfficeMime(file)) {
+    if (isPubliclyReachable(url)) {
+      const viewerSrc = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`;
+      const mimeLabel = (file.mime_type || '').includes('presentationml') ? 'presentation'
+                      : (file.mime_type || '').includes('spreadsheetml')  ? 'spreadsheet'
+                      : 'document';
+      return (
+        <div className="mt-2 rounded-xl overflow-hidden border border-gray-200">
+          <iframe
+            src={viewerSrc}
+            title={file.title}
+            className="w-full"
+            style={{ height: 520 }}
+            frameBorder="0"
+            allowFullScreen
+          />
+          <div className="py-2 px-3 flex items-center justify-between bg-gray-50 border-t border-gray-100">
+            <span className="text-xs text-gray-400 capitalize">
+              Microsoft Office Online — {mimeLabel} preview
+            </span>
+            <a href={url} download={file.original_filename || file.title || true}
+              className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+              <Download size={11} /> Download
+            </a>
+          </div>
+        </div>
+      );
+    }
 
-  if (canUseGoogleViewer) {
-    const previewSrc = `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
+    // Office file on the same server — not publicly reachable for viewer
     return (
-      <div className="mt-2 rounded-xl overflow-hidden border border-gray-200">
-        <iframe
-          src={previewSrc}
-          title={file.title}
-          className="w-full"
-          style={{ height: 420 }}
-        />
-        <div className="py-2 text-center bg-gray-50 border-t border-gray-100">
+      <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-5 text-center">
+        <FileText size={28} className="text-amber-400 mx-auto mb-2" />
+        <p className="text-sm font-semibold text-gray-700 mb-1">Office document</p>
+        <p className="text-xs text-gray-500 mb-4">
+          Online preview requires a public file URL. Download to open in Microsoft Office or Google Docs.
+        </p>
+        <div className="flex justify-center gap-3">
           <a href={url} target="_blank" rel="noreferrer"
-            download={file.original_filename || file.title || true}
-            className="text-xs text-blue-600 hover:underline">
-            Download file ↓
+            className="text-xs font-semibold px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center gap-1.5">
+            <ExternalLink size={12} /> Open file ↗
+          </a>
+          <a href={url} download={file.original_filename || file.title || true}
+            className="text-xs font-semibold px-4 py-2 rounded-lg border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors flex items-center gap-1.5">
+            <Download size={12} /> Download ↓
           </a>
         </div>
       </div>
     );
   }
 
-  // File is on the same server — just offer a direct download/open link
+  // ── Unsupported type — generic download UI ────────────────────────────────
   return (
     <div className="mt-2 rounded-xl border border-gray-200 bg-gray-50 p-5 text-center">
       <p className="text-sm text-gray-500 mb-3">
