@@ -11,8 +11,6 @@
 //     memory_updated, next_action? }
 // ============================================================================
 
-'use strict';
-
 const express              = require('express');
 const router               = express.Router();
 const { protect }          = require('../middleware/auth');

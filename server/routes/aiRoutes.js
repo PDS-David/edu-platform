@@ -22,6 +22,7 @@ const { QueryTypes }         = require('sequelize');
 const sequelize              = require('../config/database');
 const { generate }           = require('../services/ai');
 const { GoogleGenAI }        = require('@google/genai');
+const { markImage }          = require('../services/aiService');
 
 // multer: memory storage for AI image uploads (no disk write needed)
 const imageUpload = multer({
@@ -299,35 +300,6 @@ Total length: under 300 words. Plain text only — no markdown, no headers with 
     return res.status(500).json({ success: false, error: 'Failed to generate notes' });
   }
 });
-
-// ── POST /api/ai/mark-image ───────────────────────────────────────────────────
-// v6: Receives multipart/form-data binary file via multer (memoryStorage).
-//     Delegates to aiService.markImage() for the actual Gemini multimodal call.
-//     Returns camelCase fields matching the frontend's result shape.
-const multer = require('multer');
-const { markImage } = require('../services/aiService');
-
-const imageUpload = multer({
-  storage: multer.memoryStorage(),
-  limits:  { fileSize: 10 * 1024 * 1024 }, // 10 MB
-  fileFilter: (_req, file, cb) => {
-    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
-    cb(null, allowed.includes(file.mimetype));
-  },
-}).single('image');
-
-// WAEC-style grade from percentage
-function calcGrade(pct) {
-  if (pct >= 75) return 'A1';
-  if (pct >= 70) return 'B2';
-  if (pct >= 65) return 'B3';
-  if (pct >= 60) return 'C4';
-  if (pct >= 55) return 'C5';
-  if (pct >= 50) return 'C6';
-  if (pct >= 45) return 'D7';
-  if (pct >= 40) return 'E8';
-  return 'F9';
-}
 
 router.post('/mark-image', protect, (req, res) => {
   imageUpload(req, res, async (uploadErr) => {
