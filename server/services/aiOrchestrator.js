@@ -14,7 +14,7 @@ const {
   shouldCallTool,
   detectConfusion,
   appendFollowUp,
-} = require('./AISchoolonairPersonality');
+} = require('./eacbuddyPersonality');
 
 // =========================================================================
 // LLM CLIENTS
