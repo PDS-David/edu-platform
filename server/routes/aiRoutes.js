@@ -423,6 +423,14 @@ router.post('/mark-image', protect, (req, res) => {
 router.get('/predict-grade/:userId/:subjectId', protect, async (req, res) => {
   const { userId, subjectId } = req.params;
 
+  // Ownership guard — students may only access their own data
+  if (
+    req.user.role === 'student' &&
+    String(req.user.id) !== String(userId)
+  ) {
+    return res.status(403).json({ success: false, error: 'Access denied' });
+  }
+
   try {
     // Pull accuracy + topic coverage for this student × subject
     const [statsRow] = await sequelize.query(`
@@ -537,6 +545,14 @@ Return ONLY valid JSON (no markdown):
 // a prioritised 5-step AI study plan with reasons, actions, and subtopic links.
 router.get('/learning-path/:userId', protect, async (req, res) => {
   const { userId } = req.params;
+
+  // Ownership guard — students may only access their own data
+  if (
+    req.user.role === 'student' &&
+    String(req.user.id) !== String(userId)
+  ) {
+    return res.status(403).json({ success: false, error: 'Access denied' });
+  }
 
   try {
     // Weak subtopics (low accuracy, attempted)
