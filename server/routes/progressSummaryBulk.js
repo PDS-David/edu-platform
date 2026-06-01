@@ -17,6 +17,14 @@ router.get('/bulk', async (req, res) => {
     });
   }
 
+  // Ownership guard — students may only access their own data
+  if (
+    req.user.role === 'student' &&
+    String(req.user.id) !== String(student_id)
+  ) {
+    return res.status(403).json({ success: false, error: 'Access denied' });
+  }
+
   try {
     // ── IMPORTANT FIX:
     // Use DISTINCT to avoid overcounting due to joins
