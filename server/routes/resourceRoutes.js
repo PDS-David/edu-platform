@@ -858,7 +858,7 @@ router.put(
       if (class_ids.length > 0) {
         const members = await sequelize.query(
           `SELECT student_id FROM class_memberships
-            WHERE class_id = ANY(:classIds)`,
+            WHERE class_id IN (:classIds)`,
           { replacements: { classIds: class_ids }, type: QueryTypes.SELECT }
         );
         const fromClasses = members.map((m) => m.student_id);
@@ -874,7 +874,7 @@ router.put(
           `SELECT student_id FROM student_subjects
             WHERE subject_id = :sid
               AND is_active   = true
-              AND student_id  = ANY(:cids)`,
+              AND student_id  IN (:cids)`,
           {
             replacements: { sid: meta.subject_id, cids: candidateIds },
             type: QueryTypes.SELECT

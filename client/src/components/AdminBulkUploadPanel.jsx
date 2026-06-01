@@ -421,7 +421,7 @@ function AssignUsersForm({ file, onDone, onDismiss, onSuccess }) {
   const [selected,      setSelected]      = useState([]);
   const [selectedClass, setSelectedClass] = useState([]);
   const [assignAll,     setAssignAll]     = useState(false);
-  const [pushType,      setPushType]      = useState('learning_material');
+  const [pushType,      setPushType]      = useState(file.push_type || 'learning_material');
   const [search,        setSearch]        = useState('');
   const [saving,        setSaving]        = useState(false);
   const [msg,           setMsg]           = useState('');
