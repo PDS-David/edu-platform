@@ -1,14 +1,12 @@
-# .github/workflows/deploy.yml
 # ─────────────────────────────────────────────────────────────────────────────
-# Continuous Deployment — triggers on every push to main.
-# Connects to the Hetzner CX23 server via SSH and runs deploy.sh.
+# Continuous Deployment — triggers on push to main
+# SSHs into Hetzner server and runs production deploy script
 #
-# Required GitHub Secrets (set in repo → Settings → Secrets → Actions):
-#   DEPLOY_HOST    — server IP, e.g. 178.104.51.118
-#   DEPLOY_USER    — SSH user, e.g. root
-#   DEPLOY_KEY     — private SSH key (generate with: ssh-keygen -t ed25519)
-#                    The matching public key must be in ~/.ssh/authorized_keys on server
-#   DEPLOY_PATH    — absolute path to repo on server, e.g. /opt/aischoolonair
+# Required GitHub Secrets:
+#   DEPLOY_HOST   → 178.104.51.118
+#   DEPLOY_USER   → deploy (recommended) or root
+#   DEPLOY_KEY    → private SSH key (github_actions_key)
+#   DEPLOY_PATH   → /home/deploy/edu-platform
 # ─────────────────────────────────────────────────────────────────────────────
 
 name: Deploy to Production
@@ -16,7 +14,7 @@ name: Deploy to Production
 on:
   push:
     branches: [main]
-  workflow_dispatch:  # allow manual trigger from GitHub Actions UI
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -25,7 +23,7 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - name: Checkout (for reference only — actual code pulled on server)
+      - name: Checkout code (for reference only)
         uses: actions/checkout@v4
 
       - name: Deploy via SSH
@@ -36,12 +34,25 @@ jobs:
           key: ${{ secrets.DEPLOY_KEY }}
           port: 22
           timeout: 600s
+
           script: |
             set -e
-            echo "── Deploying AISchoolonair ──────────────────────"
-            echo "  Server: $(hostname)"
-            echo "  Time:   $(date -u)"
-            echo "─────────────────────────────────────────────────"
-            bash ${{ secrets.DEPLOY_PATH }}/deploy.sh
-            echo "─────────────────────────────────────────────────"
-            echo "  ✅ Deploy complete"
+
+            echo "════════════════════════════════════"
+            echo "🚀 AISchoolonair Deployment Started"
+            echo "════════════════════════════════════"
+
+            cd /home/deploy/edu-platform
+
+            echo "▶ Pulling latest code from GitHub..."
+            git pull origin main
+
+            echo "▶ Ensuring deploy script is executable..."
+            chmod +x deploy.sh
+
+            echo "▶ Running deployment script..."
+            ./deploy.sh
+
+            echo "════════════════════════════════════"
+            echo "✅ Deployment successful"
+            echo "════════════════════════════════════"
