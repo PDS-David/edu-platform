@@ -58,15 +58,17 @@ www.aischoolonair.ng {
     }
 
     # Socket.IO WebSocket upgrade (realtimeEngine)
-    @ws { header Upgrade websocket }
+    @ws {
+    header Upgrade websocket
+    }
     route @ws {
         reverse_proxy api:5000 {
             transport http {
-                read_timeout  0
-                write_timeout 0
+                read_timeout 60s
             }
-        }
-    }
+         }
+
+     }
 
     # REST API
     @api path /api/*
@@ -85,9 +87,12 @@ www.aischoolonair.ng {
     @uploads path /uploads/*
     route @uploads {
         reverse_proxy api:5000 {
-            transport http { read_timeout 60s }
-        }
-    }
+            transport http {
+                read_timeout 60s
+            }
+         }
+     }
+    
 
     # React SPA — served by nginx inside the web container
     route {
@@ -107,17 +112,25 @@ staging.aischoolonair.ng {
         }
     }
 
-    @ws_stg { header Upgrade websocket }
+    @ws_stg {
+    header Upgrade websocket
+    }
     route @ws_stg {
         reverse_proxy api_staging:5000 {
-            transport http { read_timeout 0; write_timeout 0 }
+            transport http {
+                read_timeout 0
+                write_timeout 0
+            }
         }
     }
 
     @api_stg path /api/*
     route @api_stg {
         reverse_proxy api_staging:5000 {
-            transport http { read_timeout 120s; write_timeout 120s }
+            transport http {
+                read_timeout 0
+                write_timeout 0
+             }
         }
     }
 
