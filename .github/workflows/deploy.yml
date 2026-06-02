@@ -42,11 +42,11 @@ jobs:
             echo "🚀 AISchoolonair Deployment Started"
             echo "════════════════════════════════════"
 
-            cd /home/deploy/edu-platform
+            cd /opt/aischoolonair
 
-            echo "▶ Pulling latest code from GitHub..."
-            git pull origin main
-
+            echo "▶ Syncing with GitHub (hard reset safe mode)..."
+            git fetch origin
+            git reset --hard origin/main
             echo "▶ Ensuring deploy script is executable..."
             chmod +x deploy.sh
 
