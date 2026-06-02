@@ -225,12 +225,20 @@ router.post('/types/:id/subjects', protect, authorize('admin'), async (req, res)
     );
     if (dup.length) return res.status(409).json({ success: false, error: `Code '${code}' already exists in this exam type` });
 
+    // Fetch the board code so we can store it on the subject for future-proofing
+    // (guards against exam_board_id being lost in schema migrations)
+    const boardRow = await sequelize.query(
+      `SELECT code FROM exam_boards WHERE id = :id LIMIT 1`,
+      { replacements: { id: typeId }, type: QueryTypes.SELECT }
+    );
+    const boardCode = boardRow[0]?.code || null;
+
     const result = await sequelize.query(
-      `INSERT INTO subjects (exam_board_id, name, code, description, level, icon_emoji, is_active, created_at, updated_at)
-       VALUES (:typeId, :name, UPPER(:code), :description, :level, :icon_emoji, true, NOW(), NOW())
+      `INSERT INTO subjects (exam_board_id, exam_board_code, name, code, description, level, icon_emoji, is_active, created_at, updated_at)
+       VALUES (:typeId, :boardCode, :name, UPPER(:code), :description, :level, :icon_emoji, true, NOW(), NOW())
        RETURNING *`,
       {
-        replacements: { typeId, name, code, description: description || null, level: level || null, icon_emoji: icon_emoji || null },
+        replacements: { typeId, boardCode, name, code, description: description || null, level: level || null, icon_emoji: icon_emoji || null },
         type: QueryTypes.SELECT,
       }
     );

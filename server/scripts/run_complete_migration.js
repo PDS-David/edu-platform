@@ -74,6 +74,39 @@ async function run() {
       -- If col_type is already 'integer', nothing to do.
     EXCEPTION WHEN others THEN NULL; END $$`);
 
+  // After the UUID→INTEGER column fix above, existing subjects that previously had
+  // exam_board_id populated may now have exam_board_id = NULL because the column was
+  // dropped and re-added. Repopulate using exam_board_code if present on the subject.
+  await exec('subjects: backfill exam_board_id from exam_board_code', `
+    UPDATE subjects s
+    SET    exam_board_id = eb.id
+    FROM   exam_boards eb
+    WHERE  UPPER(eb.code)        = UPPER(s.exam_board_code)
+      AND  s.exam_board_id       IS NULL
+      AND  s.exam_board_code     IS NOT NULL
+      AND  s.exam_board_code     <> ''`);
+
+  // Second-pass backfill: subjects whose exam_board_code is also NULL
+  // (created via POST /catalog/types/:id/subjects which did not write exam_board_code).
+  // Assign them to the JAMB exam board — this installation only has JAMB content.
+  // Uses a subquery to find the first active exam board with JAMB in the code/name.
+  // Safe: only updates rows where exam_board_id IS still NULL after the first pass.
+  await exec('subjects: backfill NULL exam_board_id to JAMB board', `
+    UPDATE subjects
+    SET    exam_board_id = (
+      SELECT id FROM exam_boards
+      WHERE  is_active = true
+        AND  (UPPER(code) LIKE '%JAMB%' OR UPPER(name) LIKE '%JAMB%')
+      ORDER BY id
+      LIMIT 1
+    )
+    WHERE  exam_board_id IS NULL
+      AND  EXISTS (
+        SELECT 1 FROM exam_boards
+        WHERE  is_active = true
+          AND  (UPPER(code) LIKE '%JAMB%' OR UPPER(name) LIKE '%JAMB%')
+      )`);
+
   // teacher_subjects.exam_board_id is already INTEGER in the live DB — no change needed.
   // Just ensure it exists if somehow missing.
   await exec('teacher_subjects: ensure exam_board_id column exists as INTEGER', `
