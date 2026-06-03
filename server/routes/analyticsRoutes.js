@@ -11,12 +11,40 @@ const { QueryTypes } = require('sequelize');
 const sequelize      = require('../config/database');
 const { protect }    = require('../middleware/auth');
 
-// Safe wrapper — returns fallback if practice_attempts or related tables missing
+// Safe wrapper — returns fallback on any DB error.
+// Classifies errors into three categories for actionable log output:
+//
+//   "Analytics table missing"  — Postgres 42P01 / "relation does not exist"
+//   "Analytics column missing"  — Postgres 42703 / "column does not exist"
+//   "Analytics query failed"    — everything else (syntax, type mismatch, etc.)
+//
+// Signature is unchanged: safeQuery(sql, replacements, fallback?)
+// All callers continue to receive the fallback value; no endpoint crashes.
 const safeQuery = async (sql, replacements, fallback = []) => {
   try {
     return await sequelize.query(sql, { replacements, type: QueryTypes.SELECT });
   } catch (e) {
-    console.warn('[analytics] query skipped:', e.message.slice(0, 100));
+    // Postgres SQLSTATE code is on err.original (Sequelize 6) or err.parent.
+    // Fall back to message-pattern matching when the code is unavailable
+    // (e.g. connection-level errors surfaced before reaching Postgres).
+    const pgCode = e.original?.code ?? e.parent?.code ?? '';
+    const msg    = e.message ?? '';
+
+    if (pgCode === '42P01' || /relation .+ does not exist/i.test(msg)) {
+      // Extract the table name from the Postgres message when possible.
+      const match = msg.match(/relation "?([^"\s]+)"? does not exist/i);
+      const table = match ? match[1] : 'unknown';
+      console.warn(`[analytics] Analytics table missing: ${table}`);
+    } else if (pgCode === '42703' || /column .+ does not exist/i.test(msg)) {
+      // Extract the column name from the Postgres message when possible.
+      const match = msg.match(/column "?([^"\s]+)"? does not exist/i);
+      const column = match ? match[1] : 'unknown';
+      console.warn(`[analytics] Analytics column missing: ${column}`);
+    } else {
+      // Unexpected failure — log the full message so it can be investigated.
+      console.error(`[analytics] Analytics query failed: ${msg.slice(0, 200)}`);
+    }
+
     return fallback;
   }
 };
