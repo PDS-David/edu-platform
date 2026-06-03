@@ -62,20 +62,47 @@ router.get('/summary', protect, async (req, res) => {
     const userId = req.user.id;
     const [userRows, attemptRows] = await Promise.all([
       safeQuery(
-        `SELECT COALESCE(xp_points, 0) AS xp_points,
-                COALESCE(study_streak_days, 0) AS study_streak_days
+        `SELECT
+           -- Null-safe: users with no XP or streak return 0, not null
+           COALESCE(xp_points, 0)          AS xp_points,
+           COALESCE(study_streak_days, 0)  AS study_streak_days
          FROM users WHERE id = :userId`,
         { userId }, [{}]
       ),
       safeQuery(
         `SELECT
+           -- Total rows in practice_attempts for this student
            COUNT(*)::INTEGER AS total_attempts,
-           COALESCE(ROUND(AVG(CASE WHEN pa.is_correct THEN 100 ELSE 0 END))::INTEGER, 0) AS accuracy_pct,
+
+           -- Accuracy: CASE avoids division-by-zero (COUNT(*) may be 0 at JS layer but
+           -- AVG on an empty set returns NULL; COALESCE converts that to 0).
+           -- Multiply by 100.0 (not 100) to keep ROUND precise to 1 decimal place.
+           COALESCE(
+             ROUND(
+               AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0.0 END),
+               1
+             ),
+             0
+           )::NUMERIC AS accuracy_pct,
+
+           -- subjects_practiced: distinct subjects reached via the correct join chain
+           -- practice_attempts → questions → subtopics → topics → subjects
            COUNT(DISTINCT t.subject_id)::INTEGER AS subjects_practiced,
+
+           -- active_days: distinct calendar days with at least one attempt
            COUNT(DISTINCT DATE(pa.attempted_at))::INTEGER AS active_days,
+
+           -- total_time_seconds: SUM is NULL when no rows match; COALESCE to 0
            COALESCE(SUM(pa.time_taken_seconds), 0)::BIGINT AS total_time_seconds,
-           COUNT(*) FILTER (WHERE pa.attempted_at >= CURRENT_DATE)::INTEGER AS today_attempts
+
+           -- today_attempts: attempts on the current server date (timezone-aware)
+           COUNT(*) FILTER (
+             WHERE pa.attempted_at >= CURRENT_DATE
+               AND pa.attempted_at <  CURRENT_DATE + INTERVAL '1 day'
+           )::INTEGER AS today_attempts
+
          FROM practice_attempts pa
+         -- Join chain: questions → subtopics → topics (needed for subjects_practiced)
          JOIN questions  q  ON q.id  = pa.question_id
          JOIN subtopics  st ON st.id = q.subtopic_id
          JOIN topics     t  ON t.id  = st.topic_id
@@ -83,17 +110,17 @@ router.get('/summary', protect, async (req, res) => {
         { userId }, [{}]
       ),
     ]);
-    const u = userRows[0] || {};
+    const u = userRows[0]  || {};
     const a = attemptRows[0] || {};
     return res.json({ success: true, data: {
-      total_attempts:     a.total_attempts     || 0,
-      accuracy_pct:       a.accuracy_pct       || 0,
-      study_streak_days:  u.study_streak_days  || 0,
-      xp_points:          u.xp_points          || 0,
-      subjects_practiced: a.subjects_practiced || 0,
-      active_days:        a.active_days        || 0,
-      total_time_seconds: a.total_time_seconds || 0,
-      today_attempts:     a.today_attempts     || 0,
+      total_attempts:     parseInt(a.total_attempts,     10) || 0,
+      accuracy_pct:       parseFloat(a.accuracy_pct)        || 0,
+      study_streak_days:  parseInt(u.study_streak_days,  10) || 0,
+      xp_points:          parseInt(u.xp_points,          10) || 0,
+      subjects_practiced: parseInt(a.subjects_practiced, 10) || 0,
+      active_days:        parseInt(a.active_days,        10) || 0,
+      total_time_seconds: parseInt(a.total_time_seconds, 10) || 0,
+      today_attempts:     parseInt(a.today_attempts,     10) || 0,
     }});
   } catch (err) {
     console.error('[GET /analytics/summary]', err.message);
