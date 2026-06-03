@@ -78,8 +78,12 @@ router.get('/weak-topics', protect, async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit) || 5, 20);
   try {
     const rows = await safeQuery(
-      `SELECT
-         q.topic,
+      `-- topic name + id come from the join chain:
+       --   practice_attempts → questions → subtopics → topics → subjects
+       -- q.topic (a plain text column) is NOT used; t.id/t.name are the authoritative source.
+       SELECT
+         t.id   AS topic_id,
+         t.name AS topic,
          s.name AS subject_name,
          COUNT(*)::INTEGER AS attempt_count,
          ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 1) AS accuracy_pct
@@ -90,8 +94,7 @@ router.get('/weak-topics', protect, async (req, res) => {
        JOIN subjects   s  ON s.id  = t.subject_id
        WHERE pa.student_id = :userId
          AND pa.attempted_at > NOW() - INTERVAL '30 days'
-         AND q.topic IS NOT NULL
-       GROUP BY q.topic, s.name
+       GROUP BY t.id, t.name, s.name
        HAVING COUNT(*) >= 2
        ORDER BY accuracy_pct ASC
        LIMIT :limit`,
@@ -285,17 +288,22 @@ router.get('/cohort-gaps', protect, async (req, res) => {
   const { subject_id } = req.query;
   try {
     const rows = await safeQuery(
-      `SELECT
-         q.topic,
+      `-- topic name comes from the join chain:
+       --   practice_attempts → questions → subtopics → topics
+       -- Aliased as "topic" to preserve the existing response shape consumed by the
+       -- frontend (r.topic in the .map() below remains valid).
+       SELECT
+         t.id   AS topic_id,
+         t.name AS topic,
          ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 1) AS avg_accuracy,
          COUNT(DISTINCT pa.student_id)::INTEGER AS student_count
        FROM practice_attempts pa
        JOIN questions  q  ON q.id  = pa.question_id
        JOIN subtopics  st ON st.id = q.subtopic_id
        JOIN topics     t  ON t.id  = st.topic_id
-       WHERE q.topic IS NOT NULL
+       WHERE true
          ${subject_id ? 'AND t.subject_id = :subject_id' : ''}
-       GROUP BY q.topic
+       GROUP BY t.id, t.name
        HAVING COUNT(*) >= 3
        ORDER BY avg_accuracy ASC
        LIMIT 15`,
@@ -326,8 +334,12 @@ router.get('/student/:studentId/topics', protect, async (req, res) => {
   const { subject_id } = req.query;
   try {
     const rows = await safeQuery(
-      `SELECT
-         q.topic,
+      `-- topic name + id come from the join chain:
+       --   practice_attempts → questions → subtopics → topics → subjects
+       -- Aliased as "topic" so the frontend response shape is unchanged.
+       SELECT
+         t.id   AS topic_id,
+         t.name AS topic,
          s.name AS subject_name,
          COUNT(pa.id)::INTEGER AS attempt_count,
          ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 1) AS accuracy_pct,
@@ -337,9 +349,9 @@ router.get('/student/:studentId/topics', protect, async (req, res) => {
        JOIN subtopics  st ON st.id = q.subtopic_id
        JOIN topics     t  ON t.id  = st.topic_id
        JOIN subjects   s  ON s.id  = t.subject_id
-       WHERE pa.student_id = :studentId AND q.topic IS NOT NULL
+       WHERE pa.student_id = :studentId
          ${subject_id ? 'AND t.subject_id = :subject_id' : ''}
-       GROUP BY q.topic, s.name
+       GROUP BY t.id, t.name, s.name
        ORDER BY accuracy_pct ASC`,
       { studentId, ...(subject_id ? { subject_id } : {}) }
     );
@@ -403,8 +415,12 @@ router.get('/cohort/:subjectId/topics', protect, async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit) || 10, 50);
   try {
     const rows = await safeQuery(
-      `SELECT
-         q.topic,
+      `-- topic name + id come from the join chain:
+       --   practice_attempts → questions → subtopics → topics
+       -- topics is filtered by subject via t.subject_id = :subjectId.
+       SELECT
+         t.id   AS topic_id,
+         t.name AS topic,
          COUNT(DISTINCT pa.student_id)::INTEGER AS student_count,
          COUNT(pa.id)::INTEGER AS attempt_count,
          ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 1) AS avg_accuracy,
@@ -413,8 +429,8 @@ router.get('/cohort/:subjectId/topics', protect, async (req, res) => {
        JOIN questions  q  ON q.id  = pa.question_id
        JOIN subtopics  st ON st.id = q.subtopic_id
        JOIN topics     t  ON t.id  = st.topic_id
-       WHERE t.subject_id = :subjectId AND q.topic IS NOT NULL
-       GROUP BY q.topic
+       WHERE t.subject_id = :subjectId
+       GROUP BY t.id, t.name
        HAVING COUNT(*) >= 3
        ORDER BY avg_accuracy ASC
        LIMIT :limit`,
