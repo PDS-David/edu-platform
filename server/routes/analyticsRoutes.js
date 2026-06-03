@@ -477,11 +477,14 @@ router.get('/student/:studentId/topics', protect, async (req, res) => {
 // ── GET /api/analytics/student/:studentId/summary ────────────────────────────
 router.get('/student/:studentId/summary', protect, async (req, res) => {
   const { studentId } = req.params;
+  // Authorization unchanged: students can only see their own summary.
   if (req.user.role === 'student' && String(req.user.id) !== String(studentId)) {
     return res.status(403).json({ success: false, error: 'Access denied' });
   }
   try {
-    const [userRows, attemptRows, progressRows] = await Promise.all([
+    // userRows and attemptRows run in parallel — neither depends on
+    // subtopic_progress, so they are not penalised if that table is absent.
+    const [userRows, attemptRows] = await Promise.all([
       safeQuery(
         `SELECT COALESCE(xp_points,0) AS xp_points, COALESCE(study_streak_days,0) AS study_streak_days
          FROM users WHERE id = :studentId`,
@@ -495,13 +498,19 @@ router.get('/student/:studentId/summary', protect, async (req, res) => {
          FROM practice_attempts WHERE student_id = :studentId`,
         { studentId }, [{}]
       ),
-      safeQuery(
-        `SELECT COUNT(*) FILTER (WHERE quiz_completed)::INTEGER AS quizzes_completed
-         FROM subtopic_progress WHERE student_id = :studentId`,
-        { studentId }, [{}]
-      ),
     ]);
-    const u = userRows[0] || {};
+
+    // subtopic_progress is optional: the table may not exist, or the
+    // quiz_completed column may be absent on older schema revisions.
+    // safeQuery returns the fallback [{quizzes_completed:0}] in both cases,
+    // keeping the endpoint at HTTP 200 regardless of table availability.
+    const progressRows = await safeQuery(
+      `SELECT COUNT(*) FILTER (WHERE quiz_completed)::INTEGER AS quizzes_completed
+       FROM subtopic_progress WHERE student_id = :studentId`,
+      { studentId }, [{ quizzes_completed: 0 }]
+    );
+
+    const u = userRows[0]   || {};
     const a = attemptRows[0] || {};
     const p = progressRows[0] || {};
     const totalSecs = parseInt(a.total_time_seconds) || 0;
