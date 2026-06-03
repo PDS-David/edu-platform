@@ -56,10 +56,72 @@ const SUBJECT_JOIN = `
   JOIN subjects  s  ON s.id  = t.subject_id
 `;
 
+// ── validateAnalyticsSchema() ─────────────────────────────────────────────────
+// Queries the PostgreSQL information_schema to verify that all five tables
+// required by analytics queries actually exist in the current DB.
+//
+// Returns: { valid: boolean, warnings: string[] }
+//
+// Rules:
+//   - Never throws.  All errors are caught and turned into warnings.
+//   - Missing tables produce a warning entry; they do NOT crash the caller.
+//   - valid === true  → every required table exists.
+//   - valid === false → at least one table is missing; warnings lists which ones.
+//
+// Usage:
+//   const { valid, warnings } = await validateAnalyticsSchema();
+//   warnings.forEach(w => console.warn('[analytics]', w));
+const ANALYTICS_TABLES = [
+  'practice_attempts',
+  'questions',
+  'subtopics',
+  'topics',
+  'subjects',
+];
+
+async function validateAnalyticsSchema() {
+  const warnings = [];
+  try {
+    // information_schema.tables is always present in PostgreSQL and Supabase.
+    // table_schema = 'public' excludes pg_catalog / information_schema system tables.
+    const rows = await sequelize.query(
+      `SELECT table_name
+         FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name   = ANY(:tables)`,
+      {
+        replacements: { tables: ANALYTICS_TABLES },
+        type: QueryTypes.SELECT,
+      }
+    );
+
+    const found = new Set(rows.map(r => r.table_name));
+
+    for (const tbl of ANALYTICS_TABLES) {
+      if (!found.has(tbl)) {
+        warnings.push(`Required analytics table is missing: "${tbl}"`);
+      }
+    }
+  } catch (err) {
+    // information_schema query itself failed — likely a connection problem.
+    warnings.push(`Schema validation query failed: ${(err.message || '').slice(0, 200)}`);
+  }
+
+  return { valid: warnings.length === 0, warnings };
+}
+
 // ── GET /api/analytics/summary ────────────────────────────────────────────────
 router.get('/summary', protect, async (req, res) => {
   try {
     const userId = req.user.id;
+
+    // Validate that all five tables exist before running the multi-table JOIN.
+    // Warnings are logged but never cause a 500 — safeQuery handles missing tables
+    // gracefully by returning the fallback value instead.
+    const { valid, warnings } = await validateAnalyticsSchema();
+    if (!valid) {
+      warnings.forEach(w => console.warn('[analytics/summary]', w));
+    }
     const [userRows, attemptRows] = await Promise.all([
       safeQuery(
         `SELECT
