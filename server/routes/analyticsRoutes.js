@@ -128,55 +128,51 @@ router.get('/score-trend', protect, async (req, res) => {
 });
 
 // ── GET /api/analytics/subject-breakdown ─────────────────────────────────────
+// Join strategy:
+//   student_subjects (anchor — guarantees every enrolled subject appears even
+//                               with zero practice attempts)
+//   → subjects           (subject name)
+//   LEFT JOIN topics     (a subject may have no topics yet)
+//   LEFT JOIN subtopics  (a topic may have no subtopics yet)
+//   LEFT JOIN questions  (a subtopic may have no questions yet)
+//   LEFT JOIN practice_attempts (filtered to this student — zero-attempt rows
+//                                produce NULL which COALESCE converts to 0)
+//
+// COALESCE defaults ensure students with zero attempts still appear with
+// attempts=0, accuracy_pct=0, avg_time_seconds=0 rather than being omitted.
 router.get('/subject-breakdown', protect, async (req, res) => {
   try {
     const rows = await safeQuery(
       `SELECT
-         s.id AS subject_id,
+         s.id   AS subject_id,
          s.name AS subject_name,
-         COUNT(pa.id)::INTEGER AS attempts,
-         ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 1) AS accuracy_pct,
-         ROUND(AVG(pa.time_taken_seconds), 1) AS avg_time_seconds
-       FROM subjects s
-       -- anchor on enrolled subjects (via courses)
-       INNER JOIN courses     c  ON c.subject_id  = s.id
-       INNER JOIN enrollments e  ON e.course_id   = c.id
-                                AND e.student_id  = :userId
-                                AND e.status      = 'active'
-       LEFT JOIN topics     t  ON t.subject_id  = s.id
-       LEFT JOIN subtopics  st ON st.topic_id   = t.id
-       LEFT JOIN questions  q  ON q.subtopic_id = st.id
+         COALESCE(COUNT(pa.id), 0)::INTEGER AS attempts,
+         COALESCE(
+           ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 1),
+           0
+         ) AS accuracy_pct,
+         COALESCE(ROUND(AVG(pa.time_taken_seconds), 1), 0) AS avg_time_seconds
+       FROM student_subjects ss
+       JOIN subjects s ON s.id = ss.subject_id
+       LEFT JOIN topics     t  ON t.subject_id   = s.id
+                               AND (t.is_active IS NULL OR t.is_active = true)
+       LEFT JOIN subtopics  st ON st.topic_id    = t.id
+                               AND (st.is_active IS NULL OR st.is_active = true)
+       LEFT JOIN questions  q  ON q.subtopic_id  = st.id
+                               AND (q.is_active IS NULL OR q.is_active = true)
        LEFT JOIN practice_attempts pa ON pa.question_id = q.id
                                      AND pa.student_id  = :userId
+       WHERE ss.student_id = :userId
+         AND ss.is_active  = true
+         AND s.is_active   = true
        GROUP BY s.id, s.name
        ORDER BY attempts DESC NULLS LAST, s.name ASC`,
       { userId: req.user.id }
     );
     return res.json({ success: true, data: rows });
   } catch (err) {
-    // Fall back to attempts-only query if schema differs
-    try {
-      const rows = await safeQuery(
-        `SELECT
-           s.id AS subject_id,
-           s.name AS subject_name,
-           COUNT(pa.id)::INTEGER AS attempts,
-           ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 1) AS accuracy_pct,
-           ROUND(AVG(pa.time_taken_seconds), 1) AS avg_time_seconds
-         FROM practice_attempts pa
-         JOIN questions  q  ON q.id  = pa.question_id
-         JOIN subtopics  st ON st.id = q.subtopic_id
-         JOIN topics     t  ON t.id  = st.topic_id
-         JOIN subjects   s  ON s.id  = t.subject_id
-         WHERE pa.student_id = :userId
-         GROUP BY s.id, s.name
-         ORDER BY accuracy_pct DESC`,
-        { userId: req.user.id }
-      );
-      return res.json({ success: true, data: rows });
-    } catch (err2) {
-      return res.status(500).json({ success: false, error: err2.message });
-    }
+    console.error('[GET /analytics/subject-breakdown]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 
