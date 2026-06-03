@@ -712,6 +712,7 @@ async function run() {
         ADD COLUMN IF NOT EXISTS preferred_study_time  VARCHAR(20)  DEFAULT 'evening',
         ADD COLUMN IF NOT EXISTS xp_points             INTEGER      DEFAULT 0,
         ADD COLUMN IF NOT EXISTS study_streak_days     INTEGER      DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS last_activity_date    DATE,
         ADD COLUMN IF NOT EXISTS last_login            TIMESTAMPTZ,
         ADD COLUMN IF NOT EXISTS avatar_url            TEXT,
         ADD COLUMN IF NOT EXISTS phone                 VARCHAR(30),
