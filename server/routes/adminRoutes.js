@@ -89,87 +89,133 @@ router.post('/create-teacher', protect, adminOnly, async (req, res) => {
 // GET /api/admin/platform-stats
 // Powers PlatformAnalyticsPanel in AdminDashboard.
 // Returns: { users, questions, revenue, top_subjects, daily_activity }
+// All queries use practice_attempts as the primary activity source.
+// quiz_attempts is only consulted as a fallback for daily_activity.
 // ─────────────────────────────────────────────
 router.get('/platform-stats', protect, adminOnly, async (req, res) => {
   try {
-    // User stats
+    // ── User stats ────────────────────────────────────────────────────────────
+    // role::text cast avoids enum comparison issues on strict PG configs.
+    // COALESCE(last_login, created_at) guards against NULL last_login for new accounts.
     const [userRow] = await sequelize.query(`
       SELECT
-        COUNT(*) FILTER (WHERE role = 'student')                                              AS students,
-        COUNT(*) FILTER (WHERE role = 'student'
-                           AND last_login >= NOW() - INTERVAL '1 day')                        AS active_today,
-        COUNT(*) FILTER (WHERE role = 'student'
+        COUNT(*) FILTER (WHERE role::text = 'student')                                        AS students,
+        COUNT(*) FILTER (WHERE role::text = 'student'
+                           AND COALESCE(last_login, created_at) >= NOW() - INTERVAL '1 day')  AS active_today,
+        COUNT(*) FILTER (WHERE role::text = 'student'
                            AND created_at >= NOW() - INTERVAL '7 days')                       AS new_this_week
       FROM users
     `, { type: QueryTypes.SELECT });
 
-    // Question / attempt stats (quiz_attempts may be empty initially)
+    // ── Question / attempt stats ──────────────────────────────────────────────
+    // Source: practice_attempts (always present, one row per answered question).
+    // quiz_attempts is NOT used here — it aggregates full quiz sessions, not
+    // individual question events, so its COUNT overstates daily question volume.
+    // total_pending: AI-generated questions awaiting admin approval.
     let qRow = { answered_today: 0, answered_this_week: 0, total_pending: 0 };
     try {
       const [_qRow] = await sequelize.query(`
         SELECT
-          COUNT(*) FILTER (WHERE qa.created_at >= NOW() - INTERVAL '1 day')   AS answered_today,
-          COUNT(*) FILTER (WHERE qa.created_at >= NOW() - INTERVAL '7 days')  AS answered_this_week,
+          -- Distinct questions answered in the last 24 hours
+          COUNT(*) FILTER (WHERE attempted_at >= NOW() - INTERVAL '1 day')   AS answered_today,
+          -- Distinct questions answered in the last 7 days
+          COUNT(*) FILTER (WHERE attempted_at >= NOW() - INTERVAL '7 days')  AS answered_this_week,
+          -- AI questions not yet approved/active
           (SELECT COUNT(*) FROM questions
             WHERE COALESCE(is_ai_generated, false) = true
               AND COALESCE(status, 'pending') NOT IN ('approved','active'))::INTEGER AS total_pending
-        FROM quiz_attempts qa
+        FROM practice_attempts
       `, { type: QueryTypes.SELECT });
       if (_qRow) qRow = _qRow;
-    } catch (_) { /* quiz_attempts may not exist yet */ }
+    } catch (e) {
+      // practice_attempts may not exist in early deployments — log and keep zeros
+      console.warn('[platform-stats] question stats fallback:', e.message.slice(0, 80));
+    }
 
-    // Revenue / subscription stats
-    const [revRow] = await sequelize.query(`
-      SELECT
-        COUNT(*) FILTER (WHERE subscription_status = 'active')                               AS total_active_subs,
-        COUNT(*) FILTER (WHERE subscription_status = 'active'
-                           AND created_at >= NOW() - INTERVAL '30 days')                     AS new_subs_this_month
-      FROM users
-    `, { type: QueryTypes.SELECT });
+    // ── Revenue / subscription stats ──────────────────────────────────────────
+    // subscription_status column may be enum; cast defensively.
+    let revRow = { total_active_subs: 0, new_subs_this_month: 0 };
+    try {
+      const [_revRow] = await sequelize.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE subscription_status::text = 'active')                        AS total_active_subs,
+          COUNT(*) FILTER (WHERE subscription_status::text = 'active'
+                             AND created_at >= NOW() - INTERVAL '30 days')                    AS new_subs_this_month
+        FROM users
+      `, { type: QueryTypes.SELECT });
+      if (_revRow) revRow = _revRow;
+    } catch (e) {
+      console.warn('[platform-stats] revenue stats fallback:', e.message.slice(0, 80));
+    }
 
-    // Top subjects by avg accuracy (last 30 days)
-    // student_answers table may not yet exist — fall back to empty array safely
+    // ── Top subjects by activity (last 30 days) ───────────────────────────────
+    // Source: practice_attempts via the canonical content hierarchy:
+    //   practice_attempts → questions → subtopics → topics → subjects
+    // This replaces the old path through quiz_attempts + student_answers which
+    // depends on two tables that may be empty or nonexistent.
+    // A subject only appears here when at least one of its questions has been
+    // attempted in the last 30 days (HAVING count >= 1 is implicit via JOIN).
     let topSubjects = [];
     try {
       topSubjects = await sequelize.query(`
         SELECT
           s.name,
-          ROUND(AVG(CASE WHEN sa.is_correct THEN 100.0 ELSE 0.0 END), 1) AS avg_accuracy
-        FROM student_answers sa
-        JOIN quiz_attempts   qa ON qa.id = sa.attempt_id
-        JOIN questions        q ON q.id  = sa.question_id
-        LEFT JOIN subtopics  st ON st.id = q.subtopic_id
-        LEFT JOIN topics      t ON t.id  = st.topic_id
-        LEFT JOIN subjects    s ON s.id  = t.subject_id
-        WHERE qa.created_at >= NOW() - INTERVAL '30 days'
-          AND s.name IS NOT NULL
-        GROUP BY s.name
-        ORDER BY avg_accuracy DESC
+          COUNT(pa.id)::INTEGER                                                         AS attempt_count,
+          ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0.0 END), 1)               AS avg_accuracy
+        FROM practice_attempts pa
+        -- Traverse full content chain — questions have no direct subject_id column
+        JOIN questions  q  ON q.id  = pa.question_id
+        JOIN subtopics  st ON st.id = q.subtopic_id
+        JOIN topics     t  ON t.id  = st.topic_id
+        JOIN subjects   s  ON s.id  = t.subject_id
+        WHERE pa.attempted_at >= NOW() - INTERVAL '30 days'
+        GROUP BY s.id, s.name
+        ORDER BY attempt_count DESC, avg_accuracy DESC
         LIMIT 5
       `, { type: QueryTypes.SELECT });
-    } catch (_) { /* table may not exist yet */ }
+    } catch (e) {
+      console.warn('[platform-stats] top subjects fallback:', e.message.slice(0, 80));
+    }
 
-    // Daily activity — quiz attempt count per day for last 14 days
+    // ── Daily activity — last 14 days ─────────────────────────────────────────
+    // Primary source: practice_attempts.attempted_at (one row per question event).
+    // Fallback: quiz_attempts.created_at if practice_attempts is unavailable.
+    // Response shape: [{ date: "YYYY-MM-DD", attempt_count: N }]
     let dailyActivity = [];
     try {
       dailyActivity = await sequelize.query(`
         SELECT
-          TO_CHAR(created_at::DATE, 'YYYY-MM-DD') AS date,
-          COUNT(*)::INTEGER                        AS attempt_count
-        FROM quiz_attempts
-        WHERE created_at >= NOW() - INTERVAL '14 days'
-        GROUP BY created_at::DATE
-        ORDER BY created_at::DATE ASC
+          TO_CHAR(attempted_at::DATE, 'YYYY-MM-DD') AS date,
+          COUNT(*)::INTEGER                          AS attempt_count
+        FROM practice_attempts
+        WHERE attempted_at >= NOW() - INTERVAL '14 days'
+        GROUP BY attempted_at::DATE
+        ORDER BY attempted_at::DATE ASC
       `, { type: QueryTypes.SELECT });
-    } catch (_) { /* quiz_attempts may not exist yet */ }
+    } catch (_) {
+      // practice_attempts unavailable — try quiz_attempts as a secondary source
+      try {
+        dailyActivity = await sequelize.query(`
+          SELECT
+            TO_CHAR(created_at::DATE, 'YYYY-MM-DD') AS date,
+            COUNT(*)::INTEGER                        AS attempt_count
+          FROM quiz_attempts
+          WHERE created_at >= NOW() - INTERVAL '14 days'
+          GROUP BY created_at::DATE
+          ORDER BY created_at::DATE ASC
+        `, { type: QueryTypes.SELECT });
+      } catch (e) {
+        console.warn('[platform-stats] daily activity fallback exhausted:', e.message.slice(0, 80));
+      }
+    }
 
     return res.json({
       success: true,
       data: {
         users: {
-          students:      parseInt(userRow.students)      || 0,
-          active_today:  parseInt(userRow.active_today)  || 0,
-          new_this_week: parseInt(userRow.new_this_week) || 0,
+          students:      parseInt(userRow?.students)      || 0,
+          active_today:  parseInt(userRow?.active_today)  || 0,
+          new_this_week: parseInt(userRow?.new_this_week) || 0,
         },
         questions: {
           answered_today:      parseInt(qRow.answered_today)      || 0,
