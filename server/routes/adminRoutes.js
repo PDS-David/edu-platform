@@ -739,11 +739,15 @@ router.get('/health', protect, adminOnly, async (req, res) => {
   }
 
   // ── 2. Required tables present ────────────────────────────────
+  // These tables must exist for the platform to function.
+  // quiz_attempts is intentionally excluded: it is only consulted as a
+  // last-resort fallback in platform-stats when practice_attempts is
+  // unavailable. Every primary query path uses practice_attempts instead.
   const requiredTables = [
     'users', 'exam_boards', 'subjects', 'teacher_subjects',
     'topics', 'subtopics', 'resources', 'questions',
     'student_subjects', 'student_exam_types',
-    'subtopic_progress', 'practice_attempts', 'quiz_attempts',
+    'subtopic_progress', 'practice_attempts',
   ];
   const present = new Set();
   for (const t of requiredTables) {
@@ -753,6 +757,20 @@ router.get('/health', protect, adminOnly, async (req, res) => {
     );
     if (r[0]?.exists) { present.add(t); ok(`schema.table.${t}`); }
     else ko(`schema.table.${t}`, 'missing');
+  }
+
+  // Optional tables — used only as fallbacks. Missing is acceptable and
+  // does not affect the overall health result. Checked here for visibility.
+  const optionalTables = [
+    'quiz_attempts',   // fallback data source in platform-stats daily_activity
+  ];
+  for (const t of optionalTables) {
+    const r = await sequelize.query(
+      `SELECT to_regclass(:fq) IS NOT NULL AS exists`,
+      { replacements: { fq: `public.${t}` }, type: QueryTypes.SELECT }
+    );
+    // ok() in both cases — absence is not a failure, just informational.
+    ok(`schema.table.${t} (optional)`, r[0]?.exists ? 'present' : 'absent — fallback only');
   }
 
   // ── 3. Critical columns we rely on ────────────────────────────
