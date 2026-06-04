@@ -368,7 +368,7 @@ router.get('/time-metrics', protect, async (req, res) => {
      )
      SELECT
        s.name AS subject_name,
-       ROUND(AVG(pa.time_taken_seconds), 1)       AS avg_time_seconds,
+       COALESCE(ROUND(AVG(pa.time_taken_seconds), 1), 0)       AS avg_time_seconds,
        ROUND(sb.benchmark_seconds::NUMERIC, 1)    AS benchmark_time_seconds
      FROM practice_attempts pa
      JOIN questions  q  ON q.id  = pa.question_id
@@ -516,7 +516,7 @@ router.get('/student/:studentId/topics', protect, async (req, res) => {
          s.name AS subject_name,
          COUNT(pa.id)::INTEGER AS attempt_count,
          ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 1) AS accuracy_pct,
-         ROUND(AVG(pa.time_taken_seconds), 1) AS avg_time_seconds
+         COALESCE(ROUND(AVG(pa.time_taken_seconds), 1), 0) AS avg_time_seconds
        FROM practice_attempts pa
        JOIN questions  q  ON q.id  = pa.question_id
        JOIN subtopics  st ON st.id = q.subtopic_id
@@ -606,7 +606,7 @@ router.get('/cohort/:subjectId/topics', protect, async (req, res) => {
          COUNT(DISTINCT pa.student_id)::INTEGER AS student_count,
          COUNT(pa.id)::INTEGER AS attempt_count,
          ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 1) AS avg_accuracy,
-         ROUND(AVG(pa.time_taken_seconds), 1) AS avg_time_seconds
+         COALESCE(ROUND(AVG(pa.time_taken_seconds), 1), 0) AS avg_time_seconds
        FROM practice_attempts pa
        JOIN questions  q  ON q.id  = pa.question_id
        JOIN subtopics  st ON st.id = q.subtopic_id
