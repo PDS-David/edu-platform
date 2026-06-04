@@ -97,15 +97,24 @@ router.get('/platform-stats', protect, adminOnly, async (req, res) => {
     // ── User stats ────────────────────────────────────────────────────────────
     // role::text cast avoids enum comparison issues on strict PG configs.
     // COALESCE(last_login, created_at) guards against NULL last_login for new accounts.
-    const [userRow] = await sequelize.query(`
-      SELECT
-        COUNT(*) FILTER (WHERE role::text = 'student')                                        AS students,
-        COUNT(*) FILTER (WHERE role::text = 'student'
-                           AND COALESCE(last_login, created_at) >= NOW() - INTERVAL '1 day')  AS active_today,
-        COUNT(*) FILTER (WHERE role::text = 'student'
-                           AND created_at >= NOW() - INTERVAL '7 days')                       AS new_this_week
-      FROM users
-    `, { type: QueryTypes.SELECT });
+    // Isolated try/catch: a users-table failure returns zero defaults while
+    // the remaining sections (questions, revenue, top_subjects, daily_activity)
+    // still execute and return real data.
+    let userRow = { students: 0, active_today: 0, new_this_week: 0 };
+    try {
+      const [_userRow] = await sequelize.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE role::text = 'student')                                        AS students,
+          COUNT(*) FILTER (WHERE role::text = 'student'
+                             AND COALESCE(last_login, created_at) >= NOW() - INTERVAL '1 day')  AS active_today,
+          COUNT(*) FILTER (WHERE role::text = 'student'
+                             AND created_at >= NOW() - INTERVAL '7 days')                       AS new_this_week
+        FROM users
+      `, { type: QueryTypes.SELECT });
+      if (_userRow) userRow = _userRow;
+    } catch (e) {
+      console.warn('[platform-stats] users stats fallback:', e.message.slice(0, 80));
+    }
 
     // ── Question / attempt stats ──────────────────────────────────────────────
     // Source: practice_attempts (always present, one row per answered question).
