@@ -57,16 +57,16 @@ const SUBJECT_JOIN = `
 `;
 
 // ── validateAnalyticsSchema() ─────────────────────────────────────────────────
-// Queries the PostgreSQL information_schema to verify that all five tables
-// required by analytics queries actually exist in the current DB.
+// Queries the PostgreSQL information_schema to verify that all tables and
+// critical columns required by analytics queries exist in the current DB.
 //
 // Returns: { valid: boolean, warnings: string[] }
 //
 // Rules:
 //   - Never throws.  All errors are caught and turned into warnings.
-//   - Missing tables produce a warning entry; they do NOT crash the caller.
-//   - valid === true  → every required table exists.
-//   - valid === false → at least one table is missing; warnings lists which ones.
+//   - Missing tables/columns produce a warning entry; they do NOT crash the caller.
+//   - valid === true  → every required table and column exists.
+//   - valid === false → at least one item is missing; warnings lists which ones.
 //
 // Usage:
 //   const { valid, warnings } = await validateAnalyticsSchema();
@@ -79,12 +79,34 @@ const ANALYTICS_TABLES = [
   'subjects',
 ];
 
+// Critical columns verified by this helper.
+// Each entry: [table, column, reason]
+//   reason  — printed in the warning so operators know exactly what breaks
+//             when the column is absent. Must be actionable.
+const ANALYTICS_COLUMNS = [
+  // users.last_activity_date is written by xpMiddleware after every practice
+  // attempt and is read by scheduledJobs (weekly digest, re-engagement filter).
+  // Missing → streak calculations silently return 0; re-engagement emails stop firing.
+  ['users',            'last_activity_date',  'required by xpMiddleware streak calc and scheduledJobs digest/re-engage filter'],
+
+  // practice_attempts core columns — every analytics query depends on these.
+  ['practice_attempts', 'is_correct',         'required by every accuracy_pct calculation'],
+  ['practice_attempts', 'attempted_at',        'required by active_days, today_attempts, score-trend, daily-study'],
+  ['practice_attempts', 'time_taken_seconds',  'required by total_time_seconds and time-metrics benchmark'],
+
+  // questions.subtopic_id is the root of the JOIN chain used by all analytics routes.
+  // Missing → every query that joins to topics/subjects returns zero rows silently.
+  ['questions',         'subtopic_id',         'required by the questions→subtopics→topics→subjects JOIN chain'],
+];
+
 async function validateAnalyticsSchema() {
   const warnings = [];
+
   try {
+    // ── 1. Table existence check ───────────────────────────────────────────
     // information_schema.tables is always present in PostgreSQL and Supabase.
     // table_schema = 'public' excludes pg_catalog / information_schema system tables.
-    const rows = await sequelize.query(
+    const tableRows = await sequelize.query(
       `SELECT table_name
          FROM information_schema.tables
         WHERE table_schema = 'public'
@@ -95,16 +117,52 @@ async function validateAnalyticsSchema() {
       }
     );
 
-    const found = new Set(rows.map(r => r.table_name));
+    const foundTables = new Set(tableRows.map(r => r.table_name));
 
     for (const tbl of ANALYTICS_TABLES) {
-      if (!found.has(tbl)) {
-        warnings.push(`Required analytics table is missing: "${tbl}"`);
+      if (!foundTables.has(tbl)) {
+        warnings.push(`Required analytics table is missing: "${tbl}" — run fix_live_schema.js to create it`);
       }
     }
   } catch (err) {
-    // information_schema query itself failed — likely a connection problem.
-    warnings.push(`Schema validation query failed: ${(err.message || '').slice(0, 200)}`);
+    // information_schema.tables query itself failed — likely a connection problem.
+    warnings.push(`Schema table-check query failed: ${(err.message || '').slice(0, 200)}`);
+  }
+
+  try {
+    // ── 2. Critical column existence check ────────────────────────────────
+    // One query fetches all (table_name, column_name) pairs at once to avoid
+    // N round-trips. We then cross-check against the expected list in JS.
+    const tableNames   = ANALYTICS_COLUMNS.map(([t]) => t);
+    const columnNames  = ANALYTICS_COLUMNS.map(([, c]) => c);
+
+    const columnRows = await sequelize.query(
+      `SELECT table_name, column_name
+         FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name   = ANY(:tables)
+          AND column_name  = ANY(:columns)`,
+      {
+        replacements: { tables: tableNames, columns: columnNames },
+        type: QueryTypes.SELECT,
+      }
+    );
+
+    // Build a Set of "table.column" keys for O(1) lookup.
+    const foundColumns = new Set(
+      columnRows.map(r => `${r.table_name}.${r.column_name}`)
+    );
+
+    for (const [table, column, reason] of ANALYTICS_COLUMNS) {
+      if (!foundColumns.has(`${table}.${column}`)) {
+        warnings.push(
+          `Required analytics column is missing: "${table}.${column}" — ${reason}`
+        );
+      }
+    }
+  } catch (err) {
+    // information_schema.columns query itself failed.
+    warnings.push(`Schema column-check query failed: ${(err.message || '').slice(0, 200)}`);
   }
 
   return { valid: warnings.length === 0, warnings };
