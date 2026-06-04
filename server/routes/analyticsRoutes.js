@@ -99,7 +99,19 @@ const ANALYTICS_COLUMNS = [
   ['questions',         'subtopic_id',         'required by the questions→subtopics→topics→subjects JOIN chain'],
 ];
 
+// Module-level cache for validateAnalyticsSchema().
+// Avoids hitting information_schema on every GET /analytics/summary request.
+// TTL: 5 minutes (300,000 ms).
+let schemaValidationCache   = null;
+let schemaValidationCacheAt = 0;
+const SCHEMA_CACHE_TTL_MS   = 5 * 60 * 1000; // 5 minutes
+
 async function validateAnalyticsSchema() {
+  // Return cached result if it is younger than 5 minutes.
+  if (schemaValidationCache !== null && (Date.now() - schemaValidationCacheAt) < SCHEMA_CACHE_TTL_MS) {
+    return schemaValidationCache;
+  }
+
   const warnings = [];
 
   try {
@@ -165,7 +177,13 @@ async function validateAnalyticsSchema() {
     warnings.push(`Schema column-check query failed: ${(err.message || '').slice(0, 200)}`);
   }
 
-  return { valid: warnings.length === 0, warnings };
+  const result = { valid: warnings.length === 0, warnings };
+
+  // Store in module-level cache with current timestamp.
+  schemaValidationCache   = result;
+  schemaValidationCacheAt = Date.now();
+
+  return result;
 }
 
 // ── GET /api/analytics/summary ────────────────────────────────────────────────
