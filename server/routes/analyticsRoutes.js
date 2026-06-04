@@ -226,22 +226,21 @@ router.get('/weak-topics', protect, async (req, res) => {
 // ── GET /api/analytics/score-trend?days=30 ───────────────────────────────────
 router.get('/score-trend', protect, async (req, res) => {
   const days = Math.min(parseInt(req.query.days) || 30, 90);
-  try {
-    const rows = await safeQuery(
-      `SELECT
-         DATE(pa.attempted_at) AS date,
-         ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 1) AS avg_score
-       FROM practice_attempts pa
-       WHERE pa.student_id = :userId
-         AND pa.attempted_at > NOW() - (:days * INTERVAL '1 day')
-       GROUP BY DATE(pa.attempted_at)
-       ORDER BY date ASC`,
-      { userId: req.user.id, days }
-    );
-    return res.json({ success: true, data: rows });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
-  }
+  // safeQuery is the sole error boundary: missing tables/columns are caught
+  // inside it and logged; the fallback [] is returned so the endpoint always
+  // responds with HTTP 200 and an empty dataset rather than HTTP 500.
+  const rows = await safeQuery(
+    `SELECT
+       DATE(pa.attempted_at) AS date,
+       ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 1) AS avg_score
+     FROM practice_attempts pa
+     WHERE pa.student_id = :userId
+       AND pa.attempted_at > NOW() - (:days * INTERVAL '1 day')
+     GROUP BY DATE(pa.attempted_at)
+     ORDER BY date ASC`,
+    { userId: req.user.id, days }
+  );
+  return res.json({ success: true, data: rows });
 });
 
 // ── GET /api/analytics/subject-breakdown ─────────────────────────────────────
@@ -295,35 +294,36 @@ router.get('/subject-breakdown', protect, async (req, res) => {
 
 // ── GET /api/analytics/time-metrics ──────────────────────────────────────────
 router.get('/time-metrics', protect, async (req, res) => {
-  try {
-    const rows = await safeQuery(
-      `WITH subject_bench AS (
-         SELECT t2.subject_id, AVG(pa2.time_taken_seconds) AS benchmark_seconds
-         FROM practice_attempts pa2
-         JOIN questions  q2 ON q2.id  = pa2.question_id
-         JOIN subtopics  s2 ON s2.id  = q2.subtopic_id
-         JOIN topics     t2 ON t2.id  = s2.topic_id
-         GROUP BY t2.subject_id
-       )
-       SELECT
-         s.name AS subject_name,
-         ROUND(AVG(pa.time_taken_seconds), 1) AS avg_time_seconds,
-         ROUND(sb.benchmark_seconds::NUMERIC, 1) AS benchmark_time_seconds
-       FROM practice_attempts pa
-       JOIN questions  q  ON q.id  = pa.question_id
-       JOIN subtopics  st ON st.id = q.subtopic_id
-       JOIN topics     t  ON t.id  = st.topic_id
-       JOIN subjects   s  ON s.id  = t.subject_id
-       JOIN subject_bench sb ON sb.subject_id = t.subject_id
-       WHERE pa.student_id = :userId
-       GROUP BY s.name, sb.benchmark_seconds
-       ORDER BY s.name`,
-      { userId: req.user.id }
-    );
-    return res.json({ success: true, data: rows });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
-  }
+  // safeQuery is the sole error boundary: missing tables/columns are caught
+  // inside it and logged; the fallback [] is returned so the endpoint always
+  // responds with HTTP 200 and an empty dataset rather than HTTP 500.
+  const rows = await safeQuery(
+    `WITH subject_bench AS (
+       -- Aggregate per-subject average time across all students (benchmark).
+       -- Runs without a student filter so every subject has a comparison point.
+       SELECT t2.subject_id, AVG(pa2.time_taken_seconds) AS benchmark_seconds
+       FROM practice_attempts pa2
+       JOIN questions  q2 ON q2.id  = pa2.question_id
+       JOIN subtopics  s2 ON s2.id  = q2.subtopic_id
+       JOIN topics     t2 ON t2.id  = s2.topic_id
+       GROUP BY t2.subject_id
+     )
+     SELECT
+       s.name AS subject_name,
+       ROUND(AVG(pa.time_taken_seconds), 1)       AS avg_time_seconds,
+       ROUND(sb.benchmark_seconds::NUMERIC, 1)    AS benchmark_time_seconds
+     FROM practice_attempts pa
+     JOIN questions  q  ON q.id  = pa.question_id
+     JOIN subtopics  st ON st.id = q.subtopic_id
+     JOIN topics     t  ON t.id  = st.topic_id
+     JOIN subjects   s  ON s.id  = t.subject_id
+     JOIN subject_bench sb ON sb.subject_id = t.subject_id
+     WHERE pa.student_id = :userId
+     GROUP BY s.name, sb.benchmark_seconds
+     ORDER BY s.name`,
+    { userId: req.user.id }
+  );
+  return res.json({ success: true, data: rows });
 });
 
 // ── GET /api/analytics/leaderboard?subject_id= ───────────────────────────────
