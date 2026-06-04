@@ -274,9 +274,15 @@ router.get('/weak-topics', protect, async (req, res) => {
       `-- topic name + id come from the join chain:
        --   practice_attempts → questions → subtopics → topics → subjects
        -- q.topic (a plain text column) is NOT used; t.id/t.name are the authoritative source.
+       -- st.id (subtopic_id) is included so the frontend can link directly to
+       --   /student/subtopic/:subtopicId?tab=practice instead of a generic practice route.
+       -- NOTE: selecting st.id means GROUP BY must also include st.id, so the result
+       --   returns one row per (topic, subtopic, subject) rather than per topic alone.
+       --   The HAVING + ORDER BY are unchanged; accuracy_pct still reflects that subtopic.
        SELECT
          t.id   AS topic_id,
          t.name AS topic,
+         st.id  AS subtopic_id,
          s.name AS subject_name,
          COUNT(*)::INTEGER AS attempt_count,
          ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 1) AS accuracy_pct
@@ -287,7 +293,7 @@ router.get('/weak-topics', protect, async (req, res) => {
        JOIN subjects   s  ON s.id  = t.subject_id
        WHERE pa.student_id = :userId
          AND pa.attempted_at > NOW() - INTERVAL '30 days'
-       GROUP BY t.id, t.name, s.name
+       GROUP BY t.id, t.name, st.id, s.name
        HAVING COUNT(*) >= 2
        ORDER BY accuracy_pct ASC
        LIMIT :limit`,
