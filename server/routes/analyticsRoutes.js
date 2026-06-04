@@ -338,7 +338,9 @@ router.get('/leaderboard', protect, async (req, res) => {
 
     const rows = await safeQuery(
       `SELECT
-         SUBSTRING(u.first_name, 1, 3) || '***' AS display_name,
+         -- NULL-safe: COALESCE ensures a NULL first_name renders as '?***'
+         -- rather than a blank entry. Existing non-null names are unaffected.
+         COALESCE(SUBSTRING(u.first_name, 1, 3), '?') || '***' AS display_name,
          (u.id = :userId)::BOOLEAN AS is_me,
          COALESCE(u.xp_points, 0) AS xp_points,
          ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 1) AS accuracy_pct,
