@@ -452,7 +452,10 @@ export default function StudentDashboard() {
                         <span className={`text-sm font-mono font-bold shrink-0 ${t.accuracy_pct < 40 ? "text-red-500" : "text-amber-500"}`}>
                           {t.accuracy_pct}%
                         </span>
-                        <button onClick={() => navigate("/student/practice")}
+                        <button
+                          onClick={() => t.subtopic_id
+                            ? navigate(`/student/subtopic/${t.subtopic_id}?tab=practice`)
+                            : navigate('/student/practice')}
                           className="text-xs text-rose-600 hover:text-rose-800 font-semibold shrink-0 px-2 py-1 rounded-lg hover:bg-rose-100 transition-colors">
                           Practice
                         </button>
