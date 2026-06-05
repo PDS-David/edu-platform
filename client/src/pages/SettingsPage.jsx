@@ -112,7 +112,7 @@ export default function SettingsPage() {
     setProfileSaving(true);
     try {
       await api.patch('/auth/profile', profile);
-      updateUser({ ...user, ...profile });
+      updateUser(profile);
       showToast('Profile updated successfully');
     } catch (err) {
       showToast(err?.message || 'Failed to update profile', 'error');
@@ -151,7 +151,7 @@ export default function SettingsPage() {
         preferred_study_days: JSON.stringify(studyPrefs.study_days),
         preferred_study_time: studyPrefs.study_time,
       });
-      updateUser({ ...user, daily_goal: studyPrefs.daily_goal });
+      updateUser({ daily_goal: studyPrefs.daily_goal });
       showToast('Study preferences saved');
     } catch (err) {
       showToast(err?.message || 'Failed to save preferences', 'error');
