@@ -55,6 +55,13 @@ export default function AuthProvider({ children }) {
     setUser(null);
   };
 
+  // Allows any consumer to patch the in-memory user object after a successful
+  // profile or preferences save — without requiring a full re-fetch from the API.
+  // Does not affect the token, login, or logout flows.
+  const updateUser = (updates) => {
+    setUser(prev => ({ ...prev, ...updates }));
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -63,6 +70,7 @@ export default function AuthProvider({ children }) {
         login,
         register,
         logout,
+        updateUser,
         isAuthenticated: !!user,
       }}
     >
