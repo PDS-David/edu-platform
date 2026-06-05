@@ -293,7 +293,7 @@ export default function StudentDashboard() {
   useEffect(() => { loadAll(); }, [loadAll]);
 
   const totalResources = resources.length;
-  const dailyTarget    = 20;
+  const dailyTarget    = user?.daily_goal || 20;
   const todayAttempts  = summary.today_attempts ?? 0;
   const dailyPct       = Math.min(100, Math.round((todayAttempts / dailyTarget) * 100));
 
