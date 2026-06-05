@@ -265,7 +265,6 @@ export default function StudentDashboard() {
   const [loadingSummary,   setLoadingSummary]   = useState(true);
   const [subjects,         setSubjects]         = useState([]);
   const [loadingSubjects,  setLoadingSubjects]  = useState(true);
-  const [subjectProgress,  setSubjectProgress]  = useState({});
   const [weakTopics,       setWeakTopics]       = useState([]);
   const [resources,        setResources]        = useState([]);
   const [loadingResources, setLoadingResources] = useState(true);
@@ -277,11 +276,6 @@ export default function StudentDashboard() {
     await Promise.allSettled([
       api.get("/analytics/summary").then(r => { setSummary(r.data || {}); setLoadingSummary(false); }).catch(() => setLoadingSummary(false)),
       api.get("/students/my-subjects").then(r => { setSubjects(r.data || []); setLoadingSubjects(false); }).catch(() => setLoadingSubjects(false)),
-      api.get("/analytics/subject-breakdown").then(r => {
-        const map = {};
-        (r.data || []).forEach(row => { map[row.subject_id] = parseFloat(row.accuracy_pct) || 0; });
-        setSubjectProgress(map);
-      }).catch(() => {}),
       api.get("/analytics/weak-topics?limit=3").then(r => setWeakTopics(r.data || [])).catch(() => {}),
       api.get("/resources/my-assignments").then(r => { setResources(r.data || []); setLoadingResources(false); }).catch(() => { setResources([]); setLoadingResources(false); }),
       api.get("/quizzes/history").then(r => { setRecentScores(r.data || []); setLoadingScores(false); }).catch(() => { setRecentScores([]); setLoadingScores(false); }),
