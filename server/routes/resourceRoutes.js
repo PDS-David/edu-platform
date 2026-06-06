@@ -476,11 +476,44 @@ router.get('/my-assignments', async (req, res) => {
               r.original_filename, r.mime_type, r.push_type,
               r.subject_id, r.topic_id, r.subtopic_id,
               r.created_at, r.updated_at,
-              s.name AS subject_name, t.name AS topic_name, st.name AS subtopic_name
+              s.name  AS subject_name,
+              t.name  AS topic_name,
+              st.name AS subtopic_name,
+              -- Retrieve the display name of whoever assigned this resource.
+              -- A resource can reach a student via three paths; we take the first
+              -- non-null assigned_by found across all three using a lateral subquery.
+              TRIM(
+                COALESCE(ab.first_name, '') || ' ' || COALESCE(ab.last_name, '')
+              ) AS assigned_by_name
          FROM resources r
          LEFT JOIN subjects  s  ON s.id  = r.subject_id
          LEFT JOIN topics    t  ON t.id  = r.topic_id
          LEFT JOIN subtopics st ON st.id = r.subtopic_id
+         -- Subquery: find the assigner UUID from whichever assignment path
+         -- delivered this resource to :uid, then join to users for the name.
+         LEFT JOIN LATERAL (
+           SELECT assigned_by
+             FROM (
+               -- Path A: direct student assignment
+               SELECT assigned_by
+                 FROM resource_assignments
+                WHERE resource_id = r.id AND student_id = :uid
+               UNION ALL
+               -- Path B: individual user assignment
+               SELECT assigned_by
+                 FROM resource_user_assignments
+                WHERE resource_id = r.id AND user_id = :uid
+               UNION ALL
+               -- Path C: class-based assignment
+               SELECT ra.assigned_by
+                 FROM resource_assignments ra
+                 JOIN class_memberships cm ON cm.class_id = ra.class_id
+                WHERE ra.resource_id = r.id AND cm.student_id = :uid
+             ) _ab
+            WHERE assigned_by IS NOT NULL
+            LIMIT 1
+         ) assigner ON true
+         LEFT JOIN users ab ON ab.id = assigner.assigned_by
         WHERE r.is_active = true
           AND (r.is_staged = false OR r.is_staged IS NULL)
           AND (
