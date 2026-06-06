@@ -227,9 +227,6 @@ router.get('/summary', protect, async (req, res) => {
            -- practice_attempts → questions → subtopics → topics → subjects
            COUNT(DISTINCT t.subject_id)::INTEGER AS subjects_practiced,
 
-           -- active_days: distinct calendar days with at least one attempt
-           COUNT(DISTINCT DATE(pa.attempted_at))::INTEGER AS active_days,
-
            -- total_time_seconds: SUM is NULL when no rows match; COALESCE to 0
            COALESCE(SUM(pa.time_taken_seconds), 0)::BIGINT AS total_time_seconds,
 
@@ -256,7 +253,6 @@ router.get('/summary', protect, async (req, res) => {
       study_streak_days:  parseInt(u.study_streak_days,  10) || 0,
       xp_points:          parseInt(u.xp_points,          10) || 0,
       subjects_practiced: parseInt(a.subjects_practiced, 10) || 0,
-      active_days:        parseInt(a.active_days,        10) || 0,
       total_time_seconds: parseInt(a.total_time_seconds, 10) || 0,
       today_attempts:     parseInt(a.today_attempts,     10) || 0,
     }});
