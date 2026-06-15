@@ -205,10 +205,11 @@ router.patch('/preferences', protect, async (req, res) => {
         if (!safeId) continue;
         try {
           await sequelize.query(
-            `INSERT INTO student_subjects (student_id, subject_id, is_active, enrollment_source)
-             VALUES (:userId, :subjectId, true, :enrollmentSource)
+            `INSERT INTO student_subjects (student_id, subject_id, is_active, status, enrollment_source)
+             VALUES (:userId, :subjectId, true, 'approved', :enrollmentSource)
              ON CONFLICT (student_id, subject_id) DO UPDATE
                SET is_active         = true,
+                   status            = 'approved',
                    enrollment_source = COALESCE(student_subjects.enrollment_source, :enrollmentSource)`,
             { replacements: { userId, subjectId: safeId, enrollmentSource: ENROLLMENT_SOURCE.EXPLICIT }, type: QueryTypes.RAW }
           );
