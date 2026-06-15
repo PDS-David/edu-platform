@@ -358,11 +358,11 @@ router.get('/subject-breakdown', protect, async (req, res) => {
        LEFT JOIN practice_attempts pa ON pa.question_id = q.id
                                      AND pa.student_id  = :userId
        WHERE ss.student_id = :userId
-         AND ss.status     = '${ENROLLMENT_STATUS.APPROVED}'
+         AND ss.status     = :approvedStatus
          AND s.is_active   = true
        GROUP BY s.id, s.name
        ORDER BY attempts DESC NULLS LAST, s.name ASC`,
-      { userId: req.user.id }
+      { userId: req.user.id, approvedStatus: ENROLLMENT_STATUS.APPROVED }
     );
     return res.json({ success: true, data: rows });
   } catch (err) {
