@@ -15,6 +15,7 @@ const router         = express.Router();
 const { QueryTypes } = require('sequelize');
 const sequelize      = require('../config/database');
 const { protect }    = require('../middleware/auth');
+const { ENROLLMENT_SOURCE } = require('../constants/enrollmentConstants');
 
 const UUID_REGEX  = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isValidUUID = (v) => UUID_REGEX.test(v);
@@ -416,11 +417,11 @@ router.post('/subjects', protect, async (req, res) => {
     // Table is guaranteed to exist via run_enrollment_approval_migration.js
     await sequelize.query(
       `INSERT INTO student_subjects (student_id, subject_id, is_active, enrollment_source)
-       VALUES (:studentId, :subjectId, true, 'explicit')
+       VALUES (:studentId, :subjectId, true, :enrollmentSource)
        ON CONFLICT (student_id, subject_id) DO UPDATE
          SET is_active         = true,
-             enrollment_source = COALESCE(student_subjects.enrollment_source, 'explicit')`,
-      { replacements: { studentId, subjectId: parseInt(subject_id) }, type: QueryTypes.INSERT }
+             enrollment_source = COALESCE(student_subjects.enrollment_source, :enrollmentSource)`,
+      { replacements: { studentId, subjectId: parseInt(subject_id), enrollmentSource: ENROLLMENT_SOURCE.EXPLICIT }, type: QueryTypes.INSERT }
     );
 
     // Also ensure the board is in student_exam_types
