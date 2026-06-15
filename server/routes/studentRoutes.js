@@ -432,9 +432,9 @@ router.post('/subjects', protect, async (req, res) => {
     );
     if (boardRows[0]?.exam_board_id) {
       await sequelize.query(
-        `INSERT INTO student_exam_types (student_id, exam_board_id, is_active)
-         VALUES (:studentId, :boardId, true)
-         ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active = true`,
+        `INSERT INTO student_exam_types (student_id, exam_board_id, is_active, status)
+         VALUES (:studentId, :boardId, true, 'approved')
+         ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active = true, status = 'approved'`,
         { replacements: { studentId, boardId: boardRows[0].exam_board_id }, type: QueryTypes.INSERT }
       );
     }
