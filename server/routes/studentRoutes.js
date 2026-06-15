@@ -367,8 +367,8 @@ router.get('/my-subjects', protect, async (req, res) => {
 
         // Enroll in subjects that have topics
         await sequelize.query(
-          `INSERT INTO student_subjects (student_id, subject_id, is_active)
-           SELECT :studentId, s.id, true
+          `INSERT INTO student_subjects (student_id, subject_id, is_active, status, enrollment_source)
+           SELECT :studentId, s.id, true, 'approved', 'auto_enrolled'
            FROM subjects s
            WHERE s.is_active = true
              AND EXISTS (SELECT 1 FROM topics t WHERE t.subject_id = s.id)
@@ -416,10 +416,11 @@ router.post('/subjects', protect, async (req, res) => {
   try {
     // Table is guaranteed to exist via run_enrollment_approval_migration.js
     await sequelize.query(
-      `INSERT INTO student_subjects (student_id, subject_id, is_active, enrollment_source)
-       VALUES (:studentId, :subjectId, true, :enrollmentSource)
+      `INSERT INTO student_subjects (student_id, subject_id, is_active, status, enrollment_source)
+       VALUES (:studentId, :subjectId, true, 'approved', :enrollmentSource)
        ON CONFLICT (student_id, subject_id) DO UPDATE
          SET is_active         = true,
+             status            = 'approved',
              enrollment_source = COALESCE(student_subjects.enrollment_source, :enrollmentSource)`,
       { replacements: { studentId, subjectId: parseInt(subject_id), enrollmentSource: ENROLLMENT_SOURCE.EXPLICIT }, type: QueryTypes.INSERT }
     );
@@ -455,7 +456,7 @@ router.delete('/subjects/:subjectId', protect, async (req, res) => {
   }
   try {
     await sequelize.query(
-      `UPDATE student_subjects SET is_active = false
+      `UPDATE student_subjects SET is_active = false, status = 'deactivated'
        WHERE student_id = :studentId AND subject_id = :subjectId`,
       { replacements: { studentId, subjectId }, type: QueryTypes.UPDATE }
     );
