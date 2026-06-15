@@ -17,6 +17,7 @@
 
 const { QueryTypes } = require('sequelize');
 const db = require('../config/database');
+const { ENROLLMENT_STATUS } = require('../constants/enrollmentConstants');
 
 // ─────────────────────────────────────────────────────────────
 // adminOnly
@@ -117,7 +118,7 @@ const studentAccess = async (req, res, next) => {
       `SELECT id FROM student_exam_types
        WHERE student_id   = :userId
          AND exam_board_id = :examBoardId
-         AND status        = 'approved'
+         AND status        = '${ENROLLMENT_STATUS.APPROVED}'
          AND (expires_at IS NULL OR expires_at > NOW())`,
       {
         replacements: { userId: req.user.id, examBoardId },
@@ -199,7 +200,7 @@ const getStudentExamTypes = async (userId) => {
   const rows = await db.query(
     `SELECT exam_board_id FROM student_exam_types
      WHERE student_id = :userId
-       AND status     = 'approved'
+       AND status     = '${ENROLLMENT_STATUS.APPROVED}'
        AND (expires_at IS NULL OR expires_at > NOW())`,
     { replacements: { userId }, type: QueryTypes.SELECT }
   );

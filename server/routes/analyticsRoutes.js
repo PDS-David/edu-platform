@@ -10,6 +10,7 @@ const router         = express.Router();
 const { QueryTypes } = require('sequelize');
 const sequelize      = require('../config/database');
 const { protect }    = require('../middleware/auth');
+const { ENROLLMENT_STATUS } = require('../constants/enrollmentConstants');
 
 // Safe wrapper — returns fallback on any DB error.
 // Classifies errors into three categories for actionable log output:
@@ -357,7 +358,7 @@ router.get('/subject-breakdown', protect, async (req, res) => {
        LEFT JOIN practice_attempts pa ON pa.question_id = q.id
                                      AND pa.student_id  = :userId
        WHERE ss.student_id = :userId
-         AND ss.status     = 'approved'
+         AND ss.status     = '${ENROLLMENT_STATUS.APPROVED}'
          AND s.is_active   = true
        GROUP BY s.id, s.name
        ORDER BY attempts DESC NULLS LAST, s.name ASC`,

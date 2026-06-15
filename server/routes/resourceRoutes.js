@@ -11,6 +11,7 @@ const sequelize = require('../config/database');
 const { protect, authorize } = require('../middleware/auth');
 const r2 = require('../utils/r2Storage');
 const { getSignedDownloadUrl } = r2;
+const { ENROLLMENT_STATUS } = require('../constants/enrollmentConstants');
 
 /* ================================
    UPLOAD DIRECTORY
@@ -906,7 +907,7 @@ router.put(
         const enrolledRows = await sequelize.query(
           `SELECT student_id FROM student_subjects
             WHERE subject_id = :sid
-              AND status      = 'approved'
+              AND status      = '${ENROLLMENT_STATUS.APPROVED}'
               AND student_id  IN (:cids)`,
           {
             replacements: { sid: meta.subject_id, cids: candidateIds },
