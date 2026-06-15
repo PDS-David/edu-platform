@@ -701,10 +701,10 @@ router.post('/activate-exam-types', protect, async (req, res) => {
       await sequelize.query(
         `INSERT INTO student_exam_types
            (student_id, exam_board_id, subscription_id, granted_at, expires_at, is_active, status)
-         VALUES (:studentId, :boardId, :subscriptionId, NOW(), :expiresAt, true, '${ENROLLMENT_STATUS.APPROVED}')
+         VALUES (:studentId, :boardId, :subscriptionId, NOW(), :expiresAt, true, :approvedStatus)
          ON CONFLICT (student_id, exam_board_id) DO UPDATE SET
            is_active       = true,
-           status          = '${ENROLLMENT_STATUS.APPROVED}',
+           status          = :approvedStatus,
            subscription_id = EXCLUDED.subscription_id,
            expires_at      = EXCLUDED.expires_at,
            granted_at      = NOW()`,
@@ -714,6 +714,7 @@ router.post('/activate-exam-types', protect, async (req, res) => {
             boardId,
             subscriptionId: subscriptionId || null,
             expiresAt:      expiresAt      || null,
+            approvedStatus: ENROLLMENT_STATUS.APPROVED,
           },
           type: QueryTypes.INSERT,
         }

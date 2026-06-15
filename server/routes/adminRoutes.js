@@ -919,15 +919,15 @@ router.get('/health', protect, adminOnly, async (req, res) => {
       // 10. enrol
       await sequelize.query(
         `INSERT INTO student_subjects (student_id, subject_id, is_active, status, enrollment_source)
-         VALUES (:s, :sub, true, '${ENROLLMENT_STATUS.APPROVED}', '${ENROLLMENT_SOURCE.EXPLICIT}')
-         ON CONFLICT (student_id, subject_id) DO UPDATE SET is_active=true, status='${ENROLLMENT_STATUS.APPROVED}'`,
-        { replacements: { s: created.studentId, sub: created.subjectId },
+         VALUES (:s, :sub, true, :approvedStatus, :explicitSource)
+         ON CONFLICT (student_id, subject_id) DO UPDATE SET is_active=true, status=:approvedStatus`,
+        { replacements: { s: created.studentId, sub: created.subjectId, approvedStatus: ENROLLMENT_STATUS.APPROVED, explicitSource: ENROLLMENT_SOURCE.EXPLICIT },
           type: QueryTypes.INSERT });
       await sequelize.query(
         `INSERT INTO student_exam_types (student_id, exam_board_id, is_active, status)
-         VALUES (:s, :b, true, '${ENROLLMENT_STATUS.APPROVED}')
-         ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active=true, status='${ENROLLMENT_STATUS.APPROVED}'`,
-        { replacements: { s: created.studentId, b: created.boardId },
+         VALUES (:s, :b, true, :approvedStatus)
+         ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active=true, status=:approvedStatus`,
+        { replacements: { s: created.studentId, b: created.boardId, approvedStatus: ENROLLMENT_STATUS.APPROVED },
           type: QueryTypes.INSERT });
       w('10. enrol student → subject', true);
 
