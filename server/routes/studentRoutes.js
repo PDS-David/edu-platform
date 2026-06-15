@@ -362,18 +362,7 @@ router.get('/my-subjects', protect, async (req, res) => {
     // (subjects that have at least one topic) so they see content immediately
     if (result.length === 0) {
       try {
-        // Ensure table exists
-        await sequelize.query(
-          `CREATE TABLE IF NOT EXISTS student_subjects (
-             id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-             student_id UUID        NOT NULL,
-             subject_id INTEGER     NOT NULL,
-             is_active  BOOLEAN     NOT NULL DEFAULT true,
-             enrolled_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-             UNIQUE (student_id, subject_id)
-           )`,
-          { type: QueryTypes.RAW }
-        ).catch(() => {});
+        // Table is guaranteed to exist via run_enrollment_approval_migration.js
 
         // Enroll in subjects that have topics
         await sequelize.query(
@@ -424,23 +413,13 @@ router.post('/subjects', protect, async (req, res) => {
     return res.status(400).json({ success: false, error: 'subject_id is required' });
   }
   try {
-    // Ensure student_subjects table exists
+    // Table is guaranteed to exist via run_enrollment_approval_migration.js
     await sequelize.query(
-      `CREATE TABLE IF NOT EXISTS student_subjects (
-         id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-         student_id UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-         subject_id INTEGER     NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
-         is_active  BOOLEAN     NOT NULL DEFAULT true,
-         added_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-         UNIQUE(student_id, subject_id)
-       )`,
-      { type: QueryTypes.RAW }
-    );
-
-    await sequelize.query(
-      `INSERT INTO student_subjects (student_id, subject_id, is_active)
-       VALUES (:studentId, :subjectId, true)
-       ON CONFLICT (student_id, subject_id) DO UPDATE SET is_active = true`,
+      `INSERT INTO student_subjects (student_id, subject_id, is_active, enrollment_source)
+       VALUES (:studentId, :subjectId, true, 'explicit')
+       ON CONFLICT (student_id, subject_id) DO UPDATE
+         SET is_active         = true,
+             enrollment_source = COALESCE(student_subjects.enrollment_source, 'explicit')`,
       { replacements: { studentId, subjectId: parseInt(subject_id) }, type: QueryTypes.INSERT }
     );
 
