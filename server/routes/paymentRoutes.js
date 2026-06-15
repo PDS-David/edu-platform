@@ -699,10 +699,11 @@ router.post('/activate-exam-types', protect, async (req, res) => {
     for (const boardId of pendingIds) {
       await sequelize.query(
         `INSERT INTO student_exam_types
-           (student_id, exam_board_id, subscription_id, granted_at, expires_at, is_active)
-         VALUES (:studentId, :boardId, :subscriptionId, NOW(), :expiresAt, true)
+           (student_id, exam_board_id, subscription_id, granted_at, expires_at, is_active, status)
+         VALUES (:studentId, :boardId, :subscriptionId, NOW(), :expiresAt, true, 'approved')
          ON CONFLICT (student_id, exam_board_id) DO UPDATE SET
            is_active       = true,
+           status          = 'approved',
            subscription_id = EXCLUDED.subscription_id,
            expires_at      = EXCLUDED.expires_at,
            granted_at      = NOW()`,

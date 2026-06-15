@@ -189,9 +189,9 @@ router.patch('/preferences', protect, async (req, res) => {
         );
         if (board[0]) {
           await sequelize.query(
-            `INSERT INTO student_exam_types (student_id, exam_board_id, is_active)
-             VALUES (:userId, :boardId, true)
-             ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active = true`,
+            `INSERT INTO student_exam_types (student_id, exam_board_id, is_active, status)
+             VALUES (:userId, :boardId, true, 'approved')
+             ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active = true, status = 'approved'`,
             { replacements: { userId, boardId: board[0].id }, type: QueryTypes.RAW }
           );
         }
@@ -224,9 +224,9 @@ router.patch('/preferences', protect, async (req, res) => {
       );
       for (const row of boardRows) {
         await sequelize.query(
-          `INSERT INTO student_exam_types (student_id, exam_board_id, is_active)
-           VALUES (:userId, :boardId, true)
-           ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active = true`,
+          `INSERT INTO student_exam_types (student_id, exam_board_id, is_active, status)
+           VALUES (:userId, :boardId, true, 'approved')
+           ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active = true, status = 'approved'`,
           { replacements: { userId, boardId: row.exam_board_id }, type: QueryTypes.RAW }
         );
       }

@@ -923,9 +923,9 @@ router.get('/health', protect, adminOnly, async (req, res) => {
         { replacements: { s: created.studentId, sub: created.subjectId },
           type: QueryTypes.INSERT });
       await sequelize.query(
-        `INSERT INTO student_exam_types (student_id, exam_board_id, is_active)
-         VALUES (:s, :b, true)
-         ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active=true`,
+        `INSERT INTO student_exam_types (student_id, exam_board_id, is_active, status)
+         VALUES (:s, :b, true, 'approved')
+         ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active=true, status='approved'`,
         { replacements: { s: created.studentId, b: created.boardId },
           type: QueryTypes.INSERT });
       w('10. enrol student → subject', true);
