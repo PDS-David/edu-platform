@@ -906,7 +906,7 @@ router.put(
         const enrolledRows = await sequelize.query(
           `SELECT student_id FROM student_subjects
             WHERE subject_id = :sid
-              AND is_active   = true
+              AND status      = 'approved'
               AND student_id  IN (:cids)`,
           {
             replacements: { sid: meta.subject_id, cids: candidateIds },

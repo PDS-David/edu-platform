@@ -317,7 +317,7 @@ router.get('/my-subjects', protect, async (req, res) => {
          FROM student_subjects ss
          JOIN subjects  s  ON s.id  = ss.subject_id
          JOIN exam_boards eb ON eb.id = s.exam_board_id
-         WHERE ss.student_id = :studentId AND ss.is_active = true AND s.is_active = true
+         WHERE ss.student_id = :studentId AND ss.status = 'approved' AND s.is_active = true
          ORDER BY s.name`,
         { replacements: { studentId }, type: QueryTypes.SELECT }
       );
@@ -387,7 +387,7 @@ router.get('/my-subjects', protect, async (req, res) => {
            FROM student_subjects ss
            JOIN subjects   s  ON s.id  = ss.subject_id
            JOIN exam_boards eb ON eb.id = s.exam_board_id
-           WHERE ss.student_id = :studentId AND ss.is_active = true AND s.is_active = true
+           WHERE ss.student_id = :studentId AND ss.status = 'approved' AND s.is_active = true
            ORDER BY s.name`,
           { replacements: { studentId }, type: QueryTypes.SELECT }
         );
