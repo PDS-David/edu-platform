@@ -117,7 +117,7 @@ const studentAccess = async (req, res, next) => {
       `SELECT id FROM student_exam_types
        WHERE student_id   = :userId
          AND exam_board_id = :examBoardId
-         AND is_active     = true
+         AND status        = 'approved'
          AND (expires_at IS NULL OR expires_at > NOW())`,
       {
         replacements: { userId: req.user.id, examBoardId },
@@ -199,7 +199,7 @@ const getStudentExamTypes = async (userId) => {
   const rows = await db.query(
     `SELECT exam_board_id FROM student_exam_types
      WHERE student_id = :userId
-       AND is_active  = true
+       AND status     = 'approved'
        AND (expires_at IS NULL OR expires_at > NOW())`,
     { replacements: { userId }, type: QueryTypes.SELECT }
   );

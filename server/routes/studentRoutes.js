@@ -276,7 +276,7 @@ router.get('/my-boards', protect, async (req, res) => {
       `SELECT eb.id, eb.code, eb.name, eb.icon_emoji
        FROM student_exam_types set2
        JOIN exam_boards eb ON eb.id = set2.exam_board_id
-       WHERE set2.student_id = :studentId AND set2.is_active = true
+       WHERE set2.student_id = :studentId AND set2.status = 'approved'
        ORDER BY eb.name`,
       { replacements: { studentId: req.user.id }, type: QueryTypes.SELECT }
     );
