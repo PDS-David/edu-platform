@@ -8,7 +8,7 @@ const sequelize = require('../config/database');
 
 const { protect, authorize } = require('../middleware/auth');
 const { success, error, paginated } = require('../utils/response');
-const { ENROLLMENT_SOURCE } = require('../constants/enrollmentConstants');
+const { ENROLLMENT_SOURCE, ENROLLMENT_STATUS } = require('../constants/enrollmentConstants');
 
 // ─────────────────────────────────────────────
 // GET /api/users/stats
@@ -190,8 +190,8 @@ router.patch('/preferences', protect, async (req, res) => {
         if (board[0]) {
           await sequelize.query(
             `INSERT INTO student_exam_types (student_id, exam_board_id, is_active, status)
-             VALUES (:userId, :boardId, true, 'approved')
-             ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active = true, status = 'approved'`,
+             VALUES (:userId, :boardId, true, '${ENROLLMENT_STATUS.APPROVED}')
+             ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active = true, status = '${ENROLLMENT_STATUS.APPROVED}'`,
             { replacements: { userId, boardId: board[0].id }, type: QueryTypes.RAW }
           );
         }
@@ -206,10 +206,10 @@ router.patch('/preferences', protect, async (req, res) => {
         try {
           await sequelize.query(
             `INSERT INTO student_subjects (student_id, subject_id, is_active, status, enrollment_source)
-             VALUES (:userId, :subjectId, true, 'approved', :enrollmentSource)
+             VALUES (:userId, :subjectId, true, '${ENROLLMENT_STATUS.APPROVED}', :enrollmentSource)
              ON CONFLICT (student_id, subject_id) DO UPDATE
                SET is_active         = true,
-                   status            = 'approved',
+                   status            = '${ENROLLMENT_STATUS.APPROVED}',
                    enrollment_source = COALESCE(student_subjects.enrollment_source, :enrollmentSource)`,
             { replacements: { userId, subjectId: safeId, enrollmentSource: ENROLLMENT_SOURCE.EXPLICIT }, type: QueryTypes.RAW }
           );
@@ -225,8 +225,8 @@ router.patch('/preferences', protect, async (req, res) => {
       for (const row of boardRows) {
         await sequelize.query(
           `INSERT INTO student_exam_types (student_id, exam_board_id, is_active, status)
-           VALUES (:userId, :boardId, true, 'approved')
-           ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active = true, status = 'approved'`,
+           VALUES (:userId, :boardId, true, '${ENROLLMENT_STATUS.APPROVED}')
+           ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active = true, status = '${ENROLLMENT_STATUS.APPROVED}'`,
           { replacements: { userId, boardId: row.exam_board_id }, type: QueryTypes.RAW }
         );
       }

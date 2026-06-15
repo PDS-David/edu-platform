@@ -11,6 +11,7 @@ const router     = express.Router();
 const { QueryTypes } = require('sequelize');
 const sequelize  = require('../config/database');
 const { protect } = require('../middleware/auth');
+const { ENROLLMENT_STATUS } = require('../constants/enrollmentConstants');
 
 // ── safe query helper ─────────────────────────────────────────────────────────
 const sq = async (sql, replacements = {}, fallback = []) => {
@@ -88,7 +89,7 @@ router.get('/recommendations', protect, async (req, res) => {
        JOIN subjects s  ON s.id  = t.subject_id
        JOIN student_exam_types set2 ON  set2.exam_board_id = s.exam_board_id
                                     AND set2.student_id   = :uid
-                                    AND set2.status        = 'approved'
+                                    AND set2.status        = '${ENROLLMENT_STATUS.APPROVED}'
                                     AND (set2.expires_at IS NULL OR set2.expires_at > NOW())
        LEFT JOIN subtopic_progress sp ON sp.subtopic_id = st.id AND sp.student_id = :uid
        WHERE st.is_active = true

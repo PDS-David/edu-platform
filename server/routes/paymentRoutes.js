@@ -24,6 +24,7 @@ const crypto    = require('crypto');
 const { QueryTypes } = require('sequelize');
 const sequelize = require('../config/database');
 const { protect } = require('../middleware/auth');
+const { ENROLLMENT_STATUS } = require('../constants/enrollmentConstants');
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY;
 const CLIENT_URL      = process.env.CLIENT_URL || 'http://localhost:5173';
@@ -700,10 +701,10 @@ router.post('/activate-exam-types', protect, async (req, res) => {
       await sequelize.query(
         `INSERT INTO student_exam_types
            (student_id, exam_board_id, subscription_id, granted_at, expires_at, is_active, status)
-         VALUES (:studentId, :boardId, :subscriptionId, NOW(), :expiresAt, true, 'approved')
+         VALUES (:studentId, :boardId, :subscriptionId, NOW(), :expiresAt, true, '${ENROLLMENT_STATUS.APPROVED}')
          ON CONFLICT (student_id, exam_board_id) DO UPDATE SET
            is_active       = true,
-           status          = 'approved',
+           status          = '${ENROLLMENT_STATUS.APPROVED}',
            subscription_id = EXCLUDED.subscription_id,
            expires_at      = EXCLUDED.expires_at,
            granted_at      = NOW()`,
