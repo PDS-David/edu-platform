@@ -30,6 +30,7 @@ async function runMigrations() {
     'migration_004_student_subjects.sql',
     'migrate_roles_and_curricula.sql',
     'fix_type_mismatches_v2.sql',
+    'patch_enrollment_status_columns.sql',
     'patch_answer_options.sql',
     'add_ielts_toefl_sat_subjects.sql',
     'eac_courses_topics_enrollments.sql',

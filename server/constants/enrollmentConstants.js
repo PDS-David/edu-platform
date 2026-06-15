@@ -22,8 +22,8 @@ const ENROLLMENT_SOURCE = Object.freeze({
 });
 
 // ---------------------------------------------------------------------------
-// Enrollment lifecycle status  (student_subjects.approval_status column)
-// Reserved for future approval-flow use; no runtime code sets these yet.
+// Enrollment lifecycle status  (student_subjects.status and
+//                               student_exam_types.status columns)
 // ---------------------------------------------------------------------------
 const ENROLLMENT_STATUS = Object.freeze({
   PENDING:      'pending',
