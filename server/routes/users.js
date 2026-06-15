@@ -204,9 +204,11 @@ router.patch('/preferences', protect, async (req, res) => {
         if (!safeId) continue;
         try {
           await sequelize.query(
-            `INSERT INTO student_subjects (student_id, subject_id, is_active)
-             VALUES (:userId, :subjectId, true)
-             ON CONFLICT (student_id, subject_id) DO UPDATE SET is_active = true`,
+            `INSERT INTO student_subjects (student_id, subject_id, is_active, enrollment_source)
+             VALUES (:userId, :subjectId, true, 'explicit')
+             ON CONFLICT (student_id, subject_id) DO UPDATE
+               SET is_active         = true,
+                   enrollment_source = COALESCE(student_subjects.enrollment_source, 'explicit')`,
             { replacements: { userId, subjectId: safeId }, type: QueryTypes.RAW }
           );
         } catch (_e) { /* table may not exist yet on very fresh DB */ }
