@@ -8,6 +8,7 @@ const sequelize = require('../config/database');
 
 const { protect, authorize } = require('../middleware/auth');
 const { success, error, paginated } = require('../utils/response');
+const { ENROLLMENT_SOURCE } = require('../constants/enrollmentConstants');
 
 // ─────────────────────────────────────────────
 // GET /api/users/stats
@@ -205,11 +206,11 @@ router.patch('/preferences', protect, async (req, res) => {
         try {
           await sequelize.query(
             `INSERT INTO student_subjects (student_id, subject_id, is_active, enrollment_source)
-             VALUES (:userId, :subjectId, true, 'explicit')
+             VALUES (:userId, :subjectId, true, :enrollmentSource)
              ON CONFLICT (student_id, subject_id) DO UPDATE
                SET is_active         = true,
-                   enrollment_source = COALESCE(student_subjects.enrollment_source, 'explicit')`,
-            { replacements: { userId, subjectId: safeId }, type: QueryTypes.RAW }
+                   enrollment_source = COALESCE(student_subjects.enrollment_source, :enrollmentSource)`,
+            { replacements: { userId, subjectId: safeId, enrollmentSource: ENROLLMENT_SOURCE.EXPLICIT }, type: QueryTypes.RAW }
           );
         } catch (_e) { /* table may not exist yet on very fresh DB */ }
       }
