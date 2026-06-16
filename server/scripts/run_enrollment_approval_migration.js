@@ -68,6 +68,13 @@ let _lockClient = null; // module-level so release() can always reach it
 
 async function acquireGlobalLock() {
   log.info(`Acquiring advisory lock (key=${ADVISORY_LOCK_KEY}) for "${MIGRATION_NAME}" …`);
+  console.log('DATABASE_URL present:', !!process.env.DATABASE_URL);
+  console.log(
+    'DATABASE_URL prefix:',
+    process.env.DATABASE_URL
+      ? process.env.DATABASE_URL.substring(0, 30) + '...'
+      : 'undefined'
+  );
   _lockClient = await pool.connect();
   try {
     const { rows } = await _lockClient.query(
@@ -851,8 +858,27 @@ async function runMigration() {
     log.header(`✅ Migration complete in ${elapsed}s`);
     process.exit(0);
   } catch (err) {
-    log.error('Migration failed:', err.message);
-    log.debug(err.stack);
+    console.error('\n════════════════════════════════════════════');
+    console.error('FULL ERROR OBJECT');
+    console.error('════════════════════════════════════════════');
+    console.error(err);
+
+    console.error('\nMESSAGE:');
+    console.error(err?.message);
+
+    console.error('\nSTACK:');
+    console.error(err?.stack);
+
+    console.error('\nERROR KEYS:');
+    console.error(Object.keys(err || {}));
+
+    console.error('\nERROR JSON:');
+    try {
+      console.error(JSON.stringify(err, null, 2));
+    } catch (_) {
+      console.error('Could not stringify error');
+    }
+
     process.exit(1);
   } finally {
     await releaseGlobalLock();      // [A] crash-safe release
