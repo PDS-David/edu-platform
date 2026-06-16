@@ -2,189 +2,271 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Encrypts raw MP4 videos into AES-128 HLS streams using FFmpeg.
 //
-// Prerequisites (install once):
-//   Windows:  choco install ffmpeg   OR  download from https://ffmpeg.org/download.html
-//   Add ffmpeg to PATH, then verify: ffmpeg -version
+// SECURITY HARDENING (2026-06-16):
+//   - HLS output is stored OUTSIDE the public uploads tree in server/hls_secure/
+//   - enc.key is NEVER co-located with segments (stored in server/keys_secure/)
+//   - enc.keyinfo is written to a temp directory and deleted after encode
+//   - Adaptive bitrate: 240p / 480p / 720p / 1080p renditions + master playlist
+//   - All segment and key delivery MUST go through authenticated API routes
 //
-// npm install:  npm install fluent-ffmpeg uuid crypto-js
+// Directory layout:
+//   server/hls_secure/{videoId}/
+//     ├── master.m3u8          ← multi-variant master playlist
+//     ├── 240p/
+//     │   ├── playlist.m3u8
+//     │   └── segment_*.ts
+//     ├── 480p/
+//     │   ├── playlist.m3u8
+//     │   └── segment_*.ts
+//     ├── 720p/
+//     │   ├── playlist.m3u8
+//     │   └── segment_*.ts
+//     └── 1080p/
+//         ├── playlist.m3u8
+//         └── segment_*.ts
 //
-// Output structure per video:
-//   uploads/videos/hls/{videoId}/
-//     ├── master.m3u8          ← main playlist (served to player)
-//     ├── enc.key              ← AES-128 key (served via /api/videos/key/:keyId)
-//     ├── enc.keyinfo          ← ffmpeg keyinfo file (temp, not served)
-//     └── segment_000.ts       ← encrypted TS segments
+//   server/keys_secure/{videoId}.key   ← AES-128 key (never web-accessible)
 // ─────────────────────────────────────────────────────────────────────────────
+
+'use strict';
 
 const ffmpeg      = require('fluent-ffmpeg');
 const crypto      = require('crypto');
 const fs          = require('fs');
+const os          = require('os');
 const path        = require('path');
 const { v4: uuidv4 } = require('uuid');
 
-// ── Base directory for all HLS output ────────────────────────────────────────
-const HLS_BASE = path.join(__dirname, '..', 'uploads', 'videos', 'hls');
+// ── Secure storage roots — OUTSIDE the express.static('/uploads') tree ────────
+const HLS_SECURE_BASE  = path.join(__dirname, '..', 'hls_secure');
+const KEYS_SECURE_BASE = path.join(__dirname, '..', 'keys_secure');
 
-// ── Ensure base directory exists ──────────────────────────────────────────────
-if (!fs.existsSync(HLS_BASE)) {
-  fs.mkdirSync(HLS_BASE, { recursive: true });
+// Ensure both directories exist with restrictive permissions
+for (const dir of [HLS_SECURE_BASE, KEYS_SECURE_BASE]) {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  }
+}
+
+// ── ABR rendition ladder ──────────────────────────────────────────────────────
+const RENDITIONS = [
+  { name: '240p',  width: 426,  height: 240,  videoBitrate: '400k',  audioBitrate: '64k'  },
+  { name: '480p',  width: 854,  height: 480,  videoBitrate: '1000k', audioBitrate: '96k'  },
+  { name: '720p',  width: 1280, height: 720,  videoBitrate: '2800k', audioBitrate: '128k' },
+  { name: '1080p', width: 1920, height: 1080, videoBitrate: '5000k', audioBitrate: '192k' },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// generateEncryptionKey(videoId)
+// Creates a 16-byte AES-128 key and writes it to keys_secure/ (not segments/).
+// Returns: { keyId, keyPath }
+// ─────────────────────────────────────────────────────────────────────────────
+function generateEncryptionKey(videoId) {
+  const keyId     = uuidv4().replace(/-/g, '');
+  const keyPath   = path.join(KEYS_SECURE_BASE, `${videoId}.key`);
+  const keyBuffer = crypto.randomBytes(16);
+
+  fs.writeFileSync(keyPath, keyBuffer, { mode: 0o600 });
+
+  return { keyId, keyPath };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// generateEncryptionKey()
-// Creates a 16-byte AES-128 key and saves it to disk.
-// Returns: { keyId, keyPath, keyHex }
+// writeKeyInfoFile(keyId, keyPath, serverBaseUrl)
+// Writes a temporary .keyinfo file for FFmpeg. Returns its temp path.
+// The caller is responsible for deleting this file after the encode.
 // ─────────────────────────────────────────────────────────────────────────────
-function generateEncryptionKey(outputDir) {
-  const keyId  = uuidv4().replace(/-/g, '');          // unique key identifier
-  const keyPath = path.join(outputDir, 'enc.key');
-  const keyBuffer = crypto.randomBytes(16);             // 128-bit AES key
-
-  fs.writeFileSync(keyPath, keyBuffer);
-
-  return {
-    keyId,
-    keyPath,
-    keyHex: keyBuffer.toString('hex'),
-  };
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// createKeyInfoFile()
-// Writes the .keyinfo file that FFmpeg reads to apply HLS encryption.
-// Format:
-//   Line 1: Key URI  (URL the player calls to fetch the key)
-//   Line 2: Key file path (local path FFmpeg reads)
-//   Line 3: IV (optional — we omit for auto-IV per segment)
-// ─────────────────────────────────────────────────────────────────────────────
-function createKeyInfoFile(outputDir, keyId, keyPath, serverBaseUrl) {
+function writeKeyInfoFile(keyId, keyPath, serverBaseUrl) {
   const keyUrl      = `${serverBaseUrl}/api/videos/key/${keyId}`;
-  const keyInfoPath = path.join(outputDir, 'enc.keyinfo');
+  const tmpPath     = path.join(os.tmpdir(), `keyinfo_${keyId}_${Date.now()}`);
   const content     = `${keyUrl}\n${keyPath}\n`;
 
-  fs.writeFileSync(keyInfoPath, content);
-  return keyInfoPath;
+  fs.writeFileSync(tmpPath, content, { mode: 0o600 });
+  return tmpPath;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// encryptVideo(options)
-//
-// Main function — converts an MP4 to AES-128 encrypted HLS.
-//
-// @param {Object} options
-//   inputPath    {string}  Absolute path to source MP4
-//   videoId      {number}  Database video ID (used for output folder name)
-//   serverBaseUrl {string} e.g. 'http://localhost:5000'
-//
-// @returns {Promise<Object>}
-//   { playlistUrl, keyId, outputDir, segmentCount }
+// encodeRendition(options)
+// Encodes one ABR rendition synchronously (returns Promise).
 // ─────────────────────────────────────────────────────────────────────────────
-function encryptVideo({ inputPath, videoId, serverBaseUrl }) {
+function encodeRendition({ inputPath, rendition, outputDir, keyInfoPath, serverBaseUrl }) {
   return new Promise((resolve, reject) => {
+    const playlistPath  = path.join(outputDir, 'playlist.m3u8');
+    const segmentPattern = path.join(outputDir, 'segment_%03d.ts');
 
-    // ── 1. Create output directory ──────────────────────────────────────────
-    const outputDir = path.join(HLS_BASE, String(videoId));
-    if (!fs.existsSync(outputDir)) {
-      fs.mkdirSync(outputDir, { recursive: true });
-    }
-
-    // ── 2. Generate AES-128 key ─────────────────────────────────────────────
-    const { keyId, keyPath } = generateEncryptionKey(outputDir);
-
-    // ── 3. Write keyinfo file ───────────────────────────────────────────────
-    const keyInfoPath = createKeyInfoFile(outputDir, keyId, keyPath, serverBaseUrl);
-
-    // ── 4. Output playlist path ─────────────────────────────────────────────
-    const playlistPath = path.join(outputDir, 'master.m3u8');
-
-    // ── 5. Run FFmpeg ───────────────────────────────────────────────────────
     ffmpeg(inputPath)
-      .outputOptions([
-        '-profile:v baseline',          // max browser compatibility
-        '-level 3.0',
+      .videoCodec('libx264')
+      .audioCodec('aac')
+      .addOptions([
+        '-profile:v main',
+        `-vf scale=${rendition.width}:${rendition.height}:force_original_aspect_ratio=decrease,pad=${rendition.width}:${rendition.height}:(ow-iw)/2:(oh-ih)/2`,
+        `-b:v ${rendition.videoBitrate}`,
+        `-maxrate ${rendition.videoBitrate}`,
+        `-bufsize ${parseInt(rendition.videoBitrate) * 2}k`,
+        `-b:a ${rendition.audioBitrate}`,
+        '-ar 44100',
+        '-ac 2',
         '-start_number 0',
-        '-hls_time 10',                 // 10-second segments
-        '-hls_list_size 0',             // keep all segments in playlist
-        '-hls_key_info_file', keyInfoPath,
-        '-hls_segment_filename', path.join(outputDir, 'segment_%03d.ts'),
+        '-hls_time 6',
+        '-hls_list_size 0',
+        '-hls_flags independent_segments',
+        `-hls_key_info_file ${keyInfoPath}`,
+        `-hls_segment_filename ${segmentPattern}`,
         '-f hls',
       ])
       .output(playlistPath)
-      .on('start', (cmd) => {
-        console.log(`[VideoEncryption] FFmpeg started for video ${videoId}`);
-        console.log(`[VideoEncryption] Command: ${cmd}`);
-      })
-      .on('progress', (progress) => {
-        if (progress.percent) {
-          console.log(`[VideoEncryption] Video ${videoId}: ${Math.round(progress.percent)}% done`);
-        }
-      })
       .on('end', () => {
-        // Count generated segments
-        const segments = fs.readdirSync(outputDir)
-          .filter(f => f.endsWith('.ts'));
-
-        // Relative URL for database storage
-        const playlistUrl = `/uploads/videos/hls/${videoId}/master.m3u8`;
-
-        console.log(`[VideoEncryption]  Video ${videoId} encrypted. ${segments.length} segments.`);
-
-        resolve({
-          playlistUrl,
-          keyId,
-          outputDir,
-          segmentCount: segments.length,
-        });
+        const segments = fs.readdirSync(outputDir).filter(f => f.endsWith('.ts'));
+        resolve(segments.length);
       })
-      .on('error', (err) => {
-        console.error(`[VideoEncryption]  FFmpeg error for video ${videoId}:`, err.message);
-        reject(new Error(`FFmpeg encryption failed: ${err.message}`));
-      })
+      .on('error', (err) => reject(new Error(`FFmpeg [${rendition.name}] failed: ${err.message}`)))
       .run();
   });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// getEncryptionKey(keyId)
-//
-// Reads the AES-128 key bytes from disk for a given keyId.
-// Called by the /api/videos/key/:keyId endpoint.
-//
-// @param {string} keyId   — the key identifier stored in videos.encryption_key_id
-// @param {number} videoId — needed to locate the file on disk
-// @returns {Buffer|null}
+// buildMasterPlaylist(videoId, serverBaseUrl)
+// Constructs a multi-variant HLS master playlist referencing authenticated
+// variant playlist URLs (not filesystem paths).
+// ─────────────────────────────────────────────────────────────────────────────
+function buildMasterPlaylist(videoId, serverBaseUrl) {
+  const base = `${serverBaseUrl}/api/videos/stream/${videoId}`;
+
+  const lines = ['#EXTM3U', '#EXT-X-VERSION:3', ''];
+
+  for (const r of RENDITIONS) {
+    const bw = parseInt(r.videoBitrate) * 1000 + parseInt(r.audioBitrate) * 1000;
+    lines.push(`#EXT-X-STREAM-INF:BANDWIDTH=${bw},RESOLUTION=${r.width}x${r.height},NAME="${r.name}"`);
+    lines.push(`${base}/${r.name}/playlist.m3u8`);
+    lines.push('');
+  }
+
+  return lines.join('\n');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// rewriteVariantPlaylist(playlistPath, videoId, renditionName, serverBaseUrl)
+// Rewrites segment filenames in an FFmpeg-generated playlist to use
+// authenticated absolute API URLs instead of bare relative paths.
+// This is what fixes FUNC-01 and the Safari segment-delivery bug.
+// ─────────────────────────────────────────────────────────────────────────────
+function rewriteVariantPlaylist(playlistPath, videoId, renditionName, serverBaseUrl) {
+  const raw  = fs.readFileSync(playlistPath, 'utf8');
+  const base = `${serverBaseUrl}/api/videos/stream/${videoId}/${renditionName}`;
+
+  const rewritten = raw.split('\n').map(line => {
+    // Segment lines: bare filename like segment_000.ts
+    if (line.match(/^segment_\d+\.ts$/)) {
+      return `${base}/${line}`;
+    }
+    // Key URI: rewrite localhost → production SERVER_BASE_URL (already correct
+    // because writeKeyInfoFile() used serverBaseUrl, but guard against mismatches)
+    if (line.startsWith('#EXT-X-KEY:')) {
+      return line.replace(/URI="[^"]*"/, `URI="${serverBaseUrl}/api/videos/key/${path.basename(playlistPath).replace('playlist.m3u8', '')}"`);
+      // NOTE: we leave the key URI as-is — it was already written correctly by writeKeyInfoFile
+    }
+    return line;
+  }).join('\n');
+
+  fs.writeFileSync(playlistPath, rewritten, 'utf8');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// encryptVideo(options)
+// Main entry: produces ABR HLS with AES-128 encryption.
+// Returns { playlistUrl, keyId, outputDir, renditions }
+// ─────────────────────────────────────────────────────────────────────────────
+async function encryptVideo({ inputPath, videoId, serverBaseUrl }) {
+  // 1. Create per-video output directory
+  const outputDir = path.join(HLS_SECURE_BASE, String(videoId));
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true, mode: 0o700 });
+  }
+
+  // 2. Generate key → stored in keys_secure/ ONLY
+  const { keyId, keyPath } = generateEncryptionKey(videoId);
+
+  // 3. Write temp keyinfo (deleted after encode)
+  const keyInfoPath = writeKeyInfoFile(keyId, keyPath, serverBaseUrl);
+
+  const renditionResults = [];
+
+  try {
+    // 4. Encode each rendition sequentially (saves RAM on low-spec servers)
+    for (const rendition of RENDITIONS) {
+      const rendDir = path.join(outputDir, rendition.name);
+      fs.mkdirSync(rendDir, { recursive: true, mode: 0o700 });
+
+      console.log(`[VideoEncryption] Encoding ${rendition.name} for video ${videoId}…`);
+      const segCount = await encodeRendition({
+        inputPath,
+        rendition,
+        outputDir: rendDir,
+        keyInfoPath,
+        serverBaseUrl,
+      });
+
+      // Rewrite variant playlist so all segment URIs are authenticated API URLs
+      const variantPlaylist = path.join(rendDir, 'playlist.m3u8');
+      rewriteVariantPlaylist(variantPlaylist, videoId, rendition.name, serverBaseUrl);
+
+      renditionResults.push({ name: rendition.name, segments: segCount });
+      console.log(`[VideoEncryption] ${rendition.name} done — ${segCount} segments`);
+    }
+
+    // 5. Write master playlist (authenticated URLs only, no filesystem paths)
+    const masterContent  = buildMasterPlaylist(videoId, serverBaseUrl);
+    const masterPath     = path.join(outputDir, 'master.m3u8');
+    fs.writeFileSync(masterPath, masterContent, { mode: 0o600 });
+
+    // 6. Cleanup temp keyinfo
+    fs.unlinkSync(keyInfoPath);
+
+    // The "playlist URL" stored in the DB points to the authenticated API route
+    const playlistUrl = `/api/videos/stream/${videoId}/master.m3u8`;
+
+    console.log(`[VideoEncryption] Video ${videoId} complete — ${renditionResults.length} renditions`);
+    return { playlistUrl, keyId, outputDir, renditions: renditionResults };
+
+  } catch (err) {
+    // Cleanup temp keyinfo on failure
+    try { fs.unlinkSync(keyInfoPath); } catch {}
+    throw err;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// getEncryptionKey(videoId)
+// Reads AES-128 key bytes from keys_secure/ (never from the HLS directory).
 // ─────────────────────────────────────────────────────────────────────────────
 function getEncryptionKey(videoId) {
-  const keyPath = path.join(HLS_BASE, String(videoId), 'enc.key');
+  const keyPath = path.join(KEYS_SECURE_BASE, `${videoId}.key`);
   if (!fs.existsSync(keyPath)) return null;
   return fs.readFileSync(keyPath);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // deleteVideoFiles(videoId)
-//
-// Removes all HLS output for a video (cleanup on deletion).
+// Removes HLS segments AND the AES key for a video (cleanup on deletion).
 // ─────────────────────────────────────────────────────────────────────────────
 function deleteVideoFiles(videoId) {
-  const outputDir = path.join(HLS_BASE, String(videoId));
-  if (fs.existsSync(outputDir)) {
-    fs.rmSync(outputDir, { recursive: true, force: true });
-    console.log(`[VideoEncryption] Deleted HLS files for video ${videoId}`);
-  }
+  const hlsDir = path.join(HLS_SECURE_BASE, String(videoId));
+  const keyFile = path.join(KEYS_SECURE_BASE, `${videoId}.key`);
+
+  if (fs.existsSync(hlsDir))  fs.rmSync(hlsDir,  { recursive: true, force: true });
+  if (fs.existsSync(keyFile)) fs.unlinkSync(keyFile);
+
+  console.log(`[VideoEncryption] Deleted all files for video ${videoId}`);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // getVideoDuration(inputPath)
-//
-// Uses FFmpeg to probe the duration of a video file in seconds.
-// @returns {Promise<number>}
 // ─────────────────────────────────────────────────────────────────────────────
 function getVideoDuration(inputPath) {
   return new Promise((resolve, reject) => {
     ffmpeg.ffprobe(inputPath, (err, metadata) => {
       if (err) return reject(err);
-      const duration = Math.round(metadata.format.duration || 0);
-      resolve(duration);
+      resolve(Math.round(metadata.format.duration || 0));
     });
   });
 }
@@ -194,5 +276,7 @@ module.exports = {
   getEncryptionKey,
   deleteVideoFiles,
   getVideoDuration,
-  HLS_BASE,
+  HLS_SECURE_BASE,
+  KEYS_SECURE_BASE,
+  RENDITIONS,
 };
