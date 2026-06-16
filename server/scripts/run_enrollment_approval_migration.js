@@ -15,6 +15,9 @@
 
 'use strict';
 
+// Local-only convenience; never override environment variables.
+require('dotenv').config({ path: require('path').join(__dirname, '..', '.env'), override: false });
+
 const { Pool } = require('pg');
 const os       = require('os');
 const crypto   = require('crypto');
