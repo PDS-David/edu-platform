@@ -1,38 +1,77 @@
 // server/middleware/rateLimiter.js
+// ─────────────────────────────────────────────────────────────────────────────
+// Rate limiters for the AISchoolonair API.
+//
+// STREAMING LIMITER (2026-06-16):
+//   Video routes get their own per-user limiter with a generous window so that
+//   a student watching a lecture doesn't hit the global IP cap. Because many
+//   Nigerian schools share a single NAT IP (cyber-cafes, school labs) the
+//   global limiter uses IP; the streaming limiter keys on the JWT user ID when
+//   available, falling back to IP for unauthenticated requests.
+// ─────────────────────────────────────────────────────────────────────────────
+
+'use strict';
+
 const rateLimit = require('express-rate-limit');
 
-const analyticsLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Max 100 requests per window
-  message: { 
-    success: false, 
-    error: 'Too many requests, please try again later.' 
-  }
-});
-
+// ── Global limiter — all routes ───────────────────────────────────────────────
 const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: 15 * 60 * 1000,   // 15 minutes
   max: 200,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { success: false, error: 'Too many requests' }
+  message: { success: false, error: 'Too many requests, please try again later.' },
 });
 
+// ── AI limiter — expensive inference routes ───────────────────────────────────
 const aiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { success: false, error: 'AI request limit exceeded' }
+  message: { success: false, error: 'AI request limit exceeded' },
 });
 
-// Strict limiter for login / register / password-reset endpoints
+// ── Analytics limiter ─────────────────────────────────────────────────────────
+const analyticsLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: { success: false, error: 'Too many requests, please try again later.' },
+});
+
+// ── Auth limiter — login / register / password-reset ─────────────────────────
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20,                   // 20 attempts per window per IP
+  windowMs: 15 * 60 * 1000,
+  max: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { success: false, error: 'Too many authentication attempts, please try again later.' }
+  message: { success: false, error: 'Too many authentication attempts, please try again later.' },
 });
 
-module.exports = { analyticsLimiter, globalLimiter, aiLimiter, authLimiter };
+// ── Streaming limiter — HLS manifest / segment / key / progress endpoints ────
+// Keys on userId (from JWT) when available, so shared NAT IPs don't throttle
+// classrooms. A student hitting segments every 6 s generates ~150 requests per
+// 15-minute window — well inside the 600 limit for a single viewer.
+const streamingLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,   // 15 minutes
+  max: 600,                    // ~150 seg requests × 4 students on same IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  // Use JWT user ID as key when req.user is set (protect runs before this),
+  // otherwise fall back to IP. Normalise the IP so IPv6 addresses don't
+  // produce inconsistent keys.
+  keyGenerator: (req) => {
+    if (req.user && req.user.id) return `user:${req.user.id}`;
+    const ip = (req.ip || '').replace(/^::ffff:/, '').replace(/%.*$/, '');
+    return ip || 'unknown';
+  },
+  validate: { xForwardedForHeader: false },
+  message: { success: false, error: 'Streaming rate limit exceeded. Please wait before retrying.' },
+  skip: (req) => {
+    // Never throttle admin or teacher roles
+    const role = req.user?.role;
+    return role === 'admin' || role === 'teacher';
+  },
+});
+
+module.exports = { globalLimiter, aiLimiter, analyticsLimiter, authLimiter, streamingLimiter };
