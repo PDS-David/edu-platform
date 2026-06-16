@@ -78,3 +78,6 @@ coverage/
 # ── Hetzner deployment env files (never commit) ────────────────────────────
 api.env
 api.staging.env
+
+# Temporary schema audit artifacts
+docs/schema-audit/

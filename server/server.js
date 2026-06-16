@@ -73,10 +73,27 @@ app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 
 // STATIC FILES
+// ─────────────────────────────────────────────────────────────────────────────
+// SECURITY: /uploads/videos/hls/** and /uploads/videos/raw/** are NEVER served
+// as static files. HLS segments and AES keys are now stored in hls_secure/ and
+// keys_secure/ (outside this tree) and delivered ONLY through authenticated API
+// routes in /api/videos/stream/* and /api/videos/key/*.
+//
+// The /uploads static mount still serves other assets (thumbnails, resources,
+// PDFs) but a guard middleware blocks any attempt to reach the video directories.
+// ─────────────────────────────────────────────────────────────────────────────
+app.use('/uploads/videos', (_req, res) => {
+  // Block all direct access to the video sub-directory, including any legacy
+  // paths that might still exist before migration of hls_secure/.
+  return res.status(403).json({
+    success: false,
+    error: 'Direct access to video files is not permitted. Use /api/videos/stream/*.',
+  });
+});
+
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
   setHeaders: (res) => {
     // Allow embedding file previews (PDF/office viewers) from the frontend domain.
-    // Without this, browsers may block iframe previews with "refused to connect".
     res.setHeader('X-Frame-Options', 'ALLOWALL');
     const a = [process.env.CLIENT_URL, process.env.PROD_CLIENT_URL]
       .filter(Boolean)
