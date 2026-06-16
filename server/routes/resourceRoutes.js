@@ -907,10 +907,10 @@ router.put(
         const enrolledRows = await sequelize.query(
           `SELECT student_id FROM student_subjects
             WHERE subject_id = :sid
-              AND status      = '${ENROLLMENT_STATUS.APPROVED}'
+              AND status      = :approvedStatus
               AND student_id  IN (:cids)`,
           {
-            replacements: { sid: meta.subject_id, cids: candidateIds },
+            replacements: { sid: meta.subject_id, cids: candidateIds, approvedStatus: ENROLLMENT_STATUS.APPROVED },
             type: QueryTypes.SELECT
           }
         );

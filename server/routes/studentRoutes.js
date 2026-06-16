@@ -276,9 +276,9 @@ router.get('/my-boards', protect, async (req, res) => {
       `SELECT eb.id, eb.code, eb.name, eb.icon_emoji
        FROM student_exam_types set2
        JOIN exam_boards eb ON eb.id = set2.exam_board_id
-       WHERE set2.student_id = :studentId AND set2.status = '${ENROLLMENT_STATUS.APPROVED}'
+       WHERE set2.student_id = :studentId AND set2.status = :approvedStatus
        ORDER BY eb.name`,
-      { replacements: { studentId: req.user.id }, type: QueryTypes.SELECT }
+      { replacements: { studentId: req.user.id, approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.SELECT }
     );
 
     // Fallback: use pending_exam_board_ids if student hasn't completed onboarding yet
@@ -317,9 +317,9 @@ router.get('/my-subjects', protect, async (req, res) => {
          FROM student_subjects ss
          JOIN subjects  s  ON s.id  = ss.subject_id
          JOIN exam_boards eb ON eb.id = s.exam_board_id
-         WHERE ss.student_id = :studentId AND ss.status = '${ENROLLMENT_STATUS.APPROVED}' AND s.is_active = true
+         WHERE ss.student_id = :studentId AND ss.status = :approvedStatus AND s.is_active = true
          ORDER BY s.name`,
-        { replacements: { studentId }, type: QueryTypes.SELECT }
+        { replacements: { studentId, approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.SELECT }
       );
     } catch (e) {
       // student_subjects table may not exist yet — handled by migration below
@@ -368,12 +368,12 @@ router.get('/my-subjects', protect, async (req, res) => {
         // Enroll in subjects that have topics
         await sequelize.query(
           `INSERT INTO student_subjects (student_id, subject_id, is_active, status, enrollment_source)
-           SELECT :studentId, s.id, true, '${ENROLLMENT_STATUS.APPROVED}', '${ENROLLMENT_SOURCE.AUTO_ENROLLED}'
+           SELECT :studentId, s.id, true, :approvedStatus, :autoEnrolledSource
            FROM subjects s
            WHERE s.is_active = true
              AND EXISTS (SELECT 1 FROM topics t WHERE t.subject_id = s.id)
            ON CONFLICT (student_id, subject_id) DO NOTHING`,
-          { replacements: { studentId }, type: QueryTypes.INSERT }
+          { replacements: { studentId, approvedStatus: ENROLLMENT_STATUS.APPROVED, autoEnrolledSource: ENROLLMENT_SOURCE.AUTO_ENROLLED }, type: QueryTypes.INSERT }
         );
 
         // Re-fetch
@@ -387,9 +387,9 @@ router.get('/my-subjects', protect, async (req, res) => {
            FROM student_subjects ss
            JOIN subjects   s  ON s.id  = ss.subject_id
            JOIN exam_boards eb ON eb.id = s.exam_board_id
-           WHERE ss.student_id = :studentId AND ss.status = '${ENROLLMENT_STATUS.APPROVED}' AND s.is_active = true
+           WHERE ss.student_id = :studentId AND ss.status = :approvedStatus AND s.is_active = true
            ORDER BY s.name`,
-          { replacements: { studentId }, type: QueryTypes.SELECT }
+          { replacements: { studentId, approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.SELECT }
         );
         result = ownSubjects;
       } catch (e) {
@@ -417,12 +417,12 @@ router.post('/subjects', protect, async (req, res) => {
     // Table is guaranteed to exist via run_enrollment_approval_migration.js
     await sequelize.query(
       `INSERT INTO student_subjects (student_id, subject_id, is_active, status, enrollment_source)
-       VALUES (:studentId, :subjectId, true, '${ENROLLMENT_STATUS.APPROVED}', :enrollmentSource)
+       VALUES (:studentId, :subjectId, true, :approvedStatus, :enrollmentSource)
        ON CONFLICT (student_id, subject_id) DO UPDATE
          SET is_active         = true,
-             status            = '${ENROLLMENT_STATUS.APPROVED}',
+             status            = :approvedStatus,
              enrollment_source = COALESCE(student_subjects.enrollment_source, :enrollmentSource)`,
-      { replacements: { studentId, subjectId: parseInt(subject_id), enrollmentSource: ENROLLMENT_SOURCE.EXPLICIT }, type: QueryTypes.INSERT }
+      { replacements: { studentId, subjectId: parseInt(subject_id), enrollmentSource: ENROLLMENT_SOURCE.EXPLICIT, approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.INSERT }
     );
 
     // Also ensure the board is in student_exam_types
@@ -433,9 +433,9 @@ router.post('/subjects', protect, async (req, res) => {
     if (boardRows[0]?.exam_board_id) {
       await sequelize.query(
         `INSERT INTO student_exam_types (student_id, exam_board_id, is_active, status)
-         VALUES (:studentId, :boardId, true, '${ENROLLMENT_STATUS.APPROVED}')
-         ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active = true, status = '${ENROLLMENT_STATUS.APPROVED}'`,
-        { replacements: { studentId, boardId: boardRows[0].exam_board_id }, type: QueryTypes.INSERT }
+         VALUES (:studentId, :boardId, true, :approvedStatus)
+         ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active = true, status = :approvedStatus`,
+        { replacements: { studentId, boardId: boardRows[0].exam_board_id, approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.INSERT }
       );
     }
 
@@ -456,9 +456,9 @@ router.delete('/subjects/:subjectId', protect, async (req, res) => {
   }
   try {
     await sequelize.query(
-      `UPDATE student_subjects SET is_active = false, status = '${ENROLLMENT_STATUS.DEACTIVATED}'
+      `UPDATE student_subjects SET is_active = false, status = :deactivatedStatus
        WHERE student_id = :studentId AND subject_id = :subjectId`,
-      { replacements: { studentId, subjectId }, type: QueryTypes.UPDATE }
+      { replacements: { studentId, subjectId, deactivatedStatus: ENROLLMENT_STATUS.DEACTIVATED }, type: QueryTypes.UPDATE }
     );
     return res.status(200).json({ success: true, message: 'Subject removed' });
   } catch (err) {
