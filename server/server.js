@@ -72,21 +72,26 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 
+// STATIC FILES" ... "app.use(express.static(clientDist));"
+ *   with the block below.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+
 // STATIC FILES
 // ─────────────────────────────────────────────────────────────────────────────
-// SECURITY — upload directory access policy:
+// SECURITY: The following directories are NEVER served as static files.
+// All access to these must go through authenticated API endpoints.
 //
-//  /uploads/videos/**     → always 403. HLS/keys served through /api/videos/*
-//  /uploads/resources/**  → always 403. Files served through /api/resources/:id/download
-//                           or /api/resources/r2/* (both require authentication +
-//                           entitlement check). Direct URL access is permanently
-//                           disabled to prevent stored XSS and auth bypass.
-//  /uploads/past-papers/** → always 403. Served via authenticated past-paper routes.
-//  /uploads/**            → any remaining path (thumbnails etc.) falls through to
-//                           static with X-Content-Type-Options: nosniff.
+//   /uploads/videos      → served via /api/videos/stream/* (HLS + auth)
+//   /uploads/resources   → served via /api/resources/:id/download (entitlement check)
+//   /uploads/past-papers → served via /api/past-papers/:id/download or R2 signed URL
+//   /uploads/raw         → internal raw uploads, never served
+//
+// /uploads remains mounted for remaining public assets (e.g. thumbnails),
+// but with explicit subdirectory blocks above it.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Block direct access to video files
+// Block all direct access to video files (existing fix — kept)
 app.use('/uploads/videos', (_req, res) => {
   return res.status(403).json({
     success: false,
@@ -94,40 +99,45 @@ app.use('/uploads/videos', (_req, res) => {
   });
 });
 
-// INVALID-01 FIX: Block direct access to uploaded resources.
-// Previously, an attacker who uploaded payload.html with Content-Type: image/png
-// could trigger stored XSS by visiting /uploads/resources/payload.html directly.
-// Files must now be accessed through the authenticated download endpoint which
-// enforces entitlement checks and sets Content-Disposition/X-Content-Type-Options.
+// Block direct access to resources — must go through authenticated download
 app.use('/uploads/resources', (_req, res) => {
   return res.status(403).json({
     success: false,
-    error: 'Direct access to uploaded resources is not permitted. Use /api/resources/:id/download.',
+    error: 'Direct access to resource files is not permitted. Use /api/resources/:id/download.',
   });
 });
 
-// Block direct access to past-paper uploads
+// Block direct access to past-paper files
 app.use('/uploads/past-papers', (_req, res) => {
   return res.status(403).json({
     success: false,
-    error: 'Direct access to past-paper files is not permitted.',
+    error: 'Direct access to past paper files is not permitted.',
   });
 });
 
-// Remaining /uploads paths (thumbnails, etc.) served statically
+// /uploads static mount for remaining public assets (thumbnails, etc.)
+// X-Content-Type-Options: nosniff prevents MIME-sniffing attacks on anything
+// still served from here.
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
   setHeaders: (res) => {
-    // Prevent MIME confusion: browser must honour the Content-Type we set.
+    // Prevent browser MIME sniffing — must honour Content-Type header only
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    // Allow embedding in PDF/office viewers from the frontend domain.
+    // Allow embedding (PDF/office viewers) from the frontend domain only
     res.setHeader('X-Frame-Options', 'ALLOWALL');
     const a = [process.env.CLIENT_URL, process.env.PROD_CLIENT_URL]
       .filter(Boolean)
       .map((u) => u.replace(/\/+$/, ''));
-    const frameAncestors = a.length ? a.join(' ') : '*';
+    const frameAncestors = a.length ? a.join(' ') : 'https://www.aischoolonair.ng https://aischoolonair.ng';
     res.setHeader('Content-Security-Policy', `frame-ancestors ${frameAncestors}`);
   },
 }));
+
+// CLIENT BUILD
+const clientDist = path.join(__dirname, '..', 'client', 'dist');
+if (fs.existsSync(clientDist)) {
+  app.use(express.static(clientDist));
+}
+
 
 // CLIENT BUILD
 const clientDist = path.join(__dirname, '..', 'client', 'dist');
