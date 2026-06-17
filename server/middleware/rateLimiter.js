@@ -74,4 +74,25 @@ const streamingLimiter = rateLimit({
   },
 });
 
-module.exports = { globalLimiter, aiLimiter, analyticsLimiter, authLimiter, streamingLimiter };
+// ── Admin-action limiter (R-02) ───────────────────────────────────────────────
+// Applied to write operations on admin routes: create-teacher, account
+// creation, role changes.  More permissive than authLimiter (an admin
+// legitimately batches teacher creation) but still prevents abuse of a
+// compromised or malicious admin token.
+// Keys on the authenticated user ID so different admins have independent
+// budgets; falls back to IP for any unauthenticated slip-through (should not
+// happen given protect middleware runs first, but defensive).
+const adminActionLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,   // 15 minutes
+  max: 50,                     // 50 write actions per 15 min per admin user
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    if (req.user && req.user.id) return `admin:${req.user.id}`;
+    const ip = (req.ip || '').replace(/^::ffff:/, '').replace(/%.*$/, '');
+    return ip || 'unknown';
+  },
+  message: { success: false, error: 'Too many admin actions, please slow down and try again.' },
+});
+
+module.exports = { globalLimiter, aiLimiter, analyticsLimiter, authLimiter, streamingLimiter, adminActionLimiter };

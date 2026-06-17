@@ -17,6 +17,11 @@ const {
 } = require('../controllers/auth');
 const { protect } = require('../middleware/auth');
 const { authLimiter } = require('../middleware/rateLimiter');
+const {
+  normalisePhone,
+  validatePhone,
+  normaliseName,
+} = require('../utils/registrationValidators');
 
 let sendWelcomeEmail = () => Promise.resolve();
 try {
@@ -29,12 +34,14 @@ const registerWithEmail = async (req, res, next) => {
   const originalJson = res.json.bind(res);
 
   res.json = function (body) {
-    if (body?.success && body?.data?.user?.email) {
+    // register() returns { success, token, user } (not body.data.user)
+    const userObj = body?.user || body?.data?.user;
+    if (body?.success && userObj?.email) {
       setImmediate(() =>
         sendWelcomeEmail({
-          email:      body.data.user.email,
-          first_name: body.data.user.firstName || body.data.user.first_name || '',
-          role:       body.data.user.role || 'student',
+          email:      userObj.email,
+          first_name: userObj.firstName || userObj.first_name || '',
+          role:       userObj.role || 'student',
         }).catch(() => {})
       );
     }
@@ -109,10 +116,26 @@ router.put('/notifications', protect, async (req, res) => {
 });
 
 // PATCH /api/auth/profile — update name, phone, country
+// R-01: phone is normalised to E.164 before storing.
+// R-04: name fields are trimmed/collapsed.
 router.patch('/profile', protect, async (req, res) => {
   const { QueryTypes } = require('sequelize');
   const db = require('../config/database');
-  const { first_name, last_name, phone, country } = req.body;
+
+  const first_name = normaliseName(req.body.first_name || '');
+  const last_name  = normaliseName(req.body.last_name  || '');
+  const country    = (req.body.country || '').trim() || null;
+
+  // Phone: validate only if provided; a missing phone leaves the existing DB value intact
+  let phone = null;
+  if (req.body.phone) {
+    const phoneCheck = validatePhone(req.body.phone);
+    if (!phoneCheck.valid) {
+      return res.status(400).json({ success: false, error: phoneCheck.error });
+    }
+    phone = normalisePhone(req.body.phone);               // R-01: E.164
+  }
+
   try {
     await db.query(
       `UPDATE users SET
@@ -122,11 +145,21 @@ router.patch('/profile', protect, async (req, res) => {
          country    = COALESCE(:country, country),
          updated_at = NOW()
        WHERE id = :id`,
-      { replacements: { first_name: first_name||'', last_name: last_name||'', phone: phone||null, country: country||null, id: req.user.id }, type: QueryTypes.UPDATE }
+      {
+        replacements: {
+          first_name: first_name || '',
+          last_name:  last_name  || '',
+          phone,
+          country,
+          id: req.user.id,
+        },
+        type: QueryTypes.UPDATE,
+      }
     );
     return res.json({ success: true, message: 'Profile updated' });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    console.error('[PATCH /profile]', err.message);
+    return res.status(500).json({ success: false, error: 'Failed to update profile' });
   }
 });
 
