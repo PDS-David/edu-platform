@@ -1,24 +1,44 @@
 'use strict';
 
-const bcrypt     = require('bcryptjs');
-const crypto     = require('crypto');
-const { QueryTypes } = require('sequelize');
-const db         = require('../config/database');
-const { generateToken } = require('../utils/jwt');
+/**
+ * controllers/auth.js
+ *
+ * AUTH-001  Account lockout (failed_login_count, locked_until)
+ * AUTH-002  Server-side token revocation
+ * AUTH-003  Remember Me — session vs. persistent tokens
+ * AUTH-004  HttpOnly cookie transport (cookies set here; see authRoutes.js)
+ * AUTH-005  Token rotation handled by tokenService; inactivity in middleware
+ * AUTH-006  Audit logging via authAuditService
+ */
 
+const bcrypt      = require('bcryptjs');
+const crypto      = require('crypto');
+const { QueryTypes } = require('sequelize');
+const db          = require('../config/database');
+const tokenService = require('../services/tokenService');
+const audit        = require('../services/authAuditService');
+
+// ─── Configurable lockout policy ─────────────────────────────────────────────
+const MAX_FAILED_ATTEMPTS = parseInt(process.env.AUTH_MAX_FAILED_ATTEMPTS, 10) || 5;
+const LOCKOUT_MINUTES     = parseInt(process.env.AUTH_LOCKOUT_MINUTES,     10) || 15;
+
+// ─── Email service (optional) ─────────────────────────────────────────────────
 let sendPasswordResetEmail = () => Promise.resolve();
 let sendVerificationEmail  = () => Promise.resolve();
 try {
-  const emailService        = require('../services/emailService');
-  sendPasswordResetEmail    = emailService.sendPasswordResetEmail  || sendPasswordResetEmail;
-  sendVerificationEmail     = emailService.sendVerificationEmail   || sendVerificationEmail;
+  const emailService      = require('../services/emailService');
+  sendPasswordResetEmail  = emailService.sendPasswordResetEmail  || sendPasswordResetEmail;
+  sendVerificationEmail   = emailService.sendVerificationEmail   || sendVerificationEmail;
 } catch {}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function safeUser(row) {
   const {
     password,
+    failed_login_count, locked_until,
     reset_password_token, reset_password_expires,
-    verification_token,   verification_token_expires,
+    verification_token,  verification_token_expires,
     ...safe
   } = row;
   return safe;
@@ -28,90 +48,92 @@ function randomToken() {
   return crypto.randomBytes(32).toString('hex');
 }
 
-// ─────────────────────────────────────────────────────────────
+function clientMeta(req) {
+  return {
+    ipAddress: req.ip || req.connection?.remoteAddress || null,
+    userAgent: req.headers?.['user-agent'] || null,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // REGISTER
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 exports.register = async (req, res, next) => {
   try {
     const { email, password, role = 'student' } = req.body;
-
     const first_name = (req.body.first_name || req.body.firstName || '').trim();
     const last_name  = (req.body.last_name  || req.body.lastName  || first_name).trim();
-
     const pendingExamBoards = req.body.pendingExamBoards || [];
 
     if (!email || !password) {
       return res.status(400).json({ success: false, error: 'Email and password are required' });
     }
-
     if (password.length < 8) {
       return res.status(400).json({ success: false, error: 'Password must be at least 8 characters' });
     }
-
-    // Self-registration is student-only. Teachers are created via POST /api/admin/create-teacher.
-    const assignedRole = 'student';
 
     const existing = await db.query(
       `SELECT id FROM users WHERE email = :email LIMIT 1`,
       { replacements: { email: email.toLowerCase().trim() }, type: QueryTypes.SELECT }
     );
-
     if (existing.length > 0) {
       return res.status(409).json({ success: false, error: 'An account with that email already exists' });
     }
 
     const salt = await bcrypt.genSalt(12);
     const hashedPassword = await bcrypt.hash(password, salt);
-
     const verificationToken = randomToken();
     const verificationTokenExpires = new Date(Date.now() + 86400000);
-
     const pendingIds = Array.isArray(pendingExamBoards) ? pendingExamBoards : [];
 
     const rows = await db.query(
       `INSERT INTO users
-       (email, password, first_name, last_name, role,
-        verification_token, verification_token_expires,
-        is_active, is_verified, subscription_status,
-        subscription_expires_at,
-        pending_exam_board_ids,
-        created_at, updated_at)
+         (email, password, first_name, last_name, role,
+          verification_token, verification_token_expires,
+          is_active, is_verified, subscription_status,
+          subscription_expires_at, pending_exam_board_ids,
+          created_at, updated_at)
        VALUES
-       (:email, :password, :first_name, :last_name, :role,
-        :verificationToken, :verificationTokenExpires,
-        true, false, 'free_trial',
-        NOW() + INTERVAL '14 days',
-        :pendingIds::integer[],
-        NOW(), NOW())
+         (:email, :password, :first_name, :last_name, 'student',
+          :verificationToken, :verificationTokenExpires,
+          true, false, 'free_trial',
+          NOW() + INTERVAL '14 days',
+          :pendingIds::integer[],
+          NOW(), NOW())
        RETURNING
          id, email, first_name, last_name, role,
          is_active, is_verified, subscription_status,
          onboarding_complete, xp_points, study_streak_days,
-         pending_exam_board_ids,
-         created_at`,
+         pending_exam_board_ids, created_at`,
       {
         replacements: {
           email: email.toLowerCase().trim(),
           password: hashedPassword,
-          first_name,
-          last_name,
-          role: assignedRole,
-          verificationToken,
-          verificationTokenExpires,
-          pendingIds: pendingIds.length ? `{${pendingIds.join(',')}}` : '{}'
+          first_name, last_name,
+          verificationToken, verificationTokenExpires,
+          pendingIds: pendingIds.length ? `{${pendingIds.join(',')}}` : '{}',
         },
-        type: QueryTypes.SELECT
+        type: QueryTypes.SELECT,
       }
     );
 
     const user = safeUser(rows[0]);
-    const token = generateToken({ id: user.id, role: user.role });
+    const { ipAddress, userAgent } = clientMeta(req);
 
-    return res.status(201).json({
-      success: true,
-      token,
-      user
+    // AUTH-003: no remember-me on register — short-lived default
+    const { accessToken, refreshToken, expiresIn } = await tokenService.issueTokenPair({
+      userId: user.id, role: user.role,
+      rememberMe: false, ipAddress, userAgent,
+      deviceHint: 'register',
     });
+
+    // AUTH-006: audit
+    setImmediate(() => audit.register({ userId: user.id, email: user.email, ipAddress, userAgent }));
+
+    // AUTH-004: set HttpOnly cookie
+    setRefreshCookie(res, refreshToken, false);
+
+    return res.status(201).json({ success: true, token: accessToken, user });
 
   } catch (err) {
     console.error('[register]', err.message);
@@ -119,12 +141,19 @@ exports.register = async (req, res, next) => {
   }
 };
 
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 // LOGIN
-// ─────────────────────────────────────────────────────────────
+// AUTH-001  Lockout logic
+// AUTH-002  Token registered server-side
+// AUTH-003  rememberMe drives TTL
+// AUTH-004  Refresh token in HttpOnly cookie
+// AUTH-006  Audit
+// ─────────────────────────────────────────────────────────────────────────────
 exports.login = async (req, res, next) => {
+  const { ipAddress, userAgent } = clientMeta(req);
+
   try {
-    const { email, password } = req.body;
+    const { email, password, rememberMe = false } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ success: false, error: 'Email and password are required' });
@@ -136,14 +165,17 @@ exports.login = async (req, res, next) => {
          is_active, is_verified, subscription_status,
          subscription_expires_at, onboarding_complete,
          xp_points, study_streak_days, last_login,
-         avatar_url, daily_goal
+         avatar_url, daily_goal,
+         failed_login_count, locked_until
        FROM users
        WHERE email = :email
        LIMIT 1`,
       { replacements: { email: email.toLowerCase().trim() }, type: QueryTypes.SELECT }
     );
 
+    // Unknown email — return generic error (prevents email enumeration)
     if (rows.length === 0) {
+      setImmediate(() => audit.loginFailure({ email, ipAddress, userAgent, metadata: { reason: 'unknown_email' } }));
       return res.status(401).json({ success: false, error: 'Invalid email or password' });
     }
 
@@ -153,28 +185,92 @@ exports.login = async (req, res, next) => {
       return res.status(403).json({ success: false, error: 'Account is deactivated' });
     }
 
+    // AUTH-001: check lockout
+    if (userRow.locked_until && new Date(userRow.locked_until) > new Date()) {
+      const minutesLeft = Math.ceil(
+        (new Date(userRow.locked_until).getTime() - Date.now()) / 60000
+      );
+      setImmediate(() => audit.loginFailure({
+        userId: userRow.id, email, ipAddress, userAgent,
+        metadata: { reason: 'account_locked', locked_until: userRow.locked_until },
+      }));
+      return res.status(423).json({
+        success: false,
+        error: `Account is temporarily locked. Try again in ${minutesLeft} minute${minutesLeft !== 1 ? 's' : ''}.`,
+      });
+    }
+
     const match = await bcrypt.compare(password, userRow.password);
 
     if (!match) {
+      // AUTH-001: increment failure counter, possibly lock
+      const newCount = (userRow.failed_login_count || 0) + 1;
+      const shouldLock = newCount >= MAX_FAILED_ATTEMPTS;
+      const lockedUntil = shouldLock
+        ? new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000)
+        : null;
+
+      await db.query(
+        `UPDATE users
+         SET failed_login_count = :count,
+             locked_until       = :lockedUntil,
+             updated_at         = NOW()
+         WHERE id = :id`,
+        { replacements: { count: newCount, lockedUntil, id: userRow.id }, type: QueryTypes.UPDATE }
+      );
+
+      if (shouldLock) {
+        setImmediate(() => audit.lockout({
+          userId: userRow.id, email, ipAddress, userAgent,
+          metadata: { attempts: newCount, locked_until: lockedUntil },
+        }));
+        return res.status(423).json({
+          success: false,
+          error: `Account locked after ${MAX_FAILED_ATTEMPTS} failed attempts. Try again in ${LOCKOUT_MINUTES} minutes.`,
+        });
+      }
+
+      setImmediate(() => audit.loginFailure({
+        userId: userRow.id, email, ipAddress, userAgent,
+        metadata: { reason: 'wrong_password', attempt: newCount },
+      }));
       return res.status(401).json({ success: false, error: 'Invalid email or password' });
     }
 
+    // Successful auth — clear lockout counters
     setImmediate(() =>
       db.query(
-        `UPDATE users SET last_login = NOW(), updated_at = NOW() WHERE id = :id`,
+        `UPDATE users
+         SET last_login         = NOW(),
+             failed_login_count = 0,
+             locked_until       = NULL,
+             updated_at         = NOW()
+         WHERE id = :id`,
         { replacements: { id: userRow.id }, type: QueryTypes.UPDATE }
       ).catch(() => {})
     );
 
-    const token = generateToken({ id: userRow.id, role: userRow.role });
+    // AUTH-002 + AUTH-003 + AUTH-005: issue server-registered token pair
+    const { accessToken, refreshToken, expiresIn } = await tokenService.issueTokenPair({
+      userId:     userRow.id,
+      role:       userRow.role,
+      rememberMe: !!rememberMe,
+      ipAddress,
+      userAgent,
+      deviceHint: req.headers?.['x-device-hint'] || 'web',
+    });
+
+    // AUTH-006
+    setImmediate(() => audit.loginSuccess({
+      userId: userRow.id, email, ipAddress, userAgent,
+      metadata: { rememberMe: !!rememberMe },
+    }));
+
+    // AUTH-004: refresh token in HttpOnly Secure cookie
+    setRefreshCookie(res, refreshToken, !!rememberMe);
 
     const user = safeUser(userRow);
-
-    return res.status(200).json({
-      success: true,
-      token,
-      user
-    });
+    return res.status(200).json({ success: true, token: accessToken, user });
 
   } catch (err) {
     console.error('[login]', err.message);
@@ -182,9 +278,91 @@ exports.login = async (req, res, next) => {
   }
 };
 
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// LOGOUT  (AUTH-002 single-session)
+// ─────────────────────────────────────────────────────────────────────────────
+exports.logout = async (req, res, next) => {
+  const { ipAddress, userAgent } = clientMeta(req);
+  try {
+    const authHeader = req.headers?.authorization || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+
+    if (token) await tokenService.revokeToken(token, 'logout');
+
+    // Also clear the refresh cookie
+    res.clearCookie('refresh_token', { httpOnly: true, secure: true, sameSite: 'Strict', path: '/api/auth' });
+
+    setImmediate(() => audit.logout({
+      userId: req.user?.id, ipAddress, userAgent,
+      metadata: { type: 'single_session' },
+    }));
+
+    return res.status(200).json({ success: true, message: 'Logged out successfully' });
+  } catch (err) {
+    console.error('[logout]', err.message);
+    next(err);
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LOGOUT ALL DEVICES  (AUTH-002 all-device)
+// ─────────────────────────────────────────────────────────────────────────────
+exports.logoutAll = async (req, res, next) => {
+  const { ipAddress, userAgent } = clientMeta(req);
+  try {
+    await tokenService.revokeAllForUser(req.user.id, 'all_devices');
+
+    res.clearCookie('refresh_token', { httpOnly: true, secure: true, sameSite: 'Strict', path: '/api/auth' });
+
+    setImmediate(() => audit.logoutAllDevices({
+      userId: req.user.id, ipAddress, userAgent,
+      metadata: { type: 'all_devices' },
+    }));
+
+    return res.status(200).json({ success: true, message: 'Logged out from all devices' });
+  } catch (err) {
+    console.error('[logoutAll]', err.message);
+    next(err);
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REFRESH TOKEN  (AUTH-005 rotation)
+// ─────────────────────────────────────────────────────────────────────────────
+exports.refreshToken = async (req, res, next) => {
+  const { ipAddress, userAgent } = clientMeta(req);
+  try {
+    // Accept from HttpOnly cookie (preferred) or body (mobile fallback)
+    const rawRefreshToken = req.cookies?.refresh_token || req.body?.refreshToken;
+
+    if (!rawRefreshToken) {
+      return res.status(401).json({ success: false, error: 'No refresh token provided' });
+    }
+
+    const { accessToken, refreshToken: newRefresh, expiresIn } =
+      await tokenService.rotateRefreshToken({ rawRefreshToken, ipAddress, userAgent });
+
+    // Rotate cookie too
+    setRefreshCookie(res, newRefresh, false);  // remember-me handled inside tokenService
+
+    setImmediate(() => audit.tokenRefresh({ ipAddress, userAgent, metadata: {} }));
+
+    return res.status(200).json({ success: true, token: accessToken, expiresIn });
+
+  } catch (err) {
+    const code = err.code || 'REFRESH_ERROR';
+    if (['REFRESH_INVALID', 'REFRESH_EXPIRED', 'REFRESH_REUSED'].includes(code)) {
+      res.clearCookie('refresh_token', { httpOnly: true, secure: true, sameSite: 'Strict', path: '/api/auth' });
+      return res.status(401).json({ success: false, error: err.message });
+    }
+    console.error('[refreshToken]', err.message);
+    next(err);
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // GET ME
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 exports.getMe = async (req, res, next) => {
   try {
     const rows = await db.query(
@@ -196,26 +374,19 @@ exports.getMe = async (req, res, next) => {
        FROM users WHERE id = :id LIMIT 1`,
       { replacements: { id: req.user.id }, type: QueryTypes.SELECT }
     );
-
-    if (!rows.length) {
-      return res.status(404).json({ success: false, error: 'User not found' });
-    }
-
-    return res.status(200).json({
-      success: true,
-      user: safeUser(rows[0])
-    });
-
+    if (!rows.length) return res.status(404).json({ success: false, error: 'User not found' });
+    return res.status(200).json({ success: true, user: safeUser(rows[0]) });
   } catch (err) {
     console.error('[getMe]', err.message);
     next(err);
   }
 };
 
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 // UPDATE PASSWORD
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 exports.updatePassword = async (req, res, next) => {
+  const { ipAddress, userAgent } = clientMeta(req);
   try {
     const { current_password, new_password } = req.body;
     if (!current_password || !new_password) {
@@ -239,17 +410,25 @@ exports.updatePassword = async (req, res, next) => {
       { replacements: { password: hashed, id: req.user.id }, type: QueryTypes.UPDATE }
     );
 
-    return res.status(200).json({ success: true, message: 'Password updated' });
+    // Revoke all other sessions on password change
+    await tokenService.revokeAllForUser(req.user.id, 'password_change');
+
+    setImmediate(() => audit.passwordChange({
+      userId: req.user.id, ipAddress, userAgent,
+    }));
+
+    return res.status(200).json({ success: true, message: 'Password updated. Please log in again.' });
   } catch (err) {
     console.error('[updatePassword]', err.message);
     next(err);
   }
 };
 
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 // FORGOT PASSWORD
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 exports.forgotPassword = async (req, res, next) => {
+  const { ipAddress, userAgent } = clientMeta(req);
   try {
     const { email } = req.body;
     if (!email) return res.status(400).json({ success: false, error: 'Email is required' });
@@ -259,20 +438,22 @@ exports.forgotPassword = async (req, res, next) => {
       { replacements: { email }, type: QueryTypes.SELECT }
     );
 
-    // Always return 200 to avoid email enumeration
-    if (!rows.length) return res.status(200).json({ success: true, message: 'If that email exists, a reset link has been sent.' });
+    if (!rows.length) {
+      return res.status(200).json({ success: true, message: 'If that email exists, a reset link has been sent.' });
+    }
 
     const token   = crypto.randomBytes(32).toString('hex');
-    const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    const expires = new Date(Date.now() + 60 * 60 * 1000);
 
     await db.query(
       `UPDATE users SET reset_password_token = :token, reset_password_expires = :expires WHERE id = :id`,
       { replacements: { token, expires, id: rows[0].id }, type: QueryTypes.UPDATE }
     );
 
-    // Email sending is handled by the route wrapper (registerWithEmail pattern)
-    // NOTE: resetToken is intentionally NOT returned in the response — it is
-    // delivered only via the password-reset email so that email access is required.
+    setImmediate(() => audit.passwordResetRequest({
+      userId: rows[0].id, email, ipAddress, userAgent,
+    }));
+
     return res.status(200).json({ success: true, message: 'If that email exists, a reset link has been sent.' });
   } catch (err) {
     console.error('[forgotPassword]', err.message);
@@ -280,10 +461,11 @@ exports.forgotPassword = async (req, res, next) => {
   }
 };
 
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 // RESET PASSWORD
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 exports.resetPassword = async (req, res, next) => {
+  const { ipAddress, userAgent } = clientMeta(req);
   try {
     const { token, new_password } = req.body;
     if (!token || !new_password) {
@@ -300,21 +482,36 @@ exports.resetPassword = async (req, res, next) => {
     const hashed = await bcrypt.hash(new_password, salt);
 
     await db.query(
-      `UPDATE users SET password = :password, reset_password_token = NULL, reset_password_expires = NULL, updated_at = NOW() WHERE id = :id`,
+      `UPDATE users
+       SET password = :password,
+           reset_password_token = NULL,
+           reset_password_expires = NULL,
+           failed_login_count = 0,
+           locked_until = NULL,
+           updated_at = NOW()
+       WHERE id = :id`,
       { replacements: { password: hashed, id: rows[0].id }, type: QueryTypes.UPDATE }
     );
 
-    return res.status(200).json({ success: true, message: 'Password reset successful' });
+    // Revoke all active sessions after reset
+    await tokenService.revokeAllForUser(rows[0].id, 'password_reset');
+
+    setImmediate(() => audit.passwordResetSuccess({
+      userId: rows[0].id, ipAddress, userAgent,
+    }));
+
+    return res.status(200).json({ success: true, message: 'Password reset successful. Please log in again.' });
   } catch (err) {
     console.error('[resetPassword]', err.message);
     next(err);
   }
 };
 
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 // VERIFY EMAIL
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 exports.verifyEmail = async (req, res, next) => {
+  const { ipAddress, userAgent } = clientMeta(req);
   try {
     const { token } = req.body;
     if (!token) return res.status(400).json({ success: false, error: 'Verification token is required' });
@@ -330,9 +527,28 @@ exports.verifyEmail = async (req, res, next) => {
       { replacements: { id: rows[0].id }, type: QueryTypes.UPDATE }
     );
 
+    setImmediate(() => audit.emailVerified({ userId: rows[0].id, ipAddress, userAgent }));
+
     return res.status(200).json({ success: true, message: 'Email verified successfully' });
   } catch (err) {
     console.error('[verifyEmail]', err.message);
     next(err);
   }
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helper — set refresh token HttpOnly cookie  (AUTH-004)
+// ─────────────────────────────────────────────────────────────────────────────
+function setRefreshCookie(res, token, rememberMe) {
+  const maxAge = rememberMe
+    ? 30 * 24 * 60 * 60 * 1000   // 30 days  (ms)
+    : undefined;                   // session cookie (no Max-Age)
+
+  res.cookie('refresh_token', token, {
+    httpOnly: true,
+    secure:   process.env.NODE_ENV === 'production',
+    sameSite: 'Strict',
+    path:     '/api/auth',   // restrict cookie to auth endpoints only
+    ...(maxAge ? { maxAge } : {}),
+  });
+}
