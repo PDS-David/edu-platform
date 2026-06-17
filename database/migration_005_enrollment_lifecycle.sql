@@ -78,11 +78,11 @@ CREATE INDEX IF NOT EXISTS idx_enrollments_user_id       ON enrollments(user_id)
 
 -- 7. Audit log table for enrollment events
 CREATE TABLE IF NOT EXISTS enrollment_audit_log (
-  id          BIGSERIAL    PRIMARY KEY,
-  enrollment_id INTEGER    REFERENCES enrollments(id) ON DELETE SET NULL,
-  student_id  UUID         REFERENCES users(id)       ON DELETE SET NULL,
-  course_id   INTEGER,
-  actor_id    UUID         REFERENCES users(id)       ON DELETE SET NULL,
+  id            BIGSERIAL   PRIMARY KEY,
+  enrollment_id UUID        REFERENCES enrollments(id) ON DELETE SET NULL,
+  student_id    UUID        REFERENCES users(id)        ON DELETE SET NULL,
+  course_id     UUID,
+  actor_id      UUID        REFERENCES users(id)        ON DELETE SET NULL,
   event       VARCHAR(60)  NOT NULL,
   from_status VARCHAR(20),
   to_status   VARCHAR(20),
