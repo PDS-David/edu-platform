@@ -74,26 +74,52 @@ app.options('*', cors(corsOptions));
 
 // STATIC FILES
 // ─────────────────────────────────────────────────────────────────────────────
-// SECURITY: /uploads/videos/hls/** and /uploads/videos/raw/** are NEVER served
-// as static files. HLS segments and AES keys are now stored in hls_secure/ and
-// keys_secure/ (outside this tree) and delivered ONLY through authenticated API
-// routes in /api/videos/stream/* and /api/videos/key/*.
+// SECURITY — upload directory access policy:
 //
-// The /uploads static mount still serves other assets (thumbnails, resources,
-// PDFs) but a guard middleware blocks any attempt to reach the video directories.
+//  /uploads/videos/**     → always 403. HLS/keys served through /api/videos/*
+//  /uploads/resources/**  → always 403. Files served through /api/resources/:id/download
+//                           or /api/resources/r2/* (both require authentication +
+//                           entitlement check). Direct URL access is permanently
+//                           disabled to prevent stored XSS and auth bypass.
+//  /uploads/past-papers/** → always 403. Served via authenticated past-paper routes.
+//  /uploads/**            → any remaining path (thumbnails etc.) falls through to
+//                           static with X-Content-Type-Options: nosniff.
 // ─────────────────────────────────────────────────────────────────────────────
+
+// Block direct access to video files
 app.use('/uploads/videos', (_req, res) => {
-  // Block all direct access to the video sub-directory, including any legacy
-  // paths that might still exist before migration of hls_secure/.
   return res.status(403).json({
     success: false,
     error: 'Direct access to video files is not permitted. Use /api/videos/stream/*.',
   });
 });
 
+// INVALID-01 FIX: Block direct access to uploaded resources.
+// Previously, an attacker who uploaded payload.html with Content-Type: image/png
+// could trigger stored XSS by visiting /uploads/resources/payload.html directly.
+// Files must now be accessed through the authenticated download endpoint which
+// enforces entitlement checks and sets Content-Disposition/X-Content-Type-Options.
+app.use('/uploads/resources', (_req, res) => {
+  return res.status(403).json({
+    success: false,
+    error: 'Direct access to uploaded resources is not permitted. Use /api/resources/:id/download.',
+  });
+});
+
+// Block direct access to past-paper uploads
+app.use('/uploads/past-papers', (_req, res) => {
+  return res.status(403).json({
+    success: false,
+    error: 'Direct access to past-paper files is not permitted.',
+  });
+});
+
+// Remaining /uploads paths (thumbnails, etc.) served statically
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
   setHeaders: (res) => {
-    // Allow embedding file previews (PDF/office viewers) from the frontend domain.
+    // Prevent MIME confusion: browser must honour the Content-Type we set.
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    // Allow embedding in PDF/office viewers from the frontend domain.
     res.setHeader('X-Frame-Options', 'ALLOWALL');
     const a = [process.env.CLIENT_URL, process.env.PROD_CLIENT_URL]
       .filter(Boolean)

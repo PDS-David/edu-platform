@@ -2,6 +2,12 @@
 // GET  /api/past-papers          — list with filters (public)
 // POST /api/past-papers          — upload (teacher/admin, multipart)
 // DELETE /api/past-papers/:id    — admin only
+//
+// SECURITY REMEDIATION 2026-06-17
+//  INVALID-01: Replaced client-MIME-only check with four-layer validation via
+//              validateBuffer (extension allowlist + declared MIME + magic bytes
+//              + PDF structure). Filenames are now sanitised before storage.
+//  FUNC-01:    multer errors now return proper 400/413, not generic 500.
 
 const express  = require('express');
 const router   = express.Router();
@@ -13,10 +19,17 @@ const sequelize = require('../config/database');
 const { protect } = require('../middleware/auth');
 const r2 = require('../utils/r2Storage');
 const pastPaperScraper = require('../services/pastPaperScraper');
+const {
+  validateBuffer,
+  multerFileFilter,
+  multerErrorHandler,
+  sanitiseFilename,
+  logUploadAttempt,
+} = require('../utils/fileValidation');
 
 // ── Multer ───────────────────────────────────────────────────────────────────
 // When R2 is configured, hold the file in memory and push to object storage.
-// Otherwise persist to local disk (Render ephemeral) as a fallback.
+// Otherwise persist to local disk (Hetzner persistent volume) as a fallback.
 const diskStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     const dir = path.join(__dirname, '../uploads/past-papers');
@@ -24,17 +37,18 @@ const diskStorage = multer.diskStorage({
     cb(null, dir);
   },
   filename: (req, file, cb) => {
-    const safe = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
-    cb(null, `${Date.now()}_${safe}`);
+    // UUID-based name: original filename never touches the filesystem.
+    const { secureStorageName } = require('../utils/fileValidation');
+    cb(null, secureStorageName('pdf'));
   },
 });
+
+// Pre-flight: extension + declared-MIME check. Full validation (magic bytes +
+// PDF structure) runs inside the route handler after the buffer is available.
 const upload = multer({
   storage: r2.isR2Enabled() ? multer.memoryStorage() : diskStorage,
   limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'application/pdf') cb(null, true);
-    else cb(new Error('Only PDF files are allowed'));
-  },
+  fileFilter: multerFileFilter(['pdf']),
 });
 
 const teacherOrAdmin = (req, res, next) => {
@@ -91,55 +105,91 @@ router.get('/', async (req, res) => {
 });
 
 // ── POST /api/past-papers ─────────────────────────────────────────────────────
-router.post('/', protect, teacherOrAdmin, upload.single('file'), async (req, res) => {
-  if (!req.file) return res.status(400).json({ success: false, error: 'PDF file is required' });
+router.post(
+  '/',
+  protect,
+  teacherOrAdmin,
+  // Wrap multer in callback style so multer errors return 400/413, not 500.
+  (req, res, next) => upload.single('file')(req, res, (err) => {
+    if (err) return multerErrorHandler(err, req, res, next);
+    next();
+  }),
+  async (req, res) => {
+    if (!req.file) return res.status(400).json({ success: false, error: 'PDF file is required' });
 
-  const { subject_id, exam_board, year, paper_type, title } = req.body;
-  if (!title) return res.status(400).json({ success: false, error: 'title is required' });
+    // ── Deep validation: magic-byte + PDF structure ───────────────────────
+    const buf = req.file.buffer || (() => {
+      try { return fs.readFileSync(req.file.path); } catch (_) { return null; }
+    })();
 
-  let fileUrl;
-  try {
-    if (r2.isR2Enabled()) {
-      const { url } = await r2.uploadBuffer({
-        buffer:      req.file.buffer,
+    if (buf) {
+      const v = await validateBuffer(buf, req.file.originalname, req.file.mimetype);
+      logUploadAttempt({
+        success:      v.valid,
+        userId:       req.user?.id,
         originalname: req.file.originalname,
-        mimetype:    req.file.mimetype || 'application/pdf',
+        ext:          v.ext,
+        detectedMime: v.detectedMime,
+        hash:         v.hash,
+        size:         req.file.size,
+        error:        v.error,
+        route:        'POST /past-papers',
       });
-      fileUrl = url;
-    } else {
-      fileUrl = `/uploads/past-papers/${req.file.filename}`;
-    }
-  } catch (err) {
-    console.error('[POST /api/past-papers] upload error:', err.message);
-    return res.status(500).json({ success: false, error: 'Upload failed: ' + err.message });
-  }
-
-  try {
-    const result = await sequelize.query(
-      `INSERT INTO past_papers (subject_id, exam_board, year, paper_type, title, file_url, file_size_bytes, created_by, created_at)
-       VALUES
-         (:subject_id, :exam_board, :year, :paper_type, :title,
-          :file_url, :file_size_bytes, :created_by, NOW())
-       RETURNING id`,
-      {
-        replacements: {
-          subject_id:      subject_id || null,
-          exam_board:      exam_board || null,
-          year:            year ? Number(year) : null,
-          paper_type:      paper_type || null,
-          title,
-          file_url:        fileUrl,
-          file_size_bytes: req.file.size,
-          created_by:      req.user.id,
-        },
-        type: QueryTypes.INSERT,
+      if (!v.valid) {
+        if (req.file.path) fs.unlink(req.file.path, () => {});
+        return res.status(v.status || 422).json({ success: false, error: v.error });
       }
-    );
-    return res.status(201).json({ success: true, data: { id: result[0][0].id, file_url: fileUrl } });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    }
+
+    const { subject_id, exam_board, year, paper_type, title } = req.body;
+    if (!title) return res.status(400).json({ success: false, error: 'title is required' });
+
+    const safeOriginal = sanitiseFilename(req.file.originalname);
+
+    let fileUrl;
+    try {
+      if (r2.isR2Enabled()) {
+        const { url } = await r2.uploadBuffer({
+          buffer:       req.file.buffer,
+          originalname: safeOriginal,
+          mimetype:     'application/pdf', // validated — safe to assert
+        });
+        fileUrl = url;
+      } else {
+        fileUrl = `/uploads/past-papers/${req.file.filename}`;
+      }
+    } catch (err) {
+      console.error('[POST /api/past-papers] upload error:', err.message);
+      return res.status(500).json({ success: false, error: 'Upload failed: ' + err.message });
+    }
+
+    try {
+      const result = await sequelize.query(
+        `INSERT INTO past_papers (subject_id, exam_board, year, paper_type, title, file_url, file_size_bytes, created_by, created_at)
+         VALUES
+           (:subject_id, :exam_board, :year, :paper_type, :title,
+            :file_url, :file_size_bytes, :created_by, NOW())
+         RETURNING id`,
+        {
+          replacements: {
+            subject_id:      subject_id || null,
+            exam_board:      exam_board || null,
+            year:            year ? Number(year) : null,
+            paper_type:      paper_type || null,
+            title,
+            file_url:        fileUrl,
+            file_size_bytes: req.file.size,
+            created_by:      req.user.id,
+          },
+          type: QueryTypes.INSERT,
+        }
+      );
+      return res.status(201).json({ success: true, data: { id: result[0][0].id, file_url: fileUrl } });
+    } catch (err) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
   }
-});
+);
 
 // ── DELETE /api/past-papers/:id ───────────────────────────────────────────────
 router.delete('/:id', protect, (req, res, next) => {
