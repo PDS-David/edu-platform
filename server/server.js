@@ -15,7 +15,7 @@ const requestId = require('./middleware/requestId');
 const requestLogger = require('./middleware/requestLogger');
 
 // ENV
-// In production, rely on platform-provided environment variables (Render/Hetzner).
+// In production, rely on platform-provided environment variables (Hetzner api.env).
 // Only load a local `server/.env` file for local development, and never override
 // existing environment variables.
 if (process.env.NODE_ENV !== 'production') {
