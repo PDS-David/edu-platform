@@ -10,6 +10,15 @@ const { QueryTypes } = require('sequelize');
 const sequelize = require('../config/database');
 const { protect, authorize } = require('../middleware/auth');
 const r2 = require('../utils/r2Storage');
+const {
+  validateBuffer,
+  multerFileFilter,
+  multerErrorHandler,
+  sanitiseFilename,
+  secureStorageName,
+  logUploadAttempt,
+  ALLOWED,
+} = require('../utils/fileValidation');
 const { getSignedDownloadUrl } = r2;
 const { ENROLLMENT_STATUS } = require('../constants/enrollmentConstants');
 
@@ -27,30 +36,30 @@ if (!fs.existsSync(UPLOADS_DIR)) {
    MULTER CONFIG
    ================================ */
 
+const RESOURCE_ALLOWED_EXTS = [
+  'pdf', 'docx', 'xlsx', 'pptx', 'csv', 'txt',
+  'jpg', 'jpeg', 'png', 'webp',
+  'mp4', 'mov',
+];
+
 const diskStorage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
   filename: (_req, file, cb) => {
-    const unique = `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
-    cb(null, unique + path.extname(file.originalname));
+    // Use UUID-based name so original filename cannot cause path traversal
+    // and is never exposed in the filesystem path.
+    const ext = path.extname(file.originalname).toLowerCase().replace(/^\./, '');
+    cb(null, secureStorageName(ext || 'bin'));
   }
 });
 
 // When R2 is configured, hold the file in memory just long enough to push
 // it to object storage. Otherwise persist to local disk like before.
+// multer pre-flight: extension allowlist + declared-MIME check.
+// Full magic-byte + structure validation runs after upload() in validateBuffer().
 const upload = multer({
   storage: r2.isR2Enabled() ? multer.memoryStorage() : diskStorage,
   limits: { fileSize: 500 * 1024 * 1024 }, // 500 MB
-  fileFilter: (_req, file, cb) => {
-    // Block high-risk web-executable types that would be dangerous to serve from /uploads.
-    const blocked = new Set([
-      'text/html',
-      'application/javascript',
-      'text/javascript',
-      'image/svg+xml',
-    ]);
-    if (blocked.has(file.mimetype)) return cb(new Error('File type not allowed'));
-    cb(null, true);
-  }
+  fileFilter: multerFileFilter(RESOURCE_ALLOWED_EXTS),
 });
 
 /* ================================
@@ -212,10 +221,14 @@ router.get('/health', (_req, res) => {
    Streams a file from Cloudflare R2 when the bucket is private or when
    R2_PUBLIC_BASE_URL isn't configured.
    ================================ */
+// ACCESS-01 FIX: This proxy now enforces full entitlement checks identical to
+// /:id/download before streaming any object. Students must be assigned to the
+// resource; revoking an assignment cuts off access immediately.
 router.get('/r2/*', protect, async (req, res) => {
   try {
-    const keyRaw = req.params[0] || '';
-    const key = decodeURIComponent(keyRaw);
+    // Decode exactly once — Express has already URL-decoded req.params[0],
+    // so a second decodeURIComponent is the double-decode anti-pattern.
+    const key = req.params[0] || '';
     if (!key || !key.startsWith('resources/')) {
       return res.status(400).json({ success: false, error: 'Invalid R2 key' });
     }
@@ -223,18 +236,65 @@ router.get('/r2/*', protect, async (req, res) => {
       return res.status(503).json({ success: false, error: 'R2 is not configured' });
     }
 
+    // ── Entitlement check: look up the resource by r2_key ────────────────
+    // Students may only access resources assigned to them.
+    // Admins and teachers may access any resource.
+    const role   = req.user.role;
+    const userId = req.user.id;
+
+    const resourceRows = await sequelize.query(
+      `SELECT id, is_active, mime_type, original_filename
+         FROM resources
+        WHERE r2_key = :key
+          AND is_active = true
+        LIMIT 1`,
+      { replacements: { key }, type: QueryTypes.SELECT }
+    );
+
+    if (!resourceRows.length) {
+      console.warn('[r2 proxy] access denied — key not found or inactive', { key, userId });
+      return res.status(404).json({ success: false, error: 'File not found' });
+    }
+
+    const resource = resourceRows[0];
+
+    if (role === 'student') {
+      await ensureResourceAssignments();
+      const access = await sequelize.query(
+        `SELECT 1 FROM resources r
+          WHERE r.id = :rid
+            AND (
+              EXISTS (SELECT 1 FROM resource_assignments ra
+                       WHERE ra.resource_id = r.id AND ra.student_id = :uid)
+              OR EXISTS (SELECT 1 FROM resource_user_assignments rua
+                          WHERE rua.resource_id = r.id AND rua.user_id = :uid)
+              OR EXISTS (
+                SELECT 1 FROM resource_assignments ra
+                  JOIN class_memberships cm ON cm.class_id = ra.class_id
+                 WHERE ra.resource_id = r.id AND cm.student_id = :uid
+              )
+            )
+          LIMIT 1`,
+        { replacements: { rid: resource.id, uid: userId }, type: QueryTypes.SELECT }
+      );
+
+      if (!access.length) {
+        console.warn('[r2 proxy] access denied — student not assigned', { resourceId: resource.id, userId });
+        return res.status(403).json({ success: false, error: 'Access denied' });
+      }
+    }
+
+    // ── Stream the object ─────────────────────────────────────────────────
     const obj = await r2.getObjectByKey(key);
     res.setHeader('Content-Type', obj.contentType || 'application/octet-stream');
     if (obj.contentLength) res.setHeader('Content-Length', String(obj.contentLength));
-    if (obj.cacheControl) res.setHeader('Cache-Control', obj.cacheControl);
-    if (obj.etag) res.setHeader('ETag', obj.etag);
+    if (obj.cacheControl)  res.setHeader('Cache-Control', obj.cacheControl);
+    if (obj.etag)          res.setHeader('ETag', obj.etag);
     // Allow inline viewing in iframes (PDF/Office viewers).
     res.setHeader('X-Frame-Options', 'ALLOWALL');
     res.setHeader('Content-Security-Policy', 'frame-ancestors *');
-
     if (obj.contentDisposition) res.setHeader('Content-Disposition', obj.contentDisposition);
 
-    // obj.body is a stream from AWS SDK
     return obj.body.pipe(res);
   } catch (err) {
     console.error('[r2 proxy]', err.message);
@@ -251,7 +311,10 @@ router.get('/r2/*', protect, async (req, res) => {
 router.post(
   '/bulk-upload',
   authorize('admin', 'teacher'),
-  upload.any(),
+  (req, res, next) => upload.any()(req, res, (err) => {
+    if (err) return multerErrorHandler(err, req, res, next);
+    next();
+  }),
   async (req, res) => {
     try {
       await ensureExtraColumns();
@@ -259,8 +322,6 @@ router.post(
       // Storage mode: if Cloudflare R2 env vars are present, push to R2.
       // Otherwise fall back to local disk. Local disk is acceptable on
       // Hetzner (persistent volumes) or any server with stable storage.
-      // Set ALLOW_LOCAL_UPLOADS=true on Render ONLY if you have mounted a
-      // persistent disk at /uploads — otherwise files will vanish on redeploy.
       const isProd = process.env.NODE_ENV === 'production';
       const allowLocal = process.env.ALLOW_LOCAL_UPLOADS !== 'false'; // default: allow
       if (isProd && !allowLocal && !r2.isR2Enabled()) {
@@ -285,6 +346,35 @@ router.post(
       const failures = [];
 
       for (const f of files) {
+        // ── Deep validation: magic-byte + structure check ────────────────
+        // The buffer must exist in memory whether using R2 or disk mode.
+        // For disk mode, read the saved file back for validation then proceed.
+        let buf = f.buffer;
+        if (!buf && f.path) {
+          try { buf = require('fs').readFileSync(f.path); } catch (_) {}
+        }
+
+        if (buf) {
+          const v = await validateBuffer(buf, f.originalname, f.mimetype);
+          logUploadAttempt({
+            success:      v.valid,
+            userId:       req.user?.id,
+            originalname: f.originalname,
+            ext:          v.ext,
+            detectedMime: v.detectedMime,
+            hash:         v.hash,
+            size:         f.size,
+            error:        v.error,
+            route:        'POST /resources/bulk-upload',
+          });
+          if (!v.valid) {
+            failures.push({ filename: sanitiseFilename(f.originalname), error: v.error });
+            // Delete the disk file if multer already wrote it
+            if (f.path) require('fs').unlink(f.path, () => {});
+            continue; // skip to next file
+          }
+        }
+
         try {
           let fileUrl;
           let r2Key = null;
@@ -298,10 +388,11 @@ router.post(
             fileUrl = url;
             r2Key = key;
           } else {
-            // Local disk fallback (Render ephemeral)
+            // Local disk — file already written by multer with UUID name
             fileUrl = `/uploads/resources/${path.basename(f.path)}`;
           }
-          const title = path.parse(f.originalname).name || f.originalname;
+          const safeOriginal = sanitiseFilename(f.originalname);
+          const title = path.parse(safeOriginal).name || safeOriginal;
           const resourceType = guessResourceType(f.originalname);
 
           // sequelize.query without QueryTypes returns [rows, meta]
@@ -324,7 +415,7 @@ router.post(
                 fileUrl,
                 r2Key: r2Key || null,
                 size: f.size,
-                origName: f.originalname,
+                origName: safeOriginal,
                 mime: f.mimetype,
                 uploadedBy: req.user && req.user.id ? req.user.id : null
               }
@@ -334,7 +425,7 @@ router.post(
           inserted.push(rows[0]);
         } catch (err) {
           console.error('[bulk-upload insert]', err.message);
-          failures.push({ filename: f.originalname, error: err.message });
+          failures.push({ filename: sanitiseFilename(f.originalname), error: err.message });
         }
       }
 
@@ -716,9 +807,21 @@ router.get('/:id/download', protect, async (req, res) => {
       return res.redirect(302, signedUrl);
     }
 
-    // Local disk fallback: file_url is a relative /uploads/... path
+    // Local disk fallback: stream the file directly (authenticated) rather than
+    // redirecting to the public /uploads URL. A redirect hands the client a URL
+    // that is permanently accessible with no auth — defeating the entitlement
+    // check that ran above. Streaming keeps the file behind this endpoint.
     if (resource.file_url && !resource.file_url.startsWith('http')) {
-      return res.redirect(302, resource.file_url);
+      const localPath = path.join(__dirname, '..', resource.file_url);
+      if (!fs.existsSync(localPath)) {
+        return res.status(404).json({ success: false, error: 'File not found on disk' });
+      }
+      const mime = resource.mime_type || 'application/octet-stream';
+      const safe = sanitiseFilename(resource.original_filename || path.basename(resource.file_url));
+      res.setHeader('Content-Type', mime);
+      res.setHeader('Content-Disposition', `inline; filename="${safe}"`);
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      return fs.createReadStream(localPath).pipe(res);
     }
 
     return res.status(502).json({ success: false, error: 'File storage not configured' });
