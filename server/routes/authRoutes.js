@@ -13,7 +13,7 @@ const express = require('express');
 const router  = express.Router();
 const {
   register, login, getMe, updatePassword,
-  forgotPassword, resetPassword, verifyEmail,
+  forgotPassword, resetPassword, verifyEmail, logout,
 } = require('../controllers/auth');
 const { protect } = require('../middleware/auth');
 const { authLimiter } = require('../middleware/rateLimiter');
@@ -100,6 +100,7 @@ router.post('/verify-email',    verifyEmail);
 
 // Protected routes — JWT required
 router.get('/me',       protect, getMe);
+router.post('/logout',  protect, logout);
 router.put('/password', protect, updatePassword);
 
 // PUT /api/auth/notifications — save notification preferences

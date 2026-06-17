@@ -138,12 +138,11 @@ function UploadTab({ showToast }) {
       const apiBase = rawBase.endsWith('/api')
         ? rawBase
         : (rawBase ? `${rawBase}/api` : '/api');
-      const token = localStorage.getItem('token') || '';
-
       await new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open('POST', `${apiBase}/resources/upload`);
-        if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        // DEF-001: the JWT now lives in an HttpOnly cookie, not localStorage.
+        xhr.withCredentials = true;
         xhr.upload.onprogress = (e) => {
           if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 100));
         };

@@ -64,12 +64,101 @@ function resolveFileUrl(rawUrl) {
   return rawUrl;
 }
 
+// SECURITY (DEF-007): fetches a protected resource through the authenticated
+// `api` client (Bearer token attached) and triggers a save via a temporary
+// blob object URL, instead of pointing a plain <a href download> tag at the
+// bare endpoint — which would send no auth header and be rejected by the
+// server's `protect` middleware before the enrollment/ownership check runs.
+async function downloadFileAuthenticated(file) {
+  if (!file.id) {
+    // No id → not a protected resource; fall back to the legacy direct URL.
+    const url = resolveFileUrl(file.file_url);
+    if (url) window.open(url, "_blank", "noreferrer");
+    return;
+  }
+  try {
+    const res = await api.get(`/resources/${file.id}/download`, {
+      responseType: "blob",
+      timeout: 30000,
+    });
+    const blob = res.data instanceof Blob ? res.data : new Blob([res.data]);
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = objectUrl;
+    a.download = file.original_filename || file.title || "download";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+  } catch {
+    alert("This file couldn't be downloaded. You may not have access to it, or it may no longer be available.");
+  }
+}
+
 // ── Inline file viewer ────────────────────────────────────────────────────────
+// SECURITY (DEF-007): files are now fetched via the authenticated `api` client
+// (which attaches the Bearer token) and rendered from an in-memory object URL,
+// rather than pointing <img>/<video>/<audio>/<a> tags directly at a bare URL.
+// Native media/anchor tags never send custom headers, so a direct `src`/`href`
+// would hit the server's `protect`-gated download route with no token and be
+// rejected before the enrollment/ownership check ever runs.
 function InlineViewer({ file }) {
-  const url  = file.id ? `/api/resources/${file.id}/download` : resolveFileUrl(file.file_url);
+  const apiDownloadPath = file.id ? `/resources/${file.id}/download` : null;
+  const fallbackUrl = file.id ? null : resolveFileUrl(file.file_url);
   const type = (file.type || file.resource_type || "").toLowerCase();
-  const ext  = url.split("?")[0].split(".").pop().toLowerCase();
+  const ext  = (apiDownloadPath || fallbackUrl || "").split("?")[0].split(".").pop().toLowerCase();
+
+  const [objectUrl, setObjectUrl] = useState(null);
+  const [loadState, setLoadState] = useState(apiDownloadPath ? "loading" : "ready");
   const [broken, setBroken] = useState(false);
+
+  useEffect(() => {
+    if (!apiDownloadPath) return;
+    let revokeUrl = null;
+    let cancelled = false;
+
+    setLoadState("loading");
+    setBroken(false);
+
+    api.get(apiDownloadPath, { responseType: "blob", timeout: 30000 })
+      .then(res => {
+        if (cancelled) return;
+        const blob = res.data instanceof Blob ? res.data : new Blob([res.data]);
+        revokeUrl = URL.createObjectURL(blob);
+        setObjectUrl(revokeUrl);
+        setLoadState("ready");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setLoadState("error");
+      });
+
+    return () => {
+      cancelled = true;
+      if (revokeUrl) URL.revokeObjectURL(revokeUrl);
+    };
+  }, [apiDownloadPath]);
+
+  const url = apiDownloadPath ? objectUrl : fallbackUrl;
+
+  if (apiDownloadPath && loadState === "loading") {
+    return (
+      <div className="mt-2 rounded-xl border border-gray-100 bg-gray-50 p-4 text-center">
+        <p className="text-xs text-gray-400">Loading file…</p>
+      </div>
+    );
+  }
+
+  if (apiDownloadPath && loadState === "error") {
+    return (
+      <div className="mt-2 rounded-xl border border-red-100 bg-red-50 p-4 text-center">
+        <p className="text-sm text-red-600 font-medium">File unavailable</p>
+        <p className="text-xs text-red-400 mt-1">You may not have access to this file, or it could not be loaded. Try refreshing.</p>
+      </div>
+    );
+  }
+
+  if (!url) return null;
 
   // ── data: URI — plain text seeded content, decode and display directly ──
   if (url.startsWith("data:text/")) {
@@ -106,8 +195,32 @@ function InlineViewer({ file }) {
     </div>
   );
 
-  // Office formats → Microsoft Office Online viewer (handles docx/pptx/xlsx natively)
+  // Office formats → Microsoft Office Online / Google Docs viewer.
+  // SECURITY NOTE: those external services fetch the URL from their own
+  // servers, so a `blob:` object URL (authenticated, in-memory only) cannot
+  // be embedded — there is nothing for them to reach. For files served via
+  // the authenticated download route, fall back to a direct, already-
+  // authenticated download instead of routing through an external viewer.
   const isOffice = ["docx","pptx","xlsx","doc","ppt","xls"].includes(ext);
+
+  if (apiDownloadPath) {
+    return (
+      <div className="mt-2 rounded-xl border border-gray-200 bg-gray-50 p-4 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium text-gray-700">{file.title}</p>
+          <p className="text-xs text-gray-400 mt-0.5">Preview isn't available for this file type — download to view.</p>
+        </div>
+        <a
+          href={url}
+          download={file.original_filename || file.title || true}
+          className="shrink-0 text-xs font-semibold text-blue-600 hover:underline whitespace-nowrap"
+        >
+          Download
+        </a>
+      </div>
+    );
+  }
+
   const viewerUrl = isOffice
     ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`
     : `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
@@ -181,8 +294,6 @@ function AssignedFilesSection({ resources, loading, totalResources, navigate }) 
                       const fileType = (file.type || file.resource_type || "").toLowerCase();
                       const isOpen   = openFile === `${file.id}-${pt}`;
                       const isPractice = pt === "practice_test" || pt === "quiz";
-                      // Always use resolveFileUrl so old eacbuddy URLs are rewritten
-                      const resolvedUrl = file.id ? `/api/resources/${file.id}/download` : resolveFileUrl(file.file_url);
                       return (
                         <div key={`${file.id}-${pt}`} className="border border-gray-100 rounded-xl overflow-hidden bg-white hover:border-blue-200 transition-colors">
                           <div className="p-3 flex items-center gap-3">
@@ -212,10 +323,13 @@ function AssignedFilesSection({ resources, loading, totalResources, navigate }) 
                                   Practice
                                 </button>
                               )}
-                              <a href={resolvedUrl} target="_blank" rel="noreferrer" download
-                                className="p-1.5 rounded-lg border border-gray-200 text-gray-400 hover:text-blue-600 hover:border-blue-200 transition-colors">
+                              <button
+                                onClick={() => downloadFileAuthenticated(file)}
+                                className="p-1.5 rounded-lg border border-gray-200 text-gray-400 hover:text-blue-600 hover:border-blue-200 transition-colors"
+                                title="Download"
+                              >
                                 <Download size={13} />
-                              </a>
+                              </button>
                             </div>
                           </div>
                           {isOpen && (

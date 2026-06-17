@@ -168,6 +168,7 @@ export default function ImageMarkingPage() {
       // The resolved value IS the payload — no destructuring needed.
       const res = await api.post('/ai/mark-image', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 60000, // AI vision/marking can take up to ~40s; give headroom
       });
 
       if (res && res.success) {

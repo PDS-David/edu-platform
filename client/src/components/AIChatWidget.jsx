@@ -126,7 +126,7 @@ export default function AIChatWidget({
             subject_id:    subjectId,
             subtopic_id:   subtopicId,
           },
-        });
+        }, { timeout: 60000 });
 
       // Save session_id from first response
       if (res.session_id && !sessionId) {

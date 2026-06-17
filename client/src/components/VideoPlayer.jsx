@@ -11,12 +11,12 @@
 //     so no Authorization header is needed. The token is fetched from
 //     GET /api/videos/token?videoId=:id and is valid for 15 minutes.
 //
-//   SEC-03 partial:
-//     localStorage.getItem('token') is still used for hls.js xhrSetup because
-//     that path requires a custom header.  The Safari native path avoids
-//     localStorage entirely by using server-issued per-session tokens.
-//     Migrating away from localStorage fully requires switching to HttpOnly
-//     cookies for the main JWT (separate auth-layer change).
+//   SEC-03 (complete):
+//     hls.js xhrSetup now relies on the HttpOnly auth cookie (withCredentials)
+//     instead of reading the JWT from localStorage — localStorage is no
+//     longer used to store the token anywhere in the app (DEF-001). The
+//     Safari native path continues to use its own short-lived per-session
+//     streaming token, unrelated to the main JWT.
 //
 //   FUNC-03 / ABR:
 //     The master.m3u8 now contains 4 renditions (240p/480p/720p/1080p).
@@ -145,10 +145,15 @@ export default function VideoPlayer({ videoId, onComplete }) {
 
     const initHlsJs = (streamUrl) => {
       const hls = new Hls({
-        // Inject Authorization header on every XHR (manifest, segment, key)
-        xhrSetup: (xhr, url) => {
-          const token = localStorage.getItem('token');
-          if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        // DEF-001 completion: the JWT now lives only in an HttpOnly cookie
+        // set by the server on login/register — localStorage is no longer
+        // used to store it at all, so there is nothing here to read into a
+        // header. withCredentials makes the browser attach that cookie to
+        // every HLS XHR (manifest, segment, key) automatically; the
+        // server's extractToken() falls back to the cookie when there's no
+        // Authorization header, so playback auth still works end to end.
+        xhrSetup: (xhr) => {
+          xhr.withCredentials = true;
         },
         // Start with lowest quality and adapt up — good for Nigerian connections
         startLevel: 0,

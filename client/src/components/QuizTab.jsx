@@ -555,7 +555,7 @@ function HintModal({ question, onClose }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.post('/ai/hint', { question_id: question.id, hint_level: 1 })
+    api.post('/ai/hint', { question_id: question.id, hint_level: 1 }, { timeout: 60000 })
       .then(r => {
         const raw = r.hints || r.content || r.hint || '';
         // Split by newlines or bullets

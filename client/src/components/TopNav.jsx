@@ -13,6 +13,8 @@ export default function TopNav() {
   const [dropOpen,       setDropOpen]       = useState(false);
   const [notifOpen,      setNotifOpen]      = useState(false);
   const [notifications,  setNotifications]  = useState([]);
+  const [unreadCount,    setUnreadCount]    = useState(0);
+  const [markingRead,    setMarkingRead]    = useState(false);
 
   const dropRef  = useRef(null);
   const notifRef = useRef(null);
@@ -22,7 +24,6 @@ export default function TopNav() {
   const fullName    = `${firstName} ${lastName}`.trim() || user?.email?.split('@')[0] || 'User';
   const initials    = ((firstName[0] || '') + (lastName[0] || '')).toUpperCase() || fullName[0]?.toUpperCase();
   const role        = user?.role || 'student';
-  const unreadCount = notifications.filter(n => !n.is_read).length;
 
   const dashboardPath =
     role === 'admin'   ? '/admin/dashboard'   :
@@ -42,7 +43,10 @@ export default function TopNav() {
 
   useEffect(() => {
     if (!user) return;
-    api.get('/notifications').then(r => setNotifications(r.data || [])).catch(() => {});
+    api.get('/notifications').then(r => {
+      setNotifications(r.data || []);
+      setUnreadCount(r.unread_count ?? 0);
+    }).catch(() => {});
   }, [user]);
 
   useEffect(() => {
@@ -57,9 +61,21 @@ export default function TopNav() {
   const handleNotifOpen = () => {
     setNotifOpen(p => {
       const next = !p;
-      if (next && unreadCount > 0) {
-        setNotifications(n => n.map(x => ({ ...x, is_read: true })));
-        api.patch('/notifications/read-all').catch(() => {});
+      if (next && unreadCount > 0 && !markingRead) {
+        const previousNotifications = notifications;
+        const previousUnreadCount = unreadCount;
+        setMarkingRead(true);
+        api.patch('/notifications/read-all')
+          .then(() => {
+            setNotifications(n => n.map(x => ({ ...x, is_read: true })));
+            setUnreadCount(0);
+          })
+          .catch(() => {
+            // Roll back to pre-attempt state — server did not confirm the update.
+            setNotifications(previousNotifications);
+            setUnreadCount(previousUnreadCount);
+          })
+          .finally(() => setMarkingRead(false));
       }
       return next;
     });
