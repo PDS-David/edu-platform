@@ -42,6 +42,7 @@ import PracticeMode from "./pages/PracticeMode";
 import MockExamPage from "./pages/MockExamPage";
 import ImageMarkingPage from "./pages/ImageMarkingPage";
 import SettingsPage from "./pages/SettingsPage";
+import DashboardHome from "./pages/Dashboard/DashboardHome";
 
 // Teacher
 import TeacherDashboard from "./pages/TeacherDashboard";
@@ -55,7 +56,6 @@ import TeacherAddQuestionPage from "./pages/TeacherAddQuestionPage";
 
 // Admin
 import AdminDashboard from "./pages/AdminDashboard";
-import DashboardHome from "./pages/Dashboard/DashboardHome";
 
 // Global floating widget
 import WhatsAppButton from "./components/WhatsAppButton";
@@ -86,7 +86,7 @@ export default function App() {
         <Route element={<PrivateRoute allowedRoles={["student"]} />}>
           <Route path="/student" element={<StudentLayout />}>
             <Route index element={<StudentDashboard />} />
-            <Route path="dashboard" element={<StudentDashboard />} />
+            <Route path="dashboard" element={<DashboardHome />} />
             <Route path="analytics" element={<StudentAnalyticsDashboard />} />
             <Route path="subject/:subjectId" element={<SubjectPage />} />
             <Route path="subtopic/:subtopicId" element={<SubtopicPage />} />

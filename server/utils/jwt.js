@@ -28,10 +28,31 @@ const verifyToken = (token) => {
 
 const extractToken = (req) => {
   const header = req.headers && req.headers.authorization;
-  if (!header) return null;
-  if (!header.startsWith('Bearer ')) return null;
-  const token = header.split(' ')[1];
-  return token || null;
+  if (header && header.startsWith('Bearer ')) {
+    const token = header.split(' ')[1];
+    if (token) return token;
+  }
+  // DEF-001: fall back to the HttpOnly auth cookie set by login/register.
+  // Keeping the header path first preserves existing non-browser API
+  // consumers (mobile apps, scripts, Postman) that send a Bearer token
+  // directly and never receive/forward cookies.
+  if (req.cookies && req.cookies.token) {
+    return req.cookies.token;
+  }
+  return null;
 };
 
-module.exports = { generateToken, verifyToken, extractToken };
+// Shared cookie options for setting/clearing the auth cookie.
+// SameSite=None + Secure is required for the cross-subdomain/cross-origin
+// setup this app already runs under (CORS allow-list with credentials:true);
+// SameSite=None cookies are rejected by browsers unless Secure is also set.
+const AUTH_COOKIE_NAME = 'token';
+const authCookieOptions = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+  maxAge: 7 * 24 * 60 * 60 * 1000, // matches default JWT_EXPIRE of 7d
+  path: '/',
+});
+
+module.exports = { generateToken, verifyToken, extractToken, AUTH_COOKIE_NAME, authCookieOptions };

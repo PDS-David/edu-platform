@@ -29,7 +29,7 @@ async function fetchAIHint(questionId, selectedOptionId) {
     const res = await api.post('/ai/hint', {
       question_id:        questionId,
       selected_option_id: selectedOptionId || null,
-    });
+    }, { timeout: 60000 });
     return res?.hint || res?.data?.hint || null;
   } catch {
     return null;

@@ -10,7 +10,7 @@ const express    = require('express');
 const router     = express.Router();
 const { QueryTypes } = require('sequelize');
 const sequelize  = require('../config/database');
-const { protect } = require('../middleware/auth');
+const { protect, authorize } = require('../middleware/auth');
 const { ENROLLMENT_STATUS } = require('../constants/enrollmentConstants');
 
 // ── safe query helper ─────────────────────────────────────────────────────────
@@ -24,7 +24,7 @@ const sq = async (sql, replacements = {}, fallback = []) => {
 };
 
 // ── GET /api/dashboard/summary ────────────────────────────────────────────────
-router.get('/summary', protect, async (req, res) => {
+router.get('/summary', protect, authorize('student'), async (req, res) => {
   const uid = req.user.id;
   try {
     const [attempts, streak, subtopics] = await Promise.all([
@@ -51,7 +51,7 @@ router.get('/summary', protect, async (req, res) => {
 });
 
 // ── GET /api/dashboard/weak-topics ───────────────────────────────────────────
-router.get('/weak-topics', protect, async (req, res) => {
+router.get('/weak-topics', protect, authorize('student'), async (req, res) => {
   const uid = req.user.id;
   try {
     const rows = await sq(
@@ -77,7 +77,7 @@ router.get('/weak-topics', protect, async (req, res) => {
 });
 
 // ── GET /api/dashboard/recommendations ───────────────────────────────────────
-router.get('/recommendations', protect, async (req, res) => {
+router.get('/recommendations', protect, authorize('student'), async (req, res) => {
   const uid = req.user.id;
   try {
     const rows = await sq(
@@ -87,7 +87,7 @@ router.get('/recommendations', protect, async (req, res) => {
        FROM subtopics st
        JOIN topics   t  ON t.id  = st.topic_id
        JOIN subjects s  ON s.id  = t.subject_id
-       JOIN student_exam_types set2 ON  set2.exam_board_id = s.exam_board_id
+       JOIN student_exam_types set2 ON  set2.exam_board_id::text = s.exam_board_id::text
                                     AND set2.student_id   = :uid
                                     AND set2.status        = :approvedStatus
                                     AND (set2.expires_at IS NULL OR set2.expires_at > NOW())
@@ -105,7 +105,7 @@ router.get('/recommendations', protect, async (req, res) => {
 });
 
 // ── GET /api/dashboard/sessions ───────────────────────────────────────────────
-router.get('/sessions', protect, async (req, res) => {
+router.get('/sessions', protect, authorize('student'), async (req, res) => {
   const uid = req.user.id;
   try {
     const rows = await sq(

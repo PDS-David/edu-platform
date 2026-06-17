@@ -565,7 +565,7 @@ const AIGeneratePanel = () => {
     if (!form.topic.trim()) { setError('Please enter a topic.'); return; }
     setError(''); setResult(null); setPreviewQuestions([]); setGenerating(true);
     try {
-      const res = await api.post('/admin/generate-questions', { subject_id: form.subject_id, topic: form.topic, exam_board: form.exam_board, count: form.count, difficulty: form.difficulty });
+      const res = await api.post('/admin/generate-questions', { subject_id: form.subject_id, topic: form.topic, exam_board: form.exam_board, count: form.count, difficulty: form.difficulty }, { timeout: 120000 });
       setResult(res);
       const qs = res?.data?.questions ?? res?.questions ?? [];
       if (Array.isArray(qs)) setPreviewQuestions(qs);

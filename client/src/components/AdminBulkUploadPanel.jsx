@@ -807,12 +807,14 @@ export default function AdminBulkUploadPanel() {
       const apiBase = rawBase.replace(/\/$/, '').endsWith('/api')
         ? rawBase.replace(/\/$/, '')
         : rawBase.replace(/\/$/, '') + '/api';
-      const token   = localStorage.getItem('token') || '';
-
       const res = await new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open('POST', `${apiBase}/resources/bulk-upload`);
-        if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        // DEF-001: the JWT now lives in an HttpOnly cookie, not localStorage.
+        // withCredentials makes the browser attach that cookie to this
+        // cross-origin XHR; the server's extractToken() falls back to it
+        // when there's no Authorization header.
+        xhr.withCredentials = true;
         xhr.upload.onprogress = e => { if (e.lengthComputable) setUploadProg(Math.round(e.loaded / e.total * 100)); };
         xhr.onload = () => {
           try {
