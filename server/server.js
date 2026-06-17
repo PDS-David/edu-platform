@@ -258,14 +258,30 @@ if (fs.existsSync(clientDist)) {
 }
 
 // ERROR HANDLER
+// R-03: Never expose raw database error messages (constraint names, column
+// names, internal query text) to the client.  We log the full error server-
+// side and return a sanitised message only.
 app.use((err, _req, res, _next) => {
-  logger.error('Unhandled error', { error: err.message });
-  // Pass string (not object) — error() sets response.error = message
-  // Passing an object causes React error #31 when frontend renders err?.error
+  logger.error('Unhandled error', { error: err.message, stack: err.stack });
+
+  // Postgres unique-violation (23505) — translate to clean 409
+  const pgCode = err.parent?.code || err.original?.code;
+  if (pgCode === '23505') {
+    return res.status(409).json({ success: false, error: 'A record with that value already exists' });
+  }
+
+  // Other Postgres / Sequelize errors — suppress internal detail
+  const isDbError = pgCode || err.name === 'SequelizeDatabaseError' || err.name === 'SequelizeUniqueConstraintError';
+  if (isDbError) {
+    return res.status(500).json({ success: false, error: 'A database error occurred' });
+  }
+
   const statusCode = err.statusCode || err.status || 500;
+  // Only expose the message for application-level errors (no DB detail)
+  const safeMessage = statusCode < 500 ? (err.message || 'Request error') : 'Server error';
   return res.status(statusCode).json({
     success: false,
-    error: err.message || 'Server error',
+    error: safeMessage,
   });
 });
 

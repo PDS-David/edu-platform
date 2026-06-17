@@ -1,11 +1,38 @@
 'use strict';
 
-const bcrypt     = require('bcryptjs');
-const crypto     = require('crypto');
-const { QueryTypes } = require('sequelize');
-const db         = require('../config/database');
-const { generateToken } = require('../utils/jwt');
+// ─────────────────────────────────────────────────────────────────────────────
+// server/controllers/auth.js
+//
+// Fixes applied in this revision:
+//   R-01  Phone number is now destructured from req.body, validated (E.164),
+//         normalised (+digits), and persisted in the INSERT.
+//   R-03  Registration uses INSERT … ON CONFLICT (email) DO NOTHING to
+//         eliminate the TOCTOU race window.  Postgres error code 23505 is
+//         caught and translated to 409 everywhere raw SQL is used.
+//   R-04  All email paths now call normaliseEmail() before any DB operation.
+//         forgotPassword previously skipped normalisation — fixed.
+//   R-05  Password validation delegates to validatePassword() which enforces
+//         min 8 chars + at least one letter + at least one digit + max 128.
+//         updatePassword applies the same rules for the new password.
+// ─────────────────────────────────────────────────────────────────────────────
 
+const bcrypt           = require('bcryptjs');
+const crypto           = require('crypto');
+const { QueryTypes }   = require('sequelize');
+const db               = require('../config/database');
+const { generateToken } = require('../utils/jwt');
+const {
+  normaliseEmail,
+  validateEmail,
+  validatePassword,
+  normalisePhone,
+  validatePhone,
+  normaliseName,
+  validateName,
+  sanitisePendingExamBoards,
+} = require('../utils/registrationValidators');
+
+// ── Email service (optional — safe no-op if not installed) ───────────────────
 let sendPasswordResetEmail = () => Promise.resolve();
 let sendVerificationEmail  = () => Promise.resolve();
 try {
@@ -14,6 +41,7 @@ try {
   sendVerificationEmail     = emailService.sendVerificationEmail   || sendVerificationEmail;
 } catch {}
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function safeUser(row) {
   const {
     password,
@@ -28,103 +56,143 @@ function randomToken() {
   return crypto.randomBytes(32).toString('hex');
 }
 
-// ─────────────────────────────────────────────────────────────
+/**
+ * Translate a Postgres unique-violation (23505) into a clean 409 response.
+ * Returns true if the error was handled, false otherwise.
+ */
+function handleUniqueViolation(err, res) {
+  if (err.parent?.code === '23505' || err.original?.code === '23505' || err.message?.includes('23505')) {
+    res.status(409).json({ success: false, error: 'An account with that email already exists' });
+    return true;
+  }
+  return false;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // REGISTER
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 exports.register = async (req, res, next) => {
   try {
-    const { email, password, role = 'student' } = req.body;
+    // ── 1. Extract & normalise ─────────────────────────────────────────────
+    const rawEmail    = normaliseEmail(req.body.email);
+    const password    = req.body.password;
+    const first_name  = normaliseName(req.body.first_name || req.body.firstName || '');
+    const last_name   = normaliseName(req.body.last_name  || req.body.lastName  || first_name);
+    const rawPhone    = req.body.phone;                    // R-01: read phone
+    const pendingExamBoards = sanitisePendingExamBoards(req.body.pendingExamBoards);
 
-    const first_name = (req.body.first_name || req.body.firstName || '').trim();
-    const last_name  = (req.body.last_name  || req.body.lastName  || first_name).trim();
-
-    const pendingExamBoards = req.body.pendingExamBoards || [];
-
-    if (!email || !password) {
-      return res.status(400).json({ success: false, error: 'Email and password are required' });
+    // ── 2. Validate ────────────────────────────────────────────────────────
+    const emailCheck = validateEmail(rawEmail);
+    if (!emailCheck.valid) {
+      return res.status(400).json({ success: false, error: emailCheck.error });
     }
 
-    if (password.length < 8) {
-      return res.status(400).json({ success: false, error: 'Password must be at least 8 characters' });
+    const passCheck = validatePassword(password);          // R-05
+    if (!passCheck.valid) {
+      return res.status(400).json({ success: false, error: passCheck.error });
     }
 
-    // Self-registration is student-only. Teachers are created via POST /api/admin/create-teacher.
-    const assignedRole = 'student';
+    // Phone is required on the frontend — validate & normalise (R-01)
+    const phoneCheck = validatePhone(rawPhone);
+    if (!phoneCheck.valid) {
+      return res.status(400).json({ success: false, error: phoneCheck.error });
+    }
+    const phone = normalisePhone(rawPhone);                // "+<digits>"
 
-    const existing = await db.query(
-      `SELECT id FROM users WHERE email = :email LIMIT 1`,
-      { replacements: { email: email.toLowerCase().trim() }, type: QueryTypes.SELECT }
-    );
-
-    if (existing.length > 0) {
-      return res.status(409).json({ success: false, error: 'An account with that email already exists' });
+    const fnCheck = validateName(first_name, 'First name');
+    if (!fnCheck.valid) {
+      return res.status(400).json({ success: false, error: fnCheck.error });
     }
 
-    const salt = await bcrypt.genSalt(12);
+    // ── 3. Hash password ───────────────────────────────────────────────────
+    const salt           = await bcrypt.genSalt(12);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    const verificationToken = randomToken();
-    const verificationTokenExpires = new Date(Date.now() + 86400000);
+    const verificationToken        = randomToken();
+    const verificationTokenExpires = new Date(Date.now() + 86400000); // 24 h
 
-    const pendingIds = Array.isArray(pendingExamBoards) ? pendingExamBoards : [];
-
+    // ── 4. INSERT … ON CONFLICT — eliminates TOCTOU race window (R-03) ────
+    //
+    // ON CONFLICT (email) DO NOTHING returns 0 rows when the email already
+    // exists.  We check for that and return 409 cleanly without leaking any
+    // Postgres error detail.  The unique index on users.email ensures the
+    // second concurrent INSERT also gets 0 rows rather than a constraint
+    // error (or, if both hit simultaneously, the loser gets the 23505 error
+    // which is caught below and translated to 409 as a belt-and-suspenders).
     const rows = await db.query(
       `INSERT INTO users
-       (email, password, first_name, last_name, role,
-        verification_token, verification_token_expires,
-        is_active, is_verified, subscription_status,
-        subscription_expires_at,
-        pending_exam_board_ids,
-        created_at, updated_at)
+         (email, password, first_name, last_name, role,
+          phone,
+          verification_token, verification_token_expires,
+          is_active, is_verified, subscription_status,
+          subscription_expires_at,
+          pending_exam_board_ids,
+          created_at, updated_at)
        VALUES
-       (:email, :password, :first_name, :last_name, :role,
-        :verificationToken, :verificationTokenExpires,
-        true, false, 'free_trial',
-        NOW() + INTERVAL '14 days',
-        :pendingIds::integer[],
-        NOW(), NOW())
+         (:email, :password, :first_name, :last_name, 'student',
+          :phone,
+          :verificationToken, :verificationTokenExpires,
+          true, false, 'free_trial',
+          NOW() + INTERVAL '14 days',
+          :pendingIds::integer[],
+          NOW(), NOW())
+       ON CONFLICT (email) DO NOTHING
        RETURNING
-         id, email, first_name, last_name, role,
+         id, email, first_name, last_name, role, phone,
          is_active, is_verified, subscription_status,
          onboarding_complete, xp_points, study_streak_days,
          pending_exam_board_ids,
          created_at`,
       {
         replacements: {
-          email: email.toLowerCase().trim(),
-          password: hashedPassword,
+          email:                   rawEmail,
+          password:                hashedPassword,
           first_name,
           last_name,
-          role: assignedRole,
+          phone,                                           // R-01
           verificationToken,
           verificationTokenExpires,
-          pendingIds: pendingIds.length ? `{${pendingIds.join(',')}}` : '{}'
+          pendingIds: pendingExamBoards.length
+            ? `{${pendingExamBoards.join(',')}}`
+            : '{}',
         },
-        type: QueryTypes.SELECT
+        type: QueryTypes.SELECT,
       }
     );
 
-    const user = safeUser(rows[0]);
+    // 0 rows ⟹ email already existed — ON CONFLICT suppressed the insert
+    if (!rows || rows.length === 0) {
+      return res.status(409).json({ success: false, error: 'An account with that email already exists' });
+    }
+
+    const user  = safeUser(rows[0]);
     const token = generateToken({ id: user.id, role: user.role });
 
-    return res.status(201).json({
-      success: true,
-      token,
-      user
-    });
+    // Fire verification email (non-blocking — does not delay the response)
+    setImmediate(() =>
+      sendVerificationEmail({
+        email:      user.email,
+        first_name: user.first_name,
+        token:      verificationToken,
+      }).catch(() => {})
+    );
+
+    return res.status(201).json({ success: true, token, user });
 
   } catch (err) {
     console.error('[register]', err.message);
+    if (handleUniqueViolation(err, res)) return;          // R-03: belt-and-suspenders
     next(err);
   }
 };
 
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 // LOGIN
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 exports.login = async (req, res, next) => {
   try {
-    const { email, password } = req.body;
+    const email    = normaliseEmail(req.body.email);      // R-04
+    const password = req.body.password;
 
     if (!email || !password) {
       return res.status(400).json({ success: false, error: 'Email and password are required' });
@@ -140,7 +208,7 @@ exports.login = async (req, res, next) => {
        FROM users
        WHERE email = :email
        LIMIT 1`,
-      { replacements: { email: email.toLowerCase().trim() }, type: QueryTypes.SELECT }
+      { replacements: { email }, type: QueryTypes.SELECT }
     );
 
     if (rows.length === 0) {
@@ -154,7 +222,6 @@ exports.login = async (req, res, next) => {
     }
 
     const match = await bcrypt.compare(password, userRow.password);
-
     if (!match) {
       return res.status(401).json({ success: false, error: 'Invalid email or password' });
     }
@@ -167,14 +234,9 @@ exports.login = async (req, res, next) => {
     );
 
     const token = generateToken({ id: userRow.id, role: userRow.role });
+    const user  = safeUser(userRow);
 
-    const user = safeUser(userRow);
-
-    return res.status(200).json({
-      success: true,
-      token,
-      user
-    });
+    return res.status(200).json({ success: true, token, user });
 
   } catch (err) {
     console.error('[login]', err.message);
@@ -182,14 +244,14 @@ exports.login = async (req, res, next) => {
   }
 };
 
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 // GET ME
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 exports.getMe = async (req, res, next) => {
   try {
     const rows = await db.query(
       `SELECT id, email, first_name, last_name, role, avatar_url,
-              subscription_status, subscription_expires_at,
+              phone, subscription_status, subscription_expires_at,
               is_verified, onboarding_complete, xp_points,
               study_streak_days, daily_goal, last_login,
               created_at, updated_at
@@ -201,10 +263,7 @@ exports.getMe = async (req, res, next) => {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
 
-    return res.status(200).json({
-      success: true,
-      user: safeUser(rows[0])
-    });
+    return res.status(200).json({ success: true, user: safeUser(rows[0]) });
 
   } catch (err) {
     console.error('[getMe]', err.message);
@@ -212,14 +271,20 @@ exports.getMe = async (req, res, next) => {
   }
 };
 
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 // UPDATE PASSWORD
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 exports.updatePassword = async (req, res, next) => {
   try {
     const { current_password, new_password } = req.body;
     if (!current_password || !new_password) {
       return res.status(400).json({ success: false, error: 'current_password and new_password are required' });
+    }
+
+    // R-05: apply same policy to new password
+    const passCheck = validatePassword(new_password);
+    if (!passCheck.valid) {
+      return res.status(400).json({ success: false, error: passCheck.error });
     }
 
     const rows = await db.query(
@@ -246,21 +311,23 @@ exports.updatePassword = async (req, res, next) => {
   }
 };
 
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 // FORGOT PASSWORD
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 exports.forgotPassword = async (req, res, next) => {
   try {
-    const { email } = req.body;
+    const email = normaliseEmail(req.body.email);         // R-04: was missing normalisation
     if (!email) return res.status(400).json({ success: false, error: 'Email is required' });
 
     const rows = await db.query(
       `SELECT id FROM users WHERE email = :email LIMIT 1`,
-      { replacements: { email }, type: QueryTypes.SELECT }
+      { replacements: { email }, type: QueryTypes.SELECT }  // R-04: now uses normalised value
     );
 
     // Always return 200 to avoid email enumeration
-    if (!rows.length) return res.status(200).json({ success: true, message: 'If that email exists, a reset link has been sent.' });
+    if (!rows.length) {
+      return res.status(200).json({ success: true, message: 'If that email exists, a reset link has been sent.' });
+    }
 
     const token   = crypto.randomBytes(32).toString('hex');
     const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
@@ -270,9 +337,6 @@ exports.forgotPassword = async (req, res, next) => {
       { replacements: { token, expires, id: rows[0].id }, type: QueryTypes.UPDATE }
     );
 
-    // Email sending is handled by the route wrapper (registerWithEmail pattern)
-    // NOTE: resetToken is intentionally NOT returned in the response — it is
-    // delivered only via the password-reset email so that email access is required.
     return res.status(200).json({ success: true, message: 'If that email exists, a reset link has been sent.' });
   } catch (err) {
     console.error('[forgotPassword]', err.message);
@@ -280,14 +344,20 @@ exports.forgotPassword = async (req, res, next) => {
   }
 };
 
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 // RESET PASSWORD
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 exports.resetPassword = async (req, res, next) => {
   try {
     const { token, new_password } = req.body;
     if (!token || !new_password) {
       return res.status(400).json({ success: false, error: 'token and new_password are required' });
+    }
+
+    // R-05: apply complexity rules on reset too
+    const passCheck = validatePassword(new_password);
+    if (!passCheck.valid) {
+      return res.status(400).json({ success: false, error: passCheck.error });
     }
 
     const rows = await db.query(
@@ -311,9 +381,9 @@ exports.resetPassword = async (req, res, next) => {
   }
 };
 
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 // VERIFY EMAIL
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 exports.verifyEmail = async (req, res, next) => {
   try {
     const { token } = req.body;

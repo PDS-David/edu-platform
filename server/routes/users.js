@@ -8,6 +8,7 @@ const sequelize = require('../config/database');
 
 const { protect, authorize } = require('../middleware/auth');
 const { success, error, paginated } = require('../utils/response');
+const { adminActionLimiter } = require('../middleware/rateLimiter');
 const { ENROLLMENT_SOURCE, ENROLLMENT_STATUS } = require('../constants/enrollmentConstants');
 
 // ─────────────────────────────────────────────
@@ -105,7 +106,8 @@ router.get('/', protect, async (req, res) => {
 // ─────────────────────────────────────────────
 // PUT /api/users/:id/role
 // ─────────────────────────────────────────────
-router.put('/:id/role', protect, authorize('admin'), async (req, res) => {
+// R-02: adminActionLimiter — rate-limit role changes
+router.put('/:id/role', protect, authorize('admin'), adminActionLimiter, async (req, res) => {
   const { role } = req.body;
 
   if (!['student', 'teacher', 'admin'].includes(role)) {
@@ -134,7 +136,8 @@ router.put('/:id/role', protect, authorize('admin'), async (req, res) => {
 // ─────────────────────────────────────────────
 // PUT /api/users/:id/deactivate
 // ─────────────────────────────────────────────
-router.put('/:id/deactivate', protect, authorize('admin'), async (req, res) => {
+// R-02: adminActionLimiter — rate-limit account status changes
+router.put('/:id/deactivate', protect, authorize('admin'), adminActionLimiter, async (req, res) => {
   const { is_active } = req.body;
 
   if (typeof is_active !== 'boolean') {
