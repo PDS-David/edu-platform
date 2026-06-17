@@ -405,12 +405,12 @@ function _humanSize(bytes) {
   return mb >= 1 ? `${Math.round(mb)} MB` : `${Math.round(bytes / 1024)} KB`;
 }
 
-// ── Secure filename generator ─────────────────────────────────────────────────
-// Generates a UUID-based storage filename, keeping only the validated extension.
-const { v4: uuidv4 } = require('uuid');
+// Secure filename generator now uses Node's built-in crypto.randomUUID() —
+// no external 'uuid' dependency needed (and avoids ESM/CJS interop issues
+// with uuid@13+).
 
 function secureStorageName(ext) {
-  return `${uuidv4()}.${ext}`;
+  return `${crypto.randomUUID()}.${ext}`;
 }
 
 // ── Upload logger ─────────────────────────────────────────────────────────────

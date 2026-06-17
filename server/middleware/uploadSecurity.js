@@ -45,7 +45,7 @@
 
 const multer  = require('multer');
 const crypto  = require('crypto');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = crypto;
 const { validateFile, ALLOWED_EXTENSIONS, EXTENSION_MIME_MAP } = require('../utils/fileValidator');
 const logger  = require('../config/logger');
 
@@ -78,7 +78,7 @@ function sha256(buf) {
 // ── Helper: build a safe stored filename ─────────────────────────────────────
 
 function buildStoredName(ext) {
-  return `${uuidv4()}${ext}`;
+  return `${randomUUID()}${ext}`;
 }
 
 // ── Helper: strip dangerous characters from the original filename for logging ─
