@@ -28,8 +28,8 @@ describe('ACCESS-01 — R2 proxy bypass route removed (source check)', () => {
     expect(src).not.toMatch(/res\.redirect.*\/uploads\/resources/);
   });
 
-  test('server_static_patch.js blocks /uploads/resources direct access', () => {
-    const src = fs.readFileSync(path.join(__dirname, '../server_static_patch.js'), 'utf8');
+  test('server.js blocks /uploads/resources direct access', () => {
+    const src = fs.readFileSync(path.join(__dirname, '../server.js'), 'utf8');
     expect(src).toMatch(/app\.use\s*\(\s*['"`]\/uploads\/resources/);
     expect(src).toMatch(/403/);
   });

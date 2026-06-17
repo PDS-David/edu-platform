@@ -72,11 +72,6 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 
-// STATIC FILES" ... "app.use(express.static(clientDist));"
- *   with the block below.
- * ─────────────────────────────────────────────────────────────────────────────
- */
-
 // STATIC FILES
 // ─────────────────────────────────────────────────────────────────────────────
 // SECURITY: The following directories are NEVER served as static files.
@@ -131,13 +126,6 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
     res.setHeader('Content-Security-Policy', `frame-ancestors ${frameAncestors}`);
   },
 }));
-
-// CLIENT BUILD
-const clientDist = path.join(__dirname, '..', 'client', 'dist');
-if (fs.existsSync(clientDist)) {
-  app.use(express.static(clientDist));
-}
-
 
 // CLIENT BUILD
 const clientDist = path.join(__dirname, '..', 'client', 'dist');

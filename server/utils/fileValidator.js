@@ -267,20 +267,6 @@ const STRUCTURE_VALIDATORS = {
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
- * Derive the stored file extension from the validated MIME type, NOT from the
- * client-supplied filename. This ensures the stored extension always matches
- * the actual content type.
- *
- * @param {string} ext - lowercase extension including dot, e.g. ".pdf"
- * @returns {string} the safe extension to use when writing the file
- */
-function safeExtensionForType(ext) {
-  // The extension already passed all four validation checks, so it's safe to
-  // re-use it. This function exists to make the intent explicit.
-  return ext.toLowerCase();
-}
-
-/**
  * Full four-layer file validation.
  *
  * @param {object} options
@@ -290,81 +276,6 @@ function safeExtensionForType(ext) {
  * @returns {{ valid: boolean, reason?: string, ext?: string }}
  */
 function validateFile({ buffer, originalname, declaredMime }) {
-  // ── Layer 1: extension allowlist ──────────────────────────────────────────
-  const ext = path.extname(originalname || '').toLowerCase();
-
-  if (!ext) {
-    return { valid: false, reason: 'File has no extension' };
-  }
-
-  if (BLOCKED_EXTENSIONS.has(ext)) {
-    return { valid: false, reason: `File type "${ext}" is explicitly blocked` };
-  }
-
-  if (!ALLOWED_EXTENSIONS.has(ext)) {
-    return { valid: false, reason: `File extension "${ext}" is not permitted` };
-  }
-
-  // ── Layer 2: declared MIME type allowlist ─────────────────────────────────
-  const allowedMimes = EXTENSION_MIME_MAP[ext];
-  const normalMime   = (declaredMime || '').toLowerCase().split(';')[0].trim();
-
-  if (!allowedMimes.includes(normalMime)) {
-    return {
-      valid:  false,
-      reason: `MIME type "${normalMime}" is not permitted for extension "${ext}"`,
-    };
-  }
-
-  // ── Layer 3: magic-byte inspection ────────────────────────────────────────
-  if (!buffer || buffer.length < 4) {
-    return { valid: false, reason: 'File is too small to inspect' };
-  }
-
-  // Detect what the file ACTUALLY is by its bytes, regardless of what the
-  // client claims. Cross-check against the declared extension.
-  const isActuallyZIP  = isZipMagic(buf => buf)(buffer);
-
-  // Per-extension byte check
-  let magicOk = false;
-  switch (ext) {
-    case '.pdf':  magicOk = isPDFMagic(buffer);   break;
-    case '.docx':
-    case '.xlsx':
-    case '.pptx': magicOk = isZipMagic(buffer);   break;  // Office = ZIP
-    case '.csv':
-    case '.txt':  magicOk = true;                  break;  // text — no magic bytes
-    case '.jpg':
-    case '.jpeg': magicOk = isJPEGMagic(buffer);  break;
-    case '.png':  magicOk = isPNGMagic(buffer);   break;
-    case '.webp': magicOk = isWEBPMagic(buffer);  break;
-    case '.mp4':
-    case '.mov':  magicOk = isISOBaseMagic(buffer); break;
-    default:      magicOk = false;
-  }
-
-  if (!magicOk) {
-    return {
-      valid:  false,
-      reason: `File content does not match declared type "${ext}" — magic bytes mismatch`,
-    };
-  }
-
-  // ── Layer 4: internal structure verification ───────────────────────────────
-  const structureValidator = STRUCTURE_VALIDATORS[ext];
-  if (structureValidator) {
-    const structResult = structureValidator(buffer);
-    if (!structResult.valid) {
-      return structResult;
-    }
-  }
-
-  return { valid: true, ext };
-}
-
-// Fix the closure bug from Layer 3 (isActuallyZIP was using a closure incorrectly)
-// Re-export the clean version:
-function validateFileSafe({ buffer, originalname, declaredMime }) {
   // ── Layer 1: extension allowlist ──────────────────────────────────────────
   const ext = path.extname(originalname || '').toLowerCase();
 
@@ -417,7 +328,7 @@ function validateFileSafe({ buffer, originalname, declaredMime }) {
 }
 
 module.exports = {
-  validateFile: validateFileSafe,
+  validateFile,
   ALLOWED_EXTENSIONS,
   BLOCKED_EXTENSIONS,
   EXTENSION_MIME_MAP,

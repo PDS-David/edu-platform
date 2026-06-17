@@ -30,10 +30,10 @@
 
 const path = require('path');
 // Load env before requiring any DB / service modules
-require('dotenv').config({ path: path.join(__dirname, '..', 'server', '.env') });
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const { QueryTypes } = require('sequelize');
-const sequelize      = require('../server/config/database');
+const sequelize      = require('../config/database');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Test state — shared across all test cases
@@ -289,10 +289,10 @@ describe('Test 2: Link concept to question', () => {
 describe('Test 3: Generate AI question', () => {
   const hasGemini = !!process.env.GEMINI_API_KEY;
 
-  it.skipIf(!hasGemini)(
+  (hasGemini ? it : it.skip)(
     'calls aiQuestionGenerator and returns a question with 4 options',
     async () => {
-      const { generateAIQuestion } = require('../server/services/aiQuestionGenerator');
+      const { generateAIQuestion } = require('../services/aiQuestionGenerator');
       const result = await generateAIQuestion(state.conceptId, state.studentId);
 
       expect(isUUID(result.id)).toBe(true);
@@ -310,7 +310,7 @@ describe('Test 3: Generate AI question', () => {
     60_000
   );
 
-  it.skipIf(!hasGemini)(
+  (hasGemini ? it : it.skip)(
     'persists the question to the questions table with status approved',
     async () => {
       if (!state.aiQuestionId) return; // previous test skipped
@@ -327,7 +327,7 @@ describe('Test 3: Generate AI question', () => {
     }
   );
 
-  it.skipIf(!hasGemini)(
+  (hasGemini ? it : it.skip)(
     'writes a row to ai_question_logs',
     async () => {
       if (!state.aiQuestionId) return;
@@ -354,7 +354,7 @@ describe('Test 3: Generate AI question', () => {
 
   // When Gemini is not configured, verify the generator throws a useful error
   it('throws if concept_id is invalid', async () => {
-    const { generateAIQuestion } = require('../server/services/aiQuestionGenerator');
+    const { generateAIQuestion } = require('../services/aiQuestionGenerator');
     await expect(
       generateAIQuestion('not-a-uuid', state.studentId)
     ).rejects.toThrow();
@@ -577,7 +577,7 @@ describe('Test 6: Update mastery', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('Test 7: Detect weakness', () => {
   it('getWeakConcepts returns concepts with mastery_score < 0.5', async () => {
-    const { getWeakConcepts } = require('../server/services/weakConceptService');
+    const { getWeakConcepts } = require('../services/weakConceptService');
     const weakConcepts = await getWeakConcepts(state.studentId);
 
     expect(Array.isArray(weakConcepts)).toBe(true);
@@ -614,7 +614,7 @@ describe('Test 7: Detect weakness', () => {
   });
 
   it('getRootConcepts returns prerequisite chain for a concept', async () => {
-    const { getRootConcepts } = require('../server/services/weakConceptService');
+    const { getRootConcepts } = require('../services/weakConceptService');
     // Our test concept has no dependencies — should return an empty array cleanly
     const roots = await getRootConcepts(state.conceptId);
     expect(Array.isArray(roots)).toBe(true);
@@ -624,7 +624,7 @@ describe('Test 7: Detect weakness', () => {
     // This exercises the AI fallback path (Prompt 3).
     // We call it with a topic we know has 0 questions just to confirm no throw.
     // If Gemini is available, it will generate; if not, it will return partial.
-    const { generateQuizByTopic } = require('../server/services/quizGenerator');
+    const { generateQuizByTopic } = require('../services/quizGenerator');
 
     // Find a topic that may have no questions (any topic works — if it has
     // questions we still verify the payload shape; if not, fallback fires)
