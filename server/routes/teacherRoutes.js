@@ -10,6 +10,7 @@ const router         = express.Router();
 const { QueryTypes } = require('sequelize');
 const sequelize      = require('../config/database');
 const { protect }    = require('../middleware/auth');
+const { requireTeacherClassOwnership } = require('../middleware/teacherScope');
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -234,38 +235,10 @@ async function ensureClassTables() {
   }
 }
 
-// ── GET /api/teacher/students ─────────────────────────────────────────────────
-// Returns all students who are members of any of this teacher's classes.
-// Used by TeacherResourcesPage to populate the push-to-student list.
-router.get('/students', protect, teacherOnly, async (req, res) => {
-  try {
-    const rows = await safeQuery(
-      `SELECT DISTINCT u.id, u.first_name, u.last_name, u.email
-       FROM users u
-       JOIN class_memberships cm ON cm.student_id = u.id
-       JOIN classes c ON c.id = cm.class_id
-       WHERE c.teacher_id = :teacherId
-         AND u.is_active = true
-       ORDER BY u.first_name, u.last_name`,
-      { teacherId: req.user.id }
-    );
-    // Fallback: if teacher has no classes, return all active students
-    if (!rows.length) {
-      const allStudents = await safeQuery(
-        `SELECT id, first_name, last_name, email
-         FROM users
-         WHERE role = 'student' AND is_active = true
-         ORDER BY first_name, last_name
-         LIMIT 200`,
-        {}
-      );
-      return res.json({ success: true, data: allStudents });
-    }
-    return res.json({ success: true, data: rows });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
-  }
-});
+
+// NOTE: GET /students defined below after ensureClassTables — see secure implementation.
+
+
 
 // ── GET /api/teacher/class/:classId/students (already exists below) ───────────
 router.get('/classes', protect, teacherOnly, async (req, res) => {
@@ -422,7 +395,7 @@ router.put('/class/:classId/members', protect, teacherOnly, async (req, res) => 
 });
 
 // ── GET /api/teacher/class/:classId/members ───────────────────────────────────
-router.get('/class/:classId/members', protect, teacherOnly, async (req, res) => {
+router.get('/class/:classId/members', protect, teacherOnly, requireTeacherClassOwnership, async (req, res) => {
   const { classId } = req.params;
   if (!UUID_REGEX.test(classId)) {
     return res.status(400).json({ success: false, error: 'Invalid class id' });
@@ -444,7 +417,7 @@ router.get('/class/:classId/members', protect, teacherOnly, async (req, res) => 
 });
 
 // ── GET /api/teacher/class/:classId/analytics ────────────────────────────────
-router.get('/class/:classId/analytics', protect, teacherOnly, async (req, res) => {
+router.get('/class/:classId/analytics', protect, teacherOnly, requireTeacherClassOwnership, async (req, res) => {
   try {
     const students = await safeQuery(
       `SELECT u.id, u.first_name||' '||u.last_name AS name, u.email,
@@ -464,35 +437,32 @@ router.get('/class/:classId/analytics', protect, teacherOnly, async (req, res) =
 
 // ── GET /api/teacher/students ─────────────────────────────────────────────────
 // Returns students the teacher can push resources to:
-//   1. Students in any of the teacher's classes (preferred — scoped)
-//   2. Fallback: all active students (when teacher has no classes yet)
+// (insecure duplicate removed — see secure /students definition below)
+
+
+
+
+// ── GET /api/teacher/students ─────────────────────────────────────────────────
+// Returns students visible to this teacher via their assigned classes.
+// SECURITY: No fallback to all-students. A teacher with no classes sees an
+// empty list — not the full user roster. Admins manage class assignments.
 router.get('/students', protect, teacherOnly, async (req, res) => {
+  await ensureClassTables();
   try {
-    // Students from teacher's own classes
     const classStudents = await safeQuery(
       `SELECT DISTINCT u.id, u.first_name, u.last_name, u.email,
-              c.name AS class_name
+              c.id AS class_id, c.name AS class_name
        FROM class_memberships cm
-       JOIN classes c ON c.id = cm.class_id AND c.teacher_id = :teacherId
        JOIN users   u ON u.id = cm.student_id
-       WHERE u.is_active = true
-       ORDER BY u.first_name, u.last_name`,
+       JOIN classes c ON c.id = cm.class_id
+       WHERE c.teacher_id = :teacherId
+         AND u.is_active  = true
+       ORDER BY u.last_name ASC, u.first_name ASC`,
       { teacherId: req.user.id }
     );
 
-    if (classStudents.length > 0) {
-      return res.json({ success: true, data: classStudents, source: 'classes' });
-    }
-
-    // Fallback: all active students (teacher has no classes yet)
-    const allStudents = await safeQuery(
-      `SELECT id, first_name, last_name, email
-       FROM users
-       WHERE role = 'student' AND is_active = true
-       ORDER BY first_name, last_name`,
-      {}
-    );
-    return res.json({ success: true, data: allStudents, source: 'all' });
+    // Return scoped list — may be empty if teacher has no classes assigned yet.
+    return res.json({ success: true, data: classStudents, source: 'class_members' });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }

@@ -1,29 +1,25 @@
-// server/middleware/rateLimiter.js
-// ─────────────────────────────────────────────────────────────────────────────
-// Rate limiters for the AISchoolonair API.
-//
-// STREAMING LIMITER (2026-06-16):
-//   Video routes get their own per-user limiter with a generous window so that
-//   a student watching a lecture doesn't hit the global IP cap. Because many
-//   Nigerian schools share a single NAT IP (cyber-cafes, school labs) the
-//   global limiter uses IP; the streaming limiter keys on the JWT user ID when
-//   available, falling back to IP for unauthenticated requests.
-// ─────────────────────────────────────────────────────────────────────────────
-
 'use strict';
 
-const rateLimit = require('express-rate-limit');
+/**
+ * server/middleware/rateLimiter.js
+ *
+ * Rate limiters for AISchoolOnair.
+ * Added: adminActionLimiter — tight window for admin write operations.
+ */
 
-// ── Global limiter — all routes ───────────────────────────────────────────────
+const rateLimit = require('express-rate-limit');
+const { ipKeyGenerator } = rateLimit;
+
+// ── Global limiter ────────────────────────────────────────────────────────────
 const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,   // 15 minutes
+  windowMs: 15 * 60 * 1000,
   max: 200,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, error: 'Too many requests, please try again later.' },
 });
 
-// ── AI limiter — expensive inference routes ───────────────────────────────────
+// ── AI limiter ────────────────────────────────────────────────────────────────
 const aiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
@@ -39,7 +35,7 @@ const analyticsLimiter = rateLimit({
   message: { success: false, error: 'Too many requests, please try again later.' },
 });
 
-// ── Auth limiter — login / register / password-reset ─────────────────────────
+// ── Auth limiter ──────────────────────────────────────────────────────────────
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
@@ -48,30 +44,49 @@ const authLimiter = rateLimit({
   message: { success: false, error: 'Too many authentication attempts, please try again later.' },
 });
 
-// ── Streaming limiter — HLS manifest / segment / key / progress endpoints ────
-// Keys on userId (from JWT) when available, so shared NAT IPs don't throttle
-// classrooms. A student hitting segments every 6 s generates ~150 requests per
-// 15-minute window — well inside the 600 limit for a single viewer.
+// ── Streaming limiter ─────────────────────────────────────────────────────────
+// Keys on userId (JWT) so shared NAT IPs (Nigerian school labs) don't throttle
+// entire classrooms. Falls back to IP for unauthenticated requests.
 const streamingLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,   // 15 minutes
-  max: 600,                    // ~150 seg requests × 4 students on same IP
+  windowMs: 15 * 60 * 1000,
+  max: 600,
   standardHeaders: true,
   legacyHeaders: false,
-  // Use JWT user ID as key when req.user is set (protect runs before this),
-  // otherwise fall back to IP. Normalise the IP so IPv6 addresses don't
-  // produce inconsistent keys.
+  validate: { xForwardedForHeader: false, trustProxy: false },
   keyGenerator: (req) => {
     if (req.user && req.user.id) return `user:${req.user.id}`;
-    const ip = (req.ip || '').replace(/^::ffff:/, '').replace(/%.*$/, '');
-    return ip || 'unknown';
+    return ipKeyGenerator(req);
   },
-  validate: { xForwardedForHeader: false },
   message: { success: false, error: 'Streaming rate limit exceeded. Please wait before retrying.' },
   skip: (req) => {
-    // Never throttle admin or teacher roles
     const role = req.user?.role;
     return role === 'admin' || role === 'teacher';
   },
 });
 
-module.exports = { globalLimiter, aiLimiter, analyticsLimiter, authLimiter, streamingLimiter };
+// ── Admin action limiter ──────────────────────────────────────────────────────
+// 30 write/destructive operations per admin per 15-minute window.
+// Keys on user ID so one admin hitting the limit does not affect others.
+const adminActionLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
+  keyGenerator: (req) => `admin:${req.user?.id || ipKeyGenerator(req)}`,
+  message: {
+    success: false,
+    error: 'Admin action rate limit exceeded. Too many changes in a short period.',
+    code: 'ADMIN_RATE_LIMIT',
+  },
+  skip: () => false,
+});
+
+module.exports = {
+  globalLimiter,
+  aiLimiter,
+  analyticsLimiter,
+  authLimiter,
+  streamingLimiter,
+  adminActionLimiter,
+};
