@@ -1,7 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 // Layout shells
-import StudentLayout from "./layouts/StudentLayout";
 import TeacherLayout from "./layouts/TeacherLayout";
 import AdminLayout from "./layouts/AdminLayout";
 
@@ -27,7 +26,7 @@ import PastPapersPage from "./pages/PastPapersPage";
 import SubjectCatalog from "./pages/SubjectCatalog";
 
 // Student
-import StudentDashboard from "./pages/StudentDashboard";
+import StudentDashboard, { DashboardContent } from "./pages/StudentDashboard";
 import StudentSubjectsPage from "./pages/StudentSubjectsPage";
 import StudentFilesPage from "./pages/StudentFilesPage";
 import StudentExamTypesPage from "./pages/StudentExamTypesPage";
@@ -89,9 +88,12 @@ export default function App() {
 
         {/* STUDENT */}
         <Route element={<PrivateRoute allowedRoles={["student"]} />}>
-          <Route path="/student" element={<StudentLayout />}>
-            <Route index element={<StudentDashboard />} />
-            <Route path="dashboard" element={<StudentDashboard />} />
+          <Route path="/student" element={<StudentDashboard />}>
+            {/* DEF-003: DashboardContent is the index child so /student and /student/dashboard
+                both render it through the shell's <Outlet>.  The old pattern had StudentDashboard
+                pointing at itself for /dashboard, creating an infinite self-referencing loop. */}
+            <Route index element={<DashboardContent />} />
+            <Route path="dashboard" element={<DashboardContent />} />
             <Route path="analytics" element={<StudentAnalyticsDashboard />} />
             <Route path="subject/:subjectId" element={<SubjectPage />} />
             <Route path="subtopic/:subtopicId" element={<SubtopicPage />} />
@@ -104,7 +106,8 @@ export default function App() {
             <Route path="test/:testId" element={<StudentTestPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="subjects"   element={<StudentSubjectsPage />} />
-            <Route path="files"      element={<StudentFilesPage />} />
+            {/* DEF-018: canonical URL is /student/resources; /student/files redirects */}
+            <Route path="files"      element={<Navigate to="/student/resources" replace />} />
             <Route path="resources"  element={<StudentFilesPage />} />
             <Route path="exam-types" element={<StudentExamTypesPage />} />
           </Route>
