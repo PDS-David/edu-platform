@@ -72,6 +72,7 @@ const {
 } = require('../middleware/videoAudit');
 
 const logger = require('../config/logger');
+const { multerFileFilter, multerErrorHandler } = require('../utils/fileValidation');
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const SERVER_BASE_URL = process.env.SERVER_BASE_URL || 'http://localhost:5000';
@@ -148,20 +149,27 @@ const storage = multer.diskStorage({
   },
 });
 
+// Pre-flight: extension allowlist + declared-MIME check.
+// FFmpeg processing acts as a secondary structural gate — non-video content
+// fails the encode/probe step and is marked 'failed' in the DB.
 const upload = multer({
   storage,
   limits: { fileSize: 2 * 1024 * 1024 * 1024 }, // 2 GB
-  fileFilter: (_req, file, cb) => {
-    if (file.mimetype.startsWith('video/')) return cb(null, true);
-    cb(new Error('Only video files are allowed'));
-  },
+  fileFilter: multerFileFilter(['mp4', 'mov']),
 });
 
 // =============================================================================
 // POST /api/videos/upload
 // Upload + encrypt. Teacher/Admin only.
 // =============================================================================
-router.post('/upload', protect, upload.single('video'), async (req, res) => {
+router.post(
+  '/upload',
+  protect,
+  (req, res, next) => upload.single('video')(req, res, (err) => {
+    if (err) return multerErrorHandler(err, req, res, next);
+    next();
+  }),
+  async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ success: false, error: 'No video file provided' });
   }

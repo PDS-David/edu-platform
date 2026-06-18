@@ -33,6 +33,8 @@ const {
 } = require('../utils/registrationValidators');
 
 // ── Email service (optional — safe no-op if not installed) ───────────────────
+const audit      = require('../services/auditLogger');
+
 let sendPasswordResetEmail = () => Promise.resolve();
 let sendVerificationEmail  = () => Promise.resolve();
 try {
@@ -212,6 +214,10 @@ exports.login = async (req, res, next) => {
     );
 
     if (rows.length === 0) {
+      await audit.log(req, audit.ACTIONS.LOGIN_FAILED, {
+        severity: 'warning',
+        metadata: { email: email.toLowerCase().trim(), reason: 'user_not_found' },
+      });
       return res.status(401).json({ success: false, error: 'Invalid email or password' });
     }
 
@@ -223,6 +229,11 @@ exports.login = async (req, res, next) => {
 
     const match = await bcrypt.compare(password, userRow.password);
     if (!match) {
+      await audit.log(req, audit.ACTIONS.LOGIN_FAILED, {
+        severity: 'warning',
+        actorId: userRow.id, actorEmail: userRow.email, actorRole: userRow.role,
+        metadata: { email: userRow.email, reason: 'wrong_password' },
+      });
       return res.status(401).json({ success: false, error: 'Invalid email or password' });
     }
 
@@ -234,9 +245,21 @@ exports.login = async (req, res, next) => {
     );
 
     const token = generateToken({ id: userRow.id, role: userRow.role });
-    const user  = safeUser(userRow);
+    const user = safeUser(userRow);
 
-    return res.status(200).json({ success: true, token, user });
+    // Audit successful login (setImmediate so it doesn't delay response)
+    setImmediate(() =>
+      audit.log(req, audit.ACTIONS.LOGIN, {
+        actorId: userRow.id, actorEmail: userRow.email, actorRole: userRow.role,
+        metadata: { role: userRow.role },
+      }).catch(() => {})
+    );
+
+    return res.status(200).json({
+      success: true,
+      token,
+      user
+    });
 
   } catch (err) {
     console.error('[login]', err.message);

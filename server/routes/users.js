@@ -1,14 +1,27 @@
 'use strict';
 
-const express = require('express');
-const router = express.Router();
+/**
+ * server/routes/users.js
+ *
+ * Security hardening (2026-06):
+ *   - Soft delete (sets deleted_at) instead of hard DELETE
+ *   - Recovery endpoint: POST /api/users/:id/restore
+ *   - Last-admin protection enforced at DB trigger level; application layer
+ *     pre-checks to return a clean 400 instead of a 500 on constraint violation
+ *   - Full audit logging on all write operations
+ *   - DELETE requires X-Admin-Action: 1 confirmation header
+ */
 
+const express    = require('express');
+const router     = express.Router();
 const { QueryTypes } = require('sequelize');
-const sequelize = require('../config/database');
-
-const { protect, authorize } = require('../middleware/auth');
+const sequelize  = require('../config/database');
+const { protect, authorize }  = require('../middleware/auth');
 const { success, error, paginated } = require('../utils/response');
 const { adminActionLimiter } = require('../middleware/rateLimiter');
+const { adminActionLimiter }  = require('../middleware/rateLimiter');
+const { requireAdminConfirm } = require('../middleware/confirmDestructive');
+const audit = require('../services/auditLogger');
 const { ENROLLMENT_SOURCE, ENROLLMENT_STATUS } = require('../constants/enrollmentConstants');
 
 // ─────────────────────────────────────────────
@@ -18,16 +31,15 @@ router.get('/stats', protect, authorize('admin'), async (req, res) => {
   try {
     const rows = await sequelize.query(
       `SELECT
-         COUNT(*) AS total,
-         COUNT(*) FILTER (WHERE role = 'student') AS students,
-         COUNT(*) FILTER (WHERE role = 'teacher') AS teachers,
-         COUNT(*) FILTER (WHERE role = 'admin') AS admins
+         COUNT(*)                                          AS total,
+         COUNT(*) FILTER (WHERE role = 'student')         AS students,
+         COUNT(*) FILTER (WHERE role = 'teacher')         AS teachers,
+         COUNT(*) FILTER (WHERE role = 'admin')           AS admins,
+         COUNT(*) FILTER (WHERE deleted_at IS NOT NULL)   AS soft_deleted
        FROM users`,
       { type: QueryTypes.SELECT }
     );
-
     return success(res, rows[0]);
-
   } catch (err) {
     console.error('[users.stats]', err.message);
     return error(res, 'Failed to fetch stats');
@@ -38,31 +50,26 @@ router.get('/stats', protect, authorize('admin'), async (req, res) => {
 // GET /api/users (paginated)
 // ─────────────────────────────────────────────
 router.get('/', protect, async (req, res) => {
-  // Admins can list all users; teachers can only list students (for resource assignment)
   const isAdmin   = req.user.role === 'admin';
   const isTeacher = req.user.role === 'teacher';
-  if (!isAdmin && !isTeacher) {
-    return error(res, 'Access denied', 403);
-  }
+  if (!isAdmin && !isTeacher) return error(res, 'Access denied', 403);
 
-  // Teachers may only query students
   let role = (req.query.role || '').trim();
   if (isTeacher) role = 'student';
   const validRoles = ['student', 'teacher', 'admin'];
   if (role && !validRoles.includes(role)) role = '';
 
+  // Admins can see soft-deleted users with ?include_deleted=1
+  const includeDeleted = isAdmin && req.query.include_deleted === '1';
+
   const search = req.query.search || '';
   const page   = Math.max(parseInt(req.query.page  || '1',  10), 1);
   const limit  = Math.min(parseInt(req.query.limit || '50', 10), 200);
   const offset = (page - 1) * limit;
-  // Role clause: only applied when a valid role is present.
-  // We inject the literal string (from a strict allowlist) rather than a
-  // replacement because Postgres won't cast a $1 placeholder to an enum.
-  const roleClause = role ? `AND role::text = '${role}'` : '';
-  // Search clause: built conditionally in JS — avoids passing a JS boolean
-  // as a SQL parameter (Sequelize maps it to a string 'true'/'false' which
-  // Postgres may not short-circuit correctly as a boolean in a WHERE clause).
-  const searchClause = search
+
+  const roleClause    = role ? `AND role::text = '${role}'` : '';
+  const deletedClause = includeDeleted ? '' : 'AND deleted_at IS NULL';
+  const searchClause  = search
     ? `AND (email ILIKE :searchLike OR first_name ILIKE :searchLike OR last_name ILIKE :searchLike)`
     : '';
 
@@ -72,31 +79,22 @@ router.get('/', protect, async (req, res) => {
 
     const [countRows, users] = await Promise.all([
       sequelize.query(
-        `SELECT COUNT(*)::int AS total
-         FROM users
-         WHERE 1=1
-           ${roleClause}
-           ${searchClause}`,
+        `SELECT COUNT(*)::int AS total FROM users
+         WHERE 1=1 ${deletedClause} ${roleClause} ${searchClause}`,
         { replacements, type: QueryTypes.SELECT }
       ),
       sequelize.query(
-        `SELECT id, email, first_name, last_name, role, is_active, created_at
+        `SELECT id, email, first_name, last_name, role, is_active,
+                created_at, deleted_at
          FROM users
-         WHERE 1=1
-           ${roleClause}
-           ${searchClause}
+         WHERE 1=1 ${deletedClause} ${roleClause} ${searchClause}
          ORDER BY created_at DESC
          LIMIT :limit OFFSET :offset`,
         { replacements: { ...replacements, limit, offset }, type: QueryTypes.SELECT }
       ),
     ]);
 
-    return paginated(res, users, {
-      total: countRows[0].total,
-      page,
-      limit,
-    });
-
+    return paginated(res, users, { total: countRows[0].total, page, limit });
   } catch (err) {
     console.error('[users.list]', err.message);
     return error(res, 'Failed to fetch users');
@@ -106,28 +104,57 @@ router.get('/', protect, async (req, res) => {
 // ─────────────────────────────────────────────
 // PUT /api/users/:id/role
 // ─────────────────────────────────────────────
-// R-02: adminActionLimiter — rate-limit role changes
 router.put('/:id/role', protect, authorize('admin'), adminActionLimiter, async (req, res) => {
   const { role } = req.body;
+  const targetId = req.params.id;
 
   if (!['student', 'teacher', 'admin'].includes(role)) {
     return error(res, 'Invalid role', 400);
   }
 
   try {
-    const rows = await sequelize.query(
-      `UPDATE users SET role=:role WHERE id=:id RETURNING id, email, role`,
-      {
-        replacements: { role, id: req.params.id },
-        type: QueryTypes.SELECT,
+    // Pre-check: is this a last-admin demotion?
+    if (role !== 'admin') {
+      const [target] = await sequelize.query(
+        `SELECT role FROM users WHERE id = :id LIMIT 1`,
+        { replacements: { id: targetId }, type: QueryTypes.SELECT }
+      );
+      if (target?.role === 'admin') {
+        const [countRow] = await sequelize.query(
+          `SELECT COUNT(*)::int AS cnt FROM users
+           WHERE role = 'admin' AND is_active = true AND deleted_at IS NULL`,
+          { type: QueryTypes.SELECT }
+        );
+        if (parseInt(countRow?.cnt) <= 1) {
+          return error(res, 'Cannot demote the last active admin', 400);
+        }
       }
+    }
+
+    const [prev] = await sequelize.query(
+      `SELECT role, email FROM users WHERE id = :id`, { replacements: { id: targetId }, type: QueryTypes.SELECT }
+    );
+
+    const rows = await sequelize.query(
+      `UPDATE users SET role = :role, updated_at = NOW()
+       WHERE id = :id AND deleted_at IS NULL
+       RETURNING id, email, role`,
+      { replacements: { role, id: targetId }, type: QueryTypes.SELECT }
     );
 
     if (!rows.length) return error(res, 'User not found', 404);
 
-    return success(res, rows[0]);
+    await audit.log(req, audit.ACTIONS.ROLE_CHANGE, {
+      targetType: 'user', targetId, targetEmail: prev?.email,
+      severity: 'warning',
+      metadata: { old_role: prev?.role, new_role: role },
+    });
 
+    return success(res, rows[0]);
   } catch (err) {
+    if (err.message.includes('LAST_ADMIN_PROTECTION')) {
+      return error(res, err.message.replace('LAST_ADMIN_PROTECTION: ', ''), 400);
+    }
     console.error('[users.role]', err.message);
     return error(res, 'Failed to update role');
   }
@@ -136,44 +163,61 @@ router.put('/:id/role', protect, authorize('admin'), adminActionLimiter, async (
 // ─────────────────────────────────────────────
 // PUT /api/users/:id/deactivate
 // ─────────────────────────────────────────────
-// R-02: adminActionLimiter — rate-limit account status changes
 router.put('/:id/deactivate', protect, authorize('admin'), adminActionLimiter, async (req, res) => {
   const { is_active } = req.body;
+  const targetId = req.params.id;
 
-  if (typeof is_active !== 'boolean') {
-    return error(res, 'is_active must be boolean', 400);
-  }
+  if (typeof is_active !== 'boolean') return error(res, 'is_active must be boolean', 400);
 
   try {
-    const rows = await sequelize.query(
-      `UPDATE users SET is_active=:is_active WHERE id=:id RETURNING id, email, is_active`,
-      {
-        replacements: { is_active, id: req.params.id },
-        type: QueryTypes.SELECT,
+    // Pre-check last-admin deactivation
+    if (!is_active) {
+      const [target] = await sequelize.query(
+        `SELECT role, email FROM users WHERE id = :id LIMIT 1`,
+        { replacements: { id: targetId }, type: QueryTypes.SELECT }
+      );
+      if (target?.role === 'admin') {
+        const [countRow] = await sequelize.query(
+          `SELECT COUNT(*)::int AS cnt FROM users
+           WHERE role = 'admin' AND is_active = true AND deleted_at IS NULL`,
+          { type: QueryTypes.SELECT }
+        );
+        if (parseInt(countRow?.cnt) <= 1) {
+          return error(res, 'Cannot deactivate the last active admin', 400);
+        }
       }
+    }
+
+    const rows = await sequelize.query(
+      `UPDATE users SET is_active = :is_active, updated_at = NOW()
+       WHERE id = :id AND deleted_at IS NULL
+       RETURNING id, email, is_active`,
+      { replacements: { is_active, id: targetId }, type: QueryTypes.SELECT }
     );
 
     if (!rows.length) return error(res, 'User not found', 404);
 
-    return success(res, rows[0]);
+    const action = is_active ? audit.ACTIONS.USER_REACTIVATE : audit.ACTIONS.USER_DEACTIVATE;
+    await audit.log(req, action, {
+      targetType: 'user', targetId, targetEmail: rows[0].email, severity: 'warning',
+    });
 
+    return success(res, rows[0]);
   } catch (err) {
+    if (err.message.includes('LAST_ADMIN_PROTECTION')) {
+      return error(res, err.message.replace('LAST_ADMIN_PROTECTION: ', ''), 400);
+    }
     console.error('[users.deactivate]', err.message);
     return error(res, 'Failed to update status');
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PATCH /api/users/preferences
-// Called by OnboardingPage and SettingsPage.
-// Must be defined BEFORE /:id routes — Express would treat "preferences" as an ID.
-// Body: { exam_boards: ['JAMB','WAEC'], subject_ids: [1,2], daily_goal: 50,
-//         preferred_study_days: '["Mon","Tue"]', preferred_study_time: 'evening' }
-// ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// PATCH /api/users/preferences  (must stay before /:id routes)
+// ─────────────────────────────────────────────
 router.patch('/preferences', protect, async (req, res) => {
   const { exam_boards, subject_ids, daily_goal,
           preferred_study_days, preferred_study_time } = req.body;
-  // SettingsPage sends study_days as a JSON string; normalise here
   const studyDays = preferred_study_days != null
     ? (typeof preferred_study_days === 'string'
         ? JSON.parse(preferred_study_days || '[]')
@@ -183,7 +227,6 @@ router.patch('/preferences', protect, async (req, res) => {
   const userId = req.user.id;
 
   try {
-    // 1. Save exam board selections → student_exam_types
     if (Array.isArray(exam_boards) && exam_boards.length > 0) {
       for (const code of exam_boards) {
         const board = await sequelize.query(
@@ -201,7 +244,6 @@ router.patch('/preferences', protect, async (req, res) => {
       }
     }
 
-    // 2. Save subject selections → student_subjects
     if (Array.isArray(subject_ids) && subject_ids.length > 0) {
       for (const sid of subject_ids) {
         const safeId = parseInt(sid);
@@ -211,15 +253,13 @@ router.patch('/preferences', protect, async (req, res) => {
             `INSERT INTO student_subjects (student_id, subject_id, is_active, status, enrollment_source)
              VALUES (:userId, :subjectId, true, :approvedStatus, :enrollmentSource)
              ON CONFLICT (student_id, subject_id) DO UPDATE
-               SET is_active         = true,
-                   status            = :approvedStatus,
+               SET is_active = true, status = :approvedStatus,
                    enrollment_source = COALESCE(student_subjects.enrollment_source, :enrollmentSource)`,
             { replacements: { userId, subjectId: safeId, enrollmentSource: ENROLLMENT_SOURCE.EXPLICIT, approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.RAW }
           );
-        } catch (_e) { /* table may not exist yet on very fresh DB */ }
+        } catch (_e) {}
       }
 
-      // Derive and save the exam boards those subjects belong to
       const boardRows = await sequelize.query(
         `SELECT DISTINCT exam_board_id FROM subjects
          WHERE id = ANY(:subjectIds::int[]) AND is_active = true AND exam_board_id IS NOT NULL`,
@@ -235,7 +275,6 @@ router.patch('/preferences', protect, async (req, res) => {
       }
     }
 
-    // 3. Persist daily goal
     if (daily_goal != null) {
       await sequelize.query(
         `UPDATE users SET daily_goal = :g, updated_at = NOW() WHERE id = :userId`,
@@ -243,23 +282,22 @@ router.patch('/preferences', protect, async (req, res) => {
       );
     }
 
-    // 4. Persist study schedule
     if (Array.isArray(studyDays)) {
       await sequelize.query(
-        `UPDATE users
-         SET preferred_study_days = :days,
-             preferred_study_time = :time,
-             updated_at           = NOW()
-         WHERE id = :userId`,
+        `UPDATE users SET preferred_study_days = :days, preferred_study_time = :time, updated_at = NOW() WHERE id = :userId`,
         { replacements: { days: JSON.stringify(studyDays), time: studyTime || 'evening', userId }, type: QueryTypes.RAW }
       );
     }
 
-    // 5. Mark onboarding complete
     await sequelize.query(
       `UPDATE users SET onboarding_complete = true, updated_at = NOW() WHERE id = :userId`,
       { replacements: { userId }, type: QueryTypes.RAW }
     );
+
+    await audit.log(req, audit.ACTIONS.SETTINGS_CHANGE, {
+      targetType: 'user', targetId: userId,
+      metadata: { changed: Object.keys(req.body) },
+    });
 
     return res.status(200).json({ success: true, message: 'Preferences saved' });
   } catch (err) {
@@ -268,25 +306,22 @@ router.patch('/preferences', protect, async (req, res) => {
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /api/users/:id  — fetch single user detail (admin only)
-// Must stay AFTER all named sub-routes (stats, preferences).
-// ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// GET /api/users/:id
+// ─────────────────────────────────────────────
 router.get('/:id', protect, authorize('admin'), async (req, res) => {
   const { id } = req.params;
-  if (!id || !id.trim()) {
-    return error(res, 'User ID is required', 400);
-  }
+  if (!id?.trim()) return error(res, 'User ID is required', 400);
   try {
     const rows = await sequelize.query(
       `SELECT id, email, first_name, last_name, role, is_active,
               subscription_status, subscription_expires_at, created_at,
               last_login, xp_points, study_streak_days, onboarding_complete,
-              avatar_url, phone, country
+              avatar_url, phone, country, deleted_at, deleted_by, delete_reason
        FROM users WHERE id = :id`,
       { replacements: { id }, type: QueryTypes.SELECT }
     );
-    if (rows.length === 0) return error(res, 'User not found', 404);
+    if (!rows.length) return error(res, 'User not found', 404);
     return success(res, rows[0]);
   } catch (err) {
     console.error('[GET /users/:id]', err.message);
@@ -295,24 +330,93 @@ router.get('/:id', protect, authorize('admin'), async (req, res) => {
 });
 
 // ─────────────────────────────────────────────
-// DELETE /api/users/:id
+// DELETE /api/users/:id  — SOFT DELETE
+// Requires X-Admin-Action: 1 confirmation header.
 // ─────────────────────────────────────────────
-router.delete('/:id', protect, authorize('admin'), async (req, res) => {
-  if (req.params.id === req.user.id) {
+router.delete('/:id', protect, authorize('admin'), adminActionLimiter, requireAdminConfirm, async (req, res) => {
+  const targetId = req.params.id;
+
+  if (targetId === req.user.id) {
     return error(res, 'Cannot delete yourself', 400);
   }
 
   try {
+    // Pre-check last-admin deletion
+    const [target] = await sequelize.query(
+      `SELECT role, email FROM users WHERE id = :id AND deleted_at IS NULL LIMIT 1`,
+      { replacements: { id: targetId }, type: QueryTypes.SELECT }
+    );
+    if (!target) return error(res, 'User not found', 404);
+
+    if (target.role === 'admin') {
+      const [countRow] = await sequelize.query(
+        `SELECT COUNT(*)::int AS cnt FROM users
+         WHERE role = 'admin' AND is_active = true AND deleted_at IS NULL`,
+        { type: QueryTypes.SELECT }
+      );
+      if (parseInt(countRow?.cnt) <= 1) {
+        return error(res, 'Cannot delete the last active admin', 400);
+      }
+    }
+
+    const reason = req.body?.reason || null;
+
     await sequelize.query(
-      `DELETE FROM users WHERE id=:id`,
-      { replacements: { id: req.params.id }, type: QueryTypes.DELETE }
+      `UPDATE users
+       SET deleted_at    = NOW(),
+           deleted_by    = :deletedBy,
+           delete_reason = :reason,
+           is_active     = false,
+           updated_at    = NOW()
+       WHERE id = :id AND deleted_at IS NULL`,
+      { replacements: { id: targetId, deletedBy: req.user.id, reason }, type: QueryTypes.UPDATE }
     );
 
-    return success(res, { message: 'User deleted' });
+    await audit.log(req, audit.ACTIONS.USER_DELETE, {
+      targetType: 'user', targetId, targetEmail: target.email,
+      severity: 'warning',
+      metadata: { reason, soft_delete: true },
+    });
 
+    return success(res, { message: 'User soft-deleted', id: targetId });
   } catch (err) {
+    if (err.message.includes('LAST_ADMIN_PROTECTION')) {
+      return error(res, err.message.replace('LAST_ADMIN_PROTECTION: ', ''), 400);
+    }
     console.error('[users.delete]', err.message);
     return error(res, 'Failed to delete user');
+  }
+});
+
+// ─────────────────────────────────────────────
+// POST /api/users/:id/restore  — recovery workflow
+// ─────────────────────────────────────────────
+router.post('/:id/restore', protect, authorize('admin'), adminActionLimiter, async (req, res) => {
+  const targetId = req.params.id;
+  try {
+    const rows = await sequelize.query(
+      `UPDATE users
+       SET deleted_at    = NULL,
+           deleted_by    = NULL,
+           delete_reason = NULL,
+           is_active     = true,
+           updated_at    = NOW()
+       WHERE id = :id AND deleted_at IS NOT NULL
+       RETURNING id, email, role`,
+      { replacements: { id: targetId }, type: QueryTypes.SELECT }
+    );
+
+    if (!rows.length) return error(res, 'User not found or not deleted', 404);
+
+    await audit.log(req, audit.ACTIONS.USER_RESTORE, {
+      targetType: 'user', targetId, targetEmail: rows[0].email,
+      metadata: { restored_by: req.user.id },
+    });
+
+    return success(res, { message: 'User restored', user: rows[0] });
+  } catch (err) {
+    console.error('[users.restore]', err.message);
+    return error(res, 'Failed to restore user');
   }
 });
 
