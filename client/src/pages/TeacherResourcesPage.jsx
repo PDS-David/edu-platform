@@ -1,6 +1,6 @@
 // client/src/pages/TeacherResourcesPage.jsx
 // URL: /teacher/resources
-// Tab 1 — Upload Resource → POST /api/resources/upload (multipart)
+// Tab 1 — Upload Resource → POST /api/resources/bulk-upload (multipart)
 // Tab 2 — My Resources   → GET/DELETE /api/resources
 // Tab 3 — Add Question   → POST /api/teacher/questions
 
@@ -132,6 +132,8 @@ function UploadTab({ showToast }) {
     // NOTE: uploaded_by is set server-side from req.user.id — do NOT send it from frontend
     if (form.topic_id)    fd.append('topic_id',    String(form.topic_id));
     if (form.subtopic_id) fd.append('subtopic_id', String(form.subtopic_id));
+    // subject_id is sent so the server can tag it during bulk-upload
+    if (form.subject_id)  fd.append('subject_id',  String(form.subject_id));
 
     try {
       const rawBase = import.meta.env.VITE_API_URL || '';
@@ -140,9 +142,9 @@ function UploadTab({ showToast }) {
         : (rawBase ? `${rawBase}/api` : '/api');
       const token = localStorage.getItem('token') || '';
 
-      await new Promise((resolve, reject) => {
+      const uploadResult = await new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        xhr.open('POST', `${apiBase}/resources/upload`);
+        xhr.open('POST', `${apiBase}/resources/bulk-upload`);
         if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
         xhr.upload.onprogress = (e) => {
           if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 100));
@@ -159,6 +161,26 @@ function UploadTab({ showToast }) {
         xhr.onerror = () => reject(new Error('Network error — check your connection.'));
         xhr.send(fd);
       });
+
+      // Auto-assign metadata so files don't sit in the staging tray.
+      // Without this call, is_staged stays true and the resource is invisible
+      // to students and cannot be pushed. subject_id is the minimum required field.
+      if (form.subject_id && uploadResult.data?.length) {
+        for (const uploaded of uploadResult.data) {
+          try {
+            await api.put(`/resources/${uploaded.id}/assign-meta`, {
+              title:        form.title.trim() || uploaded.title,
+              subject_id:   form.subject_id   || null,
+              topic_id:     form.topic_id     || null,
+              subtopic_id:  form.subtopic_id  || null,
+              content_kind: 'learning_material',
+              push_type:    'learning_material',
+            });
+          } catch {
+            // Non-fatal — resource uploaded OK, metadata can be set later in admin panel
+          }
+        }
+      }
 
       showToast('Resource uploaded successfully!');
       setFile(null);
@@ -358,8 +380,10 @@ function ResourcesTab({ showToast }) {
 
   // Lazy-load students & classes when push panel opens
   const openPush = (id) => {
+    const resource = resources.find(r => r.id === id);
+    const defaultPushType = resource?.push_type || 'learning_material';
     setPushing(id);
-    setPushForm({ push_type: 'learning_material', student_ids: [], class_ids: [], assign_all: false });
+    setPushForm({ push_type: defaultPushType, student_ids: [], class_ids: [], assign_all: false });
     setPushSearch('');
     if (students.length === 0) {
       // /teacher/students returns class members (fallback: all students)
@@ -397,7 +421,12 @@ function ResourcesTab({ showToast }) {
         class_ids:  pushForm.class_ids,
         push_type:  pushForm.push_type,
       });
-      showToast(res?.message || 'Resource pushed successfully!');
+      const skipped = res?.skipped_count || 0;
+      const baseMsg = res?.message || 'Resource pushed successfully!';
+      const fullMsg = skipped > 0
+        ? `${baseMsg} (${skipped} student${skipped > 1 ? 's' : ''} skipped — not enrolled in this subject)`
+        : baseMsg;
+      showToast(fullMsg, skipped > 0 ? 'error' : 'success');
       setPushing(null);
     } catch (err) {
       showToast(err?.message || 'Push failed.', 'error');
@@ -466,8 +495,29 @@ function ResourcesTab({ showToast }) {
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <a href={r.id ? `/api/resources/${r.id}/download` : (r.url || r.file_url)} target="_blank" rel="noreferrer"
-                className="text-xs text-blue-600 hover:text-blue-800 font-medium px-3 py-1.5 border border-blue-200 rounded-lg transition-colors">
+              <a
+                href="#"
+                onClick={async (e) => {
+                  e.preventDefault();
+                  try {
+                    // Fetch the download URL authenticated so the Bearer token is sent.
+                    // The server returns a signed R2 URL (302 redirect) or streams the file.
+                    const token = localStorage.getItem('token') || '';
+                    const rawBase = import.meta.env.VITE_API_URL || '';
+                    const apiBase = rawBase.endsWith('/api') ? rawBase : (rawBase ? `${rawBase}/api` : '/api');
+                    const resp = await fetch(`${apiBase}/resources/${r.id}/download`, {
+                      headers: token ? { Authorization: `Bearer ${token}` } : {},
+                      redirect: 'follow',
+                    });
+                    if (!resp.ok) { alert(`Could not open file (${resp.status}). Check your access.`); return; }
+                    const blob = await resp.blob();
+                    const url  = URL.createObjectURL(blob);
+                    window.open(url, '_blank');
+                    setTimeout(() => URL.revokeObjectURL(url), 60000);
+                  } catch { alert('Download failed. Check your connection.'); }
+                }}
+                className="text-xs text-blue-600 hover:text-blue-800 font-medium px-3 py-1.5 border border-blue-200 rounded-lg transition-colors"
+              >
                 View
               </a>
               <button
