@@ -74,31 +74,55 @@ app.options('*', cors(corsOptions));
 
 // STATIC FILES
 // ─────────────────────────────────────────────────────────────────────────────
-// SECURITY: /uploads/videos/hls/** and /uploads/videos/raw/** are NEVER served
-// as static files. HLS segments and AES keys are now stored in hls_secure/ and
-// keys_secure/ (outside this tree) and delivered ONLY through authenticated API
-// routes in /api/videos/stream/* and /api/videos/key/*.
+// SECURITY: The following directories are NEVER served as static files.
+// All access to these must go through authenticated API endpoints.
 //
-// The /uploads static mount still serves other assets (thumbnails, resources,
-// PDFs) but a guard middleware blocks any attempt to reach the video directories.
+//   /uploads/videos      → served via /api/videos/stream/* (HLS + auth)
+//   /uploads/resources   → served via /api/resources/:id/download (entitlement check)
+//   /uploads/past-papers → served via /api/past-papers/:id/download or R2 signed URL
+//   /uploads/raw         → internal raw uploads, never served
+//
+// /uploads remains mounted for remaining public assets (e.g. thumbnails),
+// but with explicit subdirectory blocks above it.
 // ─────────────────────────────────────────────────────────────────────────────
+
+// Block all direct access to video files (existing fix — kept)
 app.use('/uploads/videos', (_req, res) => {
-  // Block all direct access to the video sub-directory, including any legacy
-  // paths that might still exist before migration of hls_secure/.
   return res.status(403).json({
     success: false,
     error: 'Direct access to video files is not permitted. Use /api/videos/stream/*.',
   });
 });
 
+// Block direct access to resources — must go through authenticated download
+app.use('/uploads/resources', (_req, res) => {
+  return res.status(403).json({
+    success: false,
+    error: 'Direct access to resource files is not permitted. Use /api/resources/:id/download.',
+  });
+});
+
+// Block direct access to past-paper files
+app.use('/uploads/past-papers', (_req, res) => {
+  return res.status(403).json({
+    success: false,
+    error: 'Direct access to past paper files is not permitted.',
+  });
+});
+
+// /uploads static mount for remaining public assets (thumbnails, etc.)
+// X-Content-Type-Options: nosniff prevents MIME-sniffing attacks on anything
+// still served from here.
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
   setHeaders: (res) => {
-    // Allow embedding file previews (PDF/office viewers) from the frontend domain.
+    // Prevent browser MIME sniffing — must honour Content-Type header only
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    // Allow embedding (PDF/office viewers) from the frontend domain only
     res.setHeader('X-Frame-Options', 'ALLOWALL');
     const a = [process.env.CLIENT_URL, process.env.PROD_CLIENT_URL]
       .filter(Boolean)
       .map((u) => u.replace(/\/+$/, ''));
-    const frameAncestors = a.length ? a.join(' ') : '*';
+    const frameAncestors = a.length ? a.join(' ') : 'https://www.aischoolonair.ng https://aischoolonair.ng';
     res.setHeader('Content-Security-Policy', `frame-ancestors ${frameAncestors}`);
   },
 }));
@@ -153,6 +177,7 @@ const analyticsRoutes = safeRequire('./routes/analyticsRoutes');
 const questionsRoutes = safeRequire('./routes/questionsRoutes');
 const resourceRoutes = safeRequire('./routes/resourceRoutes');
 const adminRoutes = safeRequire('./routes/adminRoutes');
+const auditRoutes = safeRequire('./routes/auditRoutes');
 const studentRoutes = safeRequire('./routes/studentRoutes');
 const teacherRoutes = safeRequire('./routes/teacherRoutes');
 const catalogRoutes = safeRequire('./routes/catalogRoutes');
@@ -215,6 +240,7 @@ if (curriculumRoutes) app.use('/api/curriculum', protect, curriculumRoutes);
 if (studentRoutes) app.use('/api/students', protect, studentRoutes);
 if (teacherRoutes) app.use('/api/teacher', protect, teacherRoutes);
 if (adminRoutes) app.use('/api/admin', protect, adminRoutes);
+if (auditRoutes) app.use('/api/audit', protect, auditRoutes);
 if (paymentRoutes) app.use('/api/payments', protect, paymentRoutes);
 if (weakTopicRoutes) app.use('/api/weak-topics', protect, weakTopicRoutes);
 if (recommendationRoutes) app.use('/api/recommendations', protect, recommendationRoutes);

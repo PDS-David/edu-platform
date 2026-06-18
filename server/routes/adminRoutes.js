@@ -17,6 +17,9 @@ const {
 } = require('../utils/registrationValidators');
 const { success, error } = require('../utils/response');
 const { ENROLLMENT_SOURCE, ENROLLMENT_STATUS } = require('../constants/enrollmentConstants');
+const audit = require('../services/auditLogger');
+const { adminActionLimiter } = require('../middleware/rateLimiter');
+const { requireConfirmHeader, requireAdminConfirm } = require('../middleware/confirmDestructive');
 
 // ─────────────────────────────────────────────
 // ADMIN GUARD
@@ -33,8 +36,6 @@ const adminOnly = (req, res, next) => {
 // Admin-only. Creates a teacher account directly (no email verification required).
 // Body: { email, password, first_name, last_name }
 // ─────────────────────────────────────────────
-// R-02: adminActionLimiter added — protects teacher/account creation from
-//        abuse by a compromised admin token.
 router.post('/create-teacher', protect, adminOnly, adminActionLimiter, async (req, res) => {
   const bcrypt = require('bcryptjs');
   const crypto = require('crypto');
@@ -95,6 +96,10 @@ router.post('/create-teacher', protect, adminOnly, adminActionLimiter, async (re
       return error(res, 'An account with that email already exists', 409);
     }
 
+    await audit.log(req, audit.ACTIONS.TEACHER_CREATE, {
+      targetType: 'user', targetId: rows[0].id, targetEmail: rows[0].email,
+      metadata: { first_name: rows[0].first_name, last_name: rows[0].last_name },
+    });
     return success(res, { user: rows[0] }, null, 201);
   } catch (err) {
     console.error('[POST /admin/create-teacher]', err.message);
@@ -105,9 +110,6 @@ router.post('/create-teacher', protect, adminOnly, adminActionLimiter, async (re
     return error(res, 'Failed to create teacher account');
   }
 });
-
-// ─────────────────────────────────────────────
-// GET /api/admin/platform-stats
 // Powers PlatformAnalyticsPanel in AdminDashboard.
 // Returns: { users, questions, revenue, top_subjects, daily_activity }
 // All queries use practice_attempts as the primary activity source.
@@ -347,7 +349,7 @@ router.get('/questions/pending', protect, adminOnly, async (req, res) => {
 });
 
 // PUT /api/admin/questions/:id/review  — approve or reject a question
-router.put('/questions/:id/review', protect, adminOnly, async (req, res) => {
+router.put('/questions/:id/review', protect, adminOnly, adminActionLimiter, async (req, res) => {
   try {
     const { action, feedback } = req.body;
     if (!['approve', 'reject'].includes(action)) {
@@ -373,6 +375,12 @@ router.put('/questions/:id/review', protect, adminOnly, async (req, res) => {
         type: QueryTypes.UPDATE,
       }
     );
+
+    const qAction = req.body.action === 'approve' ? audit.ACTIONS.QUESTION_APPROVE : audit.ACTIONS.QUESTION_REJECT;
+    await audit.log(req, qAction, {
+      targetType: 'question', targetId: req.params.id,
+      metadata: { status: newStatus, feedback: feedback?.trim() || null },
+    });
 
     return res.json({ success: true, status: newStatus });
   } catch (err) {
@@ -413,7 +421,7 @@ router.post('/send-weekly-digest', protect, adminOnly, async (req, res) => {
 // Sends an in-app notification to all users, students only, or teachers only.
 // Body: { target: 'all'|'students'|'teachers', title: string, message: string }
 // ─────────────────────────────────────────────
-router.post('/send-notification', protect, adminOnly, async (req, res) => {
+router.post('/send-notification', protect, adminOnly, adminActionLimiter, async (req, res) => {
   try {
     const { target = 'all', title, message } = req.body;
     if (!title || !message) {
@@ -449,6 +457,9 @@ router.post('/send-notification', protect, adminOnly, async (req, res) => {
     ));
 
     console.log(`[admin] Notification sent to ${users.length} users by admin ${req.user.id}`);
+    await audit.log(req, audit.ACTIONS.NOTIFICATION_SEND, {
+      metadata: { target, title, sent_count: users.length },
+    });
     return res.json({ success: true, sent: users.length });
   } catch (err) {
     console.error('[POST /admin/send-notification]', err.message);
@@ -1116,13 +1127,9 @@ router.post('/migrate-to-r2', protect, adminOnly, async (req, res) => {
 // Deletes ALL resources, their assignments (resource_assignments +
 // resource_user_assignments), and any R2 objects. Irreversible.
 // Protected: admin only. Requires header  X-Confirm: purge-all-resources
-router.delete('/purge-all-resources', protect, adminOnly, async (req, res) => {
-  if (req.headers['x-confirm'] !== 'purge-all-resources') {
-    return res.status(400).json({
-      success: false,
-      error: 'Missing confirmation header. Send X-Confirm: purge-all-resources'
-    });
-  }
+router.delete('/purge-all-resources', protect, adminOnly, adminActionLimiter, requireConfirmHeader('purge-all-resources'), async (req, res) => {
+  // Note: confirmation header check is now handled by requireConfirmHeader middleware above.
+  // The old inline check below is superseded but kept as belt-and-suspenders comment.
 
   try {
     const r2 = require('../utils/r2Storage');
@@ -1142,6 +1149,11 @@ router.delete('/purge-all-resources', protect, adminOnly, async (req, res) => {
     const [, raResult]  = await sequelize.query(`DELETE FROM resource_assignments`, { type: QueryTypes.DELETE });
     const [, ruaResult] = await sequelize.query(`DELETE FROM resource_user_assignments`, { type: QueryTypes.DELETE });
     const [, rResult]   = await sequelize.query(`DELETE FROM resources`, { type: QueryTypes.DELETE });
+
+    await audit.log(req, audit.ACTIONS.RESOURCE_PURGE, {
+      severity: 'critical',
+      metadata: { resources_deleted: rows.length, r2_attempted: r2.isR2Enabled() ? rows.length : 0 },
+    });
 
     return res.json({
       success: true,
