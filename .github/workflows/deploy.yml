@@ -44,11 +44,13 @@ jobs:
 
             cd /opt/aischoolonair
             echo "▶ Cleaning up stale Git lock files..."
-            find .git/refs/remotes/origin -name "*.lock" -delete 2>/dev/null || true
-            find .git -name "*.lock" -maxdepth 2 -delete 2>/dev/null || true
+            find .git/refs -name "*.lock" -delete 2>/dev/null || true
+            find .git -name "*.lock" -delete 2>/dev/null || true
+
+            echo "▶ Fixing Git directory permissions..."
+            chmod -R u+w .git 2>/dev/null || true
 
             echo "▶ Syncing with GitHub (hard reset safe mode)..."
-            git fetch origin
             git reset --hard origin/main
             echo "▶ Ensuring deploy script is executable..."
             chmod +x deploy.sh
