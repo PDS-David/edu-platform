@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { Eye, EyeOff, ChevronDown, ChevronUp, AlertCircle, RefreshCw } from 'lucide-react';
 import PublicNav from '../components/PublicNav';
 import api from '../services/apiClient';
+import { getPostAuthRedirect } from '../utils/postAuthRedirect';
 
 // ── Country codes ─────────────────────────────────────────────────────────────
 const COUNTRY_CODES = [
@@ -357,9 +358,7 @@ const RegisterPage = () => {
         terms_accepted:    true,
       });
 
-      if (user.role === 'student')      navigate('/student/dashboard');
-      else if (user.role === 'teacher') navigate('/teacher/dashboard');
-      else                              navigate('/admin/dashboard');
+      navigate(getPostAuthRedirect(user));
     } catch (err) {
       setError(err?.message || 'Registration failed. Please try again.');
     } finally {
