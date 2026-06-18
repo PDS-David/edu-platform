@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Eye, EyeOff, AlertCircle } from 'lucide-react';
 import PublicNav from '../components/PublicNav';
+import { getPostAuthRedirect } from '../utils/postAuthRedirect';
 
 const LoginPage = () => {
   const [email,       setEmail]       = useState('');
@@ -21,16 +22,7 @@ const LoginPage = () => {
     setLoading(true);
     try {
       const user = await login(email, password, rememberMe);
-      // Support both snake_case (API) and camelCase versions of the flag
-      if (user.role === 'student') {
-        navigate('/student/dashboard');
-      } else {
-        const redirectMap = {
-          teacher: '/teacher/dashboard',
-          admin:   '/admin/dashboard',
-        };
-        navigate(redirectMap[user.role] || '/');
-      }
+      navigate(getPostAuthRedirect(user));
     } catch (err) {
       // Defensively extract string — err.error may be an object if server sends {error: {message:...}}
       const raw = err?.message ?? '';
