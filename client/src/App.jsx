@@ -79,8 +79,13 @@ export default function App() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
-        <Route path="/onboarding" element={<OnboardingPage />} />
         <Route path="/payment/verify" element={<PaymentVerify />} />
+
+        {/* ONBOARDING — authenticated, student-only, but exempt from the
+            onboarding-redirect check (it IS the onboarding page). */}
+        <Route element={<PrivateRoute allowedRoles={["student"]} skipOnboardingCheck />}>
+          <Route path="/onboarding" element={<OnboardingPage />} />
+        </Route>
 
         {/* STUDENT */}
         <Route element={<PrivateRoute allowedRoles={["student"]} />}>
