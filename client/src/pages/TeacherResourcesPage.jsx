@@ -145,7 +145,8 @@ function UploadTab({ showToast }) {
       const uploadResult = await new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open('POST', `${apiBase}/resources/bulk-upload`);
-        if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);\n        xhr.upload.onprogress = (e) => {
+        if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        xhr.upload.onprogress = (e) => {
           if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 100));
         };
         xhr.onload = () => {
