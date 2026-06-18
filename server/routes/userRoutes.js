@@ -254,31 +254,77 @@ router.patch('/preferences', protect, async (req, res) => {
         { type: QueryTypes.RAW }
       );
 
-      // Save each selected subject
+      // Save each selected subject.
+      // FIX 2026-06-18: explicitly set status = 'approved' here (not just
+      // is_active = true). resourceRoutes.js's assign-users entitlement
+      // check filters recipients by `student_subjects.status = 'approved'`,
+      // while this onboarding insert previously only set is_active and
+      // relied on the column's model-level DEFAULT 'approved' — which is
+      // NOT guaranteed by the inline CREATE TABLE IF NOT EXISTS fallback
+      // above (it has no status column at all). Setting it explicitly here
+      // means a student who enrolls in a subject via onboarding is
+      // immediately visible to staff pushing assigned files/quizzes/tests
+      // for that subject, regardless of which code path created the row.
       for (const sid of subject_ids) {
         const safeId = parseInt(sid);
         if (!safeId) continue;
         await sequelize.query(
-          `INSERT INTO student_subjects (student_id, subject_id, is_active)
-           VALUES (:userId, :subjectId, true)
-           ON CONFLICT (student_id, subject_id) DO UPDATE SET is_active = true`,
+          `INSERT INTO student_subjects (student_id, subject_id, is_active, status)
+           VALUES (:userId, :subjectId, true, 'approved')
+           ON CONFLICT (student_id, subject_id) DO UPDATE
+             SET is_active = true,
+                 status    = 'approved'`,
           { replacements: { userId, subjectId: safeId }, type: QueryTypes.INSERT }
         );
       }
 
       // Also save the boards those subjects belong to in student_exam_types
-      const boardRows = await sequelize.query(
-        `SELECT DISTINCT exam_board_id FROM subjects
-         WHERE id = ANY(:subjectIds) AND is_active = true AND exam_board_id IS NOT NULL`,
-        { replacements: { subjectIds: subject_ids.map(Number).filter(Boolean) }, type: QueryTypes.SELECT }
-      );
-      for (const row of boardRows) {
-        await sequelize.query(
-          `INSERT INTO student_exam_types (student_id, exam_board_id, is_active)
-           VALUES (:userId, :boardId, true)
-           ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active = true`,
-          { replacements: { userId, boardId: row.exam_board_id }, type: QueryTypes.INSERT }
-        );
+      //
+      // FIX 2026-06-18: this previously used `id = ANY(:subjectIds)` with a
+      // plain JS array passed as a Sequelize named replacement. Sequelize's
+      // raw-query replacement binding does not reliably coerce a JS array
+      // into a Postgres array literal for ANY() — it throws a type-mismatch
+      // error ("operator does not exist: integer = integer[]" or similar)
+      // depending on the pg/Sequelize version. That error was NOT caught by
+      // any inner try/catch (unlike the exam_boards loop above), so it
+      // propagated straight to the outer catch and killed the whole
+      // request with a generic 500 ("Failed to save preferences"), even
+      // though the student_subjects rows above had already been inserted.
+      // This is the exact failure seen in production when a student
+      // selected subjects (e.g. Chemistry), set a study goal/schedule, and
+      // clicked "Let's go!" — DevTools showed
+      // `PATCH api/users/preferences` → 500, and the student was stuck on
+      // the final onboarding screen with onboarding_complete never set.
+      //
+      // Fix: use IN (:subjectIds), which Sequelize reliably expands for
+      // raw replacements (this pattern is already used safely elsewhere in
+      // this codebase). Also guard the empty-array case, since `IN ()` is
+      // invalid SQL, and wrap the whole block in its own try/catch so a
+      // failure here degrades gracefully — the subject enrollment itself
+      // (already inserted above) is not lost just because the board
+      // back-fill failed.
+      try {
+        const safeSubjectIds = subject_ids.map(Number).filter(Boolean);
+        if (safeSubjectIds.length > 0) {
+          const boardRows = await sequelize.query(
+            `SELECT DISTINCT exam_board_id FROM subjects
+             WHERE id IN (:subjectIds) AND is_active = true AND exam_board_id IS NOT NULL`,
+            { replacements: { subjectIds: safeSubjectIds }, type: QueryTypes.SELECT }
+          );
+          for (const row of boardRows) {
+            await sequelize.query(
+              `INSERT INTO student_exam_types (student_id, exam_board_id, is_active)
+               VALUES (:userId, :boardId, true)
+               ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active = true`,
+              { replacements: { userId, boardId: row.exam_board_id }, type: QueryTypes.INSERT }
+            );
+          }
+        }
+      } catch (boardLookupErr) {
+        console.error('[PATCH /users/preferences] board lookup from subjects failed', boardLookupErr.message);
+        // Don't fail the whole request — subjects are already saved above,
+        // and the exam_boards loop in step 1 (if the client sent
+        // detectedBoards) already covers the common case.
       }
 
       // Persist individual subject selections into student_subjects.
