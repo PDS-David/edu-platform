@@ -43,6 +43,9 @@ jobs:
             echo "════════════════════════════════════"
 
             cd /opt/aischoolonair
+            echo "▶ Cleaning up stale Git lock files..."
+            find .git/refs/remotes/origin -name "*.lock" -delete 2>/dev/null || true
+            find .git -name "*.lock" -maxdepth 2 -delete 2>/dev/null || true
 
             echo "▶ Syncing with GitHub (hard reset safe mode)..."
             git fetch origin
