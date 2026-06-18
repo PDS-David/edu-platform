@@ -334,6 +334,10 @@ if (!PORT) {
   process.exit(1);
 }
 
+// Auth maintenance — nightly cleanup of expired tokens and audit log
+const authCleanup = safeRequire('./jobs/authCleanup');
+if (authCleanup) authCleanup.register();
+
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server bound to PORT = ${PORT}`);
 });
