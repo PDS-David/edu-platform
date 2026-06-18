@@ -35,9 +35,50 @@ router.get('/attempt-count', protect, async (req, res) => {
 // ── POST /api/quizzes/attempt ─────────────────────────────────────────────────
 // Body: { subtopic_id, answers: [{ question_id, selected_answer|selected_option_id, time_taken_seconds }] }
 router.post('/attempt', protect, async (req, res) => {
-  const { subtopic_id, subject_id, paper_type, total_time_ms, answers = [] } = req.body;
+  const { subtopic_id, paper_type, total_time_ms, answers = [] } = req.body;
   if (!subtopic_id || !answers.length) {
     return res.status(400).json({ success: false, error: 'subtopic_id and answers required' });
+  }
+
+  // Enrollment check: resolve subtopic_id to its real subject_id server-side
+  // (never trust a client-supplied subject_id for this — a mismatched pair
+  // could otherwise be used to bypass the check) and verify the student is
+  // actually enrolled in that subject before any question is scored or any
+  // attempt is recorded. Previously absent — a student could submit an
+  // attempt for any subtopic_id regardless of enrollment.
+  if (req.user.role === 'student') {
+    const subjectRows = await sequelize.query(
+      `SELECT t.subject_id
+         FROM subtopics st
+         JOIN topics t ON t.id = st.topic_id
+        WHERE st.id = :subtopicId
+        LIMIT 1`,
+      { replacements: { subtopicId: subtopic_id }, type: QueryTypes.SELECT }
+    ).catch(() => []);
+
+    const resolvedSubjectId = subjectRows[0]?.subject_id;
+
+    if (resolvedSubjectId) {
+      const enrolled = await sequelize.query(
+        `SELECT 1 FROM student_subjects
+          WHERE student_id = :studentId AND subject_id = :subjectId AND is_active = true
+          LIMIT 1`,
+        { replacements: { studentId: req.user.id, subjectId: resolvedSubjectId }, type: QueryTypes.SELECT }
+      ).catch(() => []);
+
+      if (!enrolled.length) {
+        return res.status(403).json({
+          success: false,
+          error: 'You are not enrolled in this subject. Add it from your Subjects page first.',
+          code: 'NOT_ENROLLED',
+        });
+      }
+    }
+    // If the subtopic doesn't resolve to a subject at all (orphaned/malformed
+    // catalog data), fail open here rather than block a quiz attempt for a
+    // data-integrity issue unrelated to enrollment — that's a separate
+    // problem the catalog data itself should surface, not something this
+    // entitlement check should mask as "not enrolled."
   }
 
   try {
