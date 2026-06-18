@@ -7,8 +7,19 @@ const { QueryTypes } = require('sequelize');
 const sequelize = require('../config/database');
 const { protect }  = require('../middleware/auth');
 const { generate } = require('../services/ai');
+const { adminActionLimiter } = require('../middleware/rateLimiter');
+const {
+  normaliseEmail,
+  validateEmail,
+  validatePassword,
+  normaliseName,
+  validateName,
+} = require('../utils/registrationValidators');
 const { success, error } = require('../utils/response');
 const { ENROLLMENT_SOURCE, ENROLLMENT_STATUS } = require('../constants/enrollmentConstants');
+const audit = require('../services/auditLogger');
+const { adminActionLimiter } = require('../middleware/rateLimiter');
+const { requireConfirmHeader, requireAdminConfirm } = require('../middleware/confirmDestructive');
 
 // ─────────────────────────────────────────────
 // ADMIN GUARD
@@ -25,33 +36,33 @@ const adminOnly = (req, res, next) => {
 // Admin-only. Creates a teacher account directly (no email verification required).
 // Body: { email, password, first_name, last_name }
 // ─────────────────────────────────────────────
-router.post('/create-teacher', protect, adminOnly, async (req, res) => {
+router.post('/create-teacher', protect, adminOnly, adminActionLimiter, async (req, res) => {
   const bcrypt = require('bcryptjs');
   const crypto = require('crypto');
 
-  const { email, password, first_name = '', last_name = '' } = req.body;
+  // R-04: normalise email before any DB operation
+  const email      = normaliseEmail(req.body.email);
+  const password   = req.body.password;
+  const first_name = normaliseName(req.body.first_name || '');
+  const last_name  = normaliseName(req.body.last_name  || '');
 
-  if (!email || !password) {
-    return error(res, 'email and password are required', 400);
-  }
-  if (password.length < 8) {
-    return error(res, 'Password must be at least 8 characters', 400);
-  }
+  // Validate all inputs (R-04, R-05)
+  const emailCheck = validateEmail(email);
+  if (!emailCheck.valid) return error(res, emailCheck.error, 400);
+
+  const passCheck = validatePassword(password);
+  if (!passCheck.valid) return error(res, passCheck.error, 400);
+
+  const fnCheck = validateName(first_name, 'First name');
+  if (!fnCheck.valid) return error(res, fnCheck.error, 400);
 
   try {
-    const existing = await sequelize.query(
-      `SELECT id FROM users WHERE email = :email LIMIT 1`,
-      { replacements: { email: email.toLowerCase().trim() }, type: QueryTypes.SELECT }
-    );
-    if (existing.length > 0) {
-      return error(res, 'An account with that email already exists', 409);
-    }
-
     const salt   = await bcrypt.genSalt(12);
     const hashed = await bcrypt.hash(password, salt);
     const verificationToken        = crypto.randomBytes(32).toString('hex');
     const verificationTokenExpires = new Date(Date.now() + 86400000);
 
+    // R-03: ON CONFLICT eliminates TOCTOU race; no preceding SELECT needed.
     const rows = await sequelize.query(
       `INSERT INTO users
          (email, password, first_name, last_name, role,
@@ -65,13 +76,14 @@ router.post('/create-teacher', protect, adminOnly, async (req, res) => {
           true, true, 'free_trial',
           NOW() + INTERVAL '14 days', '{}',
           NOW(), NOW())
+       ON CONFLICT (email) DO NOTHING
        RETURNING id, email, first_name, last_name, role, is_active, created_at`,
       {
         replacements: {
-          email:                   email.toLowerCase().trim(),
+          email,
           password:                hashed,
-          first_name:              first_name.trim(),
-          last_name:               last_name.trim(),
+          first_name,
+          last_name:               last_name || first_name,
           verificationToken,
           verificationTokenExpires,
         },
@@ -79,15 +91,25 @@ router.post('/create-teacher', protect, adminOnly, async (req, res) => {
       }
     );
 
+    // 0 rows ⟹ email already existed
+    if (!rows || rows.length === 0) {
+      return error(res, 'An account with that email already exists', 409);
+    }
+
+    await audit.log(req, audit.ACTIONS.TEACHER_CREATE, {
+      targetType: 'user', targetId: rows[0].id, targetEmail: rows[0].email,
+      metadata: { first_name: rows[0].first_name, last_name: rows[0].last_name },
+    });
     return success(res, { user: rows[0] }, null, 201);
   } catch (err) {
     console.error('[POST /admin/create-teacher]', err.message);
+    // R-03: catch stray 23505 and translate — never leak raw DB errors
+    if (err.parent?.code === '23505' || err.original?.code === '23505' || err.message?.includes('23505')) {
+      return error(res, 'An account with that email already exists', 409);
+    }
     return error(res, 'Failed to create teacher account');
   }
 });
-
-// ─────────────────────────────────────────────
-// GET /api/admin/platform-stats
 // Powers PlatformAnalyticsPanel in AdminDashboard.
 // Returns: { users, questions, revenue, top_subjects, daily_activity }
 // All queries use practice_attempts as the primary activity source.
@@ -327,7 +349,7 @@ router.get('/questions/pending', protect, adminOnly, async (req, res) => {
 });
 
 // PUT /api/admin/questions/:id/review  — approve or reject a question
-router.put('/questions/:id/review', protect, adminOnly, async (req, res) => {
+router.put('/questions/:id/review', protect, adminOnly, adminActionLimiter, async (req, res) => {
   try {
     const { action, feedback } = req.body;
     if (!['approve', 'reject'].includes(action)) {
@@ -353,6 +375,12 @@ router.put('/questions/:id/review', protect, adminOnly, async (req, res) => {
         type: QueryTypes.UPDATE,
       }
     );
+
+    const qAction = req.body.action === 'approve' ? audit.ACTIONS.QUESTION_APPROVE : audit.ACTIONS.QUESTION_REJECT;
+    await audit.log(req, qAction, {
+      targetType: 'question', targetId: req.params.id,
+      metadata: { status: newStatus, feedback: feedback?.trim() || null },
+    });
 
     return res.json({ success: true, status: newStatus });
   } catch (err) {
@@ -393,7 +421,7 @@ router.post('/send-weekly-digest', protect, adminOnly, async (req, res) => {
 // Sends an in-app notification to all users, students only, or teachers only.
 // Body: { target: 'all'|'students'|'teachers', title: string, message: string }
 // ─────────────────────────────────────────────
-router.post('/send-notification', protect, adminOnly, async (req, res) => {
+router.post('/send-notification', protect, adminOnly, adminActionLimiter, async (req, res) => {
   try {
     const { target = 'all', title, message } = req.body;
     if (!title || !message) {
@@ -429,6 +457,9 @@ router.post('/send-notification', protect, adminOnly, async (req, res) => {
     ));
 
     console.log(`[admin] Notification sent to ${users.length} users by admin ${req.user.id}`);
+    await audit.log(req, audit.ACTIONS.NOTIFICATION_SEND, {
+      metadata: { target, title, sent_count: users.length },
+    });
     return res.json({ success: true, sent: users.length });
   } catch (err) {
     console.error('[POST /admin/send-notification]', err.message);
@@ -1028,7 +1059,7 @@ router.post('/migrate-to-r2', protect, adminOnly, async (req, res) => {
   if (!r2.isR2Enabled()) {
     return res.status(503).json({
       success: false,
-      error: 'R2 is not configured. Set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, R2_PUBLIC_BASE_URL in Render env vars.'
+      error: 'R2 is not configured. Set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, R2_PUBLIC_BASE_URL in api.env on the Hetzner server.'
     });
   }
 
@@ -1096,13 +1127,9 @@ router.post('/migrate-to-r2', protect, adminOnly, async (req, res) => {
 // Deletes ALL resources, their assignments (resource_assignments +
 // resource_user_assignments), and any R2 objects. Irreversible.
 // Protected: admin only. Requires header  X-Confirm: purge-all-resources
-router.delete('/purge-all-resources', protect, adminOnly, async (req, res) => {
-  if (req.headers['x-confirm'] !== 'purge-all-resources') {
-    return res.status(400).json({
-      success: false,
-      error: 'Missing confirmation header. Send X-Confirm: purge-all-resources'
-    });
-  }
+router.delete('/purge-all-resources', protect, adminOnly, adminActionLimiter, requireConfirmHeader('purge-all-resources'), async (req, res) => {
+  // Note: confirmation header check is now handled by requireConfirmHeader middleware above.
+  // The old inline check below is superseded but kept as belt-and-suspenders comment.
 
   try {
     const r2 = require('../utils/r2Storage');
@@ -1122,6 +1149,11 @@ router.delete('/purge-all-resources', protect, adminOnly, async (req, res) => {
     const [, raResult]  = await sequelize.query(`DELETE FROM resource_assignments`, { type: QueryTypes.DELETE });
     const [, ruaResult] = await sequelize.query(`DELETE FROM resource_user_assignments`, { type: QueryTypes.DELETE });
     const [, rResult]   = await sequelize.query(`DELETE FROM resources`, { type: QueryTypes.DELETE });
+
+    await audit.log(req, audit.ACTIONS.RESOURCE_PURGE, {
+      severity: 'critical',
+      metadata: { resources_deleted: rows.length, r2_attempted: r2.isR2Enabled() ? rows.length : 0 },
+    });
 
     return res.json({
       success: true,

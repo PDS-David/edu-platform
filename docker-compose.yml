@@ -8,7 +8,8 @@
 #   redis       → BullMQ queues + rate-limit store (internal :6379)
 #   api_staging / web_staging — mirror services for staging.aischoolonair.ng
 #
-# Database: Render-managed Postgres — set DATABASE_URL in api.env / api.staging.env
+# Database: Supabase Postgres — set DATABASE_URL in api.env / api.staging.env
+#           (postgresql://postgres.<ref>:<pass>@aws-0-eu-west-1.pooler.supabase.com:6543/postgres)
 # Storage:  Local uploads volume (swap to R2 later — see DEPLOYMENT.md §Storage)
 #
 # First-time setup:

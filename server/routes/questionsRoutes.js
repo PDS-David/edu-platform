@@ -22,6 +22,30 @@ router.get('/random', protect, async (req, res) => {
   const { count = '10', subject_id, subtopic_id, board, difficulty } = req.query;
   const limit = Math.min(Math.max(parseInt(count) || 10, 1), 50);
 
+  // Enrollment check: a student requesting questions for a specific subject
+  // must actually be enrolled in that subject. This was previously absent
+  // entirely — any authenticated student could pull questions for any
+  // subject_id regardless of their own student_subjects rows. Scoped to
+  // students only (teachers/admins previewing content are unaffected) and
+  // only when subject_id is actually provided (the no-subject_id fallback
+  // path used elsewhere, e.g. test-builder flows, is unaffected).
+  if (req.user.role === 'student' && subject_id) {
+    const enrolled = await sequelize.query(
+      `SELECT 1 FROM student_subjects
+        WHERE student_id = :studentId AND subject_id = :subjectId AND is_active = true
+        LIMIT 1`,
+      { replacements: { studentId: req.user.id, subjectId: subject_id }, type: QueryTypes.SELECT }
+    ).catch(() => []); // if student_subjects doesn't exist yet in this environment, fail open rather than 500
+
+    if (!enrolled.length) {
+      return res.status(403).json({
+        success: false,
+        error: 'You are not enrolled in this subject. Add it from your Subjects page first.',
+        code: 'NOT_ENROLLED',
+      });
+    }
+  }
+
   const filters      = ["q.is_active = true", "COALESCE(q.status, 'approved') IN ('approved', 'active')"];
   const replacements = { limit };
 

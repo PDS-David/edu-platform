@@ -53,6 +53,16 @@ function clientMeta(req) {
     ipAddress: req.ip || req.connection?.remoteAddress || null,
     userAgent: req.headers?.['user-agent'] || null,
   };
+/**
+ * Translate a Postgres unique-violation (23505) into a clean 409 response.
+ * Returns true if the error was handled, false otherwise.
+ */
+function handleUniqueViolation(err, res) {
+  if (err.parent?.code === '23505' || err.original?.code === '23505' || err.message?.includes('23505')) {
+    res.status(409).json({ success: false, error: 'An account with that email already exists' });
+    return true;
+  }
+  return false;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -60,58 +70,87 @@ function clientMeta(req) {
 // ─────────────────────────────────────────────────────────────────────────────
 exports.register = async (req, res, next) => {
   try {
-    const { email, password, role = 'student' } = req.body;
-    const first_name = (req.body.first_name || req.body.firstName || '').trim();
-    const last_name  = (req.body.last_name  || req.body.lastName  || first_name).trim();
-    const pendingExamBoards = req.body.pendingExamBoards || [];
+    // ── 1. Extract & normalise ─────────────────────────────────────────────
+    const rawEmail    = normaliseEmail(req.body.email);
+    const password    = req.body.password;
+    const first_name  = normaliseName(req.body.first_name || req.body.firstName || '');
+    const last_name   = normaliseName(req.body.last_name  || req.body.lastName  || first_name);
+    const rawPhone    = req.body.phone;                    // R-01: read phone
+    const pendingExamBoards = sanitisePendingExamBoards(req.body.pendingExamBoards);
 
-    if (!email || !password) {
-      return res.status(400).json({ success: false, error: 'Email and password are required' });
-    }
-    if (password.length < 8) {
-      return res.status(400).json({ success: false, error: 'Password must be at least 8 characters' });
-    }
-
-    const existing = await db.query(
-      `SELECT id FROM users WHERE email = :email LIMIT 1`,
-      { replacements: { email: email.toLowerCase().trim() }, type: QueryTypes.SELECT }
-    );
-    if (existing.length > 0) {
-      return res.status(409).json({ success: false, error: 'An account with that email already exists' });
+    // ── 2. Validate ────────────────────────────────────────────────────────
+    const emailCheck = validateEmail(rawEmail);
+    if (!emailCheck.valid) {
+      return res.status(400).json({ success: false, error: emailCheck.error });
     }
 
-    const salt = await bcrypt.genSalt(12);
+    const passCheck = validatePassword(password);          // R-05
+    if (!passCheck.valid) {
+      return res.status(400).json({ success: false, error: passCheck.error });
+    }
+
+    // Phone is required on the frontend — validate & normalise (R-01)
+    const phoneCheck = validatePhone(rawPhone);
+    if (!phoneCheck.valid) {
+      return res.status(400).json({ success: false, error: phoneCheck.error });
+    }
+    const phone = normalisePhone(rawPhone);                // "+<digits>"
+
+    const fnCheck = validateName(first_name, 'First name');
+    if (!fnCheck.valid) {
+      return res.status(400).json({ success: false, error: fnCheck.error });
+    }
+
+    // ── 3. Hash password ───────────────────────────────────────────────────
+    const salt           = await bcrypt.genSalt(12);
     const hashedPassword = await bcrypt.hash(password, salt);
-    const verificationToken = randomToken();
-    const verificationTokenExpires = new Date(Date.now() + 86400000);
-    const pendingIds = Array.isArray(pendingExamBoards) ? pendingExamBoards : [];
 
+    const verificationToken        = randomToken();
+    const verificationTokenExpires = new Date(Date.now() + 86400000); // 24 h
+
+    // ── 4. INSERT … ON CONFLICT — eliminates TOCTOU race window (R-03) ────
+    //
+    // ON CONFLICT (email) DO NOTHING returns 0 rows when the email already
+    // exists.  We check for that and return 409 cleanly without leaking any
+    // Postgres error detail.  The unique index on users.email ensures the
+    // second concurrent INSERT also gets 0 rows rather than a constraint
+    // error (or, if both hit simultaneously, the loser gets the 23505 error
+    // which is caught below and translated to 409 as a belt-and-suspenders).
     const rows = await db.query(
       `INSERT INTO users
          (email, password, first_name, last_name, role,
+          phone,
           verification_token, verification_token_expires,
           is_active, is_verified, subscription_status,
-          subscription_expires_at, pending_exam_board_ids,
+          subscription_expires_at,
+          pending_exam_board_ids,
           created_at, updated_at)
        VALUES
          (:email, :password, :first_name, :last_name, 'student',
+          :phone,
           :verificationToken, :verificationTokenExpires,
           true, false, 'free_trial',
           NOW() + INTERVAL '14 days',
           :pendingIds::integer[],
           NOW(), NOW())
+       ON CONFLICT (email) DO NOTHING
        RETURNING
-         id, email, first_name, last_name, role,
+         id, email, first_name, last_name, role, phone,
          is_active, is_verified, subscription_status,
          onboarding_complete, xp_points, study_streak_days,
          pending_exam_board_ids, created_at`,
       {
         replacements: {
-          email: email.toLowerCase().trim(),
-          password: hashedPassword,
-          first_name, last_name,
-          verificationToken, verificationTokenExpires,
-          pendingIds: pendingIds.length ? `{${pendingIds.join(',')}}` : '{}',
+          email:                   rawEmail,
+          password:                hashedPassword,
+          first_name,
+          last_name,
+          phone,                                           // R-01
+          verificationToken,
+          verificationTokenExpires,
+          pendingIds: pendingExamBoards.length
+            ? `{${pendingExamBoards.join(',')}}`
+            : '{}',
         },
         type: QueryTypes.SELECT,
       }
@@ -137,6 +176,7 @@ exports.register = async (req, res, next) => {
 
   } catch (err) {
     console.error('[register]', err.message);
+    if (handleUniqueViolation(err, res)) return;          // R-03: belt-and-suspenders
     next(err);
   }
 };
@@ -154,6 +194,8 @@ exports.login = async (req, res, next) => {
 
   try {
     const { email, password, rememberMe = false } = req.body;
+    const email    = normaliseEmail(req.body.email);      // R-04
+    const password = req.body.password;
 
     if (!email || !password) {
       return res.status(400).json({ success: false, error: 'Email and password are required' });
@@ -170,7 +212,7 @@ exports.login = async (req, res, next) => {
        FROM users
        WHERE email = :email
        LIMIT 1`,
-      { replacements: { email: email.toLowerCase().trim() }, type: QueryTypes.SELECT }
+      { replacements: { email }, type: QueryTypes.SELECT }
     );
 
     // Unknown email — return generic error (prevents email enumeration)
@@ -201,7 +243,6 @@ exports.login = async (req, res, next) => {
     }
 
     const match = await bcrypt.compare(password, userRow.password);
-
     if (!match) {
       // AUTH-001: increment failure counter, possibly lock
       const newCount = (userRow.failed_login_count || 0) + 1;
@@ -367,7 +408,7 @@ exports.getMe = async (req, res, next) => {
   try {
     const rows = await db.query(
       `SELECT id, email, first_name, last_name, role, avatar_url,
-              subscription_status, subscription_expires_at,
+              phone, subscription_status, subscription_expires_at,
               is_verified, onboarding_complete, xp_points,
               study_streak_days, daily_goal, last_login,
               created_at, updated_at
@@ -391,6 +432,12 @@ exports.updatePassword = async (req, res, next) => {
     const { current_password, new_password } = req.body;
     if (!current_password || !new_password) {
       return res.status(400).json({ success: false, error: 'current_password and new_password are required' });
+    }
+
+    // R-05: apply same policy to new password
+    const passCheck = validatePassword(new_password);
+    if (!passCheck.valid) {
+      return res.status(400).json({ success: false, error: passCheck.error });
     }
 
     const rows = await db.query(
@@ -430,14 +477,15 @@ exports.updatePassword = async (req, res, next) => {
 exports.forgotPassword = async (req, res, next) => {
   const { ipAddress, userAgent } = clientMeta(req);
   try {
-    const { email } = req.body;
+    const email = normaliseEmail(req.body.email);         // R-04: was missing normalisation
     if (!email) return res.status(400).json({ success: false, error: 'Email is required' });
 
     const rows = await db.query(
       `SELECT id FROM users WHERE email = :email LIMIT 1`,
-      { replacements: { email }, type: QueryTypes.SELECT }
+      { replacements: { email }, type: QueryTypes.SELECT }  // R-04: now uses normalised value
     );
 
+    // Always return 200 to avoid email enumeration
     if (!rows.length) {
       return res.status(200).json({ success: true, message: 'If that email exists, a reset link has been sent.' });
     }
@@ -470,6 +518,12 @@ exports.resetPassword = async (req, res, next) => {
     const { token, new_password } = req.body;
     if (!token || !new_password) {
       return res.status(400).json({ success: false, error: 'token and new_password are required' });
+    }
+
+    // R-05: apply complexity rules on reset too
+    const passCheck = validatePassword(new_password);
+    if (!passCheck.valid) {
+      return res.status(400).json({ success: false, error: passCheck.error });
     }
 
     const rows = await db.query(
