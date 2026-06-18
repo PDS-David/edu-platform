@@ -7,6 +7,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import api from '../services/apiClient';
 import TopNav from '../components/TopNav';
 import { FileText, Video, Music, File, Download, ArrowLeft, BookOpen, Loader2, ExternalLink } from 'lucide-react';
+import { openResourceAuth } from '../utils/authenticatedDownload';
 
 // Resolve the file server base URL.
 // On Hetzner Docker, VITE_API_URL="/api" (relative), so strip /api to get
@@ -87,42 +88,40 @@ function isPubliclyReachable(url) {
 }
 
 function InlineViewer({ file }) {
-  const url  = file.id ? `/api/resources/${file.id}/download` : resolveUrl(file.file_url);
+  const resourceId = file.id || null;
+  const rawUrl = file.id ? `/api/resources/${file.id}/download` : resolveUrl(file.file_url);
   const type = (file.resource_type || file.type || '').toLowerCase();
 
-  // ── Video / Audio / Image ─────────────────────────────────────────────────
-  if (type === 'video') return <video src={url} controls className="w-full rounded-xl mt-2 max-h-60 bg-black" />;
-  if (type === 'audio') return <audio src={url} controls className="w-full mt-2" />;
-  if (type === 'image') return <img src={url} alt={file.title} className="w-full rounded-xl mt-2 max-h-60 object-contain bg-gray-100" />;
+  const handleDownload = (e) => {
+    e.preventDefault();
+    openResourceAuth(resourceId, file.file_url);
+  };
+
+  // ── Video / Audio / Image — these need a blob URL with auth too
+  if (type === 'video') return <video src={rawUrl} controls className="w-full rounded-xl mt-2 max-h-60 bg-black" />;
+  if (type === 'audio') return <audio src={rawUrl} controls className="w-full mt-2" />;
+  if (type === 'image') return <img src={rawUrl} alt={file.title} className="w-full rounded-xl mt-2 max-h-60 object-contain bg-gray-100" />;
 
   // ── PDF ───────────────────────────────────────────────────────────────────
-  const isPdf = type === 'pdf' || /\.pdf(\?|$)/i.test(url);
+  const isPdf = type === 'pdf' || /\.pdf(\?|$)/i.test(rawUrl);
   if (isPdf) {
     return (
       <div className="mt-2 rounded-xl overflow-hidden border border-gray-200">
-        <iframe
-          src={url}
-          title={file.title}
-          className="w-full"
-          style={{ height: 480 }}
-        />
-        <div className="py-2 text-center bg-gray-50 border-t border-gray-100">
-          <a href={url} target="_blank" rel="noreferrer"
-            className="text-xs text-blue-600 hover:underline">
-            Open in new tab if preview doesn't load ↗
-          </a>
+        <div className="py-4 px-4 bg-gray-50 text-center space-y-2">
+          <p className="text-sm text-gray-500">PDF preview requires downloading the file first.</p>
+          <button onClick={handleDownload}
+            className="text-xs font-semibold px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center gap-1.5 mx-auto">
+            <Download size={12} /> Open PDF ↓
+          </button>
         </div>
       </div>
     );
   }
 
-  // ── Office Documents (.docx / .pptx / .xlsx and legacy .doc/.ppt/.xls) ───
-  // Use Microsoft Office Online Viewer when the file is an Office format.
-  // Falls back to download UI when the file is not publicly reachable
-  // (e.g. served from the same server behind Caddy).
+  // ── Office Documents — use MS viewer if publicly reachable, else download ─
   if (isOfficeMime(file)) {
-    if (isPubliclyReachable(url)) {
-      const viewerSrc = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`;
+    if (isPubliclyReachable(rawUrl)) {
+      const viewerSrc = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(rawUrl)}`;
       const mimeLabel = (file.mime_type || '').includes('presentationml') ? 'presentation'
                       : (file.mime_type || '').includes('spreadsheetml')  ? 'spreadsheet'
                       : 'document';
@@ -140,16 +139,16 @@ function InlineViewer({ file }) {
             <span className="text-xs text-gray-400 capitalize">
               Microsoft Office Online — {mimeLabel} preview
             </span>
-            <a href={url} download={file.original_filename || file.title || true}
+            <button onClick={handleDownload}
               className="text-xs text-blue-600 hover:underline flex items-center gap-1">
               <Download size={11} /> Download
-            </a>
+            </button>
           </div>
         </div>
       );
     }
 
-    // Office file on the same server — not publicly reachable for viewer
+    // Office file on same server — not publicly reachable for MS viewer
     return (
       <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-5 text-center">
         <FileText size={28} className="text-amber-400 mx-auto mb-2" />
@@ -158,14 +157,10 @@ function InlineViewer({ file }) {
           Online preview requires a public file URL. Download to open in Microsoft Office or Google Docs.
         </p>
         <div className="flex justify-center gap-3">
-          <a href={url} target="_blank" rel="noreferrer"
+          <button onClick={handleDownload}
             className="text-xs font-semibold px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center gap-1.5">
-            <ExternalLink size={12} /> Open file ↗
-          </a>
-          <a href={url} download={file.original_filename || file.title || true}
-            className="text-xs font-semibold px-4 py-2 rounded-lg border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors flex items-center gap-1.5">
             <Download size={12} /> Download ↓
-          </a>
+          </button>
         </div>
       </div>
     );
@@ -178,14 +173,10 @@ function InlineViewer({ file }) {
         In-browser preview is not available for this file type.
       </p>
       <div className="flex justify-center gap-3">
-        <a href={url} target="_blank" rel="noreferrer"
-          className="text-xs font-semibold px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors">
-          Open file ↗
-        </a>
-        <a href={url} download={file.original_filename || file.title || true}
-          className="text-xs font-semibold px-4 py-2 rounded-lg border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors">
-          Download ↓
-        </a>
+        <button onClick={handleDownload}
+          className="text-xs font-semibold px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center gap-1.5">
+          <Download size={12} /> Download ↓
+        </button>
       </div>
     </div>
   );
@@ -330,10 +321,11 @@ export default function StudentFilesPage() {
                                 Practice
                               </button>
                             )}
-                            <a href={href} download
+                            <button
+                              onClick={() => openResourceAuth(file.id, file.file_url)}
                               className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Download">
                               <Download size={14} />
-                            </a>
+                            </button>
                           </div>
                         </div>
                         {isOpen && (

@@ -12,6 +12,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import VideoPlayer from '../components/VideoPlayer';
+import { openResourceAuth } from '../utils/authenticatedDownload';
 import {
   ChevronLeft, ChevronRight, Loader2,
   CheckCircle, XCircle, Lightbulb, Sparkles,
@@ -196,10 +197,11 @@ function ResourcesTab({ subtopicId, subtopic, subtopicName, onComplete }) {
                       {activeRes?.id === res.id ? 'Close' : 'Read'}
                     </button>
                     {!isDataUri && (
-                      <a href={fullUrl} download
+                      <button
+                        onClick={() => openResourceAuth(res.id, res.file_url)}
                         className="bg-gray-100 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-gray-200 transition-colors">
                         ↓
-                      </a>
+                      </button>
                     )}
                   </div>
                 );
