@@ -52,6 +52,39 @@ function TabDot({ completed }) {
   );
 }
 
+
+// AuthenticatedAudio — fetches audio via the authenticated download endpoint
+// and feeds it to an <audio> element via a blob URL. A plain <audio src="/api/...">
+// never sends the Bearer token and always gets 401.
+function AuthenticatedAudio({ resourceId, fallbackUrl }) {
+  const [blobUrl, setBlobUrl] = useState(null);
+  const [err,     setErr]     = useState(false);
+
+  useEffect(() => {
+    if (!resourceId) { setErr(true); return; }
+    const token   = localStorage.getItem('token') || '';
+    const rawBase = import.meta.env.VITE_API_URL || '';
+    const apiBase = rawBase.endsWith('/api') ? rawBase : rawBase ? `${rawBase}/api` : '/api';
+    let objectUrl = null;
+    fetch(`${apiBase}/resources/${resourceId}/download`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      redirect: 'follow',
+    })
+      .then(r => r.ok ? r.blob() : Promise.reject(r.status))
+      .then(blob => { objectUrl = URL.createObjectURL(blob); setBlobUrl(objectUrl); })
+      .catch(() => setErr(true));
+    return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
+  }, [resourceId]);
+
+  if (err) return <p className="text-xs text-red-500 mt-2">Audio unavailable — check your access.</p>;
+  if (!blobUrl) return (
+    <div className="mt-2 flex items-center gap-2 text-xs text-gray-400">
+      <Loader2 size={13} className="animate-spin" /> Loading audio…
+    </div>
+  );
+  return <audio controls className="w-full mt-2" src={blobUrl} />;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // RESOURCES TAB
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -213,8 +246,7 @@ function ResourcesTab({ subtopicId, subtopic, subtopicName, onComplete }) {
             </div>
           )}
           {activeRes?.id === res.id && res.resource_type === 'audio' && (
-            <audio controls className="w-full mt-2"
-              src={(res.id ? `/api/resources/${res.id}/download` : resolveFileUrl(res.file_url))} />
+            <AuthenticatedAudio resourceId={res.id} fallbackUrl={res.file_url} />
           )}
           {activeRes?.id === res.id && (res.resource_type === 'document' || res.resource_type === 'pdf') && (() => {
             const fullUrl = (res.id ? `/api/resources/${res.id}/download` : resolveFileUrl(res.file_url));
@@ -234,8 +266,8 @@ function ResourcesTab({ subtopicId, subtopic, subtopicName, onComplete }) {
                 </div>
               );
             }
-            // Regular file — open in new tab
-            window.open(fullUrl, '_blank');
+            // Regular file — open via authenticated download (not raw window.open which has no token)
+            openResourceAuth(res.id, res.file_url);
             return null;
           })()}
         </div>
@@ -677,8 +709,11 @@ export default function SubtopicPage() {
   };
 
   if (loading) return (
-    <div className="min-h-screen bg-gray-50"><TopNav />
-      <div className="flex justify-center pt-24"><Loader2 className="w-8 h-8 text-blue-400 animate-spin" /></div>
+    <div className={`min-h-screen ${activeTab === 'quiz' ? 'bg-[#0a4a3f]' : 'bg-gray-50'}`}>
+      <TopNav />
+      <div className="flex justify-center pt-24">
+        <Loader2 className={`w-8 h-8 animate-spin ${activeTab === 'quiz' ? 'text-white/60' : 'text-blue-400'}`} />
+      </div>
     </div>
   );
 

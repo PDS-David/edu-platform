@@ -291,7 +291,6 @@ export default function StudentFilesPage() {
                   {files.map(file => {
                     const ftype = (file.resource_type || file.type || '').toLowerCase();
                     const isOpen = openId === file.id;
-                    const href   = file.id ? `/api/resources/${file.id}/download` : resolveUrl(file.file_url);
                     return (
                       <div key={file.id} className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:border-blue-200 transition-colors">
                         <div className="p-4 flex items-center gap-3">
