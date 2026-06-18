@@ -17,6 +17,7 @@ import { useAuth } from "../context/AuthContext";
 import { useNavigate, Outlet, useLocation } from "react-router-dom";
 import TopNav from "../components/TopNav";
 import api, { TIMEOUT_DASHBOARD, TIMEOUT_ANALYTICS } from "../services/apiClient";
+import { openResourceAuth } from "../utils/authenticatedDownload";
 import {
   FileText, Video, Music, File, Download,
   Zap, ClipboardList, BarChart2, BookOpen, TrendingUp,
@@ -239,16 +240,11 @@ function AssignedFilesSection({ resources, loading, error, onRetry, totalResourc
                                   Practice
                                 </button>
                               )}
-                              {/* DEF-007: Download goes through authenticated API endpoint, not direct static URL */}
-                              <a
-                                href={resolvedUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                download
-                                className="p-1.5 rounded-lg border border-gray-200 text-gray-400 hover:text-blue-600 hover:border-blue-200 transition-colors"
-                              >
+                              <button
+                                onClick={() => openResourceAuth(file.id, file.file_url)}
+                                className="p-1.5 rounded-lg border border-gray-200 text-gray-400 hover:text-blue-600 hover:border-blue-200 transition-colors">
                                 <Download size={13} />
-                              </a>
+                              </button>
                             </div>
                           </div>
                           {isOpen && (

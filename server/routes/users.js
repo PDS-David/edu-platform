@@ -18,6 +18,7 @@ const { QueryTypes } = require('sequelize');
 const sequelize  = require('../config/database');
 const { protect, authorize }  = require('../middleware/auth');
 const { success, error, paginated } = require('../utils/response');
+const { adminActionLimiter } = require('../middleware/rateLimiter');
 const { adminActionLimiter }  = require('../middleware/rateLimiter');
 const { requireAdminConfirm } = require('../middleware/confirmDestructive');
 const audit = require('../services/auditLogger');
