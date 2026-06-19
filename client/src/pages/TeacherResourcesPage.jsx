@@ -1,3 +1,4 @@
+import { getToken } from '../utils/token';
 // client/src/pages/TeacherResourcesPage.jsx
 // URL: /teacher/resources
 // Tab 1 — Upload Resource → POST /api/resources/bulk-upload (multipart)
@@ -140,7 +141,7 @@ function UploadTab({ showToast }) {
       const apiBase = rawBase.endsWith('/api')
         ? rawBase
         : (rawBase ? `${rawBase}/api` : '/api');
-      const token = localStorage.getItem('token') || '';
+      const token = getToken() || '';
 
       const uploadResult = await new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
@@ -502,7 +503,7 @@ function ResourcesTab({ showToast }) {
                   try {
                     // Fetch the download URL authenticated so the Bearer token is sent.
                     // The server returns a signed R2 URL (302 redirect) or streams the file.
-                    const token = localStorage.getItem('token') || '';
+                    const token = getToken() || '';
                     const rawBase = import.meta.env.VITE_API_URL || '';
                     const apiBase = rawBase.endsWith('/api') ? rawBase : (rawBase ? `${rawBase}/api` : '/api');
                     const resp = await fetch(`${apiBase}/resources/${r.id}/download`, {

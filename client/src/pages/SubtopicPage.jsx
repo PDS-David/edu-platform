@@ -1,3 +1,4 @@
+import { getToken } from '../utils/token';
 // client/src/pages/SubtopicPage.jsx
 // AI Buddy subtopic page — exact replica
 // URL: /student/subtopic/:subtopicId?tab=resources|practice|quiz
@@ -62,7 +63,7 @@ function AuthenticatedAudio({ resourceId, fallbackUrl }) {
 
   useEffect(() => {
     if (!resourceId) { setErr(true); return; }
-    const token   = localStorage.getItem('token') || '';
+    const token   = getToken() || '';
     const rawBase = import.meta.env.VITE_API_URL || '';
     const apiBase = rawBase.endsWith('/api') ? rawBase : rawBase ? `${rawBase}/api` : '/api';
     let objectUrl = null;

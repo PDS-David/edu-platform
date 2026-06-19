@@ -1,3 +1,4 @@
+import { getToken } from '../utils/token';
 // client/src/components/AdminBulkUploadPanel.jsx
 // Admin-only bulk file uploader.
 //
@@ -807,7 +808,7 @@ export default function AdminBulkUploadPanel() {
       const apiBase = rawBase.replace(/\/$/, '').endsWith('/api')
         ? rawBase.replace(/\/$/, '')
         : rawBase.replace(/\/$/, '') + '/api';
-      const token   = localStorage.getItem('token') || '';
+      const token   = getToken() || '';
 
       const res = await new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();

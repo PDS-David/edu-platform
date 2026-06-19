@@ -1,3 +1,4 @@
+import { getToken } from '../utils/token';
 // client/src/components/VideoPlayer.jsx
 // ─────────────────────────────────────────────────────────────────────────────
 // SECURITY + PLAYBACK REMEDIATION (2026-06-16)
@@ -12,7 +13,7 @@
 //     GET /api/videos/token?videoId=:id and is valid for 15 minutes.
 //
 //   SEC-03 partial:
-//     localStorage.getItem('token') is still used for hls.js xhrSetup because
+//     getToken() is still used for hls.js xhrSetup because
 //     that path requires a custom header.  The Safari native path avoids
 //     localStorage entirely by using server-issued per-session tokens.
 //     Migrating away from localStorage fully requires switching to HttpOnly
@@ -147,7 +148,7 @@ export default function VideoPlayer({ videoId, onComplete }) {
       const hls = new Hls({
         // Inject Authorization header on every XHR (manifest, segment, key)
         xhrSetup: (xhr, url) => {
-          const token = localStorage.getItem('token');
+          const token = getToken();
           if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
         },
         // Start with lowest quality and adapt up — good for Nigerian connections
