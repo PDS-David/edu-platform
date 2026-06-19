@@ -22,6 +22,7 @@
 //        Model names simplified back to canonical short names (gemini-2.0-flash
 //        etc.) which are correctly resolved by the new SDK on the v1 endpoint.
 //        Removed @anthropic-ai/sdk dependency entirely.
+// v16 — Fixed fallback chain pointing at retired/stale models (see below).
 //
 // Public API (signature unchanged):
 //   generate(prompt, task, options?) → Promise<string>
@@ -33,7 +34,23 @@ const { GoogleGenAI } = require('@google/genai');
 // ROUTING CONFIG
 // ═══════════════════════════════════════════════════════════════════════════
 
-// v15: New SDK resolves canonical model names correctly via v1 endpoint.
+// v16 — FIX (2026-06): gemini-2.0-flash was retired by Google (shut down
+//        June 1, 2026) and gemini-2.5-flash-preview-05-20 is a stale dated
+//        preview snapshot that no longer resolves. Both fallback steps were
+//        404ing, so any transient failure on the primary model fell through
+//        to two dead models and surfaced as "AI is temporarily busy" even
+//        though the real cause was unreachable fallbacks, not exhausted quota.
+//        Primary gemini-2.5-flash remains correct — Google's June 17, 2026
+//        deprecation date for the 2.5 generation was postponed; current
+//        official guidance (checked 2026-06-19) gives "no earlier than
+//        October 16, 2026" for gemini-2.5-flash/-pro shutdown.
+//        Fallback is gemini-2.5-flash-lite only — same generation, separate
+//        quota pool, and itself GA-stable (not due to shut down until at
+//        least July 2026). gemini-flash-latest was considered as a second
+//        fallback step but rejected: per Google's own docs, the "-latest"
+//        alias resolves to an EXPERIMENTAL model with tighter rate limits,
+//        not a stable one — using it as a fallback could itself become the
+//        thing that's exhausted/unavailable, recreating this exact bug.
 const GEMINI_MODEL_MAP = {
   'generate-questions': 'gemini-2.5-flash',
   'chat':               'gemini-2.5-flash',
@@ -42,15 +59,22 @@ const GEMINI_MODEL_MAP = {
   'notes':              'gemini-2.5-flash',
   'remediation':        'gemini-2.5-flash',
   'essay-mark':         'gemini-2.5-flash',
-  'complex_reasoning':  'gemini-2.5-flash-preview-05-20',
+  'complex_reasoning':  'gemini-2.5-flash',
   'default':            'gemini-2.5-flash',
 };
 
 // Fallback chain — tried in order if primary fails (503, 429, 404, etc.)
-//   1. gemini-2.5-flash            — primary (new paid API)
-//   2. gemini-2.5-flash-preview-05-20 — preview fallback
-//   3. gemini-1.5-flash            — stable fallback
-const FALLBACK_CHAIN = ['gemini-2.5-flash-preview-05-20', 'gemini-2.0-flash'];
+//   1. gemini-2.5-flash       — primary (current GA model, see note above)
+//   2. gemini-2.5-flash-lite  — same generation, lighter/cheaper, separate
+//                                 quota pool so primary-quota exhaustion
+//                                 doesn't take this down too; itself GA-stable
+//
+// NOTE: keep this chain free of "-latest"/"-preview" aliases. Both alias
+// types can silently start pointing at an experimental or rate-limited
+// model without any code change here — defeating the purpose of a fallback.
+// Pin to dated/named stable releases only, and revisit this comment block
+// before October 2026 when gemini-2.5-flash's own shutdown window opens.
+const FALLBACK_CHAIN = ['gemini-2.5-flash-lite'];
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PROVIDER HELPERS
@@ -135,8 +159,13 @@ async function _callGemini(prompt, task) {
       }
 
       // All models exhausted OR non-retryable error.
-      // Never expose raw Google URLs or technical details to the frontend.
-      console.error(`[ai.js] All models exhausted or fatal error:`, err.message);
+      // Never expose raw Google URLs or technical details to the frontend,
+      // but log enough detail server-side to tell "all models genuinely
+      // rate-limited" apart from "a model name in the chain no longer exists".
+      console.error(
+        `[ai.js] All models exhausted or fatal error. ` +
+        `Chain tried: ${modelsToTry.join(' -> ')}. Last error: ${err.message}`
+      );
 
       throw Object.assign(
         new Error(isRetryable
