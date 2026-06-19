@@ -36,13 +36,15 @@ docker compose up -d --no-deps api web
 echo "  Waiting 15s for containers to be ready..."
 sleep 15
 
-# 4. Run DB migrations inside the NEW running API container
-#    NOTE: run via file path, NOT via stdin pipe (node - < file).
-#    The stdin approach gives Node no __dirname/module resolution context,
-#    so require() calls fail silently and the migration never actually runs.
+# 4. Run DB migrations inside the NEW running API container.
+#    We copy the migration script from the live repo into the container at
+#    deploy time. This bypasses Docker layer caching — the running container
+#    always gets the current file from disk, regardless of build cache.
 echo ""
 echo "▶ 4/4  Running DB migrations..."
-docker exec aischool_api node /app/scripts/run_complete_migration.js
+docker cp /opt/aischoolonair/server/scripts/run_complete_migration.js \
+           aischool_api:/tmp/run_complete_migration.js
+docker exec aischool_api node /tmp/run_complete_migration.js
 
 echo ""
 echo "═══════════════════════════════════════════════════"
