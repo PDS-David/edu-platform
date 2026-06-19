@@ -13,8 +13,6 @@ export default function TopNav() {
   const [dropOpen,       setDropOpen]       = useState(false);
   const [notifOpen,      setNotifOpen]      = useState(false);
   const [notifications,  setNotifications]  = useState([]);
-  const [unreadCount,    setUnreadCount]    = useState(0);
-  const [markingRead,    setMarkingRead]    = useState(false);
 
   const dropRef  = useRef(null);
   const notifRef = useRef(null);
@@ -24,6 +22,7 @@ export default function TopNav() {
   const fullName    = `${firstName} ${lastName}`.trim() || user?.email?.split('@')[0] || 'User';
   const initials    = ((firstName[0] || '') + (lastName[0] || '')).toUpperCase() || fullName[0]?.toUpperCase();
   const role        = user?.role || 'student';
+  const unreadCount = notifications.filter(n => !n.is_read).length;
 
   const dashboardPath =
     role === 'admin'   ? '/admin/dashboard'   :
@@ -43,10 +42,11 @@ export default function TopNav() {
 
   useEffect(() => {
     if (!user) return;
-    api.get('/notifications').then(r => {
-      setNotifications(r.data || []);
-      setUnreadCount(r.unread_count ?? 0);
-    }).catch(() => {});
+    // The notifications endpoint returns { success, count, data: [...] }
+    // but apiClient normalises it so r.data is already the array (via data?.data ?? data)
+    api.get('/notifications')
+      .then(r => setNotifications(Array.isArray(r.data) ? r.data : []))
+      .catch(() => setNotifications([]));
   }, [user]);
 
   useEffect(() => {
@@ -61,21 +61,20 @@ export default function TopNav() {
   const handleNotifOpen = () => {
     setNotifOpen(p => {
       const next = !p;
-      if (next && unreadCount > 0 && !markingRead) {
-        const previousNotifications = notifications;
-        const previousUnreadCount = unreadCount;
-        setMarkingRead(true);
+      if (next && unreadCount > 0) {
+        // DEF-008: Do NOT mark notifications read client-side until the server
+        // confirms success. Previously, state was mutated before the API call,
+        // permanently silencing the badge even when the route was missing (DEF-002).
+        const prevNotifications = notifications;
         api.patch('/notifications/read-all')
           .then(() => {
+            // Server confirmed — now update local state
             setNotifications(n => n.map(x => ({ ...x, is_read: true })));
-            setUnreadCount(0);
           })
           .catch(() => {
-            // Roll back to pre-attempt state — server did not confirm the update.
-            setNotifications(previousNotifications);
-            setUnreadCount(previousUnreadCount);
-          })
-          .finally(() => setMarkingRead(false));
+            // Server failed — leave state unchanged (unread badge remains)
+            setNotifications(prevNotifications);
+          });
       }
       return next;
     });

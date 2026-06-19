@@ -316,7 +316,7 @@ router.get('/my-subjects', protect, async (req, res) => {
            'own'    AS source
          FROM student_subjects ss
          JOIN subjects  s  ON s.id  = ss.subject_id
-         JOIN exam_boards eb ON eb.id::text = s.exam_board_id::text
+         JOIN exam_boards eb ON eb.id = s.exam_board_id
          WHERE ss.student_id = :studentId AND ss.status = :approvedStatus AND s.is_active = true
          ORDER BY s.name`,
         { replacements: { studentId, approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.SELECT }
@@ -341,7 +341,7 @@ router.get('/my-subjects', protect, async (req, res) => {
          JOIN classes          c   ON c.id   = cm.class_id
          JOIN class_subjects   cs  ON cs.class_id = c.id
          JOIN subjects         s   ON s.id   = cs.subject_id
-         JOIN exam_boards      eb  ON eb.id::text = s.exam_board_id::text
+         JOIN exam_boards      eb  ON eb.id  = s.exam_board_id
          WHERE cm.student_id = :studentId AND s.is_active = true
          ORDER BY s.name`,
         { replacements: { studentId }, type: QueryTypes.SELECT }
@@ -386,7 +386,7 @@ router.get('/my-subjects', protect, async (req, res) => {
              'own'    AS source
            FROM student_subjects ss
            JOIN subjects   s  ON s.id  = ss.subject_id
-           JOIN exam_boards eb ON eb.id::text = s.exam_board_id::text
+           JOIN exam_boards eb ON eb.id = s.exam_board_id
            WHERE ss.student_id = :studentId AND ss.status = :approvedStatus AND s.is_active = true
            ORDER BY s.name`,
           { replacements: { studentId, approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.SELECT }
@@ -425,26 +425,18 @@ router.post('/subjects', protect, async (req, res) => {
       { replacements: { studentId, subjectId: parseInt(subject_id), enrollmentSource: ENROLLMENT_SOURCE.EXPLICIT, approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.INSERT }
     );
 
-    // Also ensure the board is in student_exam_types.
-    // Wrapped separately: if subjects.exam_board_id and
-    // student_exam_types.exam_board_id are out of sync on type (see DEF-011 /
-    // database/patch_subjects_exam_board_id_type.sql), this secondary sync
-    // should not fail the primary subject-add operation above.
-    try {
-      const boardRows = await sequelize.query(
-        `SELECT exam_board_id FROM subjects WHERE id = :subjectId AND is_active = true`,
-        { replacements: { subjectId: parseInt(subject_id) }, type: QueryTypes.SELECT }
+    // Also ensure the board is in student_exam_types
+    const boardRows = await sequelize.query(
+      `SELECT exam_board_id FROM subjects WHERE id = :subjectId AND is_active = true`,
+      { replacements: { subjectId: parseInt(subject_id) }, type: QueryTypes.SELECT }
+    );
+    if (boardRows[0]?.exam_board_id) {
+      await sequelize.query(
+        `INSERT INTO student_exam_types (student_id, exam_board_id, is_active, status)
+         VALUES (:studentId, :boardId, true, :approvedStatus)
+         ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active = true, status = :approvedStatus`,
+        { replacements: { studentId, boardId: boardRows[0].exam_board_id, approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.INSERT }
       );
-      if (boardRows[0]?.exam_board_id) {
-        await sequelize.query(
-          `INSERT INTO student_exam_types (student_id, exam_board_id, is_active, status)
-           VALUES (:studentId, :boardId, true, :approvedStatus)
-           ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active = true, status = :approvedStatus`,
-          { replacements: { studentId, boardId: boardRows[0].exam_board_id, approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.INSERT }
-        );
-      }
-    } catch (syncErr) {
-      console.error('[POST /students/subjects] exam-type sync skipped:', syncErr.message);
     }
 
     return res.status(200).json({ success: true, message: 'Subject added' });

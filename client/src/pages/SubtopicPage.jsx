@@ -76,7 +76,7 @@ function ResourcesTab({ subtopicId, subtopic, subtopicName, onComplete }) {
       const r = await api.post('/ai/notes/generate', {
         subject_id: subtopic?.subject_id,
         topic_name: subtopicName,
-      }, { timeout: 60000 });
+      });
       setNotes(r.notes);
     } catch {} finally { setNotesLoading(false); }
   };
@@ -387,7 +387,7 @@ function MCQQuestion({ question, questionNumber, totalQuestions, onAnswer, onPre
       });
       setResult(res);
       setExplainLoad(true);
-      api.post('/ai/explain', { question_id: question.id }, { timeout: 60000 })
+      api.post('/ai/explain', { question_id: question.id })
         .then(r => { if (r.success) setAiExplain(r.data?.explanation ?? r.explanation); })
         .catch(() => {})
         .finally(() => setExplainLoad(false));
@@ -514,7 +514,7 @@ function OpenAnswerQuestion({ question, questionNumber, totalQuestions, dismisse
         question_id:        question.id,
         selected_option_id: null,
         typed_answer:       answer,
-      }, { timeout: 60000 });
+      });
       setResult(r.data?.explanation ?? r.explanation ?? 'AI feedback submitted.');
     } catch { setResult('AI marking not available. Continue to next question.'); }
     finally  { setLoading(false); }

@@ -102,7 +102,7 @@ export default function StudentAnalyticsDashboard() {
     setPathError('');
     setLearningPath(null);
     try {
-      const res = await api.get(`/ai/learning-path/${user.id}`, { timeout: 60000 });
+      const res = await api.get(`/ai/learning-path/${user.id}`);
       if (res.success !== false && res.data?.steps) {
         setLearningPath(res.data);
       } else {
@@ -123,7 +123,7 @@ export default function StudentAnalyticsDashboard() {
     setPrediction(null);
     try {
       // FIX: API returns { success, data: { predictedGrade, ... } }
-      const res = await api.get(`/ai/predict-grade/${user.id}/${subjectId}`, { timeout: 60000 });
+      const res = await api.get(`/ai/predict-grade/${user.id}/${subjectId}`);
       if (res.success) {
         setPrediction(res.data);
       } else {

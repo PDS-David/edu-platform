@@ -7,6 +7,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/apiClient';
+import { getToken } from '../utils/token';
 import TopNav from '../components/TopNav';
 import {
   Upload, FileText, Video, Music, Trash2, Loader2,
@@ -138,11 +139,12 @@ function UploadTab({ showToast }) {
       const apiBase = rawBase.endsWith('/api')
         ? rawBase
         : (rawBase ? `${rawBase}/api` : '/api');
+      const token = getToken() || '';
+
       await new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open('POST', `${apiBase}/resources/upload`);
-        // DEF-001: the JWT now lives in an HttpOnly cookie, not localStorage.
-        xhr.withCredentials = true;
+        if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
         xhr.upload.onprogress = (e) => {
           if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 100));
         };
