@@ -22,6 +22,11 @@ const {
 
 const { protect }     = require('../middleware/auth');
 const { authLimiter } = require('../middleware/rateLimiter');
+const {
+  normalisePhone,
+  validatePhone,
+  normaliseName,
+} = require('../utils/registrationValidators');
 
 // Mount cookie-parser only for auth routes (minimise surface area)
 router.use(cookieParser());
@@ -65,11 +70,27 @@ router.put ('/password',        protect, updatePassword);
 router.post('/logout',          protect, logout);
 router.post('/logout-all',      protect, logoutAll);
 
-// Profile update
+// PATCH /api/auth/profile — update name, phone, country
+// R-01: phone is normalised to E.164 before storing.
+// R-04: name fields are trimmed/collapsed.
 router.patch('/profile', protect, async (req, res) => {
   const { QueryTypes } = require('sequelize');
   const db = require('../config/database');
-  const { first_name, last_name, phone, country } = req.body;
+
+  const first_name = normaliseName(req.body.first_name || '');
+  const last_name  = normaliseName(req.body.last_name  || '');
+  const country    = (req.body.country || '').trim() || null;
+
+  // Phone: validate only if provided; a missing phone leaves the existing DB value intact
+  let phone = null;
+  if (req.body.phone) {
+    const phoneCheck = validatePhone(req.body.phone);
+    if (!phoneCheck.valid) {
+      return res.status(400).json({ success: false, error: phoneCheck.error });
+    }
+    phone = normalisePhone(req.body.phone);               // R-01: E.164
+  }
+
   try {
     await db.query(
       `UPDATE users SET
@@ -81,8 +102,10 @@ router.patch('/profile', protect, async (req, res) => {
        WHERE id = :id`,
       {
         replacements: {
-          first_name: first_name || '', last_name: last_name || '',
-          phone: phone || null, country: country || null,
+          first_name: first_name || '',
+          last_name:  last_name  || '',
+          phone,
+          country,
           id: req.user.id,
         },
         type: QueryTypes.UPDATE,
@@ -90,7 +113,8 @@ router.patch('/profile', protect, async (req, res) => {
     );
     return res.json({ success: true, message: 'Profile updated' });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    console.error('[PATCH /profile]', err.message);
+    return res.status(500).json({ success: false, error: 'Failed to update profile' });
   }
 });
 
