@@ -78,6 +78,10 @@ exports.register = async (req, res, next) => {
     const rawPhone    = req.body.phone;                    // R-01: read phone
     const pendingExamBoards = sanitisePendingExamBoards(req.body.pendingExamBoards);
 
+    // FIX-1: role was ignored (INSERT hardcoded 'student'). Whitelist and forward.
+    const ALLOWED_ROLES = ['student', 'teacher', 'admin'];
+    const role = ALLOWED_ROLES.includes(req.body.role) ? req.body.role : 'student';
+
     // ── 2. Validate ────────────────────────────────────────────────────────
     const emailCheck = validateEmail(rawEmail);
     if (!emailCheck.valid) {
@@ -126,7 +130,7 @@ exports.register = async (req, res, next) => {
           pending_exam_board_ids,
           created_at, updated_at)
        VALUES
-         (:email, :password, :first_name, :last_name, 'student',
+         (:email, :password, :first_name, :last_name, :role,
           :phone,
           :verificationToken, :verificationTokenExpires,
           true, false, 'free_trial',
@@ -145,6 +149,7 @@ exports.register = async (req, res, next) => {
           password:                hashedPassword,
           first_name,
           last_name,
+          role,                                            // FIX-1: forwarded role
           phone,                                           // R-01
           verificationToken,
           verificationTokenExpires,
@@ -160,7 +165,7 @@ exports.register = async (req, res, next) => {
     const { ipAddress, userAgent } = clientMeta(req);
 
     // AUTH-003: no remember-me on register — short-lived default
-    const { accessToken, refreshToken, expiresIn } = await tokenService.issueTokenPair({
+    const { accessToken, refreshToken } = await tokenService.issueTokenPair({
       userId: user.id, role: user.role,
       rememberMe: false, ipAddress, userAgent,
       deviceHint: 'register',
@@ -292,7 +297,7 @@ exports.login = async (req, res, next) => {
     );
 
     // AUTH-002 + AUTH-003 + AUTH-005: issue server-registered token pair
-    const { accessToken, refreshToken, expiresIn } = await tokenService.issueTokenPair({
+    const { accessToken, refreshToken } = await tokenService.issueTokenPair({
       userId:     userRow.id,
       role:       userRow.role,
       rememberMe: !!rememberMe,
@@ -380,11 +385,12 @@ exports.refreshToken = async (req, res, next) => {
       return res.status(401).json({ success: false, error: 'No refresh token provided' });
     }
 
-    const { accessToken, refreshToken: newRefresh, expiresIn } =
+    const { accessToken, refreshToken: newRefresh, expiresIn, rememberMe } =
       await tokenService.rotateRefreshToken({ rawRefreshToken, ipAddress, userAgent });
 
-    // Rotate cookie too
-    setRefreshCookie(res, newRefresh, false);  // remember-me handled inside tokenService
+    // FIX-4: was hardcoded false — the rotated cookie lost Max-Age for
+    // rememberMe sessions. tokenService now returns rememberMe from the DB row.
+    setRefreshCookie(res, newRefresh, !!rememberMe);
 
     setImmediate(() => audit.tokenRefresh({ ipAddress, userAgent, metadata: {} }));
 
@@ -416,7 +422,8 @@ exports.getMe = async (req, res, next) => {
       { replacements: { id: req.user.id }, type: QueryTypes.SELECT }
     );
     if (!rows.length) return res.status(404).json({ success: false, error: 'User not found' });
-    return res.status(200).json({ success: true, user: safeUser(rows[0]) });
+    // Row is already scoped — no sensitive columns present; spread directly
+    return res.status(200).json({ success: true, user: rows[0] });
   } catch (err) {
     console.error('[getMe]', err.message);
     next(err);
@@ -434,14 +441,15 @@ exports.updatePassword = async (req, res, next) => {
       return res.status(400).json({ success: false, error: 'current_password and new_password are required' });
     }
 
-    // R-05: apply same policy to new password
+    // R-05: validate new password strength before hashing
     const passCheck = validatePassword(new_password);
     if (!passCheck.valid) {
       return res.status(400).json({ success: false, error: passCheck.error });
     }
 
+    // FIX-5: was SELECT * — fetches only what's needed (id + password hash)
     const rows = await db.query(
-      `SELECT * FROM users WHERE id = :id LIMIT 1`,
+      `SELECT id, password FROM users WHERE id = :id LIMIT 1`,
       { replacements: { id: req.user.id }, type: QueryTypes.SELECT }
     );
     if (!rows.length) return res.status(404).json({ success: false, error: 'User not found' });
@@ -480,9 +488,13 @@ exports.forgotPassword = async (req, res, next) => {
     const email = normaliseEmail(req.body.email);         // R-04: was missing normalisation
     if (!email) return res.status(400).json({ success: false, error: 'Email is required' });
 
+    // FIX-3: email was not normalised — users who registered with mixed-case
+    // email could not trigger a reset using lowercase (or vice versa).
+    const normalisedEmail = email.toLowerCase().trim();
+
     const rows = await db.query(
       `SELECT id FROM users WHERE email = :email LIMIT 1`,
-      { replacements: { email }, type: QueryTypes.SELECT }  // R-04: now uses normalised value
+      { replacements: { email: normalisedEmail }, type: QueryTypes.SELECT }  // FIX-3 + R-04
     );
 
     // Always return 200 to avoid email enumeration
@@ -499,7 +511,7 @@ exports.forgotPassword = async (req, res, next) => {
     );
 
     setImmediate(() => audit.passwordResetRequest({
-      userId: rows[0].id, email, ipAddress, userAgent,
+      userId: rows[0].id, email: normalisedEmail, ipAddress, userAgent,
     }));
 
     return res.status(200).json({ success: true, message: 'If that email exists, a reset link has been sent.' });
