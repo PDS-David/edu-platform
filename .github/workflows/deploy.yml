@@ -54,11 +54,9 @@ jobs:
             echo "▶ Syncing with GitHub (hard reset safe mode)..."
             git fetch origin
             git reset --hard origin/main
-            echo "▶ Ensuring deploy script is executable..."
-            chmod +x deploy.sh
 
             echo "▶ Running deployment script..."
-            ./deploy.sh
+            bash deploy.sh
 
             echo "════════════════════════════════════"
             echo "✅ Deployment successful"
