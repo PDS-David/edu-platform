@@ -35,16 +35,22 @@ const { GoogleGenAI } = require('@google/genai');
 // ═══════════════════════════════════════════════════════════════════════════
 
 // v16 — FIX (2026-06): gemini-2.0-flash was retired by Google (shut down
-//        Mar/Jun 2026) and gemini-2.5-flash-preview-05-20 is a stale dated
+//        June 1, 2026) and gemini-2.5-flash-preview-05-20 is a stale dated
 //        preview snapshot that no longer resolves. Both fallback steps were
 //        404ing, so any transient failure on the primary model fell through
 //        to two dead models and surfaced as "AI is temporarily busy" even
 //        though the real cause was unreachable fallbacks, not exhausted quota.
-//        Fallback chain now uses gemini-2.5-flash-lite (cheaper/faster
-//        sibling of the primary, same generation, very high availability)
-//        and gemini-flash-latest (Google's auto-updated rolling alias, which
-//        always points at a currently-supported model so it cannot go stale
-//        the way a dated snapshot does).
+//        Primary gemini-2.5-flash remains correct — Google's June 17, 2026
+//        deprecation date for the 2.5 generation was postponed; current
+//        official guidance (checked 2026-06-19) gives "no earlier than
+//        October 16, 2026" for gemini-2.5-flash/-pro shutdown.
+//        Fallback is gemini-2.5-flash-lite only — same generation, separate
+//        quota pool, and itself GA-stable (not due to shut down until at
+//        least July 2026). gemini-flash-latest was considered as a second
+//        fallback step but rejected: per Google's own docs, the "-latest"
+//        alias resolves to an EXPERIMENTAL model with tighter rate limits,
+//        not a stable one — using it as a fallback could itself become the
+//        thing that's exhausted/unavailable, recreating this exact bug.
 const GEMINI_MODEL_MAP = {
   'generate-questions': 'gemini-2.5-flash',
   'chat':               'gemini-2.5-flash',
@@ -58,14 +64,17 @@ const GEMINI_MODEL_MAP = {
 };
 
 // Fallback chain — tried in order if primary fails (503, 429, 404, etc.)
-//   1. gemini-2.5-flash       — primary (current stable GA model)
+//   1. gemini-2.5-flash       — primary (current GA model, see note above)
 //   2. gemini-2.5-flash-lite  — same generation, lighter/cheaper, separate
 //                                 quota pool so primary-quota exhaustion
-//                                 doesn't take this down too
-//   3. gemini-flash-latest    — Google's auto-updated alias; always resolves
-//                                 to a currently supported model, so this
-//                                 step can never itself go stale/404
-const FALLBACK_CHAIN = ['gemini-2.5-flash-lite', 'gemini-flash-latest'];
+//                                 doesn't take this down too; itself GA-stable
+//
+// NOTE: keep this chain free of "-latest"/"-preview" aliases. Both alias
+// types can silently start pointing at an experimental or rate-limited
+// model without any code change here — defeating the purpose of a fallback.
+// Pin to dated/named stable releases only, and revisit this comment block
+// before October 2026 when gemini-2.5-flash's own shutdown window opens.
+const FALLBACK_CHAIN = ['gemini-2.5-flash-lite'];
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PROVIDER HELPERS
