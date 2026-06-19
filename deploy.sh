@@ -37,9 +37,12 @@ echo "  Waiting 15s for containers to be ready..."
 sleep 15
 
 # 4. Run DB migrations inside the NEW running API container
+#    NOTE: run via file path, NOT via stdin pipe (node - < file).
+#    The stdin approach gives Node no __dirname/module resolution context,
+#    so require() calls fail silently and the migration never actually runs.
 echo ""
 echo "▶ 4/4  Running DB migrations..."
-docker exec -i aischool_api node - < server/scripts/run_complete_migration.js
+docker exec aischool_api node /app/scripts/run_complete_migration.js
 
 echo ""
 echo "═══════════════════════════════════════════════════"
