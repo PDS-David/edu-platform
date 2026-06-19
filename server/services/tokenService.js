@@ -230,8 +230,9 @@ async function rotateRefreshToken({ rawRefreshToken, ipAddress, userAgent }) {
     { replacements: { id: row.id }, type: QueryTypes.UPDATE }
   );
 
-  // Issue fresh pair
-  return issueTokenPair({
+  // Issue fresh pair and forward rememberMe so the caller can set the
+  // correct cookie Max-Age (fix for auth.js FIX-4).
+  const pair = await issueTokenPair({
     userId:     row.user_id,
     role:       users[0].role,
     rememberMe: row.remember_me,
@@ -239,6 +240,7 @@ async function rotateRefreshToken({ rawRefreshToken, ipAddress, userAgent }) {
     ipAddress,
     userAgent,
   });
+  return { ...pair, rememberMe: row.remember_me };
 }
 
 // ─── Revocation helpers ───────────────────────────────────────────────────────
