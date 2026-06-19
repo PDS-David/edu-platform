@@ -557,6 +557,152 @@ router.post('/tests/:id/assign', protect, teacherOnly, async (req, res) => {
   }
 });
 
+// ── POST /api/teacher/tests/:id/questions ─────────────────────────────────────
+// Attaches one or more existing questions (from the teacher's own question
+// bank, server/routes -> GET /api/teacher/questions) to a custom test by
+// inserting rows into test_questions. This is the missing link that left
+// students unable to see any questions on a pushed/assigned test — tests
+// could be created, published, and assigned to a class, but no endpoint
+// ever wrote to test_questions, so GET /api/students/test/:testId always
+// returned an empty questions array.
+// Body: { question_ids: [1,2,3] }  — order in the array becomes question_order
+router.post('/tests/:id/questions', protect, teacherOnly, async (req, res) => {
+  const { id: testId } = req.params;
+  const { question_ids } = req.body;
+
+  if (!Array.isArray(question_ids) || question_ids.length === 0) {
+    return res.status(400).json({ success: false, error: 'question_ids array is required' });
+  }
+
+  try {
+    // Verify the teacher owns this test (admins can attach to any test)
+    const test = await safeQuery(
+      `SELECT id FROM custom_tests WHERE id = :id AND (teacher_id = :teacherId OR :isAdmin)`,
+      { id: testId, teacherId: req.user.id, isAdmin: req.user.role === 'admin' }
+    );
+    if (!test.length) return res.status(404).json({ success: false, error: 'Test not found' });
+
+    // Only allow attaching questions the teacher actually owns/submitted
+    // (or any question, for admins)
+    const validQuestions = await safeQuery(
+      `SELECT id, marks FROM questions
+        WHERE id = ANY(:ids) AND is_active = true AND (submitted_by = :teacherId OR :isAdmin)`,
+      { ids: question_ids, teacherId: req.user.id, isAdmin: req.user.role === 'admin' }
+    );
+    if (!validQuestions.length) {
+      return res.status(404).json({ success: false, error: 'No matching questions found for this teacher' });
+    }
+
+    // Find current max question_order so newly attached questions append at the end
+    const orderRows = await safeQuery(
+      `SELECT COALESCE(MAX(question_order), -1) AS max_order FROM test_questions WHERE test_id = :testId`,
+      { testId }
+    );
+    let nextOrder = (orderRows[0]?.max_order ?? -1) + 1;
+
+    let attached = 0;
+    const skipped = [];
+    for (const q of validQuestions) {
+      try {
+        await sequelize.query(
+          `INSERT INTO test_questions (test_id, question_id, question_order, marks_allocated)
+           VALUES (:testId, :questionId, :order, :marks)
+           ON CONFLICT (test_id, question_id) DO NOTHING`,
+          {
+            replacements: {
+              testId,
+              questionId: q.id,
+              order: nextOrder,
+              marks: q.marks || 1,
+            },
+            type: QueryTypes.INSERT,
+          }
+        );
+        nextOrder++;
+        attached++;
+      } catch (e) {
+        skipped.push({ question_id: q.id, error: e.message });
+      }
+    }
+
+    // Keep total_marks on the test in sync with what's actually attached
+    await sequelize.query(
+      `UPDATE custom_tests
+          SET total_marks = (SELECT COALESCE(SUM(marks_allocated), 0) FROM test_questions WHERE test_id = :testId),
+              updated_at = NOW()
+        WHERE id = :testId`,
+      { replacements: { testId }, type: QueryTypes.UPDATE }
+    );
+
+    return res.status(201).json({
+      success: true,
+      message: `${attached} question(s) attached to test.`,
+      attached,
+      skipped,
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── DELETE /api/teacher/tests/:id/questions/:questionId ───────────────────────
+// Removes a single question from a test.
+router.delete('/tests/:id/questions/:questionId', protect, teacherOnly, async (req, res) => {
+  const { id: testId, questionId } = req.params;
+  try {
+    const test = await safeQuery(
+      `SELECT id FROM custom_tests WHERE id = :id AND (teacher_id = :teacherId OR :isAdmin)`,
+      { id: testId, teacherId: req.user.id, isAdmin: req.user.role === 'admin' }
+    );
+    if (!test.length) return res.status(404).json({ success: false, error: 'Test not found' });
+
+    await sequelize.query(
+      `DELETE FROM test_questions WHERE test_id = :testId AND question_id = :questionId`,
+      { replacements: { testId, questionId }, type: QueryTypes.DELETE }
+    );
+
+    await sequelize.query(
+      `UPDATE custom_tests
+          SET total_marks = (SELECT COALESCE(SUM(marks_allocated), 0) FROM test_questions WHERE test_id = :testId),
+              updated_at = NOW()
+        WHERE id = :testId`,
+      { replacements: { testId }, type: QueryTypes.UPDATE }
+    );
+
+    return res.json({ success: true, message: 'Question removed from test.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── GET /api/teacher/tests/:id/questions ───────────────────────────────────────
+// Returns the questions currently attached to a test, in order — used to
+// populate the Test Builder UI so a teacher can see/edit what a student
+// will actually receive.
+router.get('/tests/:id/questions', protect, teacherOnly, async (req, res) => {
+  const { id: testId } = req.params;
+  try {
+    const test = await safeQuery(
+      `SELECT id FROM custom_tests WHERE id = :id AND (teacher_id = :teacherId OR :isAdmin)`,
+      { id: testId, teacherId: req.user.id, isAdmin: req.user.role === 'admin' }
+    );
+    if (!test.length) return res.status(404).json({ success: false, error: 'Test not found' });
+
+    const rows = await safeQuery(
+      `SELECT q.id, q.question_text, q.difficulty, q.options,
+              tq.question_order, tq.marks_allocated
+         FROM test_questions tq
+         JOIN questions q ON q.id = tq.question_id
+        WHERE tq.test_id = :testId
+        ORDER BY tq.question_order ASC`,
+      { testId }
+    );
+    return res.json({ success: true, data: rows });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ── POST /api/teacher/nudge/:userId ──────────────────────────────────────────
 router.post('/nudge/:userId', protect, teacherOnly, async (req, res) => {
   try {
