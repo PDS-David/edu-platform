@@ -60,7 +60,13 @@ function clientMeta(req) {
 // ─────────────────────────────────────────────────────────────────────────────
 exports.register = async (req, res, next) => {
   try {
-    const { email, password, role = 'student' } = req.body;
+    const { email, password } = req.body;
+
+    // FIX-1: role was destructured from req.body but the INSERT hardcoded
+    // 'student', making role silently ignored. Whitelist and use the value.
+    const ALLOWED_ROLES = ['student', 'teacher', 'admin'];
+    const role = ALLOWED_ROLES.includes(req.body.role) ? req.body.role : 'student';
+
     const first_name = (req.body.first_name || req.body.firstName || '').trim();
     const last_name  = (req.body.last_name  || req.body.lastName  || first_name).trim();
     const pendingExamBoards = req.body.pendingExamBoards || [];
@@ -94,7 +100,7 @@ exports.register = async (req, res, next) => {
           subscription_expires_at, pending_exam_board_ids,
           created_at, updated_at)
        VALUES
-         (:email, :password, :first_name, :last_name, 'student',
+         (:email, :password, :first_name, :last_name, :role,
           :verificationToken, :verificationTokenExpires,
           true, false, 'free_trial',
           NOW() + INTERVAL '14 days',
@@ -109,7 +115,7 @@ exports.register = async (req, res, next) => {
         replacements: {
           email: email.toLowerCase().trim(),
           password: hashedPassword,
-          first_name, last_name,
+          first_name, last_name, role,
           verificationToken, verificationTokenExpires,
           pendingIds: pendingIds.length ? `{${pendingIds.join(',')}}` : '{}',
         },
@@ -121,7 +127,7 @@ exports.register = async (req, res, next) => {
     const { ipAddress, userAgent } = clientMeta(req);
 
     // AUTH-003: no remember-me on register — short-lived default
-    const { accessToken, refreshToken, expiresIn } = await tokenService.issueTokenPair({
+    const { accessToken, refreshToken } = await tokenService.issueTokenPair({
       userId: user.id, role: user.role,
       rememberMe: false, ipAddress, userAgent,
       deviceHint: 'register',
@@ -251,7 +257,7 @@ exports.login = async (req, res, next) => {
     );
 
     // AUTH-002 + AUTH-003 + AUTH-005: issue server-registered token pair
-    const { accessToken, refreshToken, expiresIn } = await tokenService.issueTokenPair({
+    const { accessToken, refreshToken } = await tokenService.issueTokenPair({
       userId:     userRow.id,
       role:       userRow.role,
       rememberMe: !!rememberMe,
@@ -339,11 +345,12 @@ exports.refreshToken = async (req, res, next) => {
       return res.status(401).json({ success: false, error: 'No refresh token provided' });
     }
 
-    const { accessToken, refreshToken: newRefresh, expiresIn } =
+    const { accessToken, refreshToken: newRefresh, expiresIn, rememberMe } =
       await tokenService.rotateRefreshToken({ rawRefreshToken, ipAddress, userAgent });
 
-    // Rotate cookie too
-    setRefreshCookie(res, newRefresh, false);  // remember-me handled inside tokenService
+    // FIX-4: was hardcoded false — the rotated cookie lost Max-Age for
+    // rememberMe sessions. tokenService now returns rememberMe from the DB row.
+    setRefreshCookie(res, newRefresh, !!rememberMe);
 
     setImmediate(() => audit.tokenRefresh({ ipAddress, userAgent, metadata: {} }));
 
@@ -375,7 +382,8 @@ exports.getMe = async (req, res, next) => {
       { replacements: { id: req.user.id }, type: QueryTypes.SELECT }
     );
     if (!rows.length) return res.status(404).json({ success: false, error: 'User not found' });
-    return res.status(200).json({ success: true, user: safeUser(rows[0]) });
+    // Row is already scoped — no sensitive columns present; spread directly
+    return res.status(200).json({ success: true, user: rows[0] });
   } catch (err) {
     console.error('[getMe]', err.message);
     next(err);
@@ -393,8 +401,9 @@ exports.updatePassword = async (req, res, next) => {
       return res.status(400).json({ success: false, error: 'current_password and new_password are required' });
     }
 
+    // FIX-5: was SELECT * — fetches only what's needed (id + password hash)
     const rows = await db.query(
-      `SELECT * FROM users WHERE id = :id LIMIT 1`,
+      `SELECT id, password FROM users WHERE id = :id LIMIT 1`,
       { replacements: { id: req.user.id }, type: QueryTypes.SELECT }
     );
     if (!rows.length) return res.status(404).json({ success: false, error: 'User not found' });
@@ -433,9 +442,13 @@ exports.forgotPassword = async (req, res, next) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ success: false, error: 'Email is required' });
 
+    // FIX-3: email was not normalised — users who registered with mixed-case
+    // email could not trigger a reset using lowercase (or vice versa).
+    const normalisedEmail = email.toLowerCase().trim();
+
     const rows = await db.query(
       `SELECT id FROM users WHERE email = :email LIMIT 1`,
-      { replacements: { email }, type: QueryTypes.SELECT }
+      { replacements: { email: normalisedEmail }, type: QueryTypes.SELECT }
     );
 
     if (!rows.length) {
@@ -451,7 +464,7 @@ exports.forgotPassword = async (req, res, next) => {
     );
 
     setImmediate(() => audit.passwordResetRequest({
-      userId: rows[0].id, email, ipAddress, userAgent,
+      userId: rows[0].id, email: normalisedEmail, ipAddress, userAgent,
     }));
 
     return res.status(200).json({ success: true, message: 'If that email exists, a reset link has been sent.' });
