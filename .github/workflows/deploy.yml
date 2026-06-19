@@ -62,3 +62,7 @@ jobs:
             echo "════════════════════════════════════"
             echo "✅ Deployment successful"
             echo "════════════════════════════════════"
+
+            echo ""
+            echo "▶ API container logs (last 80 lines for diagnostics)..."
+            docker logs aischool_api --tail=80 2>&1 || true
