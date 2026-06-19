@@ -804,6 +804,14 @@ async function run() {
       CREATE INDEX IF NOT EXISTS idx_ra_student_resource ON resource_assignments(student_id, resource_id)
         WHERE student_id IS NOT NULL;
       CREATE INDEX IF NOT EXISTS idx_rua_user_resource   ON resource_user_assignments(user_id, resource_id)`],
+
+    // M-7: Backfill assigned_by on live DBs created before the column was added
+    ['resource_assignments: add assigned_by column if missing (M-7)', `
+      ALTER TABLE resource_assignments
+        ADD COLUMN IF NOT EXISTS assigned_by UUID REFERENCES users(id)`],
+    ['resource_user_assignments: add assigned_by column if missing (M-7)', `
+      ALTER TABLE resource_user_assignments
+        ADD COLUMN IF NOT EXISTS assigned_by UUID REFERENCES users(id)`],
   ];
 
   for (const [label, sql] of tables) {
