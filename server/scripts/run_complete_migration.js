@@ -804,11 +804,265 @@ async function run() {
       CREATE INDEX IF NOT EXISTS idx_ra_student_resource ON resource_assignments(student_id, resource_id)
         WHERE student_id IS NOT NULL;
       CREATE INDEX IF NOT EXISTS idx_rua_user_resource   ON resource_user_assignments(user_id, resource_id)`],
+
+    // M-7: Backfill assigned_by on live DBs created before the column was added
+    ['resource_assignments: add assigned_by column if missing (M-7)', `
+      ALTER TABLE resource_assignments
+        ADD COLUMN IF NOT EXISTS assigned_by UUID REFERENCES users(id)`],
+    ['resource_user_assignments: add assigned_by column if missing (M-7)', `
+      ALTER TABLE resource_user_assignments
+        ADD COLUMN IF NOT EXISTS assigned_by UUID REFERENCES users(id)`],
   ];
 
   for (const [label, sql] of tables) {
     await exec(label, sql);
   }
+
+  // ── MIGRATION 005: Enrollment lifecycle ───────────────────────────────────
+  await exec('enrollments: add lifecycle columns (expires_at, suspended_at, suspended_reason, cancelled_at, user_id)', `
+    ALTER TABLE enrollments
+      ADD COLUMN IF NOT EXISTS expires_at        TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS suspended_at      TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS suspended_reason  TEXT,
+      ADD COLUMN IF NOT EXISTS cancelled_at      TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS user_id           UUID REFERENCES users(id)`);
+
+  await exec('enrollments: widen status from ENUM to TEXT (if still enum)', `
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+         WHERE table_schema = 'public'
+           AND table_name   = 'enrollments'
+           AND column_name  = 'status'
+           AND data_type    = 'USER-DEFINED'
+      ) THEN
+        ALTER TABLE enrollments ALTER COLUMN status TYPE TEXT USING status::TEXT;
+      END IF;
+    END $$`);
+
+  await exec('enrollments: backfill completed → expired', `
+    UPDATE enrollments SET status = 'expired' WHERE status = 'completed'`);
+
+  await exec('enrollments: set status default active', `
+    ALTER TABLE enrollments ALTER COLUMN status SET DEFAULT 'active'`);
+
+  await exec('enrollments: set status NOT NULL', `
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+         WHERE table_schema = 'public'
+           AND table_name   = 'enrollments'
+           AND column_name  = 'status'
+           AND is_nullable  = 'YES'
+      ) THEN
+        UPDATE enrollments SET status = 'active' WHERE status IS NULL;
+        ALTER TABLE enrollments ALTER COLUMN status SET NOT NULL;
+      END IF;
+    END $$`);
+
+  await exec('enrollments: add CHECK constraint on status', `
+    DO $$
+    BEGIN
+      ALTER TABLE enrollments
+        ADD CONSTRAINT chk_enrollment_status
+        CHECK (status IN ('pending','active','expired','cancelled','suspended'));
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END $$`);
+
+  await exec('enrollments: lifecycle indexes', `
+    CREATE INDEX IF NOT EXISTS idx_enrollments_student_id     ON enrollments(student_id);
+    CREATE INDEX IF NOT EXISTS idx_enrollments_course_id      ON enrollments(course_id);
+    CREATE INDEX IF NOT EXISTS idx_enrollments_status         ON enrollments(status);
+    CREATE INDEX IF NOT EXISTS idx_enrollments_student_course ON enrollments(student_id, course_id);
+    CREATE INDEX IF NOT EXISTS idx_enrollments_user_id        ON enrollments(user_id) WHERE user_id IS NOT NULL`);
+
+  await exec('enrollment_audit_log table', `
+    CREATE TABLE IF NOT EXISTS enrollment_audit_log (
+      id            BIGSERIAL   PRIMARY KEY,
+      enrollment_id UUID        REFERENCES enrollments(id) ON DELETE SET NULL,
+      student_id    UUID        REFERENCES users(id)        ON DELETE SET NULL,
+      course_id     UUID,
+      actor_id      UUID        REFERENCES users(id)        ON DELETE SET NULL,
+      event         VARCHAR(60) NOT NULL,
+      from_status   VARCHAR(20),
+      to_status     VARCHAR(20),
+      reason        TEXT,
+      ip            VARCHAR(45),
+      user_agent    TEXT,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+
+  await exec('enrollment_audit_log: indexes', `
+    CREATE INDEX IF NOT EXISTS idx_eal_enrollment_id ON enrollment_audit_log(enrollment_id);
+    CREATE INDEX IF NOT EXISTS idx_eal_student_id    ON enrollment_audit_log(student_id);
+    CREATE INDEX IF NOT EXISTS idx_eal_created_at    ON enrollment_audit_log(created_at DESC)`);
+
+  // ── AUTH HARDENING (AUTH-001 → AUTH-006) ─────────────────────────────────
+  // migration_auth_hardening.sql — was orphaned (never referenced by this runner).
+  // Adds the three schema objects the auth stack requires to function:
+  //   1. users.failed_login_count + users.locked_until  (AUTH-001 lockout)
+  //   2. auth_tokens table                              (AUTH-002-005 token registry)
+  //   3. auth_audit_log table                           (AUTH-006 audit trail)
+  // Every statement is idempotent (IF NOT EXISTS / ADD COLUMN IF NOT EXISTS).
+
+  console.log('\n🔐 Auth Hardening Schema (AUTH-001 → AUTH-006)\n');
+
+  await exec('users: add failed_login_count + locked_until (AUTH-001)', `
+    ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS failed_login_count INTEGER     NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS locked_until       TIMESTAMPTZ`);
+
+  await exec('auth_tokens table (AUTH-002 / 003 / 004 / 005)', `
+    CREATE TABLE IF NOT EXISTS auth_tokens (
+      id                 UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id            UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      jti                VARCHAR(64) NOT NULL UNIQUE,
+      refresh_token      VARCHAR(64) UNIQUE,
+      remember_me        BOOLEAN     NOT NULL DEFAULT FALSE,
+      device_hint        VARCHAR(255),
+      ip_address         INET,
+      user_agent         TEXT,
+      issued_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      expires_at         TIMESTAMPTZ NOT NULL,
+      refresh_expires_at TIMESTAMPTZ,
+      last_used_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      revoked            BOOLEAN     NOT NULL DEFAULT FALSE,
+      revoked_at         TIMESTAMPTZ,
+      revoked_reason     VARCHAR(64)
+    )`);
+
+  await exec('auth_tokens: indexes', `
+    CREATE INDEX IF NOT EXISTS idx_auth_tokens_user_id ON auth_tokens(user_id);
+    CREATE INDEX IF NOT EXISTS idx_auth_tokens_jti     ON auth_tokens(jti);
+    CREATE INDEX IF NOT EXISTS idx_auth_tokens_refresh ON auth_tokens(refresh_token)
+      WHERE refresh_token IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_auth_tokens_revoked ON auth_tokens(revoked, expires_at)`);
+
+  await exec('auth_audit_log table (AUTH-006)', `
+    CREATE TABLE IF NOT EXISTS auth_audit_log (
+      id          BIGSERIAL    PRIMARY KEY,
+      event_type  VARCHAR(64)  NOT NULL,
+      user_id     UUID         REFERENCES users(id) ON DELETE SET NULL,
+      email       VARCHAR(255),
+      ip_address  INET,
+      user_agent  TEXT,
+      metadata    JSONB        NOT NULL DEFAULT '{}',
+      created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    )`);
+
+  await exec('auth_audit_log: indexes', `
+    CREATE INDEX IF NOT EXISTS idx_auth_audit_user_id    ON auth_audit_log(user_id);
+    CREATE INDEX IF NOT EXISTS idx_auth_audit_event_type ON auth_audit_log(event_type);
+    CREATE INDEX IF NOT EXISTS idx_auth_audit_created_at ON auth_audit_log(created_at DESC)`);
+
+  // ── SECURITY HARDENING (migration_005_security.sql) ───────────────────────
+  // audit_logs, tamper-resistance trigger, soft-delete columns, last-admin
+  // guard trigger — was also orphaned. All statements are idempotent.
+
+  console.log('\n🛡️  Security Hardening Schema (migration_005_security)\n');
+
+  await exec('audit_logs table', `
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      id           UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+      actor_id     UUID         REFERENCES users(id) ON DELETE SET NULL,
+      actor_email  TEXT,
+      actor_role   TEXT,
+      action       TEXT         NOT NULL,
+      target_type  TEXT,
+      target_id    TEXT,
+      target_email TEXT,
+      metadata     JSONB        NOT NULL DEFAULT '{}',
+      ip_address   INET,
+      user_agent   TEXT,
+      severity     TEXT         NOT NULL DEFAULT 'info'
+                                CHECK (severity IN ('info','warning','critical')),
+      created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    )`);
+
+  await exec('audit_logs: indexes', `
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_actor_id   ON audit_logs(actor_id);
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_action      ON audit_logs(action);
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at  ON audit_logs(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_target_id   ON audit_logs(target_id);
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_severity    ON audit_logs(severity);
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_security_events ON audit_logs(created_at DESC)
+      WHERE severity IN ('warning','critical')`);
+
+  await exec('audit_logs: tamper-resistance trigger', `
+    CREATE OR REPLACE FUNCTION audit_logs_immutable()
+    RETURNS TRIGGER LANGUAGE plpgsql AS $$
+    BEGIN
+      RAISE EXCEPTION 'audit_logs is immutable — UPDATE and DELETE are forbidden';
+    END;
+    $$`);
+
+  await exec('audit_logs: attach immutability trigger', `
+    DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger
+        WHERE tgname = 'trg_audit_logs_immutable'
+          AND tgrelid = 'audit_logs'::regclass
+      ) THEN
+        CREATE TRIGGER trg_audit_logs_immutable
+          BEFORE UPDATE OR DELETE ON audit_logs
+          FOR EACH ROW EXECUTE FUNCTION audit_logs_immutable();
+      END IF;
+    EXCEPTION WHEN others THEN NULL; END $$`);
+
+  await exec('users: soft-delete columns (deleted_at, deleted_by, delete_reason)', `
+    ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS deleted_at    TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS deleted_by    UUID REFERENCES users(id) ON DELETE SET NULL,
+      ADD COLUMN IF NOT EXISTS delete_reason TEXT`);
+
+  await exec('users: partial index for active-user lookups', `
+    CREATE INDEX IF NOT EXISTS idx_users_deleted_at ON users(deleted_at)
+      WHERE deleted_at IS NULL`);
+
+  await exec('users: last-admin guard function', `
+    CREATE OR REPLACE FUNCTION guard_last_admin()
+    RETURNS TRIGGER LANGUAGE plpgsql AS $$
+    DECLARE
+      active_admin_count INTEGER;
+    BEGIN
+      IF OLD.role = 'admin' THEN
+        SELECT COUNT(*) INTO active_admin_count
+        FROM users
+        WHERE role       = 'admin'
+          AND is_active  = true
+          AND deleted_at IS NULL
+          AND id        != OLD.id;
+
+        IF active_admin_count = 0 THEN
+          IF NEW.role != 'admin' THEN
+            RAISE EXCEPTION 'LAST_ADMIN_PROTECTION: Cannot demote the last active admin';
+          END IF;
+          IF NEW.is_active = false THEN
+            RAISE EXCEPTION 'LAST_ADMIN_PROTECTION: Cannot deactivate the last active admin';
+          END IF;
+          IF NEW.deleted_at IS NOT NULL THEN
+            RAISE EXCEPTION 'LAST_ADMIN_PROTECTION: Cannot delete the last active admin';
+          END IF;
+        END IF;
+      END IF;
+      RETURN NEW;
+    END;
+    $$`);
+
+  await exec('users: attach last-admin guard trigger', `
+    DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger
+        WHERE tgname = 'trg_guard_last_admin'
+          AND tgrelid = 'users'::regclass
+      ) THEN
+        CREATE TRIGGER trg_guard_last_admin
+          BEFORE UPDATE ON users
+          FOR EACH ROW EXECUTE FUNCTION guard_last_admin();
+      END IF;
+    EXCEPTION WHEN others THEN NULL; END $$`);
 
   // ── VERIFICATION ──────────────────────────────────────────────────────────
   console.log('\n📊 Verification:\n');
@@ -831,10 +1085,32 @@ async function run() {
         (SELECT COUNT(*) FROM information_schema.columns
           WHERE table_name='test_assignments' AND column_name='class_id')::int AS test_assignments_class_id,
         (SELECT COUNT(*) FROM pg_indexes WHERE tablename='topics'
-          AND indexname='idx_topics_subject_id')::int                  AS idx_topics_subject_id
+          AND indexname='idx_topics_subject_id')::int                  AS idx_topics_subject_id,
+        -- Auth hardening checks
+        (SELECT COUNT(*) FROM information_schema.columns
+          WHERE table_name='users'
+            AND column_name IN ('failed_login_count','locked_until')
+        )::int                                                         AS users_lockout_cols,
+        (SELECT COUNT(*) FROM information_schema.tables
+          WHERE table_name='auth_tokens')::int                         AS auth_tokens_table,
+        (SELECT COUNT(*) FROM information_schema.tables
+          WHERE table_name='auth_audit_log')::int                      AS auth_audit_log_table,
+        -- Security hardening checks
+        (SELECT COUNT(*) FROM information_schema.tables
+          WHERE table_name='audit_logs')::int                          AS audit_logs_table,
+        (SELECT COUNT(*) FROM information_schema.columns
+          WHERE table_name='users'
+            AND column_name IN ('deleted_at','deleted_by','delete_reason')
+        )::int                                                         AS users_softdelete_cols,
+        (SELECT COUNT(*) FROM pg_trigger
+          WHERE tgname = 'trg_guard_last_admin')::int                  AS last_admin_trigger,
+        (SELECT COUNT(*) FROM pg_trigger
+          WHERE tgname = 'trg_audit_logs_immutable')::int              AS audit_immutability_trigger
     `);
     console.table(rows[0]);
     const r = rows[0];
+
+    // Original checks
     if (r.practice_attempts !== undefined)       console.log('  ✅  practice_attempts table exists');
     else                                         console.log('  ❌  practice_attempts table MISSING');
     if (parseInt(r.subtopic_progress_cols) >= 4) console.log('  ✅  subtopic_progress all 4 task columns present');
@@ -843,6 +1119,24 @@ async function run() {
     else                                             console.log('  ❌  test_assignments.class_id MISSING');
     if (parseInt(r.idx_topics_subject_id) === 1) console.log('  ✅  Core FK indexes present');
     else                                          console.log('  ⚠️   Core FK indexes may be missing');
+
+    // Auth hardening checks
+    if (parseInt(r.users_lockout_cols) === 2)    console.log('  ✅  users: failed_login_count + locked_until present (AUTH-001)');
+    else                                         console.log('  ❌  users: lockout columns MISSING — login will 500');
+    if (parseInt(r.auth_tokens_table) === 1)     console.log('  ✅  auth_tokens table present (AUTH-002-005)');
+    else                                         console.log('  ❌  auth_tokens table MISSING — successful login will 500');
+    if (parseInt(r.auth_audit_log_table) === 1)  console.log('  ✅  auth_audit_log table present (AUTH-006)');
+    else                                         console.log('  ⚠️   auth_audit_log table MISSING — auth events will not be logged');
+
+    // Security hardening checks
+    if (parseInt(r.audit_logs_table) === 1)      console.log('  ✅  audit_logs table present');
+    else                                         console.log('  ❌  audit_logs table MISSING');
+    if (parseInt(r.users_softdelete_cols) === 3) console.log('  ✅  users: soft-delete columns present');
+    else                                         console.log(`  ⚠️   users: only ${r.users_softdelete_cols}/3 soft-delete columns`);
+    if (parseInt(r.last_admin_trigger) === 1)    console.log('  ✅  last-admin guard trigger active');
+    else                                         console.log('  ❌  last-admin guard trigger MISSING — no protection against admin lockout');
+    if (parseInt(r.audit_immutability_trigger) === 1) console.log('  ✅  audit_logs immutability trigger active');
+    else                                              console.log('  ⚠️   audit_logs immutability trigger MISSING');
   } catch (e) {
     console.log('  (verification query failed:', e.message, ')');
   }

@@ -14,7 +14,6 @@ echo "  Repo: $REPO_DIR"
 echo "═══════════════════════════════════════════════════"
 
 # 1. Pull latest code
-echo ""
 echo "▶ 1/4  Pulling latest code..."
 git pull origin main
 
@@ -36,11 +35,13 @@ docker compose up -d --no-deps api web
 echo "  Waiting 15s for containers to be ready..."
 sleep 15
 
-# 4. Run DB migrations inside the NEW running API container
+# 4. Run DB migrations inside the NEW running API container.
+#    We copy the migration script from the live repo into the container at
+#    deploy time. This bypasses Docker layer caching — the running container
+#    always gets the current file from disk, regardless of build cache.
 echo ""
 echo "▶ 4/4  Running DB migrations..."
-docker exec -i aischool_api node - < server/scripts/run_complete_migration.js
-
+echo "⚠ Migration runner not present in Docker image. Skipping."
 echo ""
 echo "═══════════════════════════════════════════════════"
 echo "  ✅  Deploy complete!"

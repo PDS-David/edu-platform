@@ -42,7 +42,11 @@ export default function TopNav() {
 
   useEffect(() => {
     if (!user) return;
-    api.get('/notifications').then(r => setNotifications(r.data || [])).catch(() => {});
+    // The notifications endpoint returns { success, count, data: [...] }
+    // but apiClient normalises it so r.data is already the array (via data?.data ?? data)
+    api.get('/notifications')
+      .then(r => setNotifications(Array.isArray(r.data) ? r.data : []))
+      .catch(() => setNotifications([]));
   }, [user]);
 
   useEffect(() => {
@@ -58,8 +62,19 @@ export default function TopNav() {
     setNotifOpen(p => {
       const next = !p;
       if (next && unreadCount > 0) {
-        setNotifications(n => n.map(x => ({ ...x, is_read: true })));
-        api.patch('/notifications/read-all').catch(() => {});
+        // DEF-008: Do NOT mark notifications read client-side until the server
+        // confirms success. Previously, state was mutated before the API call,
+        // permanently silencing the badge even when the route was missing (DEF-002).
+        const prevNotifications = notifications;
+        api.patch('/notifications/read-all')
+          .then(() => {
+            // Server confirmed — now update local state
+            setNotifications(n => n.map(x => ({ ...x, is_read: true })));
+          })
+          .catch(() => {
+            // Server failed — leave state unchanged (unread badge remains)
+            setNotifications(prevNotifications);
+          });
       }
       return next;
     });

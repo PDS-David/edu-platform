@@ -4,7 +4,7 @@ import api from '../services/apiClient';
 import {
   Users, Plus, CheckCircle, Loader2, AlertTriangle,
   BarChart2, X, PenTool, BookOpen, Upload, Send,
-  ChevronDown, AlertCircle, Search, UserPlus, Settings,
+  ChevronDown, AlertCircle, Search, UserPlus, Settings, Check,
 } from 'lucide-react';
 import TopNav from '../components/TopNav';
 import { useAuth } from '../context/AuthContext';
@@ -403,6 +403,10 @@ function TestBuilderTab() {
   const [toast,      setToast]      = useState(null);
   const [showCreate, setShowCreate] = useState(false);
   const [form,       setForm]       = useState({ title: '', duration_minutes: 60, total_marks: 100 });
+  const [editingQ,   setEditingQ]   = useState(null);   // test id whose question panel is open
+  const [bank,       setBank]       = useState([]);     // teacher's question bank
+  const [attached,   setAttached]   = useState([]);     // questions already on the open test
+  const [savingQ,    setSavingQ]    = useState(false);
 
   const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3500); };
 
@@ -434,6 +438,37 @@ function TestBuilderTab() {
     if (!assignClass) { showToast('Select a class first.', 'error'); return; }
     try { await api.post(`/teacher/tests/${testId}/assign`, { class_id: assignClass }); showToast('Assigned!'); setAssigning(null); setAssignClass(''); }
     catch (err) { showToast(err?.message || 'Failed.', 'error'); }
+  };
+
+  const toggleQuestionPanel = async testId => {
+    if (editingQ === testId) { setEditingQ(null); return; }
+    setEditingQ(testId);
+    try {
+      const [b, a] = await Promise.all([
+        api.get('/teacher/questions').catch(() => ({ data: [] })),
+        api.get(`/teacher/tests/${testId}/questions`).catch(() => ({ data: [] })),
+      ]);
+      setBank(Array.isArray(b?.data) ? b.data : []);
+      setAttached(Array.isArray(a?.data) ? a.data : []);
+    } catch (err) { showToast(err?.message || 'Could not load questions.', 'error'); }
+  };
+
+  const isAttached = qId => attached.some(a => a.id === qId);
+
+  const toggleQuestionOnTest = async (testId, questionId) => {
+    setSavingQ(true);
+    try {
+      if (isAttached(questionId)) {
+        await api.delete(`/teacher/tests/${testId}/questions/${questionId}`);
+        setAttached(prev => prev.filter(a => a.id !== questionId));
+      } else {
+        await api.post(`/teacher/tests/${testId}/questions`, { question_ids: [questionId] });
+        const q = bank.find(b => b.id === questionId);
+        if (q) setAttached(prev => [...prev, q]);
+      }
+      load();
+    } catch (err) { showToast(err?.message || 'Failed to update test questions.', 'error'); }
+    finally { setSavingQ(false); }
   };
 
   if (loading) return <div className="flex justify-center py-12"><Loader2 size={20} className="animate-spin text-violet-300" /></div>;
@@ -507,6 +542,10 @@ function TestBuilderTab() {
                       {publishing === t.id ? <Loader2 size={12} className="animate-spin" /> : 'Publish'}
                     </button>
                   )}
+                  <button onClick={() => toggleQuestionPanel(t.id)}
+                    className="text-xs px-3 py-1.5 border border-gray-200 text-gray-500 hover:text-violet-600 hover:border-violet-200 font-semibold rounded-lg">
+                    Questions ({t.question_count ?? 0})
+                  </button>
                   <button onClick={() => setAssigning(assigning === t.id ? null : t.id)}
                     className="text-xs px-3 py-1.5 border border-gray-200 text-gray-500 hover:text-violet-600 hover:border-violet-200 font-semibold rounded-lg">
                     Assign
@@ -522,6 +561,36 @@ function TestBuilderTab() {
                   </select>
                   <button onClick={() => assignTest(t.id)} className="bg-violet-600 text-white text-xs font-semibold px-3 py-2 rounded-lg">Assign</button>
                   <button onClick={() => setAssigning(null)} className="text-gray-400 hover:text-gray-600"><X size={14} /></button>
+                </div>
+              )}
+              {editingQ === t.id && (
+                <div className="border-t border-gray-100 bg-gray-50 px-4 py-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-mono text-gray-400 uppercase tracking-widest">Question bank — tap to attach/remove</p>
+                    {savingQ && <Loader2 size={12} className="animate-spin text-violet-400" />}
+                  </div>
+                  {bank.length === 0 ? (
+                    <p className="text-xs text-gray-400 py-2">
+                      No questions in your bank yet. Use "Add Question" above to create some first.
+                    </p>
+                  ) : (
+                    <div className="max-h-64 overflow-y-auto space-y-1.5">
+                      {bank.map(q => {
+                        const on = isAttached(q.id);
+                        return (
+                          <button key={q.id} onClick={() => toggleQuestionOnTest(t.id, q.id)} disabled={savingQ}
+                            className={`w-full text-left text-xs px-3 py-2 rounded-lg border flex items-start gap-2 transition-colors ${
+                              on ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-white border-gray-200 text-gray-600 hover:border-violet-200'
+                            }`}>
+                            <span className={`mt-0.5 shrink-0 w-3.5 h-3.5 rounded border flex items-center justify-center ${on ? 'bg-emerald-500 border-emerald-500' : 'border-gray-300'}`}>
+                              {on && <Check size={10} className="text-white" />}
+                            </span>
+                            <span className="line-clamp-2">{q.question_text}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

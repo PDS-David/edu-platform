@@ -11,6 +11,7 @@ const { QueryTypes } = require('sequelize');
 const sequelize      = require('../config/database');
 const { protect }    = require('../middleware/auth');
 const { ENROLLMENT_STATUS } = require('../constants/enrollmentConstants');
+const { requireTeacherAnalyticsScope } = require('../middleware/teacherScope');
 
 // Safe wrapper — returns fallback on any DB error.
 // Classifies errors into three categories for actionable log output:
@@ -520,7 +521,7 @@ router.get('/cohort-gaps', protect, async (req, res) => {
 });
 
 // ── GET /api/analytics/student/:studentId/topics ─────────────────────────────
-router.get('/student/:studentId/topics', protect, async (req, res) => {
+router.get('/student/:studentId/topics', protect, requireTeacherAnalyticsScope, async (req, res) => {
   const { studentId } = req.params;
   if (req.user.role === 'student' && String(req.user.id) !== String(studentId)) {
     return res.status(403).json({ success: false, error: 'Access denied' });
@@ -556,7 +557,7 @@ router.get('/student/:studentId/topics', protect, async (req, res) => {
 });
 
 // ── GET /api/analytics/student/:studentId/summary ────────────────────────────
-router.get('/student/:studentId/summary', protect, async (req, res) => {
+router.get('/student/:studentId/summary', protect, requireTeacherAnalyticsScope, async (req, res) => {
   const { studentId } = req.params;
   // Authorization unchanged: students can only see their own summary.
   if (req.user.role === 'student' && String(req.user.id) !== String(studentId)) {

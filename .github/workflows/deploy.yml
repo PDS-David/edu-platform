@@ -6,14 +6,14 @@
 #   DEPLOY_HOST   → 178.104.51.118
 #   DEPLOY_USER   → deploy (recommended) or root
 #   DEPLOY_KEY    → private SSH key (github_actions_key)
-#   DEPLOY_PATH   → /home/deploy/edu-platform
 # ─────────────────────────────────────────────────────────────────────────────
 
 name: Deploy to Production
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
@@ -44,11 +44,20 @@ jobs:
 
             cd /opt/aischoolonair
 
+            echo "▶ Cleaning up stale Git lock files..."
+            find .git/refs -name "*.lock" -delete 2>/dev/null || true
+            find .git -name "*.lock" -delete 2>/dev/null || true
+
+            echo "▶ Fixing Git directory permissions..."
+            sudo /bin/chown -R root:deploy /opt/aischoolonair/.git
+            sudo /bin/chmod -R g+w /opt/aischoolonair/.git
+
             echo "▶ Syncing with GitHub (hard reset safe mode)..."
             git fetch origin
             git reset --hard origin/main
-            echo "▶ Ensuring deploy script is executable..."
-            chmod +x deploy.sh
+
+            echo "▶ Deploy script permissions:"
+            ls -l deploy.sh
 
             echo "▶ Running deployment script..."
             ./deploy.sh
@@ -56,3 +65,7 @@ jobs:
             echo "════════════════════════════════════"
             echo "✅ Deployment successful"
             echo "════════════════════════════════════"
+
+            echo ""
+            echo "▶ API container logs (last 80 lines for diagnostics)..."
+            docker logs aischool_api --tail=80 2>&1 || true
