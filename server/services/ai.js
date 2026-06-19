@@ -22,6 +22,7 @@
 //        Model names simplified back to canonical short names (gemini-2.0-flash
 //        etc.) which are correctly resolved by the new SDK on the v1 endpoint.
 //        Removed @anthropic-ai/sdk dependency entirely.
+// v16 — Fixed fallback chain pointing at retired/stale models (see below).
 //
 // Public API (signature unchanged):
 //   generate(prompt, task, options?) → Promise<string>
@@ -33,7 +34,17 @@ const { GoogleGenAI } = require('@google/genai');
 // ROUTING CONFIG
 // ═══════════════════════════════════════════════════════════════════════════
 
-// v15: New SDK resolves canonical model names correctly via v1 endpoint.
+// v16 — FIX (2026-06): gemini-2.0-flash was retired by Google (shut down
+//        Mar/Jun 2026) and gemini-2.5-flash-preview-05-20 is a stale dated
+//        preview snapshot that no longer resolves. Both fallback steps were
+//        404ing, so any transient failure on the primary model fell through
+//        to two dead models and surfaced as "AI is temporarily busy" even
+//        though the real cause was unreachable fallbacks, not exhausted quota.
+//        Fallback chain now uses gemini-2.5-flash-lite (cheaper/faster
+//        sibling of the primary, same generation, very high availability)
+//        and gemini-flash-latest (Google's auto-updated rolling alias, which
+//        always points at a currently-supported model so it cannot go stale
+//        the way a dated snapshot does).
 const GEMINI_MODEL_MAP = {
   'generate-questions': 'gemini-2.5-flash',
   'chat':               'gemini-2.5-flash',
@@ -42,15 +53,19 @@ const GEMINI_MODEL_MAP = {
   'notes':              'gemini-2.5-flash',
   'remediation':        'gemini-2.5-flash',
   'essay-mark':         'gemini-2.5-flash',
-  'complex_reasoning':  'gemini-2.5-flash-preview-05-20',
+  'complex_reasoning':  'gemini-2.5-flash',
   'default':            'gemini-2.5-flash',
 };
 
 // Fallback chain — tried in order if primary fails (503, 429, 404, etc.)
-//   1. gemini-2.5-flash            — primary (new paid API)
-//   2. gemini-2.5-flash-preview-05-20 — preview fallback
-//   3. gemini-1.5-flash            — stable fallback
-const FALLBACK_CHAIN = ['gemini-2.5-flash-preview-05-20', 'gemini-2.0-flash'];
+//   1. gemini-2.5-flash       — primary (current stable GA model)
+//   2. gemini-2.5-flash-lite  — same generation, lighter/cheaper, separate
+//                                 quota pool so primary-quota exhaustion
+//                                 doesn't take this down too
+//   3. gemini-flash-latest    — Google's auto-updated alias; always resolves
+//                                 to a currently supported model, so this
+//                                 step can never itself go stale/404
+const FALLBACK_CHAIN = ['gemini-2.5-flash-lite', 'gemini-flash-latest'];
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PROVIDER HELPERS
@@ -135,8 +150,13 @@ async function _callGemini(prompt, task) {
       }
 
       // All models exhausted OR non-retryable error.
-      // Never expose raw Google URLs or technical details to the frontend.
-      console.error(`[ai.js] All models exhausted or fatal error:`, err.message);
+      // Never expose raw Google URLs or technical details to the frontend,
+      // but log enough detail server-side to tell "all models genuinely
+      // rate-limited" apart from "a model name in the chain no longer exists".
+      console.error(
+        `[ai.js] All models exhausted or fatal error. ` +
+        `Chain tried: ${modelsToTry.join(' -> ')}. Last error: ${err.message}`
+      );
 
       throw Object.assign(
         new Error(isRetryable
