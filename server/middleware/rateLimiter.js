@@ -77,6 +77,7 @@ const adminActionLimiter = rateLimit({
   max: 50,                     // 50 write actions per 15 min per admin user
   standardHeaders: true,
   legacyHeaders: false,
+  validate: false,
   keyGenerator: (req) => {
     if (req.user && req.user.id) return `admin:${req.user.id}`;
     const ip = (req.ip || '').replace(/^::ffff:/, '').replace(/%.*$/, '');
