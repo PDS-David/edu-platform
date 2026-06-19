@@ -54,6 +54,16 @@ function clientMeta(req) {
     ipAddress: req.ip || req.connection?.remoteAddress || null,
     userAgent: req.headers?.['user-agent'] || null,
   };
+/**
+ * Translate a Postgres unique-violation (23505) into a clean 409 response.
+ * Returns true if the error was handled, false otherwise.
+ */
+function handleUniqueViolation(err, res) {
+  if (err.parent?.code === '23505' || err.original?.code === '23505' || err.message?.includes('23505')) {
+    res.status(409).json({ success: false, error: 'An account with that email already exists' });
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -201,6 +211,7 @@ exports.login = async (req, res, next) => {
   const { ipAddress, userAgent } = clientMeta(req);
 
   try {
+    const { email, password, rememberMe = false } = req.body;
     const { rememberMe = false } = req.body;
     const email    = normaliseEmail(req.body.email);      // R-04
     const password = req.body.password;
