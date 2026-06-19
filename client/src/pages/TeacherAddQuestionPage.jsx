@@ -1,11 +1,16 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { CheckCircle, AlertCircle, Plus, Trash2, ChevronDown } from "lucide-react";
+import { CheckCircle, AlertCircle, Plus, Trash2, ChevronDown, X, Loader2 } from "lucide-react";
 import api from "../services/apiClient";
 
 const DIFFICULTIES = ["easy", "medium", "hard"];
 
 const emptyOption = () => ({ text: "", is_correct: false });
+
+// Sentinel value used by the <select> to trigger "create new" mode.
+// Chosen so it can never collide with a real DB id (topics/subtopics use
+// integer PKs, subjects use UUIDs — neither can equal this string).
+const CREATE_NEW = "__create_new__";
 
 export default function TeacherAddQuestionPage() {
   const navigate = useNavigate();
@@ -23,6 +28,24 @@ export default function TeacherAddQuestionPage() {
   const [subjectId,  setSubjectId]  = useState("");
   const [topicId,    setTopicId]    = useState("");
   const [subtopicId, setSubtopicId] = useState("");
+  const [loadingTopics,    setLoadingTopics]    = useState(false);
+  const [loadingSubtopics, setLoadingSubtopics] = useState(false);
+
+  // "Create new topic" / "create new subtopic" inline form state.
+  // BUG FIX: previously there was no way to add a topic or subtopic from this
+  // page — if a subject had zero topics (or a topic had zero subtopics), the
+  // dropdown rendered with only the placeholder option and the teacher/admin
+  // was stuck. These endpoints (POST /teacher/topics, POST /teacher/subtopics)
+  // already existed on the server; this page just never called them.
+  const [creatingTopic,    setCreatingTopic]    = useState(false);
+  const [newTopicName,     setNewTopicName]     = useState("");
+  const [savingTopic,      setSavingTopic]      = useState(false);
+  const [topicError,       setTopicError]       = useState("");
+
+  const [creatingSubtopic, setCreatingSubtopic] = useState(false);
+  const [newSubtopicName,  setNewSubtopicName]  = useState("");
+  const [savingSubtopic,   setSavingSubtopic]   = useState(false);
+  const [subtopicError,    setSubtopicError]    = useState("");
 
   // UI state
   const [submitting, setSubmitting] = useState(false);
@@ -39,20 +62,92 @@ export default function TeacherAddQuestionPage() {
   // Load topics when subject changes
   useEffect(() => {
     setTopics([]); setTopicId(""); setSubtopics([]); setSubtopicId("");
+    setCreatingTopic(false); setCreatingSubtopic(false);
+    setTopicError(""); setSubtopicError("");
     if (!subjectId) return;
+    setLoadingTopics(true);
     api.get(`/teacher/topics?subject_id=${subjectId}`)
       .then(r => setTopics(r.data || []))
-      .catch(() => setTopics([]));
+      .catch(() => setTopics([]))
+      .finally(() => setLoadingTopics(false));
   }, [subjectId]);
 
   // Load subtopics when topic changes
   useEffect(() => {
     setSubtopics([]); setSubtopicId("");
+    setCreatingSubtopic(false); setSubtopicError("");
     if (!topicId) return;
+    setLoadingSubtopics(true);
     api.get(`/teacher/subtopics?topic_id=${topicId}`)
       .then(r => setSubtopics(r.data || []))
-      .catch(() => setSubtopics([]));
+      .catch(() => setSubtopics([]))
+      .finally(() => setLoadingSubtopics(false));
   }, [topicId]);
+
+  // ── Topic select handler — opens inline "create" form on sentinel value ──
+  const handleTopicSelect = (value) => {
+    if (value === CREATE_NEW) {
+      setCreatingTopic(true);
+      setTopicId("");
+      return;
+    }
+    setTopicId(value);
+  };
+
+  // ── Create a new topic for the current subject ───────────────────────────
+  const handleCreateTopic = async () => {
+    const name = newTopicName.trim();
+    if (!name) { setTopicError("Topic name is required."); return; }
+    setSavingTopic(true); setTopicError("");
+    try {
+      const res = await api.post("/teacher/topics", { subject_id: subjectId, name });
+      const created = res.data;
+      // Insert into the list and select it immediately, same as picking an
+      // existing topic from the dropdown — keeps the rest of the cascade
+      // (subtopic loading) working unchanged.
+      setTopics(prev => [...prev, created]);
+      setTopicId(String(created.id));
+      setCreatingTopic(false);
+      setNewTopicName("");
+    } catch (err) {
+      setTopicError(err.message || "Failed to create topic.");
+    } finally {
+      setSavingTopic(false);
+    }
+  };
+
+  // ── Subtopic select handler — opens inline "create" form on sentinel value ──
+  const handleSubtopicSelect = (value) => {
+    if (value === CREATE_NEW) {
+      setCreatingSubtopic(true);
+      setSubtopicId("");
+      return;
+    }
+    setSubtopicId(value);
+  };
+
+  // ── Create a new subtopic for the current topic ──────────────────────────
+  const handleCreateSubtopic = async () => {
+    const name = newSubtopicName.trim();
+    if (!name) { setSubtopicError("Subtopic name is required."); return; }
+    setSavingSubtopic(true); setSubtopicError("");
+    try {
+      const res = await api.post("/teacher/subtopics", {
+        topic_id: topicId,
+        subject_id: subjectId,
+        name,
+      });
+      const created = res.data;
+      setSubtopics(prev => [...prev, created]);
+      setSubtopicId(String(created.id));
+      setCreatingSubtopic(false);
+      setNewSubtopicName("");
+    } catch (err) {
+      setSubtopicError(err.message || "Failed to create subtopic.");
+    } finally {
+      setSavingSubtopic(false);
+    }
+  };
 
   // Option handlers
   const updateOption = useCallback((i, field, value) => {
@@ -268,32 +363,125 @@ export default function TeacherAddQuestionPage() {
               </div>
 
               {/* Topic */}
-              {subjectId && (
-                <div className="relative">
-                  <select
-                    value={topicId}
-                    onChange={e => setTopicId(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-300 pr-8"
+              {subjectId && !creatingTopic && (
+                <div>
+                  <div className="relative">
+                    <select
+                      value={topicId}
+                      onChange={e => handleTopicSelect(e.target.value)}
+                      disabled={loadingTopics}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-300 pr-8 disabled:bg-gray-50 disabled:text-gray-400"
+                    >
+                      <option value="">
+                        {loadingTopics ? "Loading topics…" : topics.length === 0 ? "No topics yet" : "— Select topic —"}
+                      </option>
+                      {topics.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                      {/* BUG FIX: this option is the entry point for creating a topic
+                          inline when the subject has none (or the teacher wants a new
+                          one). Without it, a subject with 0 topics was a dead end. */}
+                      <option value={CREATE_NEW}>+ Add new topic…</option>
+                    </select>
+                    <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  </div>
+                  {!loadingTopics && topics.length === 0 && (
+                    <p className="text-xs text-gray-400 mt-1.5">
+                      This subject has no topics yet. Choose "+ Add new topic…" above to create one.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Inline "create topic" form */}
+              {subjectId && creatingTopic && (
+                <div className="border border-indigo-200 bg-indigo-50/50 rounded-lg p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-gray-600">New topic name</label>
+                    <button
+                      type="button"
+                      onClick={() => { setCreatingTopic(false); setNewTopicName(""); setTopicError(""); }}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={newTopicName}
+                    onChange={e => setNewTopicName(e.target.value)}
+                    placeholder="e.g. Acid, Base and Salts"
+                    autoFocus
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  />
+                  {topicError && <p className="text-xs text-red-500">{topicError}</p>}
+                  <button
+                    type="button"
+                    onClick={handleCreateTopic}
+                    disabled={savingTopic}
+                    className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-xs font-semibold px-3 py-1.5 rounded-lg"
                   >
-                    <option value="">— Select topic —</option>
-                    {topics.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
-                  <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                    {savingTopic ? <><Loader2 size={12} className="animate-spin" /> Creating…</> : <><Plus size={12} /> Create topic</>}
+                  </button>
                 </div>
               )}
 
               {/* Subtopic */}
-              {topicId && (
-                <div className="relative">
-                  <select
-                    value={subtopicId}
-                    onChange={e => setSubtopicId(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-300 pr-8"
+              {topicId && !creatingSubtopic && (
+                <div>
+                  <div className="relative">
+                    <select
+                      value={subtopicId}
+                      onChange={e => handleSubtopicSelect(e.target.value)}
+                      disabled={loadingSubtopics}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-300 pr-8 disabled:bg-gray-50 disabled:text-gray-400"
+                    >
+                      <option value="">
+                        {loadingSubtopics ? "Loading subtopics…" : subtopics.length === 0 ? "No subtopics yet" : "— Select subtopic —"}
+                      </option>
+                      {subtopics.map(st => <option key={st.id} value={st.id}>{st.name}</option>)}
+                      {/* BUG FIX: same pattern as topics — lets a teacher create the
+                          first subtopic under a freshly-created (or empty) topic. */}
+                      <option value={CREATE_NEW}>+ Add new subtopic…</option>
+                    </select>
+                    <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  </div>
+                  {!loadingSubtopics && subtopics.length === 0 && (
+                    <p className="text-xs text-gray-400 mt-1.5">
+                      This topic has no subtopics yet. Choose "+ Add new subtopic…" above to create one.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Inline "create subtopic" form */}
+              {topicId && creatingSubtopic && (
+                <div className="border border-indigo-200 bg-indigo-50/50 rounded-lg p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-gray-600">New subtopic name</label>
+                    <button
+                      type="button"
+                      onClick={() => { setCreatingSubtopic(false); setNewSubtopicName(""); setSubtopicError(""); }}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={newSubtopicName}
+                    onChange={e => setNewSubtopicName(e.target.value)}
+                    placeholder="e.g. pH Scale and Indicators"
+                    autoFocus
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  />
+                  {subtopicError && <p className="text-xs text-red-500">{subtopicError}</p>}
+                  <button
+                    type="button"
+                    onClick={handleCreateSubtopic}
+                    disabled={savingSubtopic}
+                    className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-xs font-semibold px-3 py-1.5 rounded-lg"
                   >
-                    <option value="">— Select subtopic —</option>
-                    {subtopics.map(st => <option key={st.id} value={st.id}>{st.name}</option>)}
-                  </select>
-                  <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                    {savingSubtopic ? <><Loader2 size={12} className="animate-spin" /> Creating…</> : <><Plus size={12} /> Create subtopic</>}
+                  </button>
                 </div>
               )}
             </div>
