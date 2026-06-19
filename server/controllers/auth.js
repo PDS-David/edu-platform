@@ -54,16 +54,6 @@ function clientMeta(req) {
     ipAddress: req.ip || req.connection?.remoteAddress || null,
     userAgent: req.headers?.['user-agent'] || null,
   };
-/**
- * Translate a Postgres unique-violation (23505) into a clean 409 response.
- * Returns true if the error was handled, false otherwise.
- */
-function handleUniqueViolation(err, res) {
-  if (err.parent?.code === '23505' || err.original?.code === '23505' || err.message?.includes('23505')) {
-    res.status(409).json({ success: false, error: 'An account with that email already exists' });
-    return true;
-  }
-  return false;
 }
 
 /**
@@ -630,3 +620,5 @@ function setRefreshCookie(res, token, rememberMe) {
     ...(maxAge ? { maxAge } : {}),
   });
 }
+
+// ─── end of auth.js ─────────────────────────────────────────────────────────
