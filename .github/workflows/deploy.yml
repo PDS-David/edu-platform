@@ -48,7 +48,8 @@ jobs:
             find .git -name "*.lock" -delete 2>/dev/null || true
 
             echo "▶ Fixing Git directory permissions..."
-            chmod -R u+w .git 2>/dev/null || true
+            sudo /bin/chown -R root:deploy /opt/aischoolonair/.git
+            sudo /bin/chmod -R g+w /opt/aischoolonair/.git
 
             echo "▶ Syncing with GitHub (hard reset safe mode)..."
             git reset --hard origin/main
