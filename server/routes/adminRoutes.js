@@ -18,7 +18,6 @@ const {
 const { success, error } = require('../utils/response');
 const { ENROLLMENT_SOURCE, ENROLLMENT_STATUS } = require('../constants/enrollmentConstants');
 const audit = require('../services/auditLogger');
-const { adminActionLimiter } = require('../middleware/rateLimiter');
 const { requireConfirmHeader, requireAdminConfirm } = require('../middleware/confirmDestructive');
 
 // ─────────────────────────────────────────────
