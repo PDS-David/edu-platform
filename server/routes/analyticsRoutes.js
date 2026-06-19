@@ -9,8 +9,9 @@ const express        = require('express');
 const router         = express.Router();
 const { QueryTypes } = require('sequelize');
 const sequelize      = require('../config/database');
-const { protect, authorize } = require('../middleware/auth');
+const { protect }    = require('../middleware/auth');
 const { ENROLLMENT_STATUS } = require('../constants/enrollmentConstants');
+const { requireTeacherAnalyticsScope } = require('../middleware/teacherScope');
 
 // Safe wrapper — returns fallback on any DB error.
 // Classifies errors into three categories for actionable log output:
@@ -188,7 +189,7 @@ async function validateAnalyticsSchema() {
 }
 
 // ── GET /api/analytics/summary ────────────────────────────────────────────────
-router.get('/summary', protect, authorize('student'), async (req, res) => {
+router.get('/summary', protect, async (req, res) => {
   try {
     const userId = req.user.id;
 
@@ -264,7 +265,7 @@ router.get('/summary', protect, authorize('student'), async (req, res) => {
 });
 
 // ── GET /api/analytics/weak-topics?limit=5 ───────────────────────────────────
-router.get('/weak-topics', protect, authorize('student'), async (req, res) => {
+router.get('/weak-topics', protect, async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit) || 5, 20);
   try {
     const rows = await safeQuery(
@@ -303,7 +304,7 @@ router.get('/weak-topics', protect, authorize('student'), async (req, res) => {
 });
 
 // ── GET /api/analytics/score-trend?days=30 ───────────────────────────────────
-router.get('/score-trend', protect, authorize('student'), async (req, res) => {
+router.get('/score-trend', protect, async (req, res) => {
   const days = Math.min(parseInt(req.query.days) || 30, 90);
   // safeQuery is the sole error boundary: missing tables/columns are caught
   // inside it and logged; the fallback [] is returned so the endpoint always
@@ -335,7 +336,7 @@ router.get('/score-trend', protect, authorize('student'), async (req, res) => {
 //
 // COALESCE defaults ensure students with zero attempts still appear with
 // attempts=0, accuracy_pct=0, avg_time_seconds=0 rather than being omitted.
-router.get('/subject-breakdown', protect, authorize('student'), async (req, res) => {
+router.get('/subject-breakdown', protect, async (req, res) => {
   try {
     const rows = await safeQuery(
       `SELECT
@@ -372,7 +373,7 @@ router.get('/subject-breakdown', protect, authorize('student'), async (req, res)
 });
 
 // ── GET /api/analytics/time-metrics ──────────────────────────────────────────
-router.get('/time-metrics', protect, authorize('student'), async (req, res) => {
+router.get('/time-metrics', protect, async (req, res) => {
   // safeQuery is the sole error boundary: missing tables/columns are caught
   // inside it and logged; the fallback [] is returned so the endpoint always
   // responds with HTTP 200 and an empty dataset rather than HTTP 500.
@@ -443,7 +444,7 @@ router.get('/leaderboard', protect, async (req, res) => {
 });
 
 // ── GET /api/analytics/badges ─────────────────────────────────────────────────
-router.get('/badges', protect, authorize('student'), async (req, res) => {
+router.get('/badges', protect, async (req, res) => {
   try {
     const rows = await safeQuery(
       `SELECT badge_code, earned_at FROM user_badges
@@ -457,7 +458,7 @@ router.get('/badges', protect, authorize('student'), async (req, res) => {
 });
 
 // ── GET /api/analytics/daily-study ───────────────────────────────────────────
-router.get('/daily-study', protect, authorize('student'), async (req, res) => {
+router.get('/daily-study', protect, async (req, res) => {
   try {
     const rows = await safeQuery(
       `SELECT DISTINCT DATE(attempted_at) AS study_date
@@ -520,7 +521,7 @@ router.get('/cohort-gaps', protect, async (req, res) => {
 });
 
 // ── GET /api/analytics/student/:studentId/topics ─────────────────────────────
-router.get('/student/:studentId/topics', protect, async (req, res) => {
+router.get('/student/:studentId/topics', protect, requireTeacherAnalyticsScope, async (req, res) => {
   const { studentId } = req.params;
   if (req.user.role === 'student' && String(req.user.id) !== String(studentId)) {
     return res.status(403).json({ success: false, error: 'Access denied' });
@@ -556,7 +557,7 @@ router.get('/student/:studentId/topics', protect, async (req, res) => {
 });
 
 // ── GET /api/analytics/student/:studentId/summary ────────────────────────────
-router.get('/student/:studentId/summary', protect, async (req, res) => {
+router.get('/student/:studentId/summary', protect, requireTeacherAnalyticsScope, async (req, res) => {
   const { studentId } = req.params;
   // Authorization unchanged: students can only see their own summary.
   if (req.user.role === 'student' && String(req.user.id) !== String(studentId)) {

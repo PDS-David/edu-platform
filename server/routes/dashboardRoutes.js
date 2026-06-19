@@ -11,6 +11,9 @@ const router     = express.Router();
 const { QueryTypes } = require('sequelize');
 const sequelize  = require('../config/database');
 const { protect, authorize } = require('../middleware/auth');
+// DEF-004: All dashboard routes restricted to 'student' role.
+// Teachers/admins have their own aggregation endpoints.
+const studentOnly = authorize('student');
 const { ENROLLMENT_STATUS } = require('../constants/enrollmentConstants');
 
 // ── safe query helper ─────────────────────────────────────────────────────────
@@ -24,7 +27,7 @@ const sq = async (sql, replacements = {}, fallback = []) => {
 };
 
 // ── GET /api/dashboard/summary ────────────────────────────────────────────────
-router.get('/summary', protect, authorize('student'), async (req, res) => {
+router.get('/summary', protect, studentOnly, async (req, res) => {
   const uid = req.user.id;
   try {
     const [attempts, streak, subtopics] = await Promise.all([
@@ -51,7 +54,7 @@ router.get('/summary', protect, authorize('student'), async (req, res) => {
 });
 
 // ── GET /api/dashboard/weak-topics ───────────────────────────────────────────
-router.get('/weak-topics', protect, authorize('student'), async (req, res) => {
+router.get('/weak-topics', protect, studentOnly, async (req, res) => {
   const uid = req.user.id;
   try {
     const rows = await sq(
@@ -77,10 +80,13 @@ router.get('/weak-topics', protect, authorize('student'), async (req, res) => {
 });
 
 // ── GET /api/dashboard/recommendations ───────────────────────────────────────
-router.get('/recommendations', protect, authorize('student'), async (req, res) => {
+router.get('/recommendations', protect, studentOnly, async (req, res) => {
   const uid = req.user.id;
   try {
     const rows = await sq(
+      // DEF-011: exam_boards.id is INTEGER in production but student_exam_types
+      // and subjects store exam_board_id as UUID / text. Cast both sides to text
+      // to avoid Postgres type-mismatch errors that silently return empty arrays.
       `SELECT st.id AS subtopic_id, st.name AS subtopic_name,
               t.name AS topic_name, s.name AS subject_name,
               COALESCE(sp.completion_pct, 0) AS completion_pct
@@ -105,7 +111,7 @@ router.get('/recommendations', protect, authorize('student'), async (req, res) =
 });
 
 // ── GET /api/dashboard/sessions ───────────────────────────────────────────────
-router.get('/sessions', protect, authorize('student'), async (req, res) => {
+router.get('/sessions', protect, studentOnly, async (req, res) => {
   const uid = req.user.id;
   try {
     const rows = await sq(

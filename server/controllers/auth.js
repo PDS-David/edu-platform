@@ -4,7 +4,8 @@ const bcrypt     = require('bcryptjs');
 const crypto     = require('crypto');
 const { QueryTypes } = require('sequelize');
 const db         = require('../config/database');
-const { generateToken, AUTH_COOKIE_NAME, authCookieOptions } = require('../utils/jwt');
+const { generateToken } = require('../utils/jwt');
+const audit      = require('../services/auditLogger');
 
 let sendPasswordResetEmail = () => Promise.resolve();
 let sendVerificationEmail  = () => Promise.resolve();
@@ -87,7 +88,6 @@ exports.register = async (req, res, next) => {
          id, email, first_name, last_name, role,
          is_active, is_verified, subscription_status,
          onboarding_complete, xp_points, study_streak_days,
-         daily_goal,
          pending_exam_board_ids,
          created_at`,
       {
@@ -108,8 +108,6 @@ exports.register = async (req, res, next) => {
     const user = safeUser(rows[0]);
     const token = generateToken({ id: user.id, role: user.role });
 
-    res.cookie(AUTH_COOKIE_NAME, token, authCookieOptions());
-
     return res.status(201).json({
       success: true,
       token,
@@ -120,17 +118,6 @@ exports.register = async (req, res, next) => {
     console.error('[register]', err.message);
     next(err);
   }
-};
-
-// ─────────────────────────────────────────────────────────────
-// LOGOUT
-// ─────────────────────────────────────────────────────────────
-// DEF-001: with the token now also stored as an HttpOnly cookie, logout
-// must clear it server-side — client-side code cannot read or delete an
-// HttpOnly cookie itself. Always succeeds; there is nothing to roll back.
-exports.logout = async (req, res) => {
-  res.clearCookie(AUTH_COOKIE_NAME, { ...authCookieOptions(), maxAge: undefined });
-  return res.status(200).json({ success: true, message: 'Logged out' });
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -158,6 +145,10 @@ exports.login = async (req, res, next) => {
     );
 
     if (rows.length === 0) {
+      await audit.log(req, audit.ACTIONS.LOGIN_FAILED, {
+        severity: 'warning',
+        metadata: { email: email.toLowerCase().trim(), reason: 'user_not_found' },
+      });
       return res.status(401).json({ success: false, error: 'Invalid email or password' });
     }
 
@@ -170,6 +161,11 @@ exports.login = async (req, res, next) => {
     const match = await bcrypt.compare(password, userRow.password);
 
     if (!match) {
+      await audit.log(req, audit.ACTIONS.LOGIN_FAILED, {
+        severity: 'warning',
+        actorId: userRow.id, actorEmail: userRow.email, actorRole: userRow.role,
+        metadata: { email: userRow.email, reason: 'wrong_password' },
+      });
       return res.status(401).json({ success: false, error: 'Invalid email or password' });
     }
 
@@ -181,15 +177,15 @@ exports.login = async (req, res, next) => {
     );
 
     const token = generateToken({ id: userRow.id, role: userRow.role });
-
     const user = safeUser(userRow);
 
-    // DEF-001: set the token as an HttpOnly cookie so the browser no longer
-    // needs to keep it in localStorage. The token is still returned in the
-    // JSON body too — non-browser API consumers (mobile app, scripts) rely
-    // on that and never receive cookies; the cookie is additive, not a
-    // breaking change to the response shape.
-    res.cookie(AUTH_COOKIE_NAME, token, authCookieOptions());
+    // Audit successful login (setImmediate so it doesn't delay response)
+    setImmediate(() =>
+      audit.log(req, audit.ACTIONS.LOGIN, {
+        actorId: userRow.id, actorEmail: userRow.email, actorRole: userRow.role,
+        metadata: { role: userRow.role },
+      }).catch(() => {})
+    );
 
     return res.status(200).json({
       success: true,
