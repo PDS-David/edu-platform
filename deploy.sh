@@ -42,8 +42,6 @@ sleep 15
 #    always gets the current file from disk, regardless of build cache.
 echo ""
 echo "▶ 4/4  Running DB migrations..."
-docker cp /opt/aischoolonair/server/scripts/run_complete_migration.js \
-           aischool_api:/app/scripts/run_complete_migration.js
 docker exec aischool_api node /app/scripts/run_complete_migration.js
 
 echo ""
