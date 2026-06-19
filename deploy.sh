@@ -43,8 +43,8 @@ sleep 15
 echo ""
 echo "▶ 4/4  Running DB migrations..."
 docker cp /opt/aischoolonair/server/scripts/run_complete_migration.js \
-           aischool_api:/tmp/run_complete_migration.js
-docker exec aischool_api node /tmp/run_complete_migration.js
+           aischool_api:/app/scripts/run_complete_migration.js
+docker exec aischool_api node /app/scripts/run_complete_migration.js
 
 echo ""
 echo "═══════════════════════════════════════════════════"
