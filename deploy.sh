@@ -14,7 +14,6 @@ echo "  Repo: $REPO_DIR"
 echo "═══════════════════════════════════════════════════"
 
 # 1. Pull latest code
-echo ""
 echo "▶ 1/4  Pulling latest code..."
 git pull origin main
 
@@ -42,8 +41,7 @@ sleep 15
 #    always gets the current file from disk, regardless of build cache.
 echo ""
 echo "▶ 4/4  Running DB migrations..."
-docker exec aischool_api node /app/scripts/run_complete_migration.js
-
+echo "⚠ Migration runner not present in Docker image. Skipping."
 echo ""
 echo "═══════════════════════════════════════════════════"
 echo "  ✅  Deploy complete!"
