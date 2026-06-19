@@ -211,10 +211,8 @@ exports.login = async (req, res, next) => {
   const { ipAddress, userAgent } = clientMeta(req);
 
   try {
-    const { email, password, rememberMe = false } = req.body;
-    const { rememberMe = false } = req.body;
-    const email    = normaliseEmail(req.body.email);      // R-04
-    const password = req.body.password;
+    const { password, rememberMe = false } = req.body;
+    const email = normaliseEmail(req.body.email);      // R-04
 
     if (!email || !password) {
       return res.status(400).json({ success: false, error: 'Email and password are required' });
