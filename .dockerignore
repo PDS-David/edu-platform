@@ -1,24 +1,38 @@
-# Node / build
-node_modules
-npm-debug.log
-
 # Git
 .git
 .gitignore
 
+# Node
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Environment
+.env
+.env.*
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
 # Docker
 Dockerfile*
-docker-compose.yml
+docker-compose*
+.dockerignore
 
-# ENV
-.env*
-*.env
+# Build artifacts
+dist
+build
+.next
+out
+coverage
 
-# 🔥 CRITICAL: block ALL sensitive folders completely
-**/keys_secure
-**/hls_secure
+# IDE
+.vscode
+.idea
 
-# Logs / temp
-*.log
-tmp
-.cache
+# Misc
+*.md
