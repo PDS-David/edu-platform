@@ -308,23 +308,29 @@ router.patch('/preferences', protect, async (req, res) => {
     }
 
     if (daily_goal != null) {
-      await sequelize.query(
-        `UPDATE users SET daily_goal = :g, updated_at = NOW() WHERE id = :userId`,
-        { replacements: { g: Number(daily_goal), userId }, type: QueryTypes.RAW }
-      );
+      try {
+        await sequelize.query(
+          `UPDATE users SET daily_goal = :g, updated_at = NOW() WHERE id = :userId`,
+          { replacements: { g: Number(daily_goal), userId }, type: QueryTypes.RAW }
+        );
+      } catch (e) { console.error('[PATCH /users/preferences] daily_goal update failed:', e.message); }
     }
 
     if (Array.isArray(studyDays)) {
-      await sequelize.query(
-        `UPDATE users SET preferred_study_days = :days, preferred_study_time = :time, updated_at = NOW() WHERE id = :userId`,
-        { replacements: { days: JSON.stringify(studyDays), time: studyTime || 'evening', userId }, type: QueryTypes.RAW }
-      );
+      try {
+        await sequelize.query(
+          `UPDATE users SET preferred_study_days = :days, preferred_study_time = :time, updated_at = NOW() WHERE id = :userId`,
+          { replacements: { days: JSON.stringify(studyDays), time: studyTime || 'evening', userId }, type: QueryTypes.RAW }
+        );
+      } catch (e) { console.error('[PATCH /users/preferences] study schedule update failed:', e.message); }
     }
 
-    await sequelize.query(
-      `UPDATE users SET onboarding_complete = true, updated_at = NOW() WHERE id = :userId`,
-      { replacements: { userId }, type: QueryTypes.RAW }
-    );
+    try {
+      await sequelize.query(
+        `UPDATE users SET onboarding_complete = true, updated_at = NOW() WHERE id = :userId`,
+        { replacements: { userId }, type: QueryTypes.RAW }
+      );
+    } catch (e) { console.error('[PATCH /users/preferences] onboarding_complete update failed:', e.message); }
 
     await audit.log(req, audit.ACTIONS.SETTINGS_CHANGE, {
       targetType: 'user', targetId: userId,
