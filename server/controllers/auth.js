@@ -32,6 +32,54 @@ const {
 const MAX_FAILED_ATTEMPTS = parseInt(process.env.AUTH_MAX_FAILED_ATTEMPTS, 10) || 5;
 const LOCKOUT_MINUTES     = parseInt(process.env.AUTH_LOCKOUT_MINUTES,     10) || 15;
 
+// ─── Input normalisation & validation helpers ─────────────────────────────────
+function normaliseEmail(raw) {
+  return (raw || '').toLowerCase().trim();
+}
+
+function normaliseName(raw) {
+  return (raw || '').trim();
+}
+
+function sanitisePendingExamBoards(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(id => Number.isInteger(Number(id))).map(Number);
+}
+
+function validateEmail(email) {
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return re.test(email) ? { valid: true } : { valid: false, error: 'Invalid email address' };
+}
+
+function validatePassword(password) {
+  if (!password || password.length < 8) {
+    return { valid: false, error: 'Password must be at least 8 characters' };
+  }
+  return { valid: true };
+}
+
+function validateName(name, label = 'Name') {
+  if (!name || name.trim().length === 0) {
+    return { valid: false, error: `${label} is required` };
+  }
+  return { valid: true };
+}
+
+function validatePhone(raw) {
+  if (!raw) return { valid: true }; // phone optional at API level; frontend enforces
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length < 7 || digits.length > 15) {
+    return { valid: false, error: 'Invalid phone number' };
+  }
+  return { valid: true };
+}
+
+function normalisePhone(raw) {
+  if (!raw) return null;
+  const digits = raw.replace(/\D/g, '');
+  return digits.startsWith('0') ? '+234' + digits.slice(1) : '+' + digits;
+}
+
 // ─── Email service (optional) ─────────────────────────────────────────────────
 let sendPasswordResetEmail = () => Promise.resolve();
 let sendVerificationEmail  = () => Promise.resolve();
