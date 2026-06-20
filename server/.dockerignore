@@ -12,3 +12,7 @@ tests/
 tools/
 debug-jwt.js
 scripts/
+# HLS encryption keys — live on VPS with restricted permissions (700/root).
+# Must never be baked into a Docker image. Mounted at runtime via volume.
+hls_secure/
+hls_secure
