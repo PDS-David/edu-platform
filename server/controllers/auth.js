@@ -17,7 +17,7 @@ const { QueryTypes } = require('sequelize');
 const db          = require('../config/database');
 const tokenService = require('../services/tokenService');
 const audit        = require('../services/authAuditService');
-const { normaliseEmail } = require('../utils/registrationValidators');
+const { normaliseEmail, normaliseName } = require('../utils/registrationValidators');
 
 // ─── Configurable lockout policy ─────────────────────────────────────────────
 const MAX_FAILED_ATTEMPTS = parseInt(process.env.AUTH_MAX_FAILED_ATTEMPTS, 10) || 5;
