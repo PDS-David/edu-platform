@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 # deploy.sh — Full deploy for AISchoolonair on Hetzner CX23
-# Run as root from anywhere:  bash /opt/aischoolonair/deploy.sh
 
 set -euo pipefail
 
-# Always run from the repo root so docker compose finds docker-compose.yml
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$REPO_DIR"
 
@@ -13,48 +11,49 @@ echo "  AISchoolonair — Production Deploy"
 echo "  Repo: $REPO_DIR"
 echo "═══════════════════════════════════════════════════"
 
-# 1. Pull latest code
-echo "▶ 1/4  Pulling latest code..."
-git pull origin main
+# 1. Sync code (NO pull conflicts ever)
+echo "▶ 1/5  Syncing code..."
+git fetch origin
+git reset --hard origin/main
 
-# 🔥 CRITICAL FIX: Ensure Docker can read directory metadata (prevents permission crash)
+# 2. Ensure safe directories exist (prevents Docker permission crash)
 echo ""
-echo "▶ Fixing permissions for restricted directories..."
-chmod -R 755 server/keys_secure 2>/dev/null || true
-chmod -R 755 hls_secure 2>/dev/null || true
+echo "▶ 2/5  Preparing safe directories..."
+mkdir -p server/keys_secure
+mkdir -p hls_secure
+chmod 755 server/keys_secure || true
+chmod 755 hls_secure || true
 
-# 2. Rebuild API + Web images (NO CACHE to force .dockerignore usage)
+# 3. Clean Docker cache (ensures .dockerignore is respected)
 echo ""
-echo "▶ 2/4  Building images (no cache)..."
+echo "▶ 3/5  Cleaning Docker cache..."
+docker builder prune -af || true
+
+# 4. Build images (NO CACHE)
+echo ""
+echo "▶ 4/5  Building images..."
 docker compose build --no-cache --progress=plain api web
 
-# 3. Restart with zero downtime (Caddy stays up)
+# 5. Restart services
 echo ""
-echo "▶ 3/4  Restarting services..."
+echo "▶ 5/5  Restarting services..."
 docker compose up -d --no-deps api web
 
-# Give the new container time to start and connect to the DB
-echo "  Waiting 15s for containers to be ready..."
+echo "  Waiting 15s for containers..."
 sleep 15
 
-# 4. Run DB migrations (currently skipped)
-echo ""
-echo "▶ 4/4  Running DB migrations..."
-echo "⚠ Migration runner not present in Docker image. Skipping."
-
 echo ""
 echo "═══════════════════════════════════════════════════"
-echo "  ✅  Deploy complete!"
-echo "  Checking health..."
+echo "  ✅ Deploy complete!"
 echo "═══════════════════════════════════════════════════"
-
-sleep 4
 
 # Health check
+sleep 4
 if curl -sf https://www.aischoolonair.ng/api/health > /dev/null; then
-  echo "  🟢  API is healthy"
+  echo "  🟢 API is healthy"
 else
-  echo "  🔴  API health check failed — run: docker compose logs api"
+  echo "  🔴 API failed — check logs:"
+  echo "     docker compose logs api"
 fi
 
 echo ""
