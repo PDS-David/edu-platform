@@ -1,38 +1,25 @@
+# Node deps (must NOT be copied)
+node_modules
+
 # Git
 .git
 .gitignore
 
-# Node
-node_modules
-npm-debug.log
-yarn-error.log
-
-# Environment
+# Env (compose already injects these)
 .env
 .env.*
+
+# Logs & runtime data (you explicitly recreate these in Dockerfile)
+logs
+*.log
+
+# Uploads (you mount a volume for this)
+uploads
+
+# Python cache (you have .py files)
+__pycache__/
+*.pyc
 
 # OS junk
 .DS_Store
 Thumbs.db
-
-# Logs
-*.log
-
-# Docker
-Dockerfile*
-docker-compose*
-.dockerignore
-
-# Build artifacts
-dist
-build
-.next
-out
-coverage
-
-# IDE
-.vscode
-.idea
-
-# Misc
-*.md
