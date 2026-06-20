@@ -750,7 +750,8 @@ async function run() {
         ADD COLUMN IF NOT EXISTS resources_completed BOOLEAN NOT NULL DEFAULT false,
         ADD COLUMN IF NOT EXISTS practice_completed  BOOLEAN NOT NULL DEFAULT false,
         ADD COLUMN IF NOT EXISTS notes_viewed        BOOLEAN NOT NULL DEFAULT false,
-        ADD COLUMN IF NOT EXISTS video_watched       BOOLEAN NOT NULL DEFAULT false`],
+        ADD COLUMN IF NOT EXISTS video_watched       BOOLEAN NOT NULL DEFAULT false,
+        ADD COLUMN IF NOT EXISTS last_accessed       TIMESTAMPTZ`],
 
     // C-3: resource_assignments CHECK constraint missing from migration path
     ['resource_assignments: add target CHECK constraint (C-3)', `
