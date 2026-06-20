@@ -113,7 +113,17 @@ async function issueTokenPair({ userId, role, rememberMe = false, deviceHint, ip
       },
       type: QueryTypes.INSERT,
     }
-  );
+  ).catch(err => {
+    // Degrade gracefully if auth_tokens table hasn't been created yet
+    // (migration_auth_hardening.sql not yet run on this environment).
+    // Tokens will still work; server-side revocation just won't be available.
+    const code = err.original?.code || err.parent?.code;
+    if (code === '42P01') { // undefined_table
+      logger.warn('[tokenService] auth_tokens table missing — run migration_auth_hardening.sql on Supabase. Proceeding without server-side revocation.');
+      return;
+    }
+    throw err; // re-throw any other DB error
+  });
 
   return { accessToken, refreshToken: rawRefresh, expiresIn: accessTtl };
 }
@@ -146,7 +156,18 @@ async function verifyAccessToken(token) {
      WHERE jti = :jti
      LIMIT 1`,
     { replacements: { jti }, type: QueryTypes.SELECT }
-  );
+  ).catch(err => {
+    const code = err.original?.code || err.parent?.code;
+    if (code === '42P01') {
+      // auth_tokens table missing — skip server-side revocation check,
+      // rely on JWT signature/expiry only until migration is run.
+      return null; // signal to skip checks below
+    }
+    throw err;
+  });
+
+  // null = table missing, skip revocation checks
+  if (rows === null) return decoded;
 
   if (!rows.length) {
     throw Object.assign(new Error('Token not registered'), { code: 'TOKEN_INVALID' });
