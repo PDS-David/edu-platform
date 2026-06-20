@@ -1,12 +1,22 @@
+# Node / build
 node_modules
+npm-debug.log
+
+# Git
 .git
 .gitignore
-Dockerfile
+
+# Docker
+Dockerfile*
 docker-compose.yml
 
-# Sensitive / restricted folders
-hls_secure
-server/keys_secure
+# ENV
+.env*
+*.env
+
+# 🔥 CRITICAL: block ALL sensitive folders completely
+**/keys_secure
+**/hls_secure
 
 # Logs / temp
 *.log
