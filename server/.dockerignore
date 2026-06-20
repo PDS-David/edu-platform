@@ -1,18 +1,31 @@
-# Do not copy these into the Docker build context
+# Dependencies
 node_modules
+
+# Environment
 .env
 .env.*
+
+# Logs
 *.log
 logs/
+
+# Runtime data (mounted via volumes in production)
 uploads/
+
+# Git
 .git
 .gitignore
+
+# Docs & dev tools
 *.md
 tests/
 tools/
-debug-jwt.js
 scripts/
-# HLS encryption keys — live on VPS with restricted permissions (700/root).
-# Must never be baked into a Docker image. Mounted at runtime via volume.
+debug-jwt.js
+
+# Security-sensitive (NEVER in images)
 hls_secure/
-hls_secure
+
+# Docker files
+Dockerfile
+.dockerignore
