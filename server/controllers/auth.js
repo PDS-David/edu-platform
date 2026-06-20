@@ -48,6 +48,28 @@ function validatePassword(password) {
   return { valid: true };
 }
 
+function validateName(name, label = 'Name') {
+  if (!name || name.trim().length === 0) {
+    return { valid: false, error: `${label} is required` };
+  }
+  return { valid: true };
+}
+
+function validatePhone(raw) {
+  if (!raw) return { valid: true }; // phone optional at API level; frontend enforces
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length < 7 || digits.length > 15) {
+    return { valid: false, error: 'Invalid phone number' };
+  }
+  return { valid: true };
+}
+
+function normalisePhone(raw) {
+  if (!raw) return null;
+  const digits = raw.replace(/\D/g, '');
+  return digits.startsWith('0') ? '+234' + digits.slice(1) : '+' + digits;
+}
+
 // ─── Email service (optional) ─────────────────────────────────────────────────
 let sendPasswordResetEmail = () => Promise.resolve();
 let sendVerificationEmail  = () => Promise.resolve();
