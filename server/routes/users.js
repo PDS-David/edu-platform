@@ -227,12 +227,30 @@ router.patch('/preferences', protect, async (req, res) => {
 
   try {
     if (Array.isArray(exam_boards) && exam_boards.length > 0) {
-      for (const code of exam_boards) {
-        const board = await sequelize.query(
-          `SELECT id FROM exam_boards WHERE code = :code LIMIT 1`,
-          { replacements: { code: code.toUpperCase() }, type: QueryTypes.SELECT }
-        );
-        if (board[0]) {
+      for (const raw of exam_boards) {
+        if (raw == null) continue;
+        let board;
+        try {
+          if (typeof raw === 'string' && /^[A-Za-z]+$/.test(raw)) {
+            // Board code, e.g. "WAEC" / "JAMB"
+            board = await sequelize.query(
+              `SELECT id FROM exam_boards WHERE code = :code LIMIT 1`,
+              { replacements: { code: raw.toUpperCase() }, type: QueryTypes.SELECT }
+            );
+          } else {
+            // OnboardingPage sends board IDs, not codes — .toUpperCase() on
+            // a non-string here threw a TypeError that propagated to the
+            // outer catch as a generic 500.
+            board = await sequelize.query(
+              `SELECT id FROM exam_boards WHERE id::text = :id LIMIT 1`,
+              { replacements: { id: String(raw) }, type: QueryTypes.SELECT }
+            );
+          }
+        } catch (lookupErr) {
+          console.error('[PATCH /users/preferences] exam_boards lookup failed for value', raw, lookupErr.message);
+          continue; // skip this board rather than fail the whole request
+        }
+        if (board?.[0]) {
           await sequelize.query(
             `INSERT INTO student_exam_types (student_id, exam_board_id, is_active, status)
              VALUES (:userId, :boardId, true, :approvedStatus)
@@ -259,18 +277,33 @@ router.patch('/preferences', protect, async (req, res) => {
         } catch (_e) {}
       }
 
-      const boardRows = await sequelize.query(
-        `SELECT DISTINCT exam_board_id FROM subjects
-         WHERE id = ANY(:subjectIds::int[]) AND is_active = true AND exam_board_id IS NOT NULL`,
-        { replacements: { subjectIds: subject_ids.map(Number).filter(Boolean) }, type: QueryTypes.SELECT }
-      );
-      for (const row of boardRows) {
-        await sequelize.query(
-          `INSERT INTO student_exam_types (student_id, exam_board_id, is_active, status)
-           VALUES (:userId, :boardId, true, :approvedStatus)
-           ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active = true, status = :approvedStatus`,
-          { replacements: { userId, boardId: row.exam_board_id, approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.RAW }
-        );
+      // Back-fill the exam boards those subjects belong to. Previously used
+      // `= ANY(:subjectIds::int[])` with a plain JS array replacement, which
+      // Sequelize does not reliably bind to a Postgres array literal — threw
+      // a type-mismatch error that was NOT caught here, killing the whole
+      // request even though the student_subjects inserts above had already
+      // succeeded. IN (:subjectIds) is the pattern already used safely
+      // elsewhere in this codebase; also wrapped so a failure here degrades
+      // gracefully instead of discarding the subject enrollment just saved.
+      try {
+        const safeSubjectIds = subject_ids.map(Number).filter(Boolean);
+        if (safeSubjectIds.length > 0) {
+          const boardRows = await sequelize.query(
+            `SELECT DISTINCT exam_board_id FROM subjects
+             WHERE id IN (:subjectIds) AND is_active = true AND exam_board_id IS NOT NULL`,
+            { replacements: { subjectIds: safeSubjectIds }, type: QueryTypes.SELECT }
+          );
+          for (const row of boardRows) {
+            await sequelize.query(
+              `INSERT INTO student_exam_types (student_id, exam_board_id, is_active, status)
+               VALUES (:userId, :boardId, true, :approvedStatus)
+               ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active = true, status = :approvedStatus`,
+              { replacements: { userId, boardId: row.exam_board_id, approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.RAW }
+            );
+          }
+        }
+      } catch (boardLookupErr) {
+        console.error('[PATCH /users/preferences] board lookup from subjects failed', boardLookupErr.message);
       }
     }
 
