@@ -255,27 +255,35 @@ router.patch('/preferences', protect, async (req, res) => {
       );
 
       // Save each selected subject.
-      // FIX 2026-06-18: explicitly set status = 'approved' here (not just
-      // is_active = true). resourceRoutes.js's assign-users entitlement
-      // check filters recipients by `student_subjects.status = 'approved'`,
-      // while this onboarding insert previously only set is_active and
-      // relied on the column's model-level DEFAULT 'approved' — which is
-      // NOT guaranteed by the inline CREATE TABLE IF NOT EXISTS fallback
-      // above (it has no status column at all). Setting it explicitly here
-      // means a student who enrolls in a subject via onboarding is
-      // immediately visible to staff pushing assigned files/quizzes/tests
-      // for that subject, regardless of which code path created the row.
+      // Uses a two-attempt pattern: try with status='approved' first (works
+      // when patch_enrollment_status_columns.sql has been run), fall back to
+      // the base schema (migration_004) which has no status column.
       for (const sid of subject_ids) {
         const safeId = parseInt(sid);
         if (!safeId) continue;
-        await sequelize.query(
-          `INSERT INTO student_subjects (student_id, subject_id, is_active, status)
-           VALUES (:userId, :subjectId, true, 'approved')
-           ON CONFLICT (student_id, subject_id) DO UPDATE
-             SET is_active = true,
-                 status    = 'approved'`,
-          { replacements: { userId, subjectId: safeId }, type: QueryTypes.INSERT }
-        );
+        try {
+          await sequelize.query(
+            `INSERT INTO student_subjects (student_id, subject_id, is_active, status)
+             VALUES (:userId, :subjectId, true, 'approved')
+             ON CONFLICT (student_id, subject_id) DO UPDATE
+               SET is_active = true,
+                   status    = 'approved'`,
+            { replacements: { userId, subjectId: safeId }, type: QueryTypes.INSERT }
+          );
+        } catch (e1) {
+          // status column does not exist yet — fall back to base schema
+          if (e1.message?.includes('status') || e1.original?.code === '42703') {
+            await sequelize.query(
+              `INSERT INTO student_subjects (student_id, subject_id, is_active)
+               VALUES (:userId, :subjectId, true)
+               ON CONFLICT (student_id, subject_id) DO UPDATE
+                 SET is_active = true`,
+              { replacements: { userId, subjectId: safeId }, type: QueryTypes.INSERT }
+            );
+          } else {
+            throw e1;
+          }
+        }
       }
 
       // Also save the boards those subjects belong to in student_exam_types
