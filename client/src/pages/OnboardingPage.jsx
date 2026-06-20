@@ -141,11 +141,11 @@ export default function OnboardingPage() {
     setSaveError('');
     try {
       await api.patch('/users/preferences', {
-        exam_boards: detectedBoards,
-        subject_ids: subjects,
-        daily_goal:  goal,
-        study_days:  studyDays,
-        study_time:  studyTime,
+        exam_boards:          detectedBoards,
+        subject_ids:          subjects,
+        daily_goal:           goal,
+        preferred_study_days: JSON.stringify(studyDays),
+        preferred_study_time: studyTime,
       });
       // Update the in-memory user object immediately so PrivateRoute's
       // onboarding gate clears right away — without this, the redirect to
