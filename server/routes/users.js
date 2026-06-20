@@ -251,12 +251,16 @@ router.patch('/preferences', protect, async (req, res) => {
           continue; // skip this board rather than fail the whole request
         }
         if (board?.[0]) {
-          await sequelize.query(
-            `INSERT INTO student_exam_types (student_id, exam_board_id, is_active, status)
-             VALUES (:userId, :boardId, true, :approvedStatus)
-             ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active = true, status = :approvedStatus`,
-            { replacements: { userId, boardId: board[0].id, approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.RAW }
-          );
+          try {
+            await sequelize.query(
+              `INSERT INTO student_exam_types (student_id, exam_board_id, is_active, status)
+               VALUES (:userId, :boardId, true, :approvedStatus)
+               ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active = true, status = :approvedStatus`,
+              { replacements: { userId, boardId: board[0].id, approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.RAW }
+            );
+          } catch (insertErr) {
+            console.error('[PATCH /users/preferences] student_exam_types insert failed:', insertErr.message);
+          }
         }
       }
     }
@@ -294,12 +298,16 @@ router.patch('/preferences', protect, async (req, res) => {
             { replacements: { subjectIds: safeSubjectIds }, type: QueryTypes.SELECT }
           );
           for (const row of boardRows) {
-            await sequelize.query(
-              `INSERT INTO student_exam_types (student_id, exam_board_id, is_active, status)
-               VALUES (:userId, :boardId, true, :approvedStatus)
-               ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active = true, status = :approvedStatus`,
-              { replacements: { userId, boardId: row.exam_board_id, approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.RAW }
-            );
+            try {
+              await sequelize.query(
+                `INSERT INTO student_exam_types (student_id, exam_board_id, is_active, status)
+                 VALUES (:userId, :boardId, true, :approvedStatus)
+                 ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active = true, status = :approvedStatus`,
+                { replacements: { userId, boardId: row.exam_board_id, approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.RAW }
+              );
+            } catch (insertErr) {
+              console.error('[PATCH /users/preferences] board backfill insert failed:', insertErr.message);
+            }
           }
         }
       } catch (boardLookupErr) {
