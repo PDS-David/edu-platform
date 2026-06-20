@@ -47,9 +47,15 @@ echo ""
 echo "  Waiting 25s for containers to become healthy..."
 sleep 25
 
-# 6. Health check
+# 6. Run DB migrations (now that the container is healthy and scripts/ ships in the image)
 echo ""
-echo "▶ 6/6  Container state after deploy:"
+echo "▶ 6/7  Running DB migrations..."
+docker exec aischool_api node /app/scripts/run_complete_migration.js
+echo "  ✅ Migrations complete"
+
+# 7. Health check
+echo ""
+echo "▶ 7/7  Container state after deploy:"
 docker compose ps || true
 
 echo ""

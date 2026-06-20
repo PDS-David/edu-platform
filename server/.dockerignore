@@ -20,7 +20,8 @@ uploads/
 *.md
 tests/
 tools/
-scripts/
+# scripts/ — MUST be included: run_complete_migration.js ships in the image
+# scripts/
 debug-jwt.js
 
 # Security-sensitive (NEVER in images)
