@@ -12,54 +12,61 @@ echo "  Repo: $REPO_DIR"
 echo "═══════════════════════════════════════════════════"
 
 # 1. Sync code (force clean state)
-echo "▶ 1/5  Syncing code..."
+echo ""
+echo "▶ 1/6  Syncing code..."
 git fetch origin
 git reset --hard origin/main
 
-# 2. Ensure safe directories exist
+# 2. Ensure safe directories exist on the host (NOT inside Docker)
 echo ""
-echo "▶ 2/5  Preparing safe directories..."
+echo "▶ 2/6  Preparing runtime directories on host..."
 mkdir -p server/keys_secure
 mkdir -p hls_secure
-
-# Avoid failing if permissions are restricted (e.g., mounted volumes)
+# Fix permissions only if we own the directory — never fail if we don't
 chmod 755 server/keys_secure 2>/dev/null || true
-chmod 755 hls_secure 2>/dev/null || true
+chmod 755 hls_secure        2>/dev/null || true
 
-# 3. Clean Docker cache (ensures .dockerignore is respected)
+# 3. Show what is currently running before we touch anything
 echo ""
-echo "▶ 3/5  Cleaning Docker cache..."
-docker builder prune -af || true
+echo "▶ 3/6  Current container state:"
+docker compose ps || true
 
-# 4. Stop and remove old containers (FIXES your error)
+# 4. Build new images (skip cache wipe — wasteful and slows recovery)
 echo ""
-echo "▶ 4/5  Stopping old containers..."
-docker compose down --remove-orphans || true
+echo "▶ 4/6  Building api and web images..."
+docker compose build --no-cache --progress=plain api web
 
-# 5. Build and start fresh containers
+# 5. Ensure ALL services are running (caddy and redis may have stopped)
+#    Use --no-deps so we don't accidentally re-create healthy containers
 echo ""
-echo "▶ 5/5  Building and starting services..."
-docker compose up -d --build api web
+echo "▶ 5/6  Bringing up all services..."
+docker compose up -d caddy redis
+docker compose up -d --no-deps api web
 
 echo ""
-echo "  Waiting 15s for containers..."
-sleep 15
+echo "  Waiting 25s for containers to become healthy..."
+sleep 25
+
+# 6. Health check
+echo ""
+echo "▶ 6/6  Container state after deploy:"
+docker compose ps || true
+
+echo ""
+if curl -sf --max-time 10 https://www.aischoolonair.ng/api/health > /dev/null; then
+  echo "  🟢 API is healthy — deploy complete"
+else
+  echo "  🔴 API health check failed. Showing logs:"
+  echo ""
+  echo "--- api logs (last 30 lines) ---"
+  docker compose logs --tail=30 api || true
+  echo ""
+  echo "--- caddy logs (last 15 lines) ---"
+  docker compose logs --tail=15 caddy || true
+  exit 1
+fi
 
 echo ""
 echo "═══════════════════════════════════════════════════"
 echo "  ✅ Deploy complete!"
 echo "═══════════════════════════════════════════════════"
-
-# Health check
-echo ""
-echo "▶ Running health check..."
-sleep 5
-
-if curl -sf https://www.aischoolonair.ng/api/health > /dev/null; then
-  echo "  🟢 API is healthy"
-else
-  echo "  🔴 API failed — check logs:"
-  echo "     docker compose logs api"
-fi
-
-echo ""
