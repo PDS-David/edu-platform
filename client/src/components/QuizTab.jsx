@@ -443,12 +443,25 @@ function InProgressScreen({ subtopicId, subtopic, selectedPaper, onFinish, navig
             {isMCQ ? (
               <div className="space-y-2">
                 {(q.options || []).map((opt, i) => {
-                  const isSelected = answersRef.current[current] === (opt.id || i);
+                  // BUG FIX: previously stored/compared the array INDEX
+                  // (opt.id || i) as the selected answer, but the server
+                  // scores by comparing this value as plain TEXT against
+                  // question.correct_answer (also plain text — see
+                  // POST /quizzes/attempt and POST /questions/:id/answer).
+                  // An index like 0/1/2/3 can only equal correct-answer
+                  // text like "naoh" by coincidence, so most MCQ answers
+                  // were being scored as wrong regardless of what the
+                  // student actually selected. opt.id was dead code: no
+                  // option shape in this codebase (teacher-created,
+                  // AI-extracted, or the answer_options-table fallback)
+                  // ever sets an `id` field — all use option_text/text.
+                  const optionText = opt.text || opt.option_text || '';
+                  const isSelected = answersRef.current[current] === optionText;
                   return (
                     <button
                       key={i}
                       onClick={() => {
-                        answersRef.current[current] = opt.id || i;
+                        answersRef.current[current] = optionText;
                         // force re-render
                         setCurrent(c => c); // same index triggers re-render
                         setOpenAnswers(prev => ({ ...prev }));
@@ -464,7 +477,7 @@ function InProgressScreen({ subtopicId, subtopic, selectedPaper, onFinish, navig
                       }`}>
                         {String(i + 1).padStart(2, '0')}
                       </div>
-                      <span className="text-sm">{opt.text || opt.option_text}</span>
+                      <span className="text-sm">{optionText}</span>
                     </button>
                   );
                 })}
