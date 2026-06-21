@@ -615,7 +615,7 @@ const AIGeneratePanel = () => {
         )}
         <div className="grid grid-cols-2 gap-3">
           <div><label className="block text-xs font-semibold text-gray-600 mb-1">Difficulty</label><select value={form.difficulty} onChange={e => setForm(f => ({ ...f, difficulty: e.target.value }))} className={inputCls}><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option></select></div>
-          <div><label className="block text-xs font-semibold text-gray-600 mb-1">Count</label><select value={form.count} onChange={e => setForm(f => ({ ...f, count: Number(e.target.value) }))} className={inputCls}><option value={10}>10</option><option value={20}>20</option><option value={30}>30</option></select></div>
+          <div><label className="block text-xs font-semibold text-gray-600 mb-1">Count</label><select value={form.count} onChange={e => setForm(f => ({ ...f, count: Number(e.target.value) }))} className={inputCls}><option value={5}>5</option><option value={10}>10</option><option value={15}>15</option></select></div>
         </div>
         {error && <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm"><AlertTriangle size={14} /> {error}</div>}
         {result && <div className="flex items-center gap-2 text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 text-sm"><Check size={14} /> {result.message || 'Questions generated successfully!'}</div>}

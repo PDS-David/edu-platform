@@ -471,7 +471,7 @@ router.post('/send-notification', protect, adminOnly, adminActionLimiter, async 
 // ─────────────────────────────────────────────
 router.post('/generate-questions', protect, adminOnly, async (req, res) => {
   const rawCount = req.body.count;
-  const count = Math.min(Math.max(parseInt(rawCount) || 10, 1), 50);
+  const count = Math.min(Math.max(parseInt(rawCount) || 10, 1), 15);
   const { subject_id, topic, subtopic_id, difficulty = 'medium' } = req.body;
 
   if (!subject_id || !topic) {
