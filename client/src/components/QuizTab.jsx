@@ -113,7 +113,10 @@ function SetupScreen({ subtopic, subtopicId, attemptCount, selectedPaper, setSel
     setChecking(true);
     setNoQuestions(false);
     try {
-      const r = await import('../services/apiClient').then(m => m.default.get(`/questions/random?subtopic_id=${subtopicId}&count=1`));
+      // FIX: was dynamic import('../services/apiClient').then(m => m.default.get(...))
+      // Dynamic import bypasses the axios interceptor that attaches the Bearer token → 401.
+      // Use the static 'api' instance already imported at the top of this file instead.
+      const r = await api.get(`/questions/random?subtopic_id=${subtopicId}&count=1`);
       const qs = r.data || [];
       if (!Array.isArray(qs) || qs.length === 0) {
         setNoQuestions(true);
