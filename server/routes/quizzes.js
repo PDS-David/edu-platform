@@ -86,13 +86,36 @@ router.post('/attempt', protect, async (req, res) => {
     if (!questionIds.length) return res.status(400).json({ success: false, error: 'No valid question IDs' });
 
     // Fetch questions — questions.id is UUID, use TEXT cast for ANY()
+    // SECURITY: default changed 'approved' → 'pending' (fail safe, not fail
+    // open) — same rationale as GET /questions/random. A question with no
+    // status set must never be silently treated as gradeable/approved.
     const questionRows = await sequelize.query(
       `SELECT id, question_text, marks, explanation, correct_answer, options, type
        FROM questions WHERE id::text = ANY(ARRAY[:ids]::text[]) AND is_active = true
-         AND COALESCE(status, 'approved') IN ('approved', 'active')`,
+         AND COALESCE(status, 'pending') IN ('approved', 'active')`,
       { replacements: { ids: questionIds.map(String) }, type: QueryTypes.SELECT }
     );
     const questionMap = Object.fromEntries(questionRows.map(q => [String(q.id), q]));
+
+    // BUG FIX: if every submitted question fails this lookup (e.g. the
+    // questions became unapproved/inactive between being served and being
+    // submitted — a narrow but real race, or stale client-side question data),
+    // the loop below silently scores nothing, no practice_attempts row is
+    // written, attempt_id resolves to null, and the student lands on a
+    // generic "Could not load results" screen with no indication why. Fail
+    // loudly here instead so the real cause is visible in server logs and
+    // the student gets an explanation rather than a dead end.
+    if (questionRows.length === 0) {
+      console.error(
+        `[POST /quizzes/attempt] All ${questionIds.length} submitted question(s) ` +
+        `were not found/approved/active. subtopic_id=${subtopic_id} student=${req.user.id}`
+      );
+      return res.status(409).json({
+        success: false,
+        error: 'These questions are no longer available. Please refresh and start a new quiz.',
+        code: 'QUESTIONS_UNAVAILABLE',
+      });
+    }
 
     let totalScore = 0;
     let maxScore   = 0;
