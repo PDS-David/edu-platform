@@ -55,6 +55,9 @@ jobs:
             git fetch origin
             git reset --hard origin/main
 
+            echo "▶ Ensuring caddy is running (recovery guard)..."
+            docker compose up -d caddy redis || true
+
             echo "▶ Running deployment script..."
             bash deploy.sh
 
