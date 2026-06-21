@@ -1167,6 +1167,30 @@ async function run() {
         AND role != 'admin'`
   );
 
+  // ── migration_006: subtopic_progress missing columns (2026-06-21) ──────────
+  // resources_completed and practice_completed were referenced by the service
+  // and many analytics queries but were never added to the original schema.
+  // completion_pct added for efficient progress-bar queries.
+  await exec('subtopic_progress: add resources_completed, practice_completed, completion_pct',
+    `ALTER TABLE subtopic_progress
+       ADD COLUMN IF NOT EXISTS resources_completed BOOLEAN NOT NULL DEFAULT false,
+       ADD COLUMN IF NOT EXISTS practice_completed  BOOLEAN NOT NULL DEFAULT false,
+       ADD COLUMN IF NOT EXISTS completion_pct      SMALLINT NOT NULL DEFAULT 0
+         CHECK (completion_pct BETWEEN 0 AND 100)`
+  );
+
+  // Recompute completion_pct for existing rows that now have the column
+  await exec('subtopic_progress: backfill completion_pct',
+    `UPDATE subtopic_progress
+     SET completion_pct = (
+       (CASE WHEN resources_completed THEN 33 ELSE 0 END) +
+       (CASE WHEN practice_completed  THEN 33 ELSE 0 END) +
+       (CASE WHEN quiz_completed      THEN 34 ELSE 0 END)
+     )
+     WHERE completion_pct = 0
+       AND (quiz_completed = true)`
+  );
+
   console.log('\n✅ Migration complete.\n');
   await pool.end();
 }
