@@ -98,6 +98,11 @@ Respond ONLY with a JSON object in this exact format (no other text, no code fen
 // ---------------------------------------------------------------------------
 async function persistQuestion(question, concept, studentId) {
   try {
+    // POLICY: AI-generated questions (including these auto-remediation
+    // questions for a student's weak topic) must be reviewed by an admin
+    // before reaching any student. status = 'pending', not 'approved' —
+    // it will not be served by /api/questions/random or the quiz generator
+    // until approved in the Question Review Queue.
     const qRows = await sequelize.query(
       `INSERT INTO questions
          (id, question_text, question_type, question_sub_type,
@@ -105,7 +110,7 @@ async function persistQuestion(question, concept, studentId) {
           concept_hint, marks, created_at)
        VALUES
          (gen_random_uuid(), :questionText, 'multiple_choice', 'mcq',
-          :difficulty, 'approved', 'community', true,
+          :difficulty, 'pending', 'community', true,
           :generationSource, :conceptHint, 1, NOW())
        RETURNING id`,
       {
