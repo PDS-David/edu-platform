@@ -529,17 +529,27 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
         });
       }
 
-      // Save as 'approved' (not 'pending') — admin is explicitly generating
-      // and reviewing these. 'pending' causes the /questions/random endpoint
-      // to filter them out (status IN ('approved','active')), making them
-      // invisible to students on the quiz page.
-      // Also save subtopic_id so the hard JOIN in /questions/random resolves.
+      // POLICY: AI-generated questions always require admin review before
+      // reaching students — status='pending', not 'approved', even when an
+      // admin is the one triggering generation. A prior commit (194383c)
+      // changed this to 'approved' to work around questions being invisible
+      // on the student quiz page, but the actual cause was twofold: (1) no
+      // subtopic_id was being saved, so the hard JOIN in /questions/random
+      // excluded them entirely — now fixed above (resolvedSubtopicId); and
+      // (2) the review queue wasn't being used at all. Skipping review was
+      // the wrong fix for that visibility bug. The real fix is: save
+      // subtopic_id correctly (kept), and have the admin actually approve
+      // generated batches from the Question Review Queue — which takes one
+      // click per question and is the explicit, audited record that this
+      // admin reviewed and approved this specific content before students
+      // see it, exactly like every other AI-generated question in the
+      // system (quiz fallback, remediation engine, etc).
       await sequelize.query(
         `INSERT INTO questions
            (question_text, options, correct_answer, explanation, difficulty,
             subtopic_id, type, is_active, is_ai_generated, status, created_at, updated_at)
          VALUES (:q, :o::jsonb, :c, :e, :d,
-                 :subtopicId, 'mcq', true, true, 'approved', NOW(), NOW())`,
+                 :subtopicId, 'mcq', true, true, 'pending', NOW(), NOW())`,
         {
           replacements: {
             q: q.question_text,
