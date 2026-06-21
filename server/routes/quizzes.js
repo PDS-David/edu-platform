@@ -147,8 +147,10 @@ router.post('/attempt', protect, async (req, res) => {
         options:         question.options,
       });
 
-      // Record attempt (non-blocking)
-      sequelize.query(
+      // Record attempt — AWAITED (see fix note below; was previously
+      // fire-and-forget, which raced against the attemptId lookup that
+      // immediately follows this loop).
+      await sequelize.query(
         `INSERT INTO practice_attempts (student_id, question_id, is_correct, time_taken_seconds, attempted_at)
          VALUES (:studentId, :questionId, :isCorrect, :timeTaken, NOW())`,
         {
@@ -160,7 +162,9 @@ router.post('/attempt', protect, async (req, res) => {
           },
           type: QueryTypes.INSERT,
         }
-      ).catch(() => {});
+      ).catch((err) => {
+        console.error('[POST /quizzes/attempt] practice_attempts insert failed:', err.message);
+      });
     }
 
     // Update subtopic_progress
@@ -178,6 +182,16 @@ router.post('/attempt', protect, async (req, res) => {
 
     // Generate a stable attempt_id from the first practice_attempt row
     // so the frontend can navigate to /quiz-results/:attemptId
+    //
+    // BUG FIX: this SELECT used to race against the practice_attempts INSERT
+    // above, which was fire-and-forget (no await). On any real-world latency,
+    // this SELECT could run before that INSERT had committed, so paRow came
+    // back empty, attemptId resolved to null, and the response still went
+    // out as success:true with attempt_id:null — no error anywhere, but the
+    // results page then had nothing to fetch and showed a generic "Could not
+    // load your results" with no explanation. The INSERT above is now
+    // awaited, so by the time we reach this SELECT the row is guaranteed to
+    // exist.
     let attemptId = null;
     try {
       const paRow = await sequelize.query(

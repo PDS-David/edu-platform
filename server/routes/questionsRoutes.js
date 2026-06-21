@@ -101,6 +101,35 @@ router.get('/random', protect, async (req, res) => {
     return withText.length >= 2;
   }
 
+  // BUG FIX: hasUsableOptions() above correctly treats a plain string ("NaCl")
+  // as usable text, but the client (QuizTab.jsx) renders `opt.text ||
+  // opt.option_text` — a bare string has neither property, so it renders
+  // nothing. This insert path is not hypothetical: resourceQuestionExtractor.js
+  // explicitly prompts Gemini for `"options": ["A","B","C","D"]` (plain
+  // strings, by design) and stores that array as-is with no normalization.
+  // Any question created that way passed validation here but reached
+  // students as four blank, unanswerable option pills — exactly the
+  // four-empty-pill symptom reported live (subtopic 5, "Acid"). Rather than
+  // touch every insert path or the renderer, normalize the shape once here,
+  // at the single point every quiz/practice question already passes through.
+  function normalizeOptions(rawOptions) {
+    let opts = rawOptions;
+    if (typeof opts === 'string') {
+      try { opts = JSON.parse(opts); } catch { return rawOptions; }
+    }
+    if (!Array.isArray(opts)) return rawOptions;
+    return opts.map(o => {
+      if (typeof o === 'string') return { option_text: o, is_correct: false };
+      if (o && typeof o === 'object') {
+        // Already an object — make sure option_text is populated even if the
+        // row only ever had `.text` (some older inserts used that key alone).
+        if (!o.option_text && o.text) return { ...o, option_text: o.text };
+        return o;
+      }
+      return o;
+    });
+  }
+
   try {
     const questions = await sequelize.query(
       `SELECT
@@ -173,6 +202,22 @@ router.get('/random', protect, async (req, res) => {
     // Final pass: drop anything still unusable from either source rather
     // than send a student a question they cannot answer.
     const usable = questions.filter(q => hasUsableOptions(q.options));
+
+    // BUG FIX: normalize option shape (see normalizeOptions above) so plain
+    // string arrays — the documented output format for AI-extracted
+    // questions via resourceQuestionExtractor.js — render correctly on the
+    // client instead of as blank, unanswerable option pills. correct_answer
+    // is untouched: it's already a separate plain-text column compared
+    // directly in POST /:id/answer and POST /quizzes/attempt, independent
+    // of options' internal shape, so normalizing options here cannot affect
+    // answer-checking correctness.
+    for (const q of usable) {
+      let parsed = q.options;
+      if (typeof parsed === 'string') {
+        try { parsed = JSON.parse(parsed); } catch { /* leave as-is, already filtered usable */ }
+      }
+      q.options = normalizeOptions(parsed);
+    }
 
     return res.json({ success: true, count: usable.length, data: usable });
   } catch (err) {
