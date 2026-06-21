@@ -260,11 +260,12 @@ async function run() {
     ['student_answers', `CREATE TABLE IF NOT EXISTS student_answers (
       id                 UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
       attempt_id         UUID    NOT NULL REFERENCES quiz_attempts(id) ON DELETE CASCADE,
-      question_id        INTEGER NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
-      selected_option_id UUID    REFERENCES answer_options(id) ON DELETE SET NULL,
+      question_id        TEXT    NOT NULL,
+      selected_option_id TEXT,
       is_correct         BOOLEAN NOT NULL DEFAULT false,
       created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    ); CREATE INDEX IF NOT EXISTS idx_sa_aid ON student_answers(attempt_id)`],
+    ); CREATE INDEX IF NOT EXISTS idx_sa_aid ON student_answers(attempt_id);
+    CREATE INDEX IF NOT EXISTS idx_sa_qid ON student_answers(question_id)`],
 
     ['subtopic_quiz_attempts', `CREATE TABLE IF NOT EXISTS subtopic_quiz_attempts (
       id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),

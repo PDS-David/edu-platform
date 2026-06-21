@@ -172,12 +172,12 @@ async function submitQuiz(req, res) {
         `INSERT INTO student_answers
            (attempt_id, question_id, selected_option_id, is_correct)
          VALUES
-           (:attemptId, :questionId, :selectedOptionId, :isCorrect)`,
+           (:attemptId, :questionId::text, :selectedOptionId, :isCorrect)`,
         {
           replacements: {
             attemptId,
-            questionId,
-            selectedOptionId: selectedOptionId || null,
+            questionId:        String(questionId),
+            selectedOptionId:  selectedOptionId ? String(selectedOptionId) : null,
             isCorrect,
           },
           type:        QueryTypes.INSERT,
