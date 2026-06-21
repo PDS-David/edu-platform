@@ -1,6 +1,7 @@
 'use strict';
 
-const Anthropic                                 = require('@anthropic-ai/sdk');
+let Anthropic = null;
+try { Anthropic = require('@anthropic-ai/sdk'); } catch { /* not installed — intent detection falls back to keyword matching */ }
 const { QueryTypes }                            = require('sequelize');
 const sequelize                                 = require('../config/database');
 const { generateQuizByTopic }                   = require('./quizGenerator');
@@ -20,7 +21,7 @@ const {
 // LLM CLIENTS
 // =========================================================================
 
-const anthropic = new Anthropic();
+const anthropic = Anthropic ? new Anthropic() : null;
 const CLAUDE_INTENT_MODEL = 'claude-haiku-4-5-20251001';
 
 // v2: callLLM now routes through services/ai.js central hub.
@@ -52,6 +53,7 @@ function detectIntentFallback(message) {
 }
 
 async function detectIntent(message, context = {}) {
+  if (!anthropic) return detectIntentFallback(message);
   try {
     const response = await anthropic.messages.create({
       model: CLAUDE_INTENT_MODEL,
