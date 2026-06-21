@@ -253,8 +253,12 @@ router.post('/test/:testId/submit', protect, async (req, res) => {
 
       // Record practice attempt
       sequelize.query(
-        `INSERT INTO practice_attempts (student_id, question_id, is_correct, time_taken_seconds, attempted_at)
-         VALUES (:studentId, :questionId, :isCorrect, :timeTaken, NOW())`,
+        // BUG FIX: created_at/updated_at are NOT NULL with no value
+        // supplied here — same root cause confirmed via live production
+        // logs in quizzes.js's POST /attempt. Identical insert shape, was
+        // almost certainly failing silently the same way.
+        `INSERT INTO practice_attempts (student_id, question_id, is_correct, time_taken_seconds, attempted_at, created_at, updated_at)
+         VALUES (:studentId, :questionId, :isCorrect, :timeTaken, NOW(), NOW(), NOW())`,
         {
           replacements: {
             studentId:  req.user.id,

@@ -147,12 +147,28 @@ router.post('/attempt', protect, async (req, res) => {
         options:         question.options,
       });
 
-      // Record attempt — AWAITED (see fix note below; was previously
-      // fire-and-forget, which raced against the attemptId lookup that
-      // immediately follows this loop).
+      // Record attempt — AWAITED (was previously fire-and-forget, which
+      // raced against the attemptId lookup that immediately follows this
+      // loop — see fix note below).
+      //
+      // BUG FIX (confirmed via live production logs, not assumption):
+      // practice_attempts.created_at and .updated_at are NOT NULL columns.
+      // This INSERT supplied attempted_at explicitly but relied on the
+      // table's DEFAULT NOW() to populate created_at/updated_at — and on
+      // the live database that default is evidently not firing for this
+      // INSERT path (live error: 'null value in column "created_at" ...
+      // violates not-null constraint', firing on every single question in
+      // every quiz submission). This was the actual root cause of "Could
+      // not load your results" the whole time: every practice_attempts
+      // row failed to insert, so the attemptId lookup right after this
+      // loop always found nothing, regardless of the earlier type-cast fix
+      // (which was a real, separate bug, but never the one actually
+      // blocking this). Rather than rely on the column default at all,
+      // both timestamps are now supplied explicitly, same as attempted_at.
       await sequelize.query(
-        `INSERT INTO practice_attempts (student_id, question_id, is_correct, time_taken_seconds, attempted_at)
-         VALUES (:studentId, :questionId, :isCorrect, :timeTaken, NOW())`,
+        `INSERT INTO practice_attempts
+           (student_id, question_id, is_correct, time_taken_seconds, attempted_at, created_at, updated_at)
+         VALUES (:studentId, :questionId, :isCorrect, :timeTaken, NOW(), NOW(), NOW())`,
         {
           replacements: {
             studentId:  req.user.id,

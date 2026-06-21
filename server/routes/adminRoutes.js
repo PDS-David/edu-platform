@@ -1042,9 +1042,15 @@ router.get('/health', protect, adminOnly, async (req, res) => {
 
       // 13. practice attempt
       await sequelize.query(
+        // BUG FIX: created_at/updated_at are NOT NULL with no value
+        // supplied here — same root cause confirmed via live production
+        // logs in quizzes.js's POST /attempt. This smoke test was reporting
+        // '13. record practice attempt' as passing (w('13...', true) is
+        // hardcoded, not derived from the query result) while the INSERT
+        // itself was almost certainly failing silently the whole time.
         `INSERT INTO practice_attempts (student_id, question_id, is_correct,
-            time_taken_seconds, attempted_at)
-         VALUES (:s, :q, true, 5, NOW())`,
+            time_taken_seconds, attempted_at, created_at, updated_at)
+         VALUES (:s, :q, true, 5, NOW(), NOW(), NOW())`,
         { replacements: { s: created.studentId, q: created.questionId },
           type: QueryTypes.INSERT });
       w('13. record practice attempt', true);
