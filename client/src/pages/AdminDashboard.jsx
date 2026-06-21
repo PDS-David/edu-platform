@@ -1,7 +1,7 @@
 import { useState, useEffect, Component } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
-import api from '../services/apiClient';
+import api, { TIMEOUT_AI } from '../services/apiClient';
 import {
   Users, School, BookOpen, Settings, LogOut,
   Plus, Pencil, Trash2, ChevronDown, ChevronRight,
@@ -590,7 +590,7 @@ const AIGeneratePanel = () => {
         exam_board:  form.exam_board,
         count:       form.count,
         difficulty:  form.difficulty,
-      });
+      }, { timeout: TIMEOUT_AI });
       setResult(res);
       const qs = res?.data?.questions ?? res?.questions ?? [];
       if (Array.isArray(qs)) setPreviewQuestions(qs);
