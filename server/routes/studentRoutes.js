@@ -20,6 +20,32 @@ const { ENROLLMENT_SOURCE, ENROLLMENT_STATUS } = require('../constants/enrollmen
 const UUID_REGEX  = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isValidUUID = (v) => UUID_REGEX.test(v);
 
+// ── Self-healing schema guard (Bug 1 fix) ─────────────────────────────────────
+// student_subjects and student_exam_types are created by run_complete_migration.js
+// WITHOUT status/enrollment_source columns. The patch file exists but may not
+// have been run on production. Run ALTER TABLE lazily and memoize so it only
+// fires once per server process, not on every request.
+let _enrollmentColumnsEnsured = false;
+async function ensureEnrollmentColumns() {
+  if (_enrollmentColumnsEnsured) return;
+  try {
+    await sequelize.query(`
+      ALTER TABLE student_subjects
+        ADD COLUMN IF NOT EXISTS status            TEXT NOT NULL DEFAULT 'approved',
+        ADD COLUMN IF NOT EXISTS enrollment_source TEXT NOT NULL DEFAULT 'explicit';
+      ALTER TABLE student_exam_types
+        ADD COLUMN IF NOT EXISTS status            TEXT NOT NULL DEFAULT 'approved';
+    `, { type: QueryTypes.RAW });
+    _enrollmentColumnsEnsured = true;
+  } catch (e) {
+    // Log but don't crash — if the table doesn't exist yet it will be caught
+    // by the actual INSERT below
+    console.warn('[ensureEnrollmentColumns]', e.message);
+  }
+}
+// Export so users.js / adminRoutes.js / paymentRoutes.js can share it
+module.exports.ensureEnrollmentColumns = ensureEnrollmentColumns;
+
 // ── (removed) POST /api/students/join-class ───────────────────────────────────
 // Join codes are no longer used. Teachers add students directly from the
 // student picker in the Teacher Dashboard.
@@ -397,8 +423,7 @@ router.get('/my-subjects', protect, async (req, res) => {
     // (subjects that have at least one topic) so they see content immediately
     if (result.length === 0) {
       try {
-        // Table is guaranteed to exist via run_enrollment_approval_migration.js
-
+        await ensureEnrollmentColumns();
         // Enroll in subjects that have topics
         await sequelize.query(
           `INSERT INTO student_subjects (student_id, subject_id, is_active, status, enrollment_source)
@@ -448,7 +473,7 @@ router.post('/subjects', protect, async (req, res) => {
     return res.status(400).json({ success: false, error: 'subject_id is required' });
   }
   try {
-    // Table is guaranteed to exist via run_enrollment_approval_migration.js
+    await ensureEnrollmentColumns();
     await sequelize.query(
       `INSERT INTO student_subjects (student_id, subject_id, is_active, status, enrollment_source)
        VALUES (:studentId, :subjectId, true, :approvedStatus, :enrollmentSource)

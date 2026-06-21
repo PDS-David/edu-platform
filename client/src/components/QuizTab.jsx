@@ -54,7 +54,8 @@ const TILE_COLOURS = [
 // ══════════════════════════════════════════════════════════════════════════════
 export default function QuizTab({ subtopicId, subtopic, onQuizComplete }) {
   const [phase, setPhase]           = useState('setup');   // setup | inprogress | results
-  const [attemptId, setAttemptId]   = useState(null);
+  const [attemptId, setAttemptId]       = useState(null);
+  const [directResults, setDirectResults] = useState(null);
   const [submitError, setSubmitError] = useState(null);
   const [selectedPaper, setSelectedPaper] = useState('all');
   const [attemptCount, setAttemptCount]   = useState(0);
@@ -84,7 +85,7 @@ export default function QuizTab({ subtopicId, subtopic, onQuizComplete }) {
       subtopicId={subtopicId}
       subtopic={subtopic}
       selectedPaper={selectedPaper}
-      onFinish={(id, error) => { setAttemptId(id); setSubmitError(error || null); setPhase('results'); }}
+      onFinish={(id, error, directResults) => { setAttemptId(id); setSubmitError(error || null); setDirectResults(directResults || null); setPhase('results'); }}
       navigate={navigate}
     />
   );
@@ -94,6 +95,7 @@ export default function QuizTab({ subtopicId, subtopic, onQuizComplete }) {
       subtopicId={subtopicId}
       subtopic={subtopic}
       attemptId={attemptId}
+        directResults={directResults}
       submitError={submitError}
       onRevise={() => navigate(`/student/subtopic/${subtopicId}?tab=practice`)}
       onQuizComplete={onQuizComplete}
@@ -306,7 +308,31 @@ function InProgressScreen({ subtopicId, subtopic, selectedPaper, onFinish, navig
           time_taken_ms:      0,
         })),
       });
-      onFinish(res.data?.attempt_id ?? res.attempt_id ?? res.id ?? null);
+
+      // POST already returns full results in res.data — use them directly.
+      // This avoids a second GET call that can return 0/0 if the
+      // practice_attempts rows haven't been committed yet (race condition).
+      const payload = res?.data ?? res;
+      const directResults = payload && (payload.total_score != null || payload.answers)
+        ? {
+            score:          payload.total_score  ?? 0,
+            total_marks:    payload.max_score     ?? 0,
+            time_taken:     Math.round((TOTAL_SECS - remainingRef.current)),
+            accuracy:       payload.accuracy_pct  ?? 0,
+            avg_score:      '--',
+            avg_time:       '--',
+            recommendation: payload.accuracy_pct >= 70
+              ? 'Excellent performance! You are well prepared for this topic.'
+              : payload.accuracy_pct >= 50
+              ? 'Good effort. Review the questions you missed and try again.'
+              : 'Keep practising. Focus on the explanations for incorrect answers.',
+            answers:        payload.answers       ?? [],
+            questions:      payload.answers       ?? [],
+          }
+        : null;
+
+      const id = payload?.attempt_id ?? null;
+      onFinish(id, null, directResults);
     } catch (err) {
       // BUG FIX: previously this swallowed every error and always called
       // onFinish(null), which sent the student to the results screen with
@@ -673,9 +699,9 @@ function HintModal({ question, onClose }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // PHASE 3 — RESULTS
 // ══════════════════════════════════════════════════════════════════════════════
-function ResultsScreen({ subtopicId, subtopic, attemptId, submitError, onRevise, onQuizComplete }) {
-  const [results,       setResults]       = useState(null);
-  const [loading,       setLoading]       = useState(true);
+function ResultsScreen({ subtopicId, subtopic, attemptId, submitError, onRevise, onQuizComplete, directResults }) {
+  const [results,       setResults]       = useState(directResults || null);
+  const [loading,       setLoading]       = useState(!directResults);
   const [loadError,     setLoadError]     = useState(null);
   const [submitProgress,setSubmitProgress]= useState(null); // "Submitting question X of Y..."
   const [selectedQ,     setSelectedQ]     = useState(0);
@@ -683,11 +709,40 @@ function ResultsScreen({ subtopicId, subtopic, attemptId, submitError, onRevise,
   const [reviseToast,   setReviseToast]   = useState(true);
 
   useEffect(() => {
+    // If POST response already has results, use them directly — skip GET
+    if (directResults) {
+      setResults(directResults);
+      setLoading(false);
+      if (subtopicId) {
+        api.post(`/subtopic-progress/${subtopicId}`, { task: 'quiz' }).catch(() => {});
+        onQuizComplete?.();
+      }
+      return;
+    }
     const load = async () => {
       if (!attemptId) { setLoading(false); return; }
       try {
         const r = await api.get(`/quizzes/attempt/${attemptId}`);
-        setResults(r);
+        // Server returns { success, data: { attempt, answers, benchmark, examiner_recommendation } }
+        // apiClient wraps this as { data: { attempt, ... }, success, meta }.
+        // Normalise into the flat shape ResultsScreen reads:
+        //   results.score, results.total_marks, results.time_taken,
+        //   results.accuracy, results.answers, results.recommendation
+        const payload = r?.data ?? r;
+        const attempt = payload?.attempt ?? {};
+        setResults({
+          score:          attempt.total_score  ?? 0,
+          total_marks:    attempt.max_score    ?? 0,
+          time_taken:     Math.round((attempt.total_time_ms ?? 0) / 1000),
+          accuracy:       attempt.accuracy_pct ?? 0,
+          avg_score:      payload?.benchmark?.accuracy_pct ?? '--',
+          avg_time:       payload?.benchmark?.avg_time_ms != null
+                            ? Math.round(payload.benchmark.avg_time_ms / 1000)
+                            : '--',
+          recommendation: payload?.examiner_recommendation ?? '',
+          answers:        payload?.answers ?? [],
+          questions:      payload?.answers ?? [],
+        });
         // Mark quiz complete
         await api.post(`/subtopic-progress/${subtopicId}`, { task: 'quiz' });
         onQuizComplete?.();
@@ -705,7 +760,7 @@ function ResultsScreen({ subtopicId, subtopic, attemptId, submitError, onRevise,
       }
     };
     load();
-  }, [attemptId, subtopicId]);
+  }, [attemptId, subtopicId, directResults]);
 
   if (loading) return (
     <div className="min-h-screen bg-[#0a4a3f] flex flex-col items-center justify-center gap-4 px-4">
