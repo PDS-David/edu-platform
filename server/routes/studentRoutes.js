@@ -466,13 +466,12 @@ router.post('/subjects', protect, async (req, res) => {
     );
     if (boardRows[0]?.exam_board_id) {
       await sequelize.query(
-        // FIX: exam_board_id column is UUID — must cast the replacement to ::uuid
-        // otherwise Sequelize binds it as integer and Postgres rejects with
-        // "column exam_board_id is of type uuid but expression is of type integer"
+        // exam_board_id in student_exam_types is INTEGER (exam_boards.id is INTEGER).
+        // Do NOT cast to ::uuid — that crashes with "invalid input syntax for type uuid".
         `INSERT INTO student_exam_types (student_id, exam_board_id, is_active, status)
-         VALUES (:studentId, :boardId::uuid, true, :approvedStatus)
+         VALUES (:studentId, :boardId, true, :approvedStatus)
          ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active = true, status = :approvedStatus`,
-        { replacements: { studentId, boardId: boardRows[0].exam_board_id, approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.INSERT }
+        { replacements: { studentId, boardId: parseInt(boardRows[0].exam_board_id), approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.INSERT }
       );
     }
 

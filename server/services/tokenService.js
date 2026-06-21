@@ -148,7 +148,12 @@ async function verifyAccessToken(token) {
   }
 
   const { jti } = decoded;
-  if (!jti) throw Object.assign(new Error('Token missing jti'), { code: 'TOKEN_INVALID' });
+
+  // BACKWARD-COMPAT BRIDGE: tokens issued before auth-hardening (utils/jwt.js
+  // generateToken) have no jti. Until those 7-day tokens naturally expire we
+  // must accept them via signature+expiry only — same as before hardening.
+  // Once all pre-hardening tokens have expired this block can be removed.
+  if (!jti) return decoded;
 
   const rows = await db.query(
     `SELECT id, revoked, last_used_at, expires_at
