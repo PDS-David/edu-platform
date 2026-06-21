@@ -215,7 +215,9 @@ router.get(
            JOIN course_subjects cs ON cs.subject_id = s.id
           WHERE cs.course_id = :courseId
             AND q.is_active  = true
-            AND COALESCE(q.status, 'approved') IN ('approved', 'active')
+            -- SECURITY: default changed 'approved' → 'pending' (fail safe,
+            -- not fail open) — see questionsRoutes.js for full rationale.
+            AND COALESCE(q.status, 'pending') IN ('approved', 'active')
           ORDER BY q.difficulty, RANDOM()
           LIMIT 100`,
         { replacements: { courseId }, type: QueryTypes.SELECT }
