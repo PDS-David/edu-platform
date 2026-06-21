@@ -183,25 +183,36 @@ router.post('/attempt', protect, async (req, res) => {
     // Generate a stable attempt_id from the first practice_attempt row
     // so the frontend can navigate to /quiz-results/:attemptId
     //
-    // BUG FIX: this SELECT used to race against the practice_attempts INSERT
-    // above, which was fire-and-forget (no await). On any real-world latency,
-    // this SELECT could run before that INSERT had committed, so paRow came
-    // back empty, attemptId resolved to null, and the response still went
-    // out as success:true with attempt_id:null — no error anywhere, but the
-    // results page then had nothing to fetch and showed a generic "Could not
-    // load your results" with no explanation. The INSERT above is now
-    // awaited, so by the time we reach this SELECT the row is guaranteed to
-    // exist.
+    // BUG FIX (1 of 2, race condition): this SELECT used to race against the
+    // practice_attempts INSERT above, which was fire-and-forget (no await).
+    // The INSERT above is now awaited, so that race is closed.
+    //
+    // BUG FIX (2 of 2, type mismatch — the one actually still breaking this):
+    // question_id = ANY(ARRAY[:ids]::text[]) casts the ARRAY to text[] but
+    // never casts the `question_id` COLUMN itself — and question_id is
+    // INTEGER (see practice_attempts schema), not text. Comparing an
+    // integer column against a text[] via = ANY() is a type mismatch
+    // Postgres rejects, and that error was silently swallowed by the
+    // try/catch below, so attemptId stayed null with literally nothing
+    // surfaced anywhere — the request still returned success:true. This is
+    // the exact same class of bug already fixed one block above (line ~94,
+    // questions.id) by casting the COLUMN to text, not just the array; that
+    // fix was applied there but missed here. Same fix, applied here too.
     let attemptId = null;
     try {
       const paRow = await sequelize.query(
         `SELECT id FROM practice_attempts
-         WHERE student_id = :studentId AND question_id = ANY(ARRAY[:ids]::text[])
+         WHERE student_id = :studentId AND question_id::text = ANY(ARRAY[:ids]::text[])
          ORDER BY attempted_at DESC LIMIT 1`,
         { replacements: { studentId: req.user.id, ids: questionIds.map(String) }, type: QueryTypes.SELECT }
       );
       attemptId = paRow[0]?.id || null;
-    } catch (_) {}
+    } catch (err) {
+      // Previously silent — this single catch block was the entire reason
+      // the type-mismatch bug above was invisible. Now logged so any future
+      // failure here is diagnosable instead of a silent null.
+      console.error('[POST /quizzes/attempt] attemptId resolution failed:', err.message);
+    }
 
     return res.json({
       success:      true,
