@@ -1157,6 +1157,16 @@ async function run() {
     console.log('  (verification query failed:', e.message, ')');
   }
 
+  // Ensure Platform Admin user has role='admin' — the seed in
+  // migrate_roles_and_curricula.sql may not have run on the live DB,
+  // leaving the account with the default 'student' role from registration,
+  // which causes 403 on all /api/admin/* endpoints.
+  await exec('Platform Admin: ensure role=admin',
+    `UPDATE users SET role = 'admin', updated_at = NOW()
+      WHERE email = 'admin@aischoolonair.com'
+        AND role != 'admin'`
+  );
+
   console.log('\n✅ Migration complete.\n');
   await pool.end();
 }
