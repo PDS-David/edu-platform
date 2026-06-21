@@ -143,6 +143,8 @@ Respond ONLY with a valid JSON object in this exact format (no markdown, no extr
        status,
        source,
        submitted_by,
+       correct_answer,
+       options,
        created_at
      ) VALUES (
        gen_random_uuid(),
@@ -160,19 +162,29 @@ Respond ONLY with a valid JSON object in this exact format (no markdown, no extr
        'approved',
        'admin_import',
        :submittedBy,
+       :correctAnswer,
+       :options::jsonb,
        NOW()
      )
      RETURNING id, question_text, difficulty, explanation, is_ai_generated, created_at`,
     {
       replacements: {
-        questionText: aiResult.question_text,
-        difficulty:   difficultyText,
-        explanation:  aiResult.explanation || null,
-        subtopicId:   concept.subtopic_id,
-        subjectId:    concept.subject_id    || null,
-        examBoardId:  concept.exam_board_id || null,
-        conceptHint:  concept.concept_name,
-        submittedBy:  studentId             || null,
+        questionText:  aiResult.question_text,
+        difficulty:    difficultyText,
+        explanation:   aiResult.explanation || null,
+        subtopicId:    concept.subtopic_id,
+        subjectId:     concept.subject_id    || null,
+        examBoardId:   concept.exam_board_id || null,
+        conceptHint:   concept.concept_name,
+        submittedBy:   studentId             || null,
+        // Store correct_answer as the matching option text so grading works
+        // without needing to JOIN answer_options
+        correctAnswer: (aiResult.options.find(o => o.is_correct) || {}).option_text || null,
+        options:       JSON.stringify(aiResult.options.map((o, i) => ({
+                         option_text: o.option_text,
+                         is_correct:  o.is_correct,
+                         order_index: i,
+                       }))),
       },
       type: QueryTypes.INSERT,
     }
