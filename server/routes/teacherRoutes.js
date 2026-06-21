@@ -743,9 +743,15 @@ router.post('/questions', protect, teacherOnly, async (req, res) => {
   const correctOption = options.find(o => o.is_correct);
   if (!correctOption) return res.status(400).json({ success: false, error: 'One option must be marked correct' });
   try {
+    // Manually authored by a teacher — does NOT go through the AI Question
+    // Review Queue. Per platform policy, teacher-written questions are
+    // available to enrolled students immediately. status is set explicitly
+    // here (rather than left NULL) so availability is a deliberate, visible
+    // decision in the data rather than an artifact of a COALESCE default
+    // elsewhere in the codebase.
     const result = await sequelize.query(
-      `INSERT INTO questions (question_text, subtopic_id, submitted_by, difficulty, explanation, options, correct_answer, type, is_active, created_at, updated_at)
-       VALUES (:question_text, :subtopic_id, :submitted_by, :difficulty, :explanation, :options::jsonb, :correct_answer, 'mcq', true, NOW(), NOW())
+      `INSERT INTO questions (question_text, subtopic_id, submitted_by, difficulty, explanation, options, correct_answer, type, is_active, is_ai_generated, status, created_at, updated_at)
+       VALUES (:question_text, :subtopic_id, :submitted_by, :difficulty, :explanation, :options::jsonb, :correct_answer, 'mcq', true, false, 'approved', NOW(), NOW())
        RETURNING id`,
       {
         replacements: {

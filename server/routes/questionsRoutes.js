@@ -46,7 +46,13 @@ router.get('/random', protect, async (req, res) => {
     }
   }
 
-  const filters      = ["q.is_active = true", "COALESCE(q.status, 'approved') IN ('approved', 'active')"];
+  // SECURITY: status default changed from 'approved' to 'pending'. Every
+  // current insert path now sets status explicitly (teacher questions →
+  // 'approved' immediately; all AI-generated questions → 'pending' pending
+  // admin review). If a future insert path forgets to set status, this
+  // COALESCE must fail SAFE (excluded from students) rather than fail OPEN
+  // (silently treated as approved and served to students unreviewed).
+  const filters      = ["q.is_active = true", "COALESCE(q.status, 'pending') IN ('approved', 'active')"];
   const replacements = { limit };
 
   if (subtopic_id) {
@@ -193,6 +199,13 @@ router.post('/:id/answer', protect, async (req, res) => {
 });
 
 // ── POST /api/questions/submit — ContributeQuestion page ─────────────────────
+// Open to any authenticated role (community contribution flow, distinct from
+// the teacher's dedicated POST /teacher/questions route). The frontend
+// already promises the submitter an "Under review" success state, but the
+// insert never actually set status — it relied on COALESCE(status,'approved')
+// elsewhere to silently make it live. Now set explicitly: status='pending',
+// is_ai_generated=false (human-written, just not yet reviewed). Goes through
+// the same Question Review Queue as AI-generated content.
 router.post('/submit', protect, async (req, res) => {
   const { question_text, subtopic_id, difficulty = 'medium', explanation, options, correct_answer } = req.body;
   if (!question_text?.trim()) return res.status(400).json({ success: false, error: 'question_text is required' });
@@ -203,8 +216,8 @@ router.post('/submit', protect, async (req, res) => {
 
   try {
     const result = await sequelize.query(
-      `INSERT INTO questions (question_text, subtopic_id, submitted_by, difficulty, explanation, options, correct_answer, type, is_active, created_at, updated_at)
-       VALUES (:question_text, :subtopic_id, :submitted_by, :difficulty, :explanation, :options::jsonb, :correct_answer, 'mcq', true, NOW(), NOW())
+      `INSERT INTO questions (question_text, subtopic_id, submitted_by, difficulty, explanation, options, correct_answer, type, is_active, is_ai_generated, status, created_at, updated_at)
+       VALUES (:question_text, :subtopic_id, :submitted_by, :difficulty, :explanation, :options::jsonb, :correct_answer, 'mcq', true, false, 'pending', NOW(), NOW())
        RETURNING id`,
       {
         replacements: {
