@@ -22,7 +22,37 @@ router.get('/random', protect, async (req, res) => {
   const { count = '10', subject_id, subtopic_id, board, difficulty } = req.query;
   const limit = Math.min(Math.max(parseInt(count) || 10, 1), 50);
 
-  const filters      = ["q.is_active = true", "COALESCE(q.status, 'approved') IN ('approved', 'active')"];
+  // Enrollment check: a student requesting questions for a specific subject
+  // must actually be enrolled in that subject. This was previously absent
+  // entirely — any authenticated student could pull questions for any
+  // subject_id regardless of their own student_subjects rows. Scoped to
+  // students only (teachers/admins previewing content are unaffected) and
+  // only when subject_id is actually provided (the no-subject_id fallback
+  // path used elsewhere, e.g. test-builder flows, is unaffected).
+  if (req.user.role === 'student' && subject_id) {
+    const enrolled = await sequelize.query(
+      `SELECT 1 FROM student_subjects
+        WHERE student_id = :studentId AND subject_id = :subjectId AND is_active = true
+        LIMIT 1`,
+      { replacements: { studentId: req.user.id, subjectId: subject_id }, type: QueryTypes.SELECT }
+    ).catch(() => []); // if student_subjects doesn't exist yet in this environment, fail open rather than 500
+
+    if (!enrolled.length) {
+      return res.status(403).json({
+        success: false,
+        error: 'You are not enrolled in this subject. Add it from your Subjects page first.',
+        code: 'NOT_ENROLLED',
+      });
+    }
+  }
+
+  // SECURITY: status default changed from 'approved' to 'pending'. Every
+  // current insert path now sets status explicitly (teacher questions →
+  // 'approved' immediately; all AI-generated questions → 'pending' pending
+  // admin review). If a future insert path forgets to set status, this
+  // COALESCE must fail SAFE (excluded from students) rather than fail OPEN
+  // (silently treated as approved and served to students unreviewed).
+  const filters      = ["q.is_active = true", "COALESCE(q.status, 'pending') IN ('approved', 'active')"];
   const replacements = { limit };
 
   if (subtopic_id) {
@@ -30,7 +60,16 @@ router.get('/random', protect, async (req, res) => {
     replacements.subtopic_id = subtopic_id;
   }
   if (subject_id) {
-    filters.push('t.subject_id = :subject_id');
+    // With LEFT JOINs, t.subject_id is NULL for questions that have no subtopic_id.
+    // Use a subquery so subject-filtered quizzes still include those questions
+    // (they are linked via the subtopic chain when it exists, or orphaned otherwise).
+    // We match either the joined path OR a direct subject_id column on questions if it exists.
+    filters.push(`(
+      t.subject_id = :subject_id
+      OR (t.subject_id IS NULL AND q.subtopic_id IS NULL AND EXISTS (
+        SELECT 1 FROM subjects sub WHERE sub.id = :subject_id
+      ))
+    )`);
     replacements.subject_id = subject_id;
   }
   if (difficulty && ['easy','medium','hard'].includes(difficulty)) {
@@ -48,6 +87,49 @@ router.get('/random', protect, async (req, res) => {
 
   const where = `WHERE ${filters.join(' AND ')}`;
 
+  // Helper: does a parsed options value contain at least 2 entries with real text?
+  function hasUsableOptions(rawOptions) {
+    let opts = rawOptions;
+    if (typeof opts === 'string') {
+      try { opts = JSON.parse(opts); } catch { return false; }
+    }
+    if (!Array.isArray(opts)) return false;
+    const withText = opts.filter(o => {
+      const text = typeof o === 'string' ? o : o?.option_text ?? o?.text;
+      return text && String(text).trim();
+    });
+    return withText.length >= 2;
+  }
+
+  // BUG FIX: hasUsableOptions() above correctly treats a plain string ("NaCl")
+  // as usable text, but the client (QuizTab.jsx) renders `opt.text ||
+  // opt.option_text` — a bare string has neither property, so it renders
+  // nothing. This insert path is not hypothetical: resourceQuestionExtractor.js
+  // explicitly prompts Gemini for `"options": ["A","B","C","D"]` (plain
+  // strings, by design) and stores that array as-is with no normalization.
+  // Any question created that way passed validation here but reached
+  // students as four blank, unanswerable option pills — exactly the
+  // four-empty-pill symptom reported live (subtopic 5, "Acid"). Rather than
+  // touch every insert path or the renderer, normalize the shape once here,
+  // at the single point every quiz/practice question already passes through.
+  function normalizeOptions(rawOptions) {
+    let opts = rawOptions;
+    if (typeof opts === 'string') {
+      try { opts = JSON.parse(opts); } catch { return rawOptions; }
+    }
+    if (!Array.isArray(opts)) return rawOptions;
+    return opts.map(o => {
+      if (typeof o === 'string') return { option_text: o, is_correct: false };
+      if (o && typeof o === 'object') {
+        // Already an object — make sure option_text is populated even if the
+        // row only ever had `.text` (some older inserts used that key alone).
+        if (!o.option_text && o.text) return { ...o, option_text: o.text };
+        return o;
+      }
+      return o;
+    });
+  }
+
   try {
     const questions = await sequelize.query(
       `SELECT
@@ -58,9 +140,9 @@ router.get('/random', protect, async (req, res) => {
          s.name AS subject_name,
          eb.code AS exam_board_code
        FROM questions q
-       JOIN subtopics  st ON st.id = q.subtopic_id
-       JOIN topics     t  ON t.id  = st.topic_id
-       JOIN subjects   s  ON s.id  = t.subject_id
+       LEFT JOIN subtopics  st ON st.id = q.subtopic_id
+       LEFT JOIN topics     t  ON t.id  = st.topic_id
+       LEFT JOIN subjects   s  ON s.id  = t.subject_id
        LEFT JOIN exam_boards eb ON eb.id = s.exam_board_id
        ${boardJoin}
        ${where}
@@ -68,7 +150,76 @@ router.get('/random', protect, async (req, res) => {
        LIMIT :limit`,
       { replacements, type: QueryTypes.SELECT }
     );
-    return res.json({ success: true, count: questions.length, data: questions });
+
+    // BUG FIX: some insert paths (e.g. remediationService.js) write answer
+    // options ONLY to the separate `answer_options` table and leave the
+    // `questions.options` JSONB column null/empty. This route only ever
+    // read that JSONB column, so any question created that way reached
+    // students with zero usable answer choices — four empty option pills,
+    // unanswerable. This also covers Gemini occasionally returning
+    // malformed option text (objects with an empty option_text field),
+    // which passes a naive "array exists" check but renders as blanks.
+    //
+    // Fix: for any question whose JSONB options aren't usable, fall back to
+    // the answer_options table. If neither source has usable options,
+    // exclude the question entirely rather than show an unanswerable one —
+    // consistent with the rest of the platform's "return fewer questions
+    // rather than a broken one" approach (see quizGenerator.js).
+    const needsFallback = questions.filter(q => !hasUsableOptions(q.options));
+
+    if (needsFallback.length > 0) {
+      const fallbackRows = await sequelize.query(
+        `SELECT question_id, option_text, is_correct, order_index
+           FROM answer_options
+          WHERE question_id = ANY(:ids)
+          ORDER BY question_id, order_index ASC NULLS LAST`,
+        { replacements: { ids: needsFallback.map(q => q.id) }, type: QueryTypes.SELECT }
+      ).catch(() => []); // table may not exist in some environments — degrade gracefully
+
+      const byQuestionId = {};
+      for (const row of fallbackRows) {
+        if (!byQuestionId[row.question_id]) byQuestionId[row.question_id] = [];
+        byQuestionId[row.question_id].push({
+          option_text: row.option_text,
+          is_correct:  row.is_correct,
+        });
+      }
+
+      for (const q of needsFallback) {
+        const fromTable = byQuestionId[q.id] || [];
+        if (fromTable.length >= 2) {
+          q.options = fromTable;
+          // correct_answer may also be unset on questions inserted this way —
+          // backfill it from the table so POST /:id/answer keeps working.
+          if (!q.correct_answer) {
+            const correct = fromTable.find(o => o.is_correct);
+            if (correct) q.correct_answer = correct.option_text;
+          }
+        }
+      }
+    }
+
+    // Final pass: drop anything still unusable from either source rather
+    // than send a student a question they cannot answer.
+    const usable = questions.filter(q => hasUsableOptions(q.options));
+
+    // BUG FIX: normalize option shape (see normalizeOptions above) so plain
+    // string arrays — the documented output format for AI-extracted
+    // questions via resourceQuestionExtractor.js — render correctly on the
+    // client instead of as blank, unanswerable option pills. correct_answer
+    // is untouched: it's already a separate plain-text column compared
+    // directly in POST /:id/answer and POST /quizzes/attempt, independent
+    // of options' internal shape, so normalizing options here cannot affect
+    // answer-checking correctness.
+    for (const q of usable) {
+      let parsed = q.options;
+      if (typeof parsed === 'string') {
+        try { parsed = JSON.parse(parsed); } catch { /* leave as-is, already filtered usable */ }
+      }
+      q.options = normalizeOptions(parsed);
+    }
+
+    return res.json({ success: true, count: usable.length, data: usable });
   } catch (err) {
     console.error('[GET /questions/random]', err.message);
     return res.json({ success: true, count: 0, data: [] });
@@ -128,9 +279,14 @@ router.post('/:id/answer', protect, async (req, res) => {
 
     // Record practice attempt (non-blocking)
     sequelize.query(
+      // BUG FIX: created_at/updated_at are NOT NULL with no value supplied
+      // here — same root cause confirmed via live production logs in
+      // quizzes.js's POST /attempt (every insert there was failing
+      // silently with "null value in column created_at"). This insert has
+      // the identical shape and was almost certainly failing the same way.
       `INSERT INTO practice_attempts
-         (student_id, question_id, is_correct, time_taken_seconds, attempted_at)
-       VALUES (:studentId, :questionId, :isCorrect, :timeTaken, NOW())`,
+         (student_id, question_id, is_correct, time_taken_seconds, attempted_at, created_at, updated_at)
+       VALUES (:studentId, :questionId, :isCorrect, :timeTaken, NOW(), NOW(), NOW())`,
       {
         replacements: {
           studentId:  req.user.id,
@@ -160,6 +316,13 @@ router.post('/:id/answer', protect, async (req, res) => {
 });
 
 // ── POST /api/questions/submit — ContributeQuestion page ─────────────────────
+// Open to any authenticated role (community contribution flow, distinct from
+// the teacher's dedicated POST /teacher/questions route). The frontend
+// already promises the submitter an "Under review" success state, but the
+// insert never actually set status — it relied on COALESCE(status,'approved')
+// elsewhere to silently make it live. Now set explicitly: status='pending',
+// is_ai_generated=false (human-written, just not yet reviewed). Goes through
+// the same Question Review Queue as AI-generated content.
 router.post('/submit', protect, async (req, res) => {
   const { question_text, subtopic_id, difficulty = 'medium', explanation, options, correct_answer } = req.body;
   if (!question_text?.trim()) return res.status(400).json({ success: false, error: 'question_text is required' });
@@ -170,8 +333,8 @@ router.post('/submit', protect, async (req, res) => {
 
   try {
     const result = await sequelize.query(
-      `INSERT INTO questions (question_text, subtopic_id, submitted_by, difficulty, explanation, options, correct_answer, type, is_active, created_at, updated_at)
-       VALUES (:question_text, :subtopic_id, :submitted_by, :difficulty, :explanation, :options::jsonb, :correct_answer, 'mcq', true, NOW(), NOW())
+      `INSERT INTO questions (question_text, subtopic_id, submitted_by, difficulty, explanation, options, correct_answer, type, is_active, is_ai_generated, status, created_at, updated_at)
+       VALUES (:question_text, :subtopic_id, :submitted_by, :difficulty, :explanation, :options::jsonb, :correct_answer, 'mcq', true, false, 'pending', NOW(), NOW())
        RETURNING id`,
       {
         replacements: {

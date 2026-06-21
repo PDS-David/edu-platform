@@ -175,6 +175,19 @@ async function ensureResourceAssignments() {
     `);
     await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_rua_user_id     ON resource_user_assignments(user_id);`);
     await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_rua_resource_id ON resource_user_assignments(resource_id);`);
+
+    // Backfill: live DBs may have resource_assignments / resource_user_assignments
+    // created before assigned_by was added — CREATE TABLE IF NOT EXISTS skips silently
+    // so we must ALTER to add the column if it's missing.
+    await sequelize.query(`
+      ALTER TABLE resource_assignments
+        ADD COLUMN IF NOT EXISTS assigned_by UUID REFERENCES users(id);
+    `);
+    await sequelize.query(`
+      ALTER TABLE resource_user_assignments
+        ADD COLUMN IF NOT EXISTS assigned_by UUID REFERENCES users(id);
+    `);
+
     raEnsured = true;
   } catch (err) {
     logger.error('[ensureResourceAssignments]', err.message);

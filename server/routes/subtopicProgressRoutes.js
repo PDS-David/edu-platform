@@ -1,76 +1,88 @@
 'use strict';
 
 const express = require('express');
-const router = express.Router();
+const router  = express.Router();
 
-const { protect } = require('../middleware/auth');
-const {
-  updateProgress,
-  getProgress,
-} = require('../services/subtopicProgressService');
+const SubtopicProgressService = require('../services/subtopicProgressService');
 
 /**
- * -----------------------------------------------------
- * GET CURRENT PROGRESS
  * GET /api/subtopic-progress/:subtopicId
- * -----------------------------------------------------
+ * Returns progress state for one subtopic for the authenticated student.
  */
-router.get('/:subtopicId', protect, async (req, res) => {
+router.get('/:subtopicId', async (req, res) => {
   try {
-    const studentId = req.user.id;
+    const studentId  = req.user.id;
     const subtopicId = Number(req.params.subtopicId);
 
-    if (!subtopicId) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid subtopic ID',
-      });
+    if (!subtopicId || !Number.isInteger(subtopicId) || subtopicId <= 0) {
+      return res.status(400).json({ success: false, error: 'Invalid subtopic ID' });
     }
 
-    const data = await getProgress(studentId, subtopicId);
+    // getStudentProgress returns all rows for a student — filter to this subtopic
+    const rows = await SubtopicProgressService.getStudentProgress(studentId);
+    const row  = rows.find(r => Number(r.subtopic_id) === subtopicId) || null;
 
     return res.json({
       success: true,
-      data: data || null,
+      data: {
+        resources_completed: row?.resources_completed ?? false,
+        practice_completed:  row?.practice_completed  ?? false,
+        quiz_completed:      row?.quiz_completed       ?? false,
+      },
     });
   } catch (err) {
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to fetch progress',
-    });
+    console.error('[GET /subtopic-progress/:subtopicId]', err.message);
+    return res.status(500).json({ success: false, error: 'Failed to fetch progress' });
   }
 });
 
 /**
- * -----------------------------------------------------
- * UPDATE PROGRESS (CORE ENGINE ENTRY POINT)
  * POST /api/subtopic-progress/:subtopicId
- * -----------------------------------------------------
+ * Body: { task: 'resources' | 'practice' | 'quiz' }
+ *   OR full object: { resources_completed, practice_completed, quiz_completed, ... }
+ *
+ * FIX: previously called service as updateProgress(studentId, subtopicId, req.body)
+ * — 3 positional args — but SubtopicProgressService.updateProgress expects a SINGLE
+ * destructured object { studentId, subtopicId, resources_completed, ... }.
+ * All boolean fields received undefined → Postgres NOT NULL constraint violation → 500.
  */
-router.post('/:subtopicId', protect, async (req, res) => {
+router.post('/:subtopicId', async (req, res) => {
   try {
-    const studentId = req.user.id;
+    const studentId  = req.user.id;
     const subtopicId = Number(req.params.subtopicId);
 
-    if (!subtopicId) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid subtopic ID',
-      });
+    if (!subtopicId || !Number.isInteger(subtopicId) || subtopicId <= 0) {
+      return res.status(400).json({ success: false, error: 'Invalid subtopic ID' });
     }
 
-    const result = await updateProgress(
+    const TASK_MAP = {
+      resources: 'resources_completed',
+      practice:  'practice_completed',
+      quiz:      'quiz_completed',
+    };
+
+    // Build full payload with safe boolean defaults
+    const payload = {
       studentId,
       subtopicId,
-      req.body
-    );
+      resources_completed: req.body.resources_completed ?? false,
+      practice_completed:  req.body.practice_completed  ?? false,
+      quiz_completed:      req.body.quiz_completed       ?? false,
+      notes_viewed:        req.body.notes_viewed         ?? false,
+      video_watched:       req.body.video_watched        ?? false,
+    };
 
-    return res.json(result);
+    // Support { task: 'quiz' } shorthand — flip just that field to true
+    if (req.body.task && TASK_MAP[req.body.task]) {
+      payload[TASK_MAP[req.body.task]] = true;
+    }
+
+    const result = await SubtopicProgressService.updateProgress(payload);
+
+    return res.json({ success: true, data: result });
   } catch (err) {
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to update progress',
-    });
+    console.error('[POST /subtopic-progress/:subtopicId]', err.message);
+    return res.status(500).json({ success: false, error: 'Failed to update progress' });
   }
 });
 

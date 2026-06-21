@@ -225,15 +225,33 @@ router.post('/:id/progress', protect, async (req, res) => {
   }
 
   try {
-    await sequelize.query(`
-      INSERT INTO subtopic_progress
-        (student_id, subtopic_id, ${column}, last_accessed)
-      VALUES
-        (:studentId, :subtopicId, true, NOW())
-      ON CONFLICT (student_id, subtopic_id) DO UPDATE SET
-        ${column}    = true,
-        last_accessed = NOW()
-    `, { replacements: { studentId, subtopicId }, type: QueryTypes.INSERT });
+    // Try with last_accessed column first; fall back without it if the column
+    // doesn't exist yet in this environment (migration not yet applied).
+    try {
+      await sequelize.query(`
+        INSERT INTO subtopic_progress
+          (student_id, subtopic_id, ${column}, last_accessed)
+        VALUES
+          (:studentId, :subtopicId, true, NOW())
+        ON CONFLICT (student_id, subtopic_id) DO UPDATE SET
+          ${column}    = true,
+          last_accessed = NOW()
+      `, { replacements: { studentId, subtopicId }, type: QueryTypes.INSERT });
+    } catch (innerErr) {
+      // last_accessed column may not exist — retry without it
+      if (innerErr.message?.includes('last_accessed') || innerErr.original?.code === '42703') {
+        await sequelize.query(`
+          INSERT INTO subtopic_progress
+            (student_id, subtopic_id, ${column})
+          VALUES
+            (:studentId, :subtopicId, true)
+          ON CONFLICT (student_id, subtopic_id) DO UPDATE SET
+            ${column} = true
+        `, { replacements: { studentId, subtopicId }, type: QueryTypes.INSERT });
+      } else {
+        throw innerErr;
+      }
+    }
 
     return res.json({ success: true });
   } catch (err) {

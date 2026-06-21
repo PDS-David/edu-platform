@@ -4,7 +4,8 @@
 
 const { QueryTypes }                         = require('sequelize');
 const sequelize                              = require('../config/database');
-const { generateQuizByTopic, processQuizResults } = require('../services/quizService');
+const { generateQuizByTopic } = require('../services/quizGenerator');
+const { processQuizResults }   = require('../services/quizService');
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -135,22 +136,20 @@ async function submitQuiz(req, res) {
 
     const attemptId = attemptRows[0][0].id;
 
-    // -- 2. Resolve correct options in one query (avoid N+1) -----------------
+    // -- 2. Fetch questions to resolve correct answers via JSONB options -------
+    //    (answer_options table is unpopulated — questions use options JSONB field)
     const questionIds = answers.map(a => a.questionId).filter(Boolean);
 
-    let correctOptionMap = {};  // { questionId -> Set of correct option ids }
+    let questionMap = {};  // { questionId -> { correct_answer, options } }
     if (questionIds.length > 0) {
-      const correctRows = await sequelize.query(
-        `SELECT question_id, id AS option_id
-         FROM answer_options
-         WHERE question_id = ANY(:questionIds) AND is_correct = true`,
-        { replacements: { questionIds }, type: QueryTypes.SELECT, transaction: t }
+      const qRows = await sequelize.query(
+        `SELECT id::text AS question_id, correct_answer, options
+         FROM questions
+         WHERE id::text = ANY(ARRAY[:questionIds]::text[]) AND is_active = true`,
+        { replacements: { questionIds: questionIds.map(String) }, type: QueryTypes.SELECT, transaction: t }
       );
-      for (const row of correctRows) {
-        if (!correctOptionMap[row.question_id]) {
-          correctOptionMap[row.question_id] = new Set();
-        }
-        correctOptionMap[row.question_id].add(String(row.option_id));
+      for (const row of qRows) {
+        questionMap[row.question_id] = row;
       }
     }
 
@@ -160,8 +159,11 @@ async function submitQuiz(req, res) {
       const { questionId, selectedOptionId = null } = answer;
       if (!questionId) continue;
 
-      const isCorrect = selectedOptionId
-        ? (correctOptionMap[questionId]?.has(String(selectedOptionId)) ?? false)
+      const q = questionMap[String(questionId)];
+      // Grade: compare selectedOptionId (option text) against correct_answer
+      const isCorrect = q && selectedOptionId
+        ? String(selectedOptionId).trim().toLowerCase() ===
+          String(q.correct_answer || '').trim().toLowerCase()
         : false;
 
       if (isCorrect) correctCount++;
@@ -170,12 +172,12 @@ async function submitQuiz(req, res) {
         `INSERT INTO student_answers
            (attempt_id, question_id, selected_option_id, is_correct)
          VALUES
-           (:attemptId, :questionId, :selectedOptionId, :isCorrect)`,
+           (:attemptId, :questionId::text, :selectedOptionId, :isCorrect)`,
         {
           replacements: {
             attemptId,
-            questionId,
-            selectedOptionId: selectedOptionId || null,
+            questionId:        String(questionId),
+            selectedOptionId:  selectedOptionId ? String(selectedOptionId) : null,
             isCorrect,
           },
           type:        QueryTypes.INSERT,

@@ -1,12 +1,3 @@
-# ═══════════════════════════════════════════════════════════════════════════════
-# AISchoolonair — Client (React/Vite) production image
-#
-# VITE_API_URL is baked into the JS bundle at build time.
-# Pass it as a Docker build-arg (docker-compose handles this automatically).
-# We use /api (relative path) so the SPA always calls the same origin — no
-# CORS config needed and it works behind any domain.
-# ═══════════════════════════════════════════════════════════════════════════════
-
 # ── Stage 1: build React app ──────────────────────────────────────────────────
 FROM node:22-alpine AS builder
 

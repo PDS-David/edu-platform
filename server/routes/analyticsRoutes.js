@@ -118,17 +118,16 @@ async function validateAnalyticsSchema() {
 
   try {
     // ── 1. Table existence check ───────────────────────────────────────────
-    // information_schema.tables is always present in PostgreSQL and Supabase.
-    // table_schema = 'public' excludes pg_catalog / information_schema system tables.
+    // FIX: Sequelize 6 does not correctly bind JS arrays for PostgreSQL ANY()
+    // via named replacements. Build a safe IN (...) list from known-safe table
+    // name constants (no user input — XSS/injection not possible here).
+    const tableInList = ANALYTICS_TABLES.map(t => `'${t}'`).join(', ');
     const tableRows = await sequelize.query(
       `SELECT table_name
          FROM information_schema.tables
         WHERE table_schema = 'public'
-          AND table_name   = ANY(:tables)`,
-      {
-        replacements: { tables: ANALYTICS_TABLES },
-        type: QueryTypes.SELECT,
-      }
+          AND table_name   IN (${tableInList})`,
+      { type: QueryTypes.SELECT }
     );
 
     const foundTables = new Set(tableRows.map(r => r.table_name));
@@ -145,21 +144,19 @@ async function validateAnalyticsSchema() {
 
   try {
     // ── 2. Critical column existence check ────────────────────────────────
-    // One query fetches all (table_name, column_name) pairs at once to avoid
-    // N round-trips. We then cross-check against the expected list in JS.
+    // FIX: Same Sequelize 6 array-binding issue — use safe IN (...) literals.
     const tableNames   = ANALYTICS_COLUMNS.map(([t]) => t);
     const columnNames  = ANALYTICS_COLUMNS.map(([, c]) => c);
+    const tblInList    = [...new Set(tableNames)].map(t => `'${t}'`).join(', ');
+    const colInList    = [...new Set(columnNames)].map(c => `'${c}'`).join(', ');
 
     const columnRows = await sequelize.query(
       `SELECT table_name, column_name
          FROM information_schema.columns
         WHERE table_schema = 'public'
-          AND table_name   = ANY(:tables)
-          AND column_name  = ANY(:columns)`,
-      {
-        replacements: { tables: tableNames, columns: columnNames },
-        type: QueryTypes.SELECT,
-      }
+          AND table_name   IN (${tblInList})
+          AND column_name  IN (${colInList})`,
+      { type: QueryTypes.SELECT }
     );
 
     // Build a Set of "table.column" keys for O(1) lookup.

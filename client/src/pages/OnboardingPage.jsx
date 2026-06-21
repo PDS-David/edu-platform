@@ -134,21 +134,39 @@ export default function OnboardingPage() {
   };
 
   // ── Save preferences and redirect to student dashboard ────────────────────
+  const [saveError, setSaveError] = useState('');
+
   const finish = async () => {
     setSaving(true);
+    setSaveError('');
     try {
       await api.patch('/users/preferences', {
-        exam_boards: detectedBoards,
-        subject_ids: subjects,
-        daily_goal:  goal,
-        study_days:  studyDays,
-        study_time:  studyTime,
+        exam_boards:          detectedBoards,
+        subject_ids:          subjects,
+        daily_goal:           goal,
+        preferred_study_days: JSON.stringify(studyDays),
+        preferred_study_time: studyTime,
       });
-    } catch {
-      // fail-open — preferences are non-critical, don't block the student
+      // Update the in-memory user object immediately so PrivateRoute's
+      // onboarding gate clears right away — without this, the redirect to
+      // /student/dashboard below would immediately bounce back to
+      // /onboarding, since `user.onboarding_complete` would still be
+      // whatever it was when the page first loaded (false).
+      updateUser({ onboarding_complete: true });
+      navigate('/student/dashboard');
+    } catch (err) {
+      // The preferences save (and the onboarding_complete flag it sets)
+      // failed server-side. Do NOT navigate away — PrivateRoute would just
+      // redirect back here anyway since the server still has
+      // onboarding_complete=false, and silently sending the student to a
+      // dashboard with no subjects, no goal, and no schedule saved is the
+      // exact failure mode this fix exists to prevent. Show a retry option
+      // instead.
+      setSaveError(
+        err?.message || 'Could not save your preferences. Please check your connection and try again.'
+      );
     } finally {
       setSaving(false);
-      navigate('/student/dashboard');
     }
   };
 
@@ -308,6 +326,11 @@ export default function OnboardingPage() {
           )}
 
           {/* ── Navigation ───────────────────────────────────────────────── */}
+          {saveError && (
+            <p className="text-xs text-red-500 text-center mt-3 -mb-1">
+              {saveError}
+            </p>
+          )}
           <div className="flex items-center justify-between mt-6">
             <button
               onClick={() => setStep(s => s - 1)}

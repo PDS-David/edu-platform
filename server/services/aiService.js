@@ -23,7 +23,7 @@ const { generateAIQuestion: _generateAIQuestion } =
   require('./aiQuestionGenerator');                                   // ← canonical impl
 
 if (process.env.NODE_ENV !== 'production') {
-  console.log('[aiService] Loaded — routing through ai.js hub (gemini-2.0-flash)');
+  console.log('[aiService] Loaded — routing through ai.js hub (gemini-2.5-flash)');
 }
 
 const FALLBACK_REPLY =
@@ -273,27 +273,37 @@ Respond ONLY with valid JSON in this exact format (no markdown, no extra text):
 }
 `.trim();
 
-  try {
-    // v2: new @google/genai SDK for multimodal
-    const ai       = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    const response = await ai.models.generateContent({
-      model:    'gemini-2.0-flash',
-      contents: [
-        {
-          parts: [
-            { text: prompt },
-            { inlineData: { mimeType, data: imageBase64 } },
-          ],
-        },
-      ],
-    });
-    const raw     = response.text.trim();
-    const cleaned = raw.replace(/```json|```/g, '').trim();
-    return JSON.parse(cleaned);
-  } catch (err) {
-    console.error('[aiService markImage]', err.message);
-    throw new Error('Image marking failed: ' + err.message);
+  // v3 (2026-06): gemini-2.0-flash was retired by Google — this call had no
+  // fallback at all, so AI Marking failed outright once the model was
+  // shut down. Now uses the same primary + one fallback as the central hub.
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const candidateModels = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+  let lastErr = null;
+
+  for (const model of candidateModels) {
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: [
+          {
+            parts: [
+              { text: prompt },
+              { inlineData: { mimeType, data: imageBase64 } },
+            ],
+          },
+        ],
+      });
+      const raw     = response.text.trim();
+      const cleaned = raw.replace(/```json|```/g, '').trim();
+      return JSON.parse(cleaned);
+    } catch (err) {
+      lastErr = err;
+      console.warn(`[aiService markImage] ${model} failed: ${err.message}`);
+    }
   }
+
+  console.error('[aiService markImage] All models failed:', lastErr?.message);
+  throw new Error('Image marking failed: ' + (lastErr?.message || 'unknown error'));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

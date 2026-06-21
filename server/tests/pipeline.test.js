@@ -311,7 +311,7 @@ describe('Test 3: Generate AI question', () => {
   );
 
   (hasGemini ? it : it.skip)(
-    'persists the question to the questions table with status approved',
+    'persists the question to the questions table with status pending (awaiting admin review)',
     async () => {
       if (!state.aiQuestionId) return; // previous test skipped
       const rows = await q(
@@ -321,7 +321,10 @@ describe('Test 3: Generate AI question', () => {
       );
 
       expect(rows.length).toBe(1);
-      expect(rows[0].status).toBe('approved');
+      // POLICY: AI-generated questions must go through the admin Question
+      // Review Queue before being available to students for quiz or
+      // practice — they persist as 'pending', not 'approved'.
+      expect(rows[0].status).toBe('pending');
       expect(rows[0].is_ai_generated).toBe(true);
       expect(rows[0].ai_generation_source).toMatch(/gemini/i);
     }

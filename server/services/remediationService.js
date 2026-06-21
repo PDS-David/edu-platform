@@ -98,15 +98,30 @@ Respond ONLY with a JSON object in this exact format (no other text, no code fen
 // ---------------------------------------------------------------------------
 async function persistQuestion(question, concept, studentId) {
   try {
+    // POLICY: AI-generated questions (including these auto-remediation
+    // questions for a student's weak topic) must be reviewed by an admin
+    // before reaching any student. status = 'pending', not 'approved' —
+    // it will not be served by /api/questions/random or the quiz generator
+    // until approved in the Question Review Queue.
+    //
+    // BUG FIX: this insert previously only wrote answer_options rows (see
+    // below) and left questions.options / questions.correct_answer null.
+    // GET /api/questions/random reads options from the JSONB column on
+    // `questions`, not from `answer_options` — so a question created here
+    // reached students as an "approved" (once review-approved) question
+    // with zero visible answer choices. /api/questions/random now also
+    // falls back to answer_options defensively, but populating both here
+    // is the correct fix at the source.
+    const correctOpt = (question.options || []).find(o => o.is_correct);
     const qRows = await sequelize.query(
       `INSERT INTO questions
          (id, question_text, question_type, question_sub_type,
           difficulty, status, source, is_ai_generated, ai_generation_source,
-          concept_hint, marks, created_at)
+          concept_hint, marks, options, correct_answer, created_at)
        VALUES
          (gen_random_uuid(), :questionText, 'multiple_choice', 'mcq',
-          :difficulty, 'approved', 'community', true,
-          :generationSource, :conceptHint, 1, NOW())
+          :difficulty, 'pending', 'community', true,
+          :generationSource, :conceptHint, 1, :options::jsonb, :correctAnswer, NOW())
        RETURNING id`,
       {
         replacements: {
@@ -116,6 +131,8 @@ async function persistQuestion(question, concept, studentId) {
                             : 'hard',
           generationSource: `remediation_engine:concept:${concept.id}`,
           conceptHint:      concept.name,
+          options:          JSON.stringify(question.options || []),
+          correctAnswer:    correctOpt?.option_text || null,
         },
         type: QueryTypes.SELECT,
       }

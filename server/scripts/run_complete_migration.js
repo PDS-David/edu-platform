@@ -260,11 +260,12 @@ async function run() {
     ['student_answers', `CREATE TABLE IF NOT EXISTS student_answers (
       id                 UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
       attempt_id         UUID    NOT NULL REFERENCES quiz_attempts(id) ON DELETE CASCADE,
-      question_id        INTEGER NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
-      selected_option_id UUID    REFERENCES answer_options(id) ON DELETE SET NULL,
+      question_id        TEXT    NOT NULL,
+      selected_option_id TEXT,
       is_correct         BOOLEAN NOT NULL DEFAULT false,
       created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    ); CREATE INDEX IF NOT EXISTS idx_sa_aid ON student_answers(attempt_id)`],
+    ); CREATE INDEX IF NOT EXISTS idx_sa_aid ON student_answers(attempt_id);
+    CREATE INDEX IF NOT EXISTS idx_sa_qid ON student_answers(question_id)`],
 
     ['subtopic_quiz_attempts', `CREATE TABLE IF NOT EXISTS subtopic_quiz_attempts (
       id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -404,6 +405,20 @@ async function run() {
       last_activity_at       TIMESTAMPTZ,
       profile_updated_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
     )`],
+
+    ['learning_gaps', `CREATE TABLE IF NOT EXISTS learning_gaps (
+      id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+      student_id          UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      subject_id          INTEGER     REFERENCES subjects(id) ON DELETE SET NULL,
+      topic_name          TEXT        NOT NULL,
+      topic_id            INTEGER,
+      gap_severity        NUMERIC(4,2),
+      accuracy_in_topic   NUMERIC(4,2),
+      questions_attempted INTEGER     DEFAULT 0,
+      questions_failed    INTEGER     DEFAULT 0,
+      last_updated        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(student_id, topic_name)
+    ); CREATE INDEX IF NOT EXISTS idx_lg_sid ON learning_gaps(student_id)`],
 
     ['user_weak_topics', `CREATE TABLE IF NOT EXISTS user_weak_topics (
       id                UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -750,7 +765,8 @@ async function run() {
         ADD COLUMN IF NOT EXISTS resources_completed BOOLEAN NOT NULL DEFAULT false,
         ADD COLUMN IF NOT EXISTS practice_completed  BOOLEAN NOT NULL DEFAULT false,
         ADD COLUMN IF NOT EXISTS notes_viewed        BOOLEAN NOT NULL DEFAULT false,
-        ADD COLUMN IF NOT EXISTS video_watched       BOOLEAN NOT NULL DEFAULT false`],
+        ADD COLUMN IF NOT EXISTS video_watched       BOOLEAN NOT NULL DEFAULT false,
+        ADD COLUMN IF NOT EXISTS last_accessed       TIMESTAMPTZ`],
 
     // C-3: resource_assignments CHECK constraint missing from migration path
     ['resource_assignments: add target CHECK constraint (C-3)', `
@@ -804,6 +820,14 @@ async function run() {
       CREATE INDEX IF NOT EXISTS idx_ra_student_resource ON resource_assignments(student_id, resource_id)
         WHERE student_id IS NOT NULL;
       CREATE INDEX IF NOT EXISTS idx_rua_user_resource   ON resource_user_assignments(user_id, resource_id)`],
+
+    // M-7: Backfill assigned_by on live DBs created before the column was added
+    ['resource_assignments: add assigned_by column if missing (M-7)', `
+      ALTER TABLE resource_assignments
+        ADD COLUMN IF NOT EXISTS assigned_by UUID REFERENCES users(id)`],
+    ['resource_user_assignments: add assigned_by column if missing (M-7)', `
+      ALTER TABLE resource_user_assignments
+        ADD COLUMN IF NOT EXISTS assigned_by UUID REFERENCES users(id)`],
   ];
 
   for (const [label, sql] of tables) {
@@ -891,6 +915,171 @@ async function run() {
     CREATE INDEX IF NOT EXISTS idx_eal_student_id    ON enrollment_audit_log(student_id);
     CREATE INDEX IF NOT EXISTS idx_eal_created_at    ON enrollment_audit_log(created_at DESC)`);
 
+  // ── AUTH HARDENING (AUTH-001 → AUTH-006) ─────────────────────────────────
+  // migration_auth_hardening.sql — was orphaned (never referenced by this runner).
+  // Adds the three schema objects the auth stack requires to function:
+  //   1. users.failed_login_count + users.locked_until  (AUTH-001 lockout)
+  //   2. auth_tokens table                              (AUTH-002-005 token registry)
+  //   3. auth_audit_log table                           (AUTH-006 audit trail)
+  // Every statement is idempotent (IF NOT EXISTS / ADD COLUMN IF NOT EXISTS).
+
+  console.log('\n🔐 Auth Hardening Schema (AUTH-001 → AUTH-006)\n');
+
+  await exec('users: add failed_login_count + locked_until (AUTH-001)', `
+    ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS failed_login_count INTEGER     NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS locked_until       TIMESTAMPTZ`);
+
+  await exec('auth_tokens table (AUTH-002 / 003 / 004 / 005)', `
+    CREATE TABLE IF NOT EXISTS auth_tokens (
+      id                 UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id            UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      jti                VARCHAR(64) NOT NULL UNIQUE,
+      refresh_token      VARCHAR(64) UNIQUE,
+      remember_me        BOOLEAN     NOT NULL DEFAULT FALSE,
+      device_hint        VARCHAR(255),
+      ip_address         INET,
+      user_agent         TEXT,
+      issued_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      expires_at         TIMESTAMPTZ NOT NULL,
+      refresh_expires_at TIMESTAMPTZ,
+      last_used_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      revoked            BOOLEAN     NOT NULL DEFAULT FALSE,
+      revoked_at         TIMESTAMPTZ,
+      revoked_reason     VARCHAR(64)
+    )`);
+
+  await exec('auth_tokens: indexes', `
+    CREATE INDEX IF NOT EXISTS idx_auth_tokens_user_id ON auth_tokens(user_id);
+    CREATE INDEX IF NOT EXISTS idx_auth_tokens_jti     ON auth_tokens(jti);
+    CREATE INDEX IF NOT EXISTS idx_auth_tokens_refresh ON auth_tokens(refresh_token)
+      WHERE refresh_token IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_auth_tokens_revoked ON auth_tokens(revoked, expires_at)`);
+
+  await exec('auth_audit_log table (AUTH-006)', `
+    CREATE TABLE IF NOT EXISTS auth_audit_log (
+      id          BIGSERIAL    PRIMARY KEY,
+      event_type  VARCHAR(64)  NOT NULL,
+      user_id     UUID         REFERENCES users(id) ON DELETE SET NULL,
+      email       VARCHAR(255),
+      ip_address  INET,
+      user_agent  TEXT,
+      metadata    JSONB        NOT NULL DEFAULT '{}',
+      created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    )`);
+
+  await exec('auth_audit_log: indexes', `
+    CREATE INDEX IF NOT EXISTS idx_auth_audit_user_id    ON auth_audit_log(user_id);
+    CREATE INDEX IF NOT EXISTS idx_auth_audit_event_type ON auth_audit_log(event_type);
+    CREATE INDEX IF NOT EXISTS idx_auth_audit_created_at ON auth_audit_log(created_at DESC)`);
+
+  // ── SECURITY HARDENING (migration_005_security.sql) ───────────────────────
+  // audit_logs, tamper-resistance trigger, soft-delete columns, last-admin
+  // guard trigger — was also orphaned. All statements are idempotent.
+
+  console.log('\n🛡️  Security Hardening Schema (migration_005_security)\n');
+
+  await exec('audit_logs table', `
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      id           UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+      actor_id     UUID         REFERENCES users(id) ON DELETE SET NULL,
+      actor_email  TEXT,
+      actor_role   TEXT,
+      action       TEXT         NOT NULL,
+      target_type  TEXT,
+      target_id    TEXT,
+      target_email TEXT,
+      metadata     JSONB        NOT NULL DEFAULT '{}',
+      ip_address   INET,
+      user_agent   TEXT,
+      severity     TEXT         NOT NULL DEFAULT 'info'
+                                CHECK (severity IN ('info','warning','critical')),
+      created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    )`);
+
+  await exec('audit_logs: indexes', `
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_actor_id   ON audit_logs(actor_id);
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_action      ON audit_logs(action);
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at  ON audit_logs(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_target_id   ON audit_logs(target_id);
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_severity    ON audit_logs(severity);
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_security_events ON audit_logs(created_at DESC)
+      WHERE severity IN ('warning','critical')`);
+
+  await exec('audit_logs: tamper-resistance trigger', `
+    CREATE OR REPLACE FUNCTION audit_logs_immutable()
+    RETURNS TRIGGER LANGUAGE plpgsql AS $$
+    BEGIN
+      RAISE EXCEPTION 'audit_logs is immutable — UPDATE and DELETE are forbidden';
+    END;
+    $$`);
+
+  await exec('audit_logs: attach immutability trigger', `
+    DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger
+        WHERE tgname = 'trg_audit_logs_immutable'
+          AND tgrelid = 'audit_logs'::regclass
+      ) THEN
+        CREATE TRIGGER trg_audit_logs_immutable
+          BEFORE UPDATE OR DELETE ON audit_logs
+          FOR EACH ROW EXECUTE FUNCTION audit_logs_immutable();
+      END IF;
+    EXCEPTION WHEN others THEN NULL; END $$`);
+
+  await exec('users: soft-delete columns (deleted_at, deleted_by, delete_reason)', `
+    ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS deleted_at    TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS deleted_by    UUID REFERENCES users(id) ON DELETE SET NULL,
+      ADD COLUMN IF NOT EXISTS delete_reason TEXT`);
+
+  await exec('users: partial index for active-user lookups', `
+    CREATE INDEX IF NOT EXISTS idx_users_deleted_at ON users(deleted_at)
+      WHERE deleted_at IS NULL`);
+
+  await exec('users: last-admin guard function', `
+    CREATE OR REPLACE FUNCTION guard_last_admin()
+    RETURNS TRIGGER LANGUAGE plpgsql AS $$
+    DECLARE
+      active_admin_count INTEGER;
+    BEGIN
+      IF OLD.role = 'admin' THEN
+        SELECT COUNT(*) INTO active_admin_count
+        FROM users
+        WHERE role       = 'admin'
+          AND is_active  = true
+          AND deleted_at IS NULL
+          AND id        != OLD.id;
+
+        IF active_admin_count = 0 THEN
+          IF NEW.role != 'admin' THEN
+            RAISE EXCEPTION 'LAST_ADMIN_PROTECTION: Cannot demote the last active admin';
+          END IF;
+          IF NEW.is_active = false THEN
+            RAISE EXCEPTION 'LAST_ADMIN_PROTECTION: Cannot deactivate the last active admin';
+          END IF;
+          IF NEW.deleted_at IS NOT NULL THEN
+            RAISE EXCEPTION 'LAST_ADMIN_PROTECTION: Cannot delete the last active admin';
+          END IF;
+        END IF;
+      END IF;
+      RETURN NEW;
+    END;
+    $$`);
+
+  await exec('users: attach last-admin guard trigger', `
+    DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger
+        WHERE tgname = 'trg_guard_last_admin'
+          AND tgrelid = 'users'::regclass
+      ) THEN
+        CREATE TRIGGER trg_guard_last_admin
+          BEFORE UPDATE ON users
+          FOR EACH ROW EXECUTE FUNCTION guard_last_admin();
+      END IF;
+    EXCEPTION WHEN others THEN NULL; END $$`);
+
   // ── VERIFICATION ──────────────────────────────────────────────────────────
   console.log('\n📊 Verification:\n');
   try {
@@ -912,10 +1101,32 @@ async function run() {
         (SELECT COUNT(*) FROM information_schema.columns
           WHERE table_name='test_assignments' AND column_name='class_id')::int AS test_assignments_class_id,
         (SELECT COUNT(*) FROM pg_indexes WHERE tablename='topics'
-          AND indexname='idx_topics_subject_id')::int                  AS idx_topics_subject_id
+          AND indexname='idx_topics_subject_id')::int                  AS idx_topics_subject_id,
+        -- Auth hardening checks
+        (SELECT COUNT(*) FROM information_schema.columns
+          WHERE table_name='users'
+            AND column_name IN ('failed_login_count','locked_until')
+        )::int                                                         AS users_lockout_cols,
+        (SELECT COUNT(*) FROM information_schema.tables
+          WHERE table_name='auth_tokens')::int                         AS auth_tokens_table,
+        (SELECT COUNT(*) FROM information_schema.tables
+          WHERE table_name='auth_audit_log')::int                      AS auth_audit_log_table,
+        -- Security hardening checks
+        (SELECT COUNT(*) FROM information_schema.tables
+          WHERE table_name='audit_logs')::int                          AS audit_logs_table,
+        (SELECT COUNT(*) FROM information_schema.columns
+          WHERE table_name='users'
+            AND column_name IN ('deleted_at','deleted_by','delete_reason')
+        )::int                                                         AS users_softdelete_cols,
+        (SELECT COUNT(*) FROM pg_trigger
+          WHERE tgname = 'trg_guard_last_admin')::int                  AS last_admin_trigger,
+        (SELECT COUNT(*) FROM pg_trigger
+          WHERE tgname = 'trg_audit_logs_immutable')::int              AS audit_immutability_trigger
     `);
     console.table(rows[0]);
     const r = rows[0];
+
+    // Original checks
     if (r.practice_attempts !== undefined)       console.log('  ✅  practice_attempts table exists');
     else                                         console.log('  ❌  practice_attempts table MISSING');
     if (parseInt(r.subtopic_progress_cols) >= 4) console.log('  ✅  subtopic_progress all 4 task columns present');
@@ -924,9 +1135,61 @@ async function run() {
     else                                             console.log('  ❌  test_assignments.class_id MISSING');
     if (parseInt(r.idx_topics_subject_id) === 1) console.log('  ✅  Core FK indexes present');
     else                                          console.log('  ⚠️   Core FK indexes may be missing');
+
+    // Auth hardening checks
+    if (parseInt(r.users_lockout_cols) === 2)    console.log('  ✅  users: failed_login_count + locked_until present (AUTH-001)');
+    else                                         console.log('  ❌  users: lockout columns MISSING — login will 500');
+    if (parseInt(r.auth_tokens_table) === 1)     console.log('  ✅  auth_tokens table present (AUTH-002-005)');
+    else                                         console.log('  ❌  auth_tokens table MISSING — successful login will 500');
+    if (parseInt(r.auth_audit_log_table) === 1)  console.log('  ✅  auth_audit_log table present (AUTH-006)');
+    else                                         console.log('  ⚠️   auth_audit_log table MISSING — auth events will not be logged');
+
+    // Security hardening checks
+    if (parseInt(r.audit_logs_table) === 1)      console.log('  ✅  audit_logs table present');
+    else                                         console.log('  ❌  audit_logs table MISSING');
+    if (parseInt(r.users_softdelete_cols) === 3) console.log('  ✅  users: soft-delete columns present');
+    else                                         console.log(`  ⚠️   users: only ${r.users_softdelete_cols}/3 soft-delete columns`);
+    if (parseInt(r.last_admin_trigger) === 1)    console.log('  ✅  last-admin guard trigger active');
+    else                                         console.log('  ❌  last-admin guard trigger MISSING — no protection against admin lockout');
+    if (parseInt(r.audit_immutability_trigger) === 1) console.log('  ✅  audit_logs immutability trigger active');
+    else                                              console.log('  ⚠️   audit_logs immutability trigger MISSING');
   } catch (e) {
     console.log('  (verification query failed:', e.message, ')');
   }
+
+  // Ensure Platform Admin user has role='admin' — the seed in
+  // migrate_roles_and_curricula.sql may not have run on the live DB,
+  // leaving the account with the default 'student' role from registration,
+  // which causes 403 on all /api/admin/* endpoints.
+  await exec('Platform Admin: ensure role=admin',
+    `UPDATE users SET role = 'admin', updated_at = NOW()
+      WHERE email = 'admin@aischoolonair.com'
+        AND role != 'admin'`
+  );
+
+  // ── migration_006: subtopic_progress missing columns (2026-06-21) ──────────
+  // resources_completed and practice_completed were referenced by the service
+  // and many analytics queries but were never added to the original schema.
+  // completion_pct added for efficient progress-bar queries.
+  await exec('subtopic_progress: add resources_completed, practice_completed, completion_pct',
+    `ALTER TABLE subtopic_progress
+       ADD COLUMN IF NOT EXISTS resources_completed BOOLEAN NOT NULL DEFAULT false,
+       ADD COLUMN IF NOT EXISTS practice_completed  BOOLEAN NOT NULL DEFAULT false,
+       ADD COLUMN IF NOT EXISTS completion_pct      SMALLINT NOT NULL DEFAULT 0
+         CHECK (completion_pct BETWEEN 0 AND 100)`
+  );
+
+  // Recompute completion_pct for existing rows that now have the column
+  await exec('subtopic_progress: backfill completion_pct',
+    `UPDATE subtopic_progress
+     SET completion_pct = (
+       (CASE WHEN resources_completed THEN 33 ELSE 0 END) +
+       (CASE WHEN practice_completed  THEN 33 ELSE 0 END) +
+       (CASE WHEN quiz_completed      THEN 34 ELSE 0 END)
+     )
+     WHERE completion_pct = 0
+       AND (quiz_completed = true)`
+  );
 
   console.log('\n✅ Migration complete.\n');
   await pool.end();
