@@ -532,12 +532,12 @@ const TeacherAssignmentPanel = () => {
   );
 };
 
-// ─── AI Generate Panel ────────────────────────────────────────────────────────
 const AIGeneratePanel = () => {
   const [subjects, setSubjects] = useState([]);
+  const [subtopics, setSubtopics] = useState([]);
   const [subjectsLoad, setSubjectsLoad] = useState(false);
   const [pendingCount, setPendingCount] = useState(null);
-  const [form, setForm] = useState({ exam_type_id: '', subject_id: '', topic: '', exam_board: '', count: 10, difficulty: 'medium' });
+  const [form, setForm] = useState({ exam_type_id: '', subject_id: '', topic: '', subtopic_id: '', exam_board: '', count: 10, difficulty: 'medium' });
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
@@ -549,13 +549,31 @@ const AIGeneratePanel = () => {
 
   const handleExamTypeChange = async (typeId) => {
     const chosen = examTypes.find(et => String(et.id) === String(typeId));
-    setForm(f => ({ ...f, exam_type_id: typeId, subject_id: '', exam_board: chosen?.code || '' }));
-    setSubjects([]);
+    setForm(f => ({ ...f, exam_type_id: typeId, subject_id: '', subtopic_id: '', exam_board: chosen?.code || '' }));
+    setSubjects([]); setSubtopics([]);
     if (!typeId) return;
     setSubjectsLoad(true);
     try { const raw = await fetchSubjectsForType(typeId); setSubjects([...new Map(raw.map(s => [s.id, s])).values()]); }
     catch { setError('Failed to load subjects.'); }
     finally { setSubjectsLoad(false); }
+  };
+
+  const handleSubjectChange = async (subjectId) => {
+    setForm(f => ({ ...f, subject_id: subjectId, subtopic_id: '' }));
+    setSubtopics([]);
+    if (!subjectId) return;
+    try {
+      // Load topics, then load all subtopics for each topic
+      const topicsRes = await api.get(`/teacher/topics?subject_id=${subjectId}`).catch(() => ({ data: [] }));
+      const topics = topicsRes?.data || [];
+      const allSubtopics = [];
+      await Promise.all(topics.map(async t => {
+        const stRes = await api.get(`/teacher/subtopics?topic_id=${t.id}`).catch(() => ({ data: [] }));
+        const sts = stRes?.data || [];
+        sts.forEach(st => allSubtopics.push({ ...st, topic_name: t.name }));
+      }));
+      setSubtopics(allSubtopics);
+    } catch { setSubtopics([]); }
   };
 
   const handleGenerate = async (e) => {
@@ -565,7 +583,14 @@ const AIGeneratePanel = () => {
     if (!form.topic.trim()) { setError('Please enter a topic.'); return; }
     setError(''); setResult(null); setPreviewQuestions([]); setGenerating(true);
     try {
-      const res = await api.post('/admin/generate-questions', { subject_id: form.subject_id, topic: form.topic, exam_board: form.exam_board, count: form.count, difficulty: form.difficulty });
+      const res = await api.post('/admin/generate-questions', {
+        subject_id:  form.subject_id,
+        topic:       form.topic,
+        subtopic_id: form.subtopic_id || undefined,
+        exam_board:  form.exam_board,
+        count:       form.count,
+        difficulty:  form.difficulty,
+      });
       setResult(res);
       const qs = res?.data?.questions ?? res?.questions ?? [];
       if (Array.isArray(qs)) setPreviewQuestions(qs);
@@ -583,8 +608,11 @@ const AIGeneratePanel = () => {
       </div>
       <form onSubmit={handleGenerate} className="space-y-4 max-w-lg">
         <div><label className="block text-xs font-semibold text-gray-600 mb-1">Exam Type *</label><select value={form.exam_type_id} onChange={e => handleExamTypeChange(e.target.value)} className={inputCls} required><option value="">Select exam type first…</option>{examTypesLoad ? <option disabled>Loading…</option> : examTypes.filter(et => et.is_active !== false).map(et => <option key={et.id} value={et.id}>{safeEmoji(et.icon_emoji) ? safeEmoji(et.icon_emoji) + ' ' : ''}{et.name} ({et.code})</option>)}</select></div>
-        <div><label className="block text-xs font-semibold text-gray-600 mb-1">Subject *</label>{!form.exam_type_id ? <div className="border-2 border-dashed border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-400">Select an exam type above</div> : <select value={form.subject_id} onChange={e => setForm(f => ({ ...f, subject_id: e.target.value }))} className={inputCls} required><option value="">Select subject…</option>{subjectsLoad ? <option disabled>Loading subjects…</option> : subjects.length === 0 ? <option disabled>No subjects found</option> : subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>}</div>
-        <div><label className="block text-xs font-semibold text-gray-600 mb-1">Topic *</label><input type="text" value={form.topic} onChange={e => setForm(f => ({ ...f, topic: e.target.value }))} placeholder="e.g. Cell Biology, Algebra" className={inputCls} required /></div>
+        <div><label className="block text-xs font-semibold text-gray-600 mb-1">Subject *</label>{!form.exam_type_id ? <div className="border-2 border-dashed border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-400">Select an exam type above</div> : <select value={form.subject_id} onChange={e => handleSubjectChange(e.target.value)} className={inputCls} required><option value="">Select subject…</option>{subjectsLoad ? <option disabled>Loading subjects…</option> : subjects.length === 0 ? <option disabled>No subjects found</option> : subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>}</div>
+        <div><label className="block text-xs font-semibold text-gray-600 mb-1">Topic / Subtopic *</label><input type="text" value={form.topic} onChange={e => setForm(f => ({ ...f, topic: e.target.value }))} placeholder="e.g. Acid Base and Salts" className={inputCls} required /></div>
+        {subtopics.length > 0 && (
+          <div><label className="block text-xs font-semibold text-gray-600 mb-1">Link to Subtopic <span className="text-gray-400 font-normal">(recommended — ensures students see questions in quiz)</span></label><select value={form.subtopic_id} onChange={e => setForm(f => ({ ...f, subtopic_id: e.target.value }))} className={inputCls}><option value="">— None (questions won't appear in subtopic quiz) —</option>{subtopics.map(st => <option key={st.id} value={st.id}>{st.name}</option>)}</select></div>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <div><label className="block text-xs font-semibold text-gray-600 mb-1">Difficulty</label><select value={form.difficulty} onChange={e => setForm(f => ({ ...f, difficulty: e.target.value }))} className={inputCls}><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option></select></div>
           <div><label className="block text-xs font-semibold text-gray-600 mb-1">Count</label><select value={form.count} onChange={e => setForm(f => ({ ...f, count: Number(e.target.value) }))} className={inputCls}><option value={10}>10</option><option value={20}>20</option><option value={30}>30</option></select></div>

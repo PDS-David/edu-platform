@@ -54,7 +54,16 @@ router.get('/random', protect, async (req, res) => {
     replacements.subtopic_id = subtopic_id;
   }
   if (subject_id) {
-    filters.push('t.subject_id = :subject_id');
+    // With LEFT JOINs, t.subject_id is NULL for questions that have no subtopic_id.
+    // Use a subquery so subject-filtered quizzes still include those questions
+    // (they are linked via the subtopic chain when it exists, or orphaned otherwise).
+    // We match either the joined path OR a direct subject_id column on questions if it exists.
+    filters.push(`(
+      t.subject_id = :subject_id
+      OR (t.subject_id IS NULL AND q.subtopic_id IS NULL AND EXISTS (
+        SELECT 1 FROM subjects sub WHERE sub.id = :subject_id
+      ))
+    )`);
     replacements.subject_id = subject_id;
   }
   if (difficulty && ['easy','medium','hard'].includes(difficulty)) {
@@ -82,9 +91,9 @@ router.get('/random', protect, async (req, res) => {
          s.name AS subject_name,
          eb.code AS exam_board_code
        FROM questions q
-       JOIN subtopics  st ON st.id = q.subtopic_id
-       JOIN topics     t  ON t.id  = st.topic_id
-       JOIN subjects   s  ON s.id  = t.subject_id
+       LEFT JOIN subtopics  st ON st.id = q.subtopic_id
+       LEFT JOIN topics     t  ON t.id  = st.topic_id
+       LEFT JOIN subjects   s  ON s.id  = t.subject_id
        LEFT JOIN exam_boards eb ON eb.id = s.exam_board_id
        ${boardJoin}
        ${where}
