@@ -87,6 +87,20 @@ router.get('/random', protect, async (req, res) => {
 
   const where = `WHERE ${filters.join(' AND ')}`;
 
+  // Helper: does a parsed options value contain at least 2 entries with real text?
+  function hasUsableOptions(rawOptions) {
+    let opts = rawOptions;
+    if (typeof opts === 'string') {
+      try { opts = JSON.parse(opts); } catch { return false; }
+    }
+    if (!Array.isArray(opts)) return false;
+    const withText = opts.filter(o => {
+      const text = typeof o === 'string' ? o : o?.option_text ?? o?.text;
+      return text && String(text).trim();
+    });
+    return withText.length >= 2;
+  }
+
   try {
     const questions = await sequelize.query(
       `SELECT
@@ -107,7 +121,60 @@ router.get('/random', protect, async (req, res) => {
        LIMIT :limit`,
       { replacements, type: QueryTypes.SELECT }
     );
-    return res.json({ success: true, count: questions.length, data: questions });
+
+    // BUG FIX: some insert paths (e.g. remediationService.js) write answer
+    // options ONLY to the separate `answer_options` table and leave the
+    // `questions.options` JSONB column null/empty. This route only ever
+    // read that JSONB column, so any question created that way reached
+    // students with zero usable answer choices — four empty option pills,
+    // unanswerable. This also covers Gemini occasionally returning
+    // malformed option text (objects with an empty option_text field),
+    // which passes a naive "array exists" check but renders as blanks.
+    //
+    // Fix: for any question whose JSONB options aren't usable, fall back to
+    // the answer_options table. If neither source has usable options,
+    // exclude the question entirely rather than show an unanswerable one —
+    // consistent with the rest of the platform's "return fewer questions
+    // rather than a broken one" approach (see quizGenerator.js).
+    const needsFallback = questions.filter(q => !hasUsableOptions(q.options));
+
+    if (needsFallback.length > 0) {
+      const fallbackRows = await sequelize.query(
+        `SELECT question_id, option_text, is_correct, order_index
+           FROM answer_options
+          WHERE question_id = ANY(:ids)
+          ORDER BY question_id, order_index ASC NULLS LAST`,
+        { replacements: { ids: needsFallback.map(q => q.id) }, type: QueryTypes.SELECT }
+      ).catch(() => []); // table may not exist in some environments — degrade gracefully
+
+      const byQuestionId = {};
+      for (const row of fallbackRows) {
+        if (!byQuestionId[row.question_id]) byQuestionId[row.question_id] = [];
+        byQuestionId[row.question_id].push({
+          option_text: row.option_text,
+          is_correct:  row.is_correct,
+        });
+      }
+
+      for (const q of needsFallback) {
+        const fromTable = byQuestionId[q.id] || [];
+        if (fromTable.length >= 2) {
+          q.options = fromTable;
+          // correct_answer may also be unset on questions inserted this way —
+          // backfill it from the table so POST /:id/answer keeps working.
+          if (!q.correct_answer) {
+            const correct = fromTable.find(o => o.is_correct);
+            if (correct) q.correct_answer = correct.option_text;
+          }
+        }
+      }
+    }
+
+    // Final pass: drop anything still unusable from either source rather
+    // than send a student a question they cannot answer.
+    const usable = questions.filter(q => hasUsableOptions(q.options));
+
+    return res.json({ success: true, count: usable.length, data: usable });
   } catch (err) {
     console.error('[GET /questions/random]', err.message);
     return res.json({ success: true, count: 0, data: [] });

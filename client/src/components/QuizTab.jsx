@@ -55,6 +55,7 @@ const TILE_COLOURS = [
 export default function QuizTab({ subtopicId, subtopic, onQuizComplete }) {
   const [phase, setPhase]           = useState('setup');   // setup | inprogress | results
   const [attemptId, setAttemptId]   = useState(null);
+  const [submitError, setSubmitError] = useState(null);
   const [selectedPaper, setSelectedPaper] = useState('all');
   const [attemptCount, setAttemptCount]   = useState(0);
   const navigate = useNavigate();
@@ -83,7 +84,7 @@ export default function QuizTab({ subtopicId, subtopic, onQuizComplete }) {
       subtopicId={subtopicId}
       subtopic={subtopic}
       selectedPaper={selectedPaper}
-      onFinish={(id) => { setAttemptId(id); setPhase('results'); }}
+      onFinish={(id, error) => { setAttemptId(id); setSubmitError(error || null); setPhase('results'); }}
       navigate={navigate}
     />
   );
@@ -93,6 +94,7 @@ export default function QuizTab({ subtopicId, subtopic, onQuizComplete }) {
       subtopicId={subtopicId}
       subtopic={subtopic}
       attemptId={attemptId}
+      submitError={submitError}
       onRevise={() => navigate(`/student/subtopic/${subtopicId}?tab=practice`)}
       onQuizComplete={onQuizComplete}
     />
@@ -302,9 +304,16 @@ function InProgressScreen({ subtopicId, subtopic, selectedPaper, onFinish, navig
         })),
       });
       onFinish(res.data?.attempt_id ?? res.attempt_id ?? res.id ?? null);
-    } catch {
-      // fallback — pass null
-      onFinish(null);
+    } catch (err) {
+      // BUG FIX: previously this swallowed every error and always called
+      // onFinish(null), which sent the student to the results screen with
+      // no data and only "Could not load results. Please try again." — no
+      // indication of what went wrong or what to do next. Now the actual
+      // error (e.g. "These questions are no longer available") is passed
+      // through and shown directly, and the failure is logged so it's
+      // diagnosable instead of silent.
+      console.error('[QuizTab] submitQuiz failed:', err);
+      onFinish(null, err?.message || 'Failed to submit your answers. Please try again.');
     }
   };
 
@@ -648,9 +657,10 @@ function HintModal({ question, onClose }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // PHASE 3 — RESULTS
 // ══════════════════════════════════════════════════════════════════════════════
-function ResultsScreen({ subtopicId, subtopic, attemptId, onRevise, onQuizComplete }) {
+function ResultsScreen({ subtopicId, subtopic, attemptId, submitError, onRevise, onQuizComplete }) {
   const [results,       setResults]       = useState(null);
   const [loading,       setLoading]       = useState(true);
+  const [loadError,     setLoadError]     = useState(null);
   const [submitProgress,setSubmitProgress]= useState(null); // "Submitting question X of Y..."
   const [selectedQ,     setSelectedQ]     = useState(0);
   const [schemeOpen,    setSchemeOpen]    = useState({});
@@ -665,7 +675,14 @@ function ResultsScreen({ subtopicId, subtopic, attemptId, onRevise, onQuizComple
         // Mark quiz complete
         await api.post(`/subtopic-progress/${subtopicId}`, { task: 'quiz' });
         onQuizComplete?.();
-      } catch {
+      } catch (err) {
+        // BUG FIX: previously this caught and discarded the error entirely
+        // (empty catch block), so a 404/500 from /quizzes/attempt/:id looked
+        // identical to "attemptId was never set" — both showed the same
+        // generic, undiagnosable message. Now logged and the message is
+        // surfaced to the student.
+        console.error('[ResultsScreen] Failed to load quiz results:', err);
+        setLoadError(err?.message || null);
         setResults(null);
       } finally {
         setLoading(false);
@@ -687,8 +704,26 @@ function ResultsScreen({ subtopicId, subtopic, attemptId, onRevise, onQuizComple
   );
 
   if (!results) return (
-    <div className="min-h-screen bg-[#0a4a3f] flex items-center justify-center">
-      <div className="text-white/60 text-sm">Could not load results. Please try again.</div>
+    <div className="min-h-screen bg-[#0a4a3f] flex flex-col items-center justify-center gap-4 px-6 text-center">
+      <div className="w-14 h-14 rounded-full bg-white/10 flex items-center justify-center">
+        <AlertCircle size={26} className="text-white/60" />
+      </div>
+      <div>
+        <p className="text-white text-base font-semibold mb-1">
+          {submitError || loadError || 'Could not load your results.'}
+        </p>
+        <p className="text-white/50 text-sm">
+          {submitError || loadError
+            ? 'Your answers were not saved for this attempt. Please try the quiz again.'
+            : 'Please try again.'}
+        </p>
+      </div>
+      <button
+        onClick={onRevise}
+        className="mt-2 flex items-center gap-2 bg-white text-[#0a4a3f] text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-white/90 transition-colors"
+      >
+        Back to Subtopic
+      </button>
     </div>
   );
 
