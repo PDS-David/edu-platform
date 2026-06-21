@@ -7,10 +7,17 @@ const { QueryTypes } = require('sequelize');
 const sequelize = require('../config/database');
 const { protect }  = require('../middleware/auth');
 const { generate } = require('../services/ai');
+const { adminActionLimiter } = require('../middleware/rateLimiter');
+const {
+  normaliseEmail,
+  validateEmail,
+  validatePassword,
+  normaliseName,
+  validateName,
+} = require('../utils/registrationValidators');
 const { success, error } = require('../utils/response');
 const { ENROLLMENT_SOURCE, ENROLLMENT_STATUS } = require('../constants/enrollmentConstants');
 const audit = require('../services/auditLogger');
-const { adminActionLimiter } = require('../middleware/rateLimiter');
 const { requireConfirmHeader, requireAdminConfirm } = require('../middleware/confirmDestructive');
 
 // ─────────────────────────────────────────────
@@ -32,29 +39,29 @@ router.post('/create-teacher', protect, adminOnly, adminActionLimiter, async (re
   const bcrypt = require('bcryptjs');
   const crypto = require('crypto');
 
-  const { email, password, first_name = '', last_name = '' } = req.body;
+  // R-04: normalise email before any DB operation
+  const email      = normaliseEmail(req.body.email);
+  const password   = req.body.password;
+  const first_name = normaliseName(req.body.first_name || '');
+  const last_name  = normaliseName(req.body.last_name  || '');
 
-  if (!email || !password) {
-    return error(res, 'email and password are required', 400);
-  }
-  if (password.length < 8) {
-    return error(res, 'Password must be at least 8 characters', 400);
-  }
+  // Validate all inputs (R-04, R-05)
+  const emailCheck = validateEmail(email);
+  if (!emailCheck.valid) return error(res, emailCheck.error, 400);
+
+  const passCheck = validatePassword(password);
+  if (!passCheck.valid) return error(res, passCheck.error, 400);
+
+  const fnCheck = validateName(first_name, 'First name');
+  if (!fnCheck.valid) return error(res, fnCheck.error, 400);
 
   try {
-    const existing = await sequelize.query(
-      `SELECT id FROM users WHERE email = :email LIMIT 1`,
-      { replacements: { email: email.toLowerCase().trim() }, type: QueryTypes.SELECT }
-    );
-    if (existing.length > 0) {
-      return error(res, 'An account with that email already exists', 409);
-    }
-
     const salt   = await bcrypt.genSalt(12);
     const hashed = await bcrypt.hash(password, salt);
     const verificationToken        = crypto.randomBytes(32).toString('hex');
     const verificationTokenExpires = new Date(Date.now() + 86400000);
 
+    // R-03: ON CONFLICT eliminates TOCTOU race; no preceding SELECT needed.
     const rows = await sequelize.query(
       `INSERT INTO users
          (email, password, first_name, last_name, role,
@@ -68,19 +75,25 @@ router.post('/create-teacher', protect, adminOnly, adminActionLimiter, async (re
           true, true, 'free_trial',
           NOW() + INTERVAL '14 days', '{}',
           NOW(), NOW())
+       ON CONFLICT (email) DO NOTHING
        RETURNING id, email, first_name, last_name, role, is_active, created_at`,
       {
         replacements: {
-          email:                   email.toLowerCase().trim(),
+          email,
           password:                hashed,
-          first_name:              first_name.trim(),
-          last_name:               last_name.trim(),
+          first_name,
+          last_name:               last_name || first_name,
           verificationToken,
           verificationTokenExpires,
         },
         type: QueryTypes.SELECT,
       }
     );
+
+    // 0 rows ⟹ email already existed
+    if (!rows || rows.length === 0) {
+      return error(res, 'An account with that email already exists', 409);
+    }
 
     await audit.log(req, audit.ACTIONS.TEACHER_CREATE, {
       targetType: 'user', targetId: rows[0].id, targetEmail: rows[0].email,
@@ -89,6 +102,10 @@ router.post('/create-teacher', protect, adminOnly, adminActionLimiter, async (re
     return success(res, { user: rows[0] }, null, 201);
   } catch (err) {
     console.error('[POST /admin/create-teacher]', err.message);
+    // R-03: catch stray 23505 and translate — never leak raw DB errors
+    if (err.parent?.code === '23505' || err.original?.code === '23505' || err.message?.includes('23505')) {
+      return error(res, 'An account with that email already exists', 409);
+    }
     return error(res, 'Failed to create teacher account');
   }
 });
@@ -310,7 +327,6 @@ router.get('/questions/pending', protect, adminOnly, async (req, res) => {
        LEFT JOIN subtopics  st ON q.subtopic_id   = st.id
        LEFT JOIN subjects   s  ON st.subject_id   = s.id
        WHERE COALESCE(q.status, 'pending') NOT IN ('approved', 'active', 'rejected')
-          OR (q.is_ai_generated = true AND COALESCE(q.status, 'pending') NOT IN ('approved', 'active', 'rejected'))
        ORDER BY q.created_at DESC
        LIMIT :limit OFFSET :offset`,
       { replacements: { limit, offset }, type: QueryTypes.SELECT }
@@ -454,8 +470,8 @@ router.post('/send-notification', protect, adminOnly, adminActionLimiter, async 
 // ─────────────────────────────────────────────
 router.post('/generate-questions', protect, adminOnly, async (req, res) => {
   const rawCount = req.body.count;
-  const count = Math.min(Math.max(parseInt(rawCount) || 10, 1), 50);
-  const { subject_id, topic, difficulty = 'medium' } = req.body;
+  const count = Math.min(Math.max(parseInt(rawCount) || 10, 1), 15);
+  const { subject_id, topic, subtopic_id, difficulty = 'medium' } = req.body;
 
   if (!subject_id || !topic) {
     return error(res, 'subject_id and topic are required', 400);
@@ -469,18 +485,35 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
 
     if (!subjectRows.length) return error(res, 'Subject not found', 404);
 
-    const prompt = `Generate ${count} ${difficulty} multiple-choice questions on the topic "${topic}" for the subject "${subjectRows[0].name}". Return ONLY a valid JSON array, no markdown. Each object must have: question_text (string), options (array of 4 strings), correct_answer (string matching one option), explanation (string).`;
+    // Resolve subtopic_id: if none provided, try to find a subtopic whose
+    // name matches the typed topic text so AI-generated questions are
+    // discoverable on the student quiz page (which JOINs on subtopic_id).
+    let resolvedSubtopicId = subtopic_id || null;
+    if (!resolvedSubtopicId && topic.trim()) {
+      const stRows = await sequelize.query(
+        `SELECT st.id FROM subtopics st
+           JOIN topics t ON t.id = st.topic_id
+          WHERE t.subject_id = :subjectId
+            AND LOWER(st.name) = LOWER(:name)
+          LIMIT 1`,
+        { replacements: { subjectId: subject_id, name: topic.trim() }, type: QueryTypes.SELECT }
+      ).catch(() => []);
+      resolvedSubtopicId = stRows[0]?.id || null;
+    }
+
+    const prompt = `Generate ${count} ${difficulty} multiple-choice questions on the topic "${topic}" for the subject "${subjectRows[0].name}". Return ONLY a valid JSON array, no markdown. Each object must have: question_text (string), options (array of 4 strings), correct_answer (string matching one option exactly), explanation (string).`;
 
     const raw     = await generate(prompt, 'generate-questions');
     const cleaned = raw.replace(/```json|```/g, '').trim();
     const questions = JSON.parse(cleaned);
 
     let inserted = 0;
-    for (const q of questions) {
-      if (!q.question_text) continue;
+    let skipped  = 0;
+    const skippedReasons = [];
 
-      // Normalise options to [{option_text, is_correct}] regardless of Gemini output format.
-      // Gemini returns ["A","B","C","D"] (strings). The platform schema expects objects.
+    for (const q of questions) {
+      if (!q.question_text) { skipped++; continue; }
+
       const rawOptions = Array.isArray(q.options) ? q.options : [];
       const normOptions = rawOptions.map(opt => {
         if (typeof opt === 'string') {
@@ -489,11 +522,9 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
             is_correct:  opt.trim().toLowerCase() === (q.correct_answer || '').trim().toLowerCase(),
           };
         }
-        // Already object — preserve as-is
         return { option_text: opt.option_text || opt.text || String(opt), is_correct: !!opt.is_correct };
-      });
+      }).filter(o => o.option_text && o.option_text.trim()); // drop blank/garbage entries
 
-      // If no option was flagged correct via is_correct, flag the one matching correct_answer
       const anyCorrect = normOptions.some(o => o.is_correct);
       if (!anyCorrect && q.correct_answer) {
         normOptions.forEach(o => {
@@ -501,12 +532,48 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
         });
       }
 
+      // BUG FIX: Gemini occasionally omits/malforms the options array for a
+      // question in a batch (wrong key name, fewer than 4, no option marked
+      // correct). The old code silently inserted these with options: [] —
+      // they passed validation (only question_text was checked), reached
+      // 'pending', and an admin could approve them in the Review Queue
+      // without any visual warning (the review UI also just renders an
+      // empty grid for zero options). Students then hit a question with no
+      // answer choices at all. Now: skip and report instead of saving
+      // broken data. The admin sees exactly how many were skipped and can
+      // retry generation for that slot.
+      if (normOptions.length < 2) {
+        skipped++;
+        skippedReasons.push(`"${q.question_text.slice(0, 60)}..." — only ${normOptions.length} usable option(s)`);
+        continue;
+      }
+      if (!normOptions.some(o => o.is_correct)) {
+        skipped++;
+        skippedReasons.push(`"${q.question_text.slice(0, 60)}..." — no correct option identified`);
+        continue;
+      }
+
+      // POLICY: AI-generated questions always require admin review before
+      // reaching students — status='pending', not 'approved', even when an
+      // admin is the one triggering generation. A prior commit (194383c)
+      // changed this to 'approved' to work around questions being invisible
+      // on the student quiz page, but the actual cause was twofold: (1) no
+      // subtopic_id was being saved, so the hard JOIN in /questions/random
+      // excluded them entirely — now fixed above (resolvedSubtopicId); and
+      // (2) the review queue wasn't being used at all. Skipping review was
+      // the wrong fix for that visibility bug. The real fix is: save
+      // subtopic_id correctly (kept), and have the admin actually approve
+      // generated batches from the Question Review Queue — which takes one
+      // click per question and is the explicit, audited record that this
+      // admin reviewed and approved this specific content before students
+      // see it, exactly like every other AI-generated question in the
+      // system (quiz fallback, remediation engine, etc).
       await sequelize.query(
         `INSERT INTO questions
            (question_text, options, correct_answer, explanation, difficulty,
-            type, is_active, is_ai_generated, status, created_at, updated_at)
+            subtopic_id, type, is_active, is_ai_generated, status, created_at, updated_at)
          VALUES (:q, :o::jsonb, :c, :e, :d,
-                 'mcq', true, true, 'pending', NOW(), NOW())`,
+                 :subtopicId, 'mcq', true, true, 'pending', NOW(), NOW())`,
         {
           replacements: {
             q: q.question_text,
@@ -514,6 +581,7 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
             c: q.correct_answer  || null,
             e: q.explanation     || null,
             d: difficulty,
+            subtopicId: resolvedSubtopicId,
           },
           type: QueryTypes.INSERT,
         }
@@ -521,7 +589,17 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
       inserted++;
     }
 
-    return success(res, { generated: questions.length, inserted, questions });
+    return success(res, {
+      generated: questions.length,
+      inserted,
+      skipped,
+      skipped_reasons: skippedReasons,
+      questions,
+      subtopic_id: resolvedSubtopicId,
+      message: skipped > 0
+        ? `${inserted} question(s) saved for review, ${skipped} skipped due to missing/invalid options.`
+        : `${inserted} question(s) saved for review.`,
+    });
   } catch (err) {
     console.error('[admin.generate]', err.message);
     return error(res, 'AI generation failed: ' + err.message);
@@ -964,9 +1042,15 @@ router.get('/health', protect, adminOnly, async (req, res) => {
 
       // 13. practice attempt
       await sequelize.query(
+        // BUG FIX: created_at/updated_at are NOT NULL with no value
+        // supplied here — same root cause confirmed via live production
+        // logs in quizzes.js's POST /attempt. This smoke test was reporting
+        // '13. record practice attempt' as passing (w('13...', true) is
+        // hardcoded, not derived from the query result) while the INSERT
+        // itself was almost certainly failing silently the whole time.
         `INSERT INTO practice_attempts (student_id, question_id, is_correct,
-            time_taken_seconds, attempted_at)
-         VALUES (:s, :q, true, 5, NOW())`,
+            time_taken_seconds, attempted_at, created_at, updated_at)
+         VALUES (:s, :q, true, 5, NOW(), NOW(), NOW())`,
         { replacements: { s: created.studentId, q: created.questionId },
           type: QueryTypes.INSERT });
       w('13. record practice attempt', true);
@@ -1041,7 +1125,7 @@ router.post('/migrate-to-r2', protect, adminOnly, async (req, res) => {
   if (!r2.isR2Enabled()) {
     return res.status(503).json({
       success: false,
-      error: 'R2 is not configured. Set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, R2_PUBLIC_BASE_URL in Render env vars.'
+      error: 'R2 is not configured. Set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, R2_PUBLIC_BASE_URL in api.env on the Hetzner server.'
     });
   }
 

@@ -1,14 +1,32 @@
-# Do not copy these into the Docker build context
+# Dependencies
 node_modules
+
+# Environment
 .env
 .env.*
+
+# Logs
 *.log
 logs/
+
+# Runtime data (mounted via volumes in production)
 uploads/
+
+# Git
 .git
 .gitignore
+
+# Docs & dev tools
 *.md
 tests/
 tools/
+# scripts/ — MUST be included: run_complete_migration.js ships in the image
+# scripts/
 debug-jwt.js
-scripts/
+
+# Security-sensitive (NEVER in images)
+hls_secure/
+
+# Docker files
+Dockerfile
+.dockerignore

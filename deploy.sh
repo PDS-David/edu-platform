@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 # deploy.sh — Full deploy for AISchoolonair on Hetzner CX23
-# Run as root from anywhere:  bash /opt/aischoolonair/deploy.sh
+
 set -euo pipefail
 
-# Always run from the repo root so docker compose finds docker-compose.yml
-# regardless of the shell's current working directory.
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$REPO_DIR"
 
@@ -13,39 +11,68 @@ echo "  AISchoolonair — Production Deploy"
 echo "  Repo: $REPO_DIR"
 echo "═══════════════════════════════════════════════════"
 
-# 1. Pull latest code
+# 1. Sync code (force clean state)
 echo ""
-echo "▶ 1/4  Pulling latest code..."
-git pull origin main
+echo "▶ 1/6  Syncing code..."
+git fetch origin
+git reset --hard origin/main
 
-# 2. Rebuild API + Web images
-#    NOTE: Migrations run AFTER the new container is up (step 3/4) so the
-#    running container always has the code that matches the schema.
-#    Running migrations against the *old* container before rebuild risks a
-#    schema/code mismatch if the old container crashes mid-migration.
+# 2. Ensure safe directories exist on the host (NOT inside Docker)
 echo ""
-echo "▶ 2/4  Building images..."
-docker compose build api web
+echo "▶ 2/6  Preparing runtime directories on host..."
+mkdir -p server/keys_secure
+mkdir -p hls_secure
+# Fix permissions only if we own the directory — never fail if we don't
+chmod 755 server/keys_secure 2>/dev/null || true
+chmod 755 hls_secure        2>/dev/null || true
 
-# 3. Restart with zero downtime (Caddy stays up)
+# 3. Show what is currently running before we touch anything
 echo ""
-echo "▶ 3/4  Restarting services..."
+echo "▶ 3/6  Current container state:"
+docker compose ps || true
+
+# 4. Build new images (skip cache wipe — wasteful and slows recovery)
+echo ""
+echo "▶ 4/6  Building api and web images..."
+docker compose build --no-cache --progress=plain api web
+
+# 5. Ensure ALL services are running (caddy and redis may have stopped)
+#    Use --no-deps so we don't accidentally re-create healthy containers
+echo ""
+echo "▶ 5/6  Bringing up all services..."
+docker compose up -d caddy redis
 docker compose up -d --no-deps api web
 
-# Give the new container time to start and connect to the DB before running migrations
-echo "  Waiting 15s for containers to be ready..."
-sleep 15
-
-# 4. Run DB migrations inside the NEW running API container
 echo ""
-echo "▶ 4/4  Running DB migrations..."
-docker exec -i aischool_api node - < server/scripts/run_complete_migration.js
+echo "  Waiting 25s for containers to become healthy..."
+sleep 25
+
+# 6. Run DB migrations (now that the container is healthy and scripts/ ships in the image)
+echo ""
+echo "▶ 6/7  Running DB migrations..."
+docker exec aischool_api node /app/scripts/run_complete_migration.js
+echo "  ✅ Migrations complete"
+
+# 7. Health check
+echo ""
+echo "▶ 7/7  Container state after deploy:"
+docker compose ps || true
+
+echo ""
+if curl -sf --max-time 10 https://www.aischoolonair.ng/api/health > /dev/null; then
+  echo "  🟢 API is healthy — deploy complete"
+else
+  echo "  🔴 API health check failed. Showing logs:"
+  echo ""
+  echo "--- api logs (last 30 lines) ---"
+  docker compose logs --tail=30 api || true
+  echo ""
+  echo "--- caddy logs (last 15 lines) ---"
+  docker compose logs --tail=15 caddy || true
+  exit 1
+fi
 
 echo ""
 echo "═══════════════════════════════════════════════════"
-echo "  ✅  Deploy complete!"
-echo "  Checking health..."
+echo "  ✅ Deploy complete!"
 echo "═══════════════════════════════════════════════════"
-sleep 4
-curl -sf https://www.aischoolonair.ng/api/health && echo "  🟢  API is healthy" || echo "  🔴  API health check failed — run: docker compose logs api"
-echo ""

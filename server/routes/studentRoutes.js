@@ -104,12 +104,42 @@ router.get('/performance', protect, async (req, res) => {
 
 // ── POST /api/students/remediation ───────────────────────────────────────────
 // Generates targeted AI practice questions for the student's weak concepts.
-// Returns { conceptSets: [{ concept_name, mastery_score, questions: [...] }] }
+// POLICY: AI-generated questions must be approved in the Question Review
+// Queue before a student can see them (quiz or practice). This route queues
+// new questions for review and returns only counts/metadata — it must NOT
+// return question_text/options/explanation, since that would hand the
+// student unreviewed AI content directly in the response body regardless of
+// what status was written to the DB.
 router.post('/remediation', protect, async (req, res) => {
   try {
     const { generateRemediationSet } = require('../services/remediationService');
     const result = await generateRemediationSet(req.user.id);
-    return res.status(200).json({ success: true, data: result });
+
+    const conceptSets = (result.conceptSets || []).map(set => ({
+      concept_id:      set.concept_id,
+      concept_name:    set.concept_name,
+      mastery_score:   set.mastery_score,
+      difficulty:      set.difficulty,
+      questions_count: set.questions_count,
+      // question_text/options/explanation intentionally omitted — those
+      // questions are status = 'pending' and await admin approval.
+    }));
+
+    const totalQueued = conceptSets.reduce((sum, s) => sum + (s.questions_count || 0), 0);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        studentId:          result.studentId,
+        weak_concept_count: result.weak_concept_count ?? conceptSets.length,
+        message: result.message
+          || (totalQueued > 0
+                ? `${totalQueued} practice question(s) generated and queued for admin review. They'll appear in your practice sessions once approved.`
+                : 'No new questions were generated.'),
+        conceptSets,
+        total_questions_queued: totalQueued,
+      },
+    });
   } catch (err) {
     console.error('[POST /students/remediation]', err.message);
     return res.status(500).json({
@@ -223,8 +253,12 @@ router.post('/test/:testId/submit', protect, async (req, res) => {
 
       // Record practice attempt
       sequelize.query(
-        `INSERT INTO practice_attempts (student_id, question_id, is_correct, time_taken_seconds, attempted_at)
-         VALUES (:studentId, :questionId, :isCorrect, :timeTaken, NOW())`,
+        // BUG FIX: created_at/updated_at are NOT NULL with no value
+        // supplied here — same root cause confirmed via live production
+        // logs in quizzes.js's POST /attempt. Identical insert shape, was
+        // almost certainly failing silently the same way.
+        `INSERT INTO practice_attempts (student_id, question_id, is_correct, time_taken_seconds, attempted_at, created_at, updated_at)
+         VALUES (:studentId, :questionId, :isCorrect, :timeTaken, NOW(), NOW(), NOW())`,
         {
           replacements: {
             studentId:  req.user.id,
@@ -432,10 +466,12 @@ router.post('/subjects', protect, async (req, res) => {
     );
     if (boardRows[0]?.exam_board_id) {
       await sequelize.query(
+        // exam_board_id in student_exam_types is INTEGER (exam_boards.id is INTEGER).
+        // Do NOT cast to ::uuid — that crashes with "invalid input syntax for type uuid".
         `INSERT INTO student_exam_types (student_id, exam_board_id, is_active, status)
          VALUES (:studentId, :boardId, true, :approvedStatus)
          ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active = true, status = :approvedStatus`,
-        { replacements: { studentId, boardId: boardRows[0].exam_board_id, approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.INSERT }
+        { replacements: { studentId, boardId: parseInt(boardRows[0].exam_board_id), approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.INSERT }
       );
     }
 

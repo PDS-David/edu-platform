@@ -365,6 +365,19 @@ router.get('/:id/questions', protect, async (req, res) => {
     return res.status(400).json({ success: false, error: 'Invalid concept ID' });
   }
   try {
+    // SECURITY: this endpoint previously had no status filter at all — any
+    // authenticated user (including students) could fetch AI-generated
+    // questions still awaiting admin review, even though no current frontend
+    // page calls it. Students are now restricted to approved/active
+    // questions only, consistent with every other student-reachable
+    // question endpoint. Teachers/admins keep full visibility (including
+    // pending) since they manage concept↔question mappings and need to see
+    // everything they've linked, not just what's already approved.
+    const isStudent = req.user.role === 'student';
+    const statusFilter = isStudent
+      ? "AND COALESCE(q.status, 'pending') IN ('approved', 'active')"
+      : '';
+
     const questions = await sequelize.query(
       `SELECT
          q.id, q.question_text, q.type AS question_type,
@@ -373,6 +386,8 @@ router.get('/:id/questions', protect, async (req, res) => {
        FROM question_concepts qc
        JOIN questions q ON qc.question_id = q.id
        WHERE qc.concept_id = :conceptId
+         AND q.is_active = true
+         ${statusFilter}
        ORDER BY qc.weight ASC, q.created_at ASC`,
       { replacements: { conceptId: id }, type: QueryTypes.SELECT }
     );

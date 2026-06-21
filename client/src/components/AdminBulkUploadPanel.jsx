@@ -1,3 +1,4 @@
+import { getToken } from '../utils/token';
 // client/src/components/AdminBulkUploadPanel.jsx
 // Admin-only bulk file uploader.
 //
@@ -19,7 +20,6 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import api from '../services/apiClient';
-import { getToken } from '../utils/token';
 import {
   Upload, FileText, Video, Music, Image, File,
   CheckCircle, AlertTriangle, X, Loader2,
@@ -808,7 +808,7 @@ export default function AdminBulkUploadPanel() {
       const apiBase = rawBase.replace(/\/$/, '').endsWith('/api')
         ? rawBase.replace(/\/$/, '')
         : rawBase.replace(/\/$/, '') + '/api';
-      const token = getToken() || '';
+      const token   = getToken() || '';
 
       const res = await new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();

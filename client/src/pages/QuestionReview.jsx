@@ -169,7 +169,23 @@ export default function QuestionReview() {
         {/* Question cards */}
         {!loading && questions.length > 0 && (
           <div className="space-y-4">
-            {questions.map(q => (
+            {questions.map(q => {
+              // BUG FIX: computed once per card so both the options display
+              // and the Approve button below can react to it — previously
+              // this was calculated inline only for rendering options, so
+              // the Approve button had no way to know a question was broken
+              // and stayed clickable regardless.
+              const validOptions = (q.options || []).filter(opt => {
+                const text = typeof opt === 'string' ? opt : opt?.option_text;
+                return text && String(text).trim();
+              });
+              const hasCorrect = validOptions.some(opt =>
+                typeof opt === 'object' ? !!opt.is_correct
+                  : String(opt).trim().toLowerCase() === (q.correct_answer || '').trim().toLowerCase()
+              );
+              const isBroken = validOptions.length < 2 || !hasCorrect;
+
+              return (
               <div key={q.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                 {/* Card header */}
                 <div className="px-6 py-4 border-b border-gray-100 flex flex-wrap items-center gap-2">
@@ -204,31 +220,52 @@ export default function QuestionReview() {
                 </div>
 
                 {/* Options */}
-                <div className="px-6 pb-4 grid grid-cols-2 gap-2">
-                  {(q.options || []).map((opt, i) => {
-                    // Handle both object {option_text, is_correct} and legacy string formats
-                    const optText    = typeof opt === 'string' ? opt : (opt.option_text || '');
-                    const isCorrect  = typeof opt === 'object'
-                      ? !!opt.is_correct
-                      : optText.trim().toLowerCase() === (q.correct_answer || '').trim().toLowerCase();
-                    return (
-                      <div
-                        key={i}
-                        className={`flex items-center gap-2 p-3 rounded-xl border ${
-                          isCorrect ? 'border-green-300 bg-green-50' : 'border-gray-100 bg-gray-50'
-                        }`}
-                      >
-                        <span className={`w-6 h-6 rounded text-xs font-bold flex items-center justify-center flex-shrink-0 ${
-                          isCorrect ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'
-                        }`}>
-                          {OPTION_LABELS[i]}
-                        </span>
-                        <span className="text-sm text-gray-800 truncate">{optText}</span>
-                        {isCorrect && <CheckCircle className="w-4 h-4 text-green-500 ml-auto flex-shrink-0" />}
-                      </div>
-                    );
-                  })}
-                </div>
+                {/* BUG FIX: a question can reach the review queue with a
+                    missing or malformed options array (e.g. the AI returned
+                    an unexpected shape for one item in a batch). Previously
+                    this rendered as an empty grid with no indication
+                    anything was wrong — an admin could approve it without
+                    noticing, and the student would later see a question
+                    with zero answer choices. Now shown as an explicit
+                    warning instead of silently rendering nothing. */}
+                {isBroken ? (
+                  <div className="px-6 pb-4">
+                    <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl p-3">
+                      <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                      <p className="text-sm text-red-700">
+                        {validOptions.length < 2
+                          ? `This question only has ${validOptions.length} usable option(s) and cannot be answered. Approval is disabled — reject it instead.`
+                          : 'No option is marked as the correct answer. Approval is disabled — reject it instead.'}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="px-6 pb-4 grid grid-cols-2 gap-2">
+                    {validOptions.map((opt, i) => {
+                      // Handle both object {option_text, is_correct} and legacy string formats
+                      const optText    = typeof opt === 'string' ? opt : (opt.option_text || '');
+                      const isCorrect  = typeof opt === 'object'
+                        ? !!opt.is_correct
+                        : optText.trim().toLowerCase() === (q.correct_answer || '').trim().toLowerCase();
+                      return (
+                        <div
+                          key={i}
+                          className={`flex items-center gap-2 p-3 rounded-xl border ${
+                            isCorrect ? 'border-green-300 bg-green-50' : 'border-gray-100 bg-gray-50'
+                          }`}
+                        >
+                          <span className={`w-6 h-6 rounded text-xs font-bold flex items-center justify-center flex-shrink-0 ${
+                            isCorrect ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'
+                          }`}>
+                            {OPTION_LABELS[i]}
+                          </span>
+                          <span className="text-sm text-gray-800 truncate">{optText}</span>
+                          {isCorrect && <CheckCircle className="w-4 h-4 text-green-500 ml-auto flex-shrink-0" />}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
 
                 {/* Correct answer + explanation — visible to admin only, never shown to students */}
                 {(q.correct_answer || q.explanation) && (
@@ -258,7 +295,9 @@ export default function QuestionReview() {
                 <div className="px-6 pb-5 flex gap-3">
                   <button
                     onClick={() => { setReviewing(q); setAction('approve'); setFeedback(''); }}
-                    className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors text-sm"
+                    disabled={isBroken}
+                    title={isBroken ? 'Cannot approve — this question has no usable answer options.' : undefined}
+                    className="flex-1 bg-blue-500 hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-blue-500 text-white font-semibold py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors text-sm"
                   >
                     <CheckCircle className="w-4 h-4" /> Approve
                   </button>
@@ -270,7 +309,8 @@ export default function QuestionReview() {
                   </button>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
 

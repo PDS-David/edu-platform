@@ -17,6 +17,7 @@ import { useAuth } from "../context/AuthContext";
 import { useNavigate, Outlet, useLocation } from "react-router-dom";
 import TopNav from "../components/TopNav";
 import api, { TIMEOUT_DASHBOARD, TIMEOUT_ANALYTICS } from "../services/apiClient";
+import { openResourceAuth } from "../utils/authenticatedDownload";
 import {
   FileText, Video, Music, File, Download,
   Zap, ClipboardList, BarChart2, BookOpen, TrendingUp,
@@ -76,7 +77,12 @@ function resolveFileUrl(rawUrl) {
 //          enforces the protect middleware and enrollment checks. Direct static
 //          URLs are only used as a fallback for legacy files without an id.
 function InlineViewer({ file }) {
-  const url  = file.id ? `/api/resources/${file.id}/download` : resolveFileUrl(file.file_url);
+  const url      = file.id ? `/api/resources/${file.id}/download` : resolveFileUrl(file.file_url);
+  // Google Docs Viewer / Office Online fetch the file from their own servers,
+  // so they can't use our auth-gated /download proxy — they'd get a 401 and
+  // show "No preview available". Use the direct public storage URL instead.
+  // The authenticated proxy (url) is kept for the download button only.
+  const publicUrl = resolveFileUrl(file.file_url) || url;
   const type = (file.type || file.resource_type || "").toLowerCase();
   const ext  = url.split("?")[0].split(".").pop().toLowerCase();
   const [broken, setBroken] = useState(false);
@@ -117,8 +123,8 @@ function InlineViewer({ file }) {
 
   const isOffice = ["docx","pptx","xlsx","doc","ppt","xls"].includes(ext);
   const viewerUrl = isOffice
-    ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`
-    : `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
+    ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(publicUrl)}`
+    : `https://docs.google.com/viewer?url=${encodeURIComponent(publicUrl)}&embedded=true`;
 
   return (
     <div className="mt-2 rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
@@ -239,16 +245,11 @@ function AssignedFilesSection({ resources, loading, error, onRetry, totalResourc
                                   Practice
                                 </button>
                               )}
-                              {/* DEF-007: Download goes through authenticated API endpoint, not direct static URL */}
-                              <a
-                                href={resolvedUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                download
-                                className="p-1.5 rounded-lg border border-gray-200 text-gray-400 hover:text-blue-600 hover:border-blue-200 transition-colors"
-                              >
+                              <button
+                                onClick={() => openResourceAuth(file.id, file.file_url)}
+                                className="p-1.5 rounded-lg border border-gray-200 text-gray-400 hover:text-blue-600 hover:border-blue-200 transition-colors">
                                 <Download size={13} />
-                              </a>
+                              </button>
                             </div>
                           </div>
                           {isOpen && (

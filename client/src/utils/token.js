@@ -1,22 +1,41 @@
-// DEF-001: Moved JWT from localStorage (persists forever, XSS-accessible) to
-// sessionStorage (cleared when tab/browser closes, same XSS surface but
-// reduced exposure window).  An httpOnly-cookie migration requires server-side
-// changes outside the current sprint; sessionStorage is the approved interim
-// strategy documented in the project security log.
+// token.js  —  AUTH-004 / DEF-001
 //
-// The key is also namespaced to the app so it cannot collide with third-party
-// scripts that share the origin.
+// Access tokens live in memory (_memToken) — never in localStorage — so XSS
+// cannot steal them across page loads.  sessionStorage is used as a tab-local
+// fallback so a hard page-refresh within the same tab doesn't immediately log
+// the user out (the refresh flow is triggered on app boot if the in-memory
+// token is gone but sessionStorage has one).
+//
+// Refresh tokens are stored server-side in an HttpOnly Secure cookie set by
+// the API; the client never touches them directly.
 
-const TOKEN_KEY = 'aischoolonair.token';
+const SESSION_KEY = '__aso_at__'; // access-token key in sessionStorage
+
+// In-memory store (fastest; cleared on tab close / navigation away)
+let _memToken = null;
 
 export function setToken(token) {
-  sessionStorage.setItem(TOKEN_KEY, token);
+  _memToken = token;
+  try {
+    if (token) {
+      sessionStorage.setItem(SESSION_KEY, token);
+    } else {
+      sessionStorage.removeItem(SESSION_KEY);
+    }
+  } catch {}
 }
 
 export function getToken() {
-  return sessionStorage.getItem(TOKEN_KEY);
+  if (_memToken) return _memToken;
+  // Recover from page reload within same tab
+  try {
+    const stored = sessionStorage.getItem(SESSION_KEY);
+    if (stored) { _memToken = stored; return stored; }
+  } catch {}
+  return null;
 }
 
 export function clearToken() {
-  sessionStorage.removeItem(TOKEN_KEY);
+  _memToken = null;
+  try { sessionStorage.removeItem(SESSION_KEY); } catch {}
 }

@@ -55,6 +55,7 @@ const TILE_COLOURS = [
 export default function QuizTab({ subtopicId, subtopic, onQuizComplete }) {
   const [phase, setPhase]           = useState('setup');   // setup | inprogress | results
   const [attemptId, setAttemptId]   = useState(null);
+  const [submitError, setSubmitError] = useState(null);
   const [selectedPaper, setSelectedPaper] = useState('all');
   const [attemptCount, setAttemptCount]   = useState(0);
   const navigate = useNavigate();
@@ -83,7 +84,7 @@ export default function QuizTab({ subtopicId, subtopic, onQuizComplete }) {
       subtopicId={subtopicId}
       subtopic={subtopic}
       selectedPaper={selectedPaper}
-      onFinish={(id) => { setAttemptId(id); setPhase('results'); }}
+      onFinish={(id, error) => { setAttemptId(id); setSubmitError(error || null); setPhase('results'); }}
       navigate={navigate}
     />
   );
@@ -93,6 +94,7 @@ export default function QuizTab({ subtopicId, subtopic, onQuizComplete }) {
       subtopicId={subtopicId}
       subtopic={subtopic}
       attemptId={attemptId}
+      submitError={submitError}
       onRevise={() => navigate(`/student/subtopic/${subtopicId}?tab=practice`)}
       onQuizComplete={onQuizComplete}
     />
@@ -104,6 +106,29 @@ export default function QuizTab({ subtopicId, subtopic, onQuizComplete }) {
 // ══════════════════════════════════════════════════════════════════════════════
 function SetupScreen({ subtopic, subtopicId, attemptCount, selectedPaper, setSelectedPaper, onStart, navigate }) {
   const [expanded, setExpanded] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [noQuestions, setNoQuestions] = useState(false);
+
+  const handleStart = async () => {
+    setChecking(true);
+    setNoQuestions(false);
+    try {
+      // FIX: was dynamic import('../services/apiClient').then(m => m.default.get(...))
+      // Dynamic import bypasses the axios interceptor that attaches the Bearer token → 401.
+      // Use the static 'api' instance already imported at the top of this file instead.
+      const r = await api.get(`/questions/random?subtopic_id=${subtopicId}&count=1`);
+      const qs = r.data || [];
+      if (!Array.isArray(qs) || qs.length === 0) {
+        setNoQuestions(true);
+        setChecking(false);
+        return;
+      }
+    } catch {
+      // If check fails, proceed anyway — server will return empty and InProgress will handle it
+    }
+    setChecking(false);
+    onStart();
+  };
 
   const curName  = subtopic?.curriculum_name || '';
   const subjName = subtopic?.subject_name    || '';
@@ -196,11 +221,17 @@ function SetupScreen({ subtopic, subtopicId, attemptCount, selectedPaper, setSel
         </div>
 
         {/* Start button */}
+        {noQuestions && (
+          <div className="w-full bg-red-500/20 border border-red-400/40 text-red-300 text-sm text-center px-4 py-3 rounded-xl mb-3">
+            No questions are available for this subtopic yet. Ask your teacher to add questions.
+          </div>
+        )}
         <button
-          onClick={onStart}
-          className="w-full bg-white hover:bg-white/90 text-gray-900 font-bold text-base py-3.5 rounded-xl shadow-lg transition-colors mb-3"
+          onClick={handleStart}
+          disabled={checking}
+          className="w-full bg-white hover:bg-white/90 text-gray-900 font-bold text-base py-3.5 rounded-xl shadow-lg transition-colors mb-3 disabled:opacity-60"
         >
-          Start a Quiz
+          {checking ? 'Checking...' : 'Start a Quiz'}
         </button>
 
         <button
@@ -217,7 +248,7 @@ function SetupScreen({ subtopic, subtopicId, attemptCount, selectedPaper, setSel
 // ══════════════════════════════════════════════════════════════════════════════
 // PHASE 2 — IN PROGRESS
 // ══════════════════════════════════════════════════════════════════════════════
-function InProgressScreen({ subtopicId, subtopic, selectedPaper, onFinish, navigate }) {
+function InProgressScreen({ subtopicId, subtopic, selectedPaper, onFinish, navigate, onNoQuestions }) {
   const [questions,  setQuestions]  = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [current,    setCurrent]    = useState(0);
@@ -276,9 +307,16 @@ function InProgressScreen({ subtopicId, subtopic, selectedPaper, onFinish, navig
         })),
       });
       onFinish(res.data?.attempt_id ?? res.attempt_id ?? res.id ?? null);
-    } catch {
-      // fallback — pass null
-      onFinish(null);
+    } catch (err) {
+      // BUG FIX: previously this swallowed every error and always called
+      // onFinish(null), which sent the student to the results screen with
+      // no data and only "Could not load results. Please try again." — no
+      // indication of what went wrong or what to do next. Now the actual
+      // error (e.g. "These questions are no longer available") is passed
+      // through and shown directly, and the failure is logged so it's
+      // diagnosable instead of silent.
+      console.error('[QuizTab] submitQuiz failed:', err);
+      onFinish(null, err?.message || 'Failed to submit your answers. Please try again.');
     }
   };
 
@@ -296,6 +334,27 @@ function InProgressScreen({ subtopicId, subtopic, selectedPaper, onFinish, navig
   if (loading) return (
     <div className="min-h-screen bg-[#0a4a3f] flex items-center justify-center">
       <div className="w-10 h-10 border-4 border-blue-300 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
+  // No questions available — show a clear message instead of a blank green screen
+  if (!loading && questions.length === 0) return (
+    <div className="min-h-screen bg-[#0a4a3f] flex flex-col items-center justify-center gap-6 px-6 text-center">
+      <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center">
+        <AlertCircle size={32} className="text-white/60" />
+      </div>
+      <div>
+        <h2 className="text-white text-xl font-bold mb-2">No Questions Available</h2>
+        <p className="text-white/70 text-sm leading-relaxed max-w-xs">
+          There are no questions for this subtopic yet. Check back later or ask your teacher to add questions.
+        </p>
+      </div>
+      <button
+        onClick={() => navigate(-1)}
+        className="flex items-center gap-2 border border-white/40 text-white text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-white/10 transition-colors"
+      >
+        <ArrowLeft size={16} /> Go Back
+      </button>
     </div>
   );
 
@@ -387,12 +446,25 @@ function InProgressScreen({ subtopicId, subtopic, selectedPaper, onFinish, navig
             {isMCQ ? (
               <div className="space-y-2">
                 {(q.options || []).map((opt, i) => {
-                  const isSelected = answersRef.current[current] === (opt.id || i);
+                  // BUG FIX: previously stored/compared the array INDEX
+                  // (opt.id || i) as the selected answer, but the server
+                  // scores by comparing this value as plain TEXT against
+                  // question.correct_answer (also plain text — see
+                  // POST /quizzes/attempt and POST /questions/:id/answer).
+                  // An index like 0/1/2/3 can only equal correct-answer
+                  // text like "naoh" by coincidence, so most MCQ answers
+                  // were being scored as wrong regardless of what the
+                  // student actually selected. opt.id was dead code: no
+                  // option shape in this codebase (teacher-created,
+                  // AI-extracted, or the answer_options-table fallback)
+                  // ever sets an `id` field — all use option_text/text.
+                  const optionText = opt.text || opt.option_text || '';
+                  const isSelected = answersRef.current[current] === optionText;
                   return (
                     <button
                       key={i}
                       onClick={() => {
-                        answersRef.current[current] = opt.id || i;
+                        answersRef.current[current] = optionText;
                         // force re-render
                         setCurrent(c => c); // same index triggers re-render
                         setOpenAnswers(prev => ({ ...prev }));
@@ -408,7 +480,7 @@ function InProgressScreen({ subtopicId, subtopic, selectedPaper, onFinish, navig
                       }`}>
                         {String(i + 1).padStart(2, '0')}
                       </div>
-                      <span className="text-sm">{opt.text || opt.option_text}</span>
+                      <span className="text-sm">{optionText}</span>
                     </button>
                   );
                 })}
@@ -601,9 +673,10 @@ function HintModal({ question, onClose }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // PHASE 3 — RESULTS
 // ══════════════════════════════════════════════════════════════════════════════
-function ResultsScreen({ subtopicId, subtopic, attemptId, onRevise, onQuizComplete }) {
+function ResultsScreen({ subtopicId, subtopic, attemptId, submitError, onRevise, onQuizComplete }) {
   const [results,       setResults]       = useState(null);
   const [loading,       setLoading]       = useState(true);
+  const [loadError,     setLoadError]     = useState(null);
   const [submitProgress,setSubmitProgress]= useState(null); // "Submitting question X of Y..."
   const [selectedQ,     setSelectedQ]     = useState(0);
   const [schemeOpen,    setSchemeOpen]    = useState({});
@@ -618,7 +691,14 @@ function ResultsScreen({ subtopicId, subtopic, attemptId, onRevise, onQuizComple
         // Mark quiz complete
         await api.post(`/subtopic-progress/${subtopicId}`, { task: 'quiz' });
         onQuizComplete?.();
-      } catch {
+      } catch (err) {
+        // BUG FIX: previously this caught and discarded the error entirely
+        // (empty catch block), so a 404/500 from /quizzes/attempt/:id looked
+        // identical to "attemptId was never set" — both showed the same
+        // generic, undiagnosable message. Now logged and the message is
+        // surfaced to the student.
+        console.error('[ResultsScreen] Failed to load quiz results:', err);
+        setLoadError(err?.message || null);
         setResults(null);
       } finally {
         setLoading(false);
@@ -640,8 +720,26 @@ function ResultsScreen({ subtopicId, subtopic, attemptId, onRevise, onQuizComple
   );
 
   if (!results) return (
-    <div className="min-h-screen bg-[#0a4a3f] flex items-center justify-center">
-      <div className="text-white/60 text-sm">Could not load results. Please try again.</div>
+    <div className="min-h-screen bg-[#0a4a3f] flex flex-col items-center justify-center gap-4 px-6 text-center">
+      <div className="w-14 h-14 rounded-full bg-white/10 flex items-center justify-center">
+        <AlertCircle size={26} className="text-white/60" />
+      </div>
+      <div>
+        <p className="text-white text-base font-semibold mb-1">
+          {submitError || loadError || 'Could not load your results.'}
+        </p>
+        <p className="text-white/50 text-sm">
+          {submitError || loadError
+            ? 'Your answers were not saved for this attempt. Please try the quiz again.'
+            : 'Please try again.'}
+        </p>
+      </div>
+      <button
+        onClick={onRevise}
+        className="mt-2 flex items-center gap-2 bg-white text-[#0a4a3f] text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-white/90 transition-colors"
+      >
+        Back to Subtopic
+      </button>
     </div>
   );
 

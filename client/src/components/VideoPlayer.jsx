@@ -1,3 +1,4 @@
+import { getToken } from '../utils/token';
 // client/src/components/VideoPlayer.jsx
 // ─────────────────────────────────────────────────────────────────────────────
 // SECURITY + PLAYBACK REMEDIATION (2026-06-16)
@@ -12,7 +13,7 @@
 //     GET /api/videos/token?videoId=:id and is valid for 15 minutes.
 //
 //   SEC-03 partial:
-//     localStorage.getItem('token') is still used for hls.js xhrSetup because
+//     getToken() is still used for hls.js xhrSetup because
 //     that path requires a custom header.  The Safari native path avoids
 //     localStorage entirely by using server-issued per-session tokens.
 //     Migrating away from localStorage fully requires switching to HttpOnly
@@ -30,7 +31,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Hls from 'hls.js';
 import api from '../services/apiClient';
-import { getToken } from '../utils/token';
 import {
   Play, Pause, Volume2, VolumeX, Maximize, Minimize,
   RotateCcw, Loader2, AlertTriangle, CheckCircle2, Lock, Wifi
@@ -146,10 +146,8 @@ export default function VideoPlayer({ videoId, onComplete }) {
 
     const initHlsJs = (streamUrl) => {
       const hls = new Hls({
-        // Inject Authorization header on every XHR (manifest, segment, key).
-        // Reads from sessionStorage (via token.js) — the JWT is no longer
-        // stored in localStorage.
-        xhrSetup: (xhr) => {
+        // Inject Authorization header on every XHR (manifest, segment, key)
+        xhrSetup: (xhr, url) => {
           const token = getToken();
           if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
         },

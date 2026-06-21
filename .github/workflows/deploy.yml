@@ -44,14 +44,22 @@ jobs:
 
             cd /opt/aischoolonair
 
+            echo "▶ Cleaning up stale Git lock files..."
+            find .git/refs -name "*.lock" -delete 2>/dev/null || true
+            find .git -name "*.lock" -delete 2>/dev/null || true
+
+            echo "▶ Fixing Git directory permissions..."
+            chmod -R u+w .git 2>/dev/null || true
+
             echo "▶ Syncing with GitHub (hard reset safe mode)..."
             git fetch origin
             git reset --hard origin/main
-            echo "▶ Ensuring deploy script is executable..."
-            chmod +x deploy.sh
+
+            echo "▶ Ensuring caddy is running (recovery guard)..."
+            docker compose up -d caddy redis || true
 
             echo "▶ Running deployment script..."
-            ./deploy.sh
+            bash deploy.sh
 
             echo "════════════════════════════════════"
             echo "✅ Deployment successful"

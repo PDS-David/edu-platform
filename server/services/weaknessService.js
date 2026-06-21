@@ -16,7 +16,7 @@ async function analyzeWeakness(studentId) {
        SUM(CASE WHEN sa.is_correct THEN 1 ELSE 0 END)::INTEGER AS correct,
        SUM(CASE WHEN NOT sa.is_correct THEN 1 ELSE 0 END)::INTEGER AS failed
      FROM student_answers sa
-     JOIN questions q ON q.id = sa.question_id
+     JOIN questions q ON q.id::text = sa.question_id
      JOIN quiz_attempts qa ON qa.id = sa.attempt_id
      WHERE qa.student_id = :studentId
      GROUP BY q.subject_id_uuid, q.topic, q.subtopic_id`,
