@@ -405,6 +405,20 @@ async function run() {
       profile_updated_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
     )`],
 
+    ['learning_gaps', `CREATE TABLE IF NOT EXISTS learning_gaps (
+      id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+      student_id          UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      subject_id          INTEGER     REFERENCES subjects(id) ON DELETE SET NULL,
+      topic_name          TEXT        NOT NULL,
+      topic_id            INTEGER,
+      gap_severity        NUMERIC(4,2),
+      accuracy_in_topic   NUMERIC(4,2),
+      questions_attempted INTEGER     DEFAULT 0,
+      questions_failed    INTEGER     DEFAULT 0,
+      last_updated        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(student_id, topic_name)
+    ); CREATE INDEX IF NOT EXISTS idx_lg_sid ON learning_gaps(student_id)`],
+
     ['user_weak_topics', `CREATE TABLE IF NOT EXISTS user_weak_topics (
       id                UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
       student_id        UUID         NOT NULL REFERENCES users(id) ON DELETE CASCADE,
