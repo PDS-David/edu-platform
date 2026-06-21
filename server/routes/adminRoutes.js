@@ -508,8 +508,11 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
     const questions = JSON.parse(cleaned);
 
     let inserted = 0;
+    let skipped  = 0;
+    const skippedReasons = [];
+
     for (const q of questions) {
-      if (!q.question_text) continue;
+      if (!q.question_text) { skipped++; continue; }
 
       const rawOptions = Array.isArray(q.options) ? q.options : [];
       const normOptions = rawOptions.map(opt => {
@@ -520,13 +523,34 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
           };
         }
         return { option_text: opt.option_text || opt.text || String(opt), is_correct: !!opt.is_correct };
-      });
+      }).filter(o => o.option_text && o.option_text.trim()); // drop blank/garbage entries
 
       const anyCorrect = normOptions.some(o => o.is_correct);
       if (!anyCorrect && q.correct_answer) {
         normOptions.forEach(o => {
           o.is_correct = o.option_text.trim().toLowerCase() === q.correct_answer.trim().toLowerCase();
         });
+      }
+
+      // BUG FIX: Gemini occasionally omits/malforms the options array for a
+      // question in a batch (wrong key name, fewer than 4, no option marked
+      // correct). The old code silently inserted these with options: [] —
+      // they passed validation (only question_text was checked), reached
+      // 'pending', and an admin could approve them in the Review Queue
+      // without any visual warning (the review UI also just renders an
+      // empty grid for zero options). Students then hit a question with no
+      // answer choices at all. Now: skip and report instead of saving
+      // broken data. The admin sees exactly how many were skipped and can
+      // retry generation for that slot.
+      if (normOptions.length < 2) {
+        skipped++;
+        skippedReasons.push(`"${q.question_text.slice(0, 60)}..." — only ${normOptions.length} usable option(s)`);
+        continue;
+      }
+      if (!normOptions.some(o => o.is_correct)) {
+        skipped++;
+        skippedReasons.push(`"${q.question_text.slice(0, 60)}..." — no correct option identified`);
+        continue;
       }
 
       // POLICY: AI-generated questions always require admin review before
@@ -565,7 +589,17 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
       inserted++;
     }
 
-    return success(res, { generated: questions.length, inserted, questions, subtopic_id: resolvedSubtopicId });
+    return success(res, {
+      generated: questions.length,
+      inserted,
+      skipped,
+      skipped_reasons: skippedReasons,
+      questions,
+      subtopic_id: resolvedSubtopicId,
+      message: skipped > 0
+        ? `${inserted} question(s) saved for review, ${skipped} skipped due to missing/invalid options.`
+        : `${inserted} question(s) saved for review.`,
+    });
   } catch (err) {
     console.error('[admin.generate]', err.message);
     return error(res, 'AI generation failed: ' + err.message);
