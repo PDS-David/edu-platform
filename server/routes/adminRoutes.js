@@ -327,7 +327,6 @@ router.get('/questions/pending', protect, adminOnly, async (req, res) => {
        LEFT JOIN subtopics  st ON q.subtopic_id   = st.id
        LEFT JOIN subjects   s  ON st.subject_id   = s.id
        WHERE COALESCE(q.status, 'pending') NOT IN ('approved', 'active', 'rejected')
-          OR (q.is_ai_generated = true AND COALESCE(q.status, 'pending') NOT IN ('approved', 'active', 'rejected'))
        ORDER BY q.created_at DESC
        LIMIT :limit OFFSET :offset`,
       { replacements: { limit, offset }, type: QueryTypes.SELECT }

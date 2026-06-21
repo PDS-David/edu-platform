@@ -104,12 +104,42 @@ router.get('/performance', protect, async (req, res) => {
 
 // ── POST /api/students/remediation ───────────────────────────────────────────
 // Generates targeted AI practice questions for the student's weak concepts.
-// Returns { conceptSets: [{ concept_name, mastery_score, questions: [...] }] }
+// POLICY: AI-generated questions must be approved in the Question Review
+// Queue before a student can see them (quiz or practice). This route queues
+// new questions for review and returns only counts/metadata — it must NOT
+// return question_text/options/explanation, since that would hand the
+// student unreviewed AI content directly in the response body regardless of
+// what status was written to the DB.
 router.post('/remediation', protect, async (req, res) => {
   try {
     const { generateRemediationSet } = require('../services/remediationService');
     const result = await generateRemediationSet(req.user.id);
-    return res.status(200).json({ success: true, data: result });
+
+    const conceptSets = (result.conceptSets || []).map(set => ({
+      concept_id:      set.concept_id,
+      concept_name:    set.concept_name,
+      mastery_score:   set.mastery_score,
+      difficulty:      set.difficulty,
+      questions_count: set.questions_count,
+      // question_text/options/explanation intentionally omitted — those
+      // questions are status = 'pending' and await admin approval.
+    }));
+
+    const totalQueued = conceptSets.reduce((sum, s) => sum + (s.questions_count || 0), 0);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        studentId:          result.studentId,
+        weak_concept_count: result.weak_concept_count ?? conceptSets.length,
+        message: result.message
+          || (totalQueued > 0
+                ? `${totalQueued} practice question(s) generated and queued for admin review. They'll appear in your practice sessions once approved.`
+                : 'No new questions were generated.'),
+        conceptSets,
+        total_questions_queued: totalQueued,
+      },
+    });
   } catch (err) {
     console.error('[POST /students/remediation]', err.message);
     return res.status(500).json({
