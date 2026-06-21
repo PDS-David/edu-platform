@@ -104,6 +104,26 @@ export default function QuizTab({ subtopicId, subtopic, onQuizComplete }) {
 // ══════════════════════════════════════════════════════════════════════════════
 function SetupScreen({ subtopic, subtopicId, attemptCount, selectedPaper, setSelectedPaper, onStart, navigate }) {
   const [expanded, setExpanded] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [noQuestions, setNoQuestions] = useState(false);
+
+  const handleStart = async () => {
+    setChecking(true);
+    setNoQuestions(false);
+    try {
+      const r = await import('../services/apiClient').then(m => m.default.get(`/questions/random?subtopic_id=${subtopicId}&count=1`));
+      const qs = r.data || [];
+      if (!Array.isArray(qs) || qs.length === 0) {
+        setNoQuestions(true);
+        setChecking(false);
+        return;
+      }
+    } catch {
+      // If check fails, proceed anyway — server will return empty and InProgress will handle it
+    }
+    setChecking(false);
+    onStart();
+  };
 
   const curName  = subtopic?.curriculum_name || '';
   const subjName = subtopic?.subject_name    || '';
@@ -196,11 +216,17 @@ function SetupScreen({ subtopic, subtopicId, attemptCount, selectedPaper, setSel
         </div>
 
         {/* Start button */}
+        {noQuestions && (
+          <div className="w-full bg-red-500/20 border border-red-400/40 text-red-300 text-sm text-center px-4 py-3 rounded-xl mb-3">
+            No questions are available for this subtopic yet. Ask your teacher to add questions.
+          </div>
+        )}
         <button
-          onClick={onStart}
-          className="w-full bg-white hover:bg-white/90 text-gray-900 font-bold text-base py-3.5 rounded-xl shadow-lg transition-colors mb-3"
+          onClick={handleStart}
+          disabled={checking}
+          className="w-full bg-white hover:bg-white/90 text-gray-900 font-bold text-base py-3.5 rounded-xl shadow-lg transition-colors mb-3 disabled:opacity-60"
         >
-          Start a Quiz
+          {checking ? 'Checking...' : 'Start a Quiz'}
         </button>
 
         <button
@@ -217,7 +243,7 @@ function SetupScreen({ subtopic, subtopicId, attemptCount, selectedPaper, setSel
 // ══════════════════════════════════════════════════════════════════════════════
 // PHASE 2 — IN PROGRESS
 // ══════════════════════════════════════════════════════════════════════════════
-function InProgressScreen({ subtopicId, subtopic, selectedPaper, onFinish, navigate }) {
+function InProgressScreen({ subtopicId, subtopic, selectedPaper, onFinish, navigate, onNoQuestions }) {
   const [questions,  setQuestions]  = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [current,    setCurrent]    = useState(0);
@@ -296,6 +322,27 @@ function InProgressScreen({ subtopicId, subtopic, selectedPaper, onFinish, navig
   if (loading) return (
     <div className="min-h-screen bg-[#0a4a3f] flex items-center justify-center">
       <div className="w-10 h-10 border-4 border-blue-300 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
+  // No questions available — show a clear message instead of a blank green screen
+  if (!loading && questions.length === 0) return (
+    <div className="min-h-screen bg-[#0a4a3f] flex flex-col items-center justify-center gap-6 px-6 text-center">
+      <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center">
+        <AlertCircle size={32} className="text-white/60" />
+      </div>
+      <div>
+        <h2 className="text-white text-xl font-bold mb-2">No Questions Available</h2>
+        <p className="text-white/70 text-sm leading-relaxed max-w-xs">
+          There are no questions for this subtopic yet. Check back later or ask your teacher to add questions.
+        </p>
+      </div>
+      <button
+        onClick={() => navigate(-1)}
+        className="flex items-center gap-2 border border-white/40 text-white text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-white/10 transition-colors"
+      >
+        <ArrowLeft size={16} /> Go Back
+      </button>
     </div>
   );
 
