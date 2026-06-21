@@ -472,7 +472,7 @@ router.post('/send-notification', protect, adminOnly, adminActionLimiter, async 
 router.post('/generate-questions', protect, adminOnly, async (req, res) => {
   const rawCount = req.body.count;
   const count = Math.min(Math.max(parseInt(rawCount) || 10, 1), 50);
-  const { subject_id, topic, difficulty = 'medium' } = req.body;
+  const { subject_id, topic, subtopic_id, difficulty = 'medium' } = req.body;
 
   if (!subject_id || !topic) {
     return error(res, 'subject_id and topic are required', 400);
@@ -486,7 +486,23 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
 
     if (!subjectRows.length) return error(res, 'Subject not found', 404);
 
-    const prompt = `Generate ${count} ${difficulty} multiple-choice questions on the topic "${topic}" for the subject "${subjectRows[0].name}". Return ONLY a valid JSON array, no markdown. Each object must have: question_text (string), options (array of 4 strings), correct_answer (string matching one option), explanation (string).`;
+    // Resolve subtopic_id: if none provided, try to find a subtopic whose
+    // name matches the typed topic text so AI-generated questions are
+    // discoverable on the student quiz page (which JOINs on subtopic_id).
+    let resolvedSubtopicId = subtopic_id || null;
+    if (!resolvedSubtopicId && topic.trim()) {
+      const stRows = await sequelize.query(
+        `SELECT st.id FROM subtopics st
+           JOIN topics t ON t.id = st.topic_id
+          WHERE t.subject_id = :subjectId
+            AND LOWER(st.name) = LOWER(:name)
+          LIMIT 1`,
+        { replacements: { subjectId: subject_id, name: topic.trim() }, type: QueryTypes.SELECT }
+      ).catch(() => []);
+      resolvedSubtopicId = stRows[0]?.id || null;
+    }
+
+    const prompt = `Generate ${count} ${difficulty} multiple-choice questions on the topic "${topic}" for the subject "${subjectRows[0].name}". Return ONLY a valid JSON array, no markdown. Each object must have: question_text (string), options (array of 4 strings), correct_answer (string matching one option exactly), explanation (string).`;
 
     const raw     = await generate(prompt, 'generate-questions');
     const cleaned = raw.replace(/```json|```/g, '').trim();
@@ -496,8 +512,6 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
     for (const q of questions) {
       if (!q.question_text) continue;
 
-      // Normalise options to [{option_text, is_correct}] regardless of Gemini output format.
-      // Gemini returns ["A","B","C","D"] (strings). The platform schema expects objects.
       const rawOptions = Array.isArray(q.options) ? q.options : [];
       const normOptions = rawOptions.map(opt => {
         if (typeof opt === 'string') {
@@ -506,11 +520,9 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
             is_correct:  opt.trim().toLowerCase() === (q.correct_answer || '').trim().toLowerCase(),
           };
         }
-        // Already object — preserve as-is
         return { option_text: opt.option_text || opt.text || String(opt), is_correct: !!opt.is_correct };
       });
 
-      // If no option was flagged correct via is_correct, flag the one matching correct_answer
       const anyCorrect = normOptions.some(o => o.is_correct);
       if (!anyCorrect && q.correct_answer) {
         normOptions.forEach(o => {
@@ -518,12 +530,17 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
         });
       }
 
+      // Save as 'approved' (not 'pending') — admin is explicitly generating
+      // and reviewing these. 'pending' causes the /questions/random endpoint
+      // to filter them out (status IN ('approved','active')), making them
+      // invisible to students on the quiz page.
+      // Also save subtopic_id so the hard JOIN in /questions/random resolves.
       await sequelize.query(
         `INSERT INTO questions
            (question_text, options, correct_answer, explanation, difficulty,
-            type, is_active, is_ai_generated, status, created_at, updated_at)
+            subtopic_id, type, is_active, is_ai_generated, status, created_at, updated_at)
          VALUES (:q, :o::jsonb, :c, :e, :d,
-                 'mcq', true, true, 'pending', NOW(), NOW())`,
+                 :subtopicId, 'mcq', true, true, 'approved', NOW(), NOW())`,
         {
           replacements: {
             q: q.question_text,
@@ -531,6 +548,7 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
             c: q.correct_answer  || null,
             e: q.explanation     || null,
             d: difficulty,
+            subtopicId: resolvedSubtopicId,
           },
           type: QueryTypes.INSERT,
         }
@@ -538,7 +556,7 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
       inserted++;
     }
 
-    return success(res, { generated: questions.length, inserted, questions });
+    return success(res, { generated: questions.length, inserted, questions, subtopic_id: resolvedSubtopicId });
   } catch (err) {
     console.error('[admin.generate]', err.message);
     return error(res, 'AI generation failed: ' + err.message);
