@@ -193,7 +193,13 @@ router.post('/attempt', protect, async (req, res) => {
       success:      true,
       attempt_id:   attemptId,
       data: {
-        attempt_id,
+        attempt_id:   attemptId, // FIX: was bare shorthand `attempt_id`, which is a
+                                  // ReferenceError — no variable of that exact name
+                                  // exists, only camelCase `attemptId`. This threw on
+                                  // every quiz submission, caught by the outer catch,
+                                  // and returned as 500 "attempt_id is not defined" —
+                                  // exactly the crash now visible on the results page
+                                  // since the silent-swallow bug was fixed upstream.
         subtopic_id,
         total_score:  totalScore,
         max_score:    maxScore,
