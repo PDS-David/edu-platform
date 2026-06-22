@@ -1188,12 +1188,13 @@ async function run() {
     console.log('  (verification query failed:', e.message, ')');
   }
 
-  // Approve legacy AI-generated questions with NULL status — these were
-  // generated before the status column was introduced. Non-AI questions
-  // (teacher-submitted, bulk-imported) do not require approval.
-  await exec('questions: approve legacy NULL-status AI-generated entries',
+  // Approve legacy questions with NULL status — these were imported before the
+  // status column was introduced. COALESCE(status,'pending') treats them as
+  // pending, inflating the review queue count (was showing 204) with questions
+  // that are already live/active and can never be found via the review UI.
+  await exec('questions: approve legacy NULL-status entries',
     `UPDATE questions SET status = 'approved', updated_at = NOW()
-      WHERE status IS NULL AND is_active = true AND COALESCE(is_ai_generated, false) = true`
+      WHERE status IS NULL AND is_active = true`
   );
 
   // Ensure Platform Admin user has role='admin' — the seed in
