@@ -8,6 +8,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/apiClient';
+import { useAuth } from '../context/AuthContext';
+import TopNav from '../components/TopNav';
 import {
   CheckCircle, XCircle, Clock, ChevronLeft, ChevronRight,
   User, Calendar, BookOpen, Tag, Loader, RefreshCw, AlertCircle,
@@ -29,6 +31,8 @@ const OPTION_LABELS = ['A', 'B', 'C', 'D', 'E', 'F'];
 
 export default function QuestionReview() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const dashboardPath = user?.role === 'admin' ? '/admin/dashboard' : '/teacher/dashboard';
   const [questions, setQuestions] = useState([]);
   const [total,     setTotal]     = useState(0);
   const [offset,    setOffset]    = useState(0);
@@ -94,18 +98,26 @@ export default function QuestionReview() {
 
   if (!loading && !error && questions.length === 0 && offset === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl p-10 text-center max-w-md">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle className="w-8 h-8 text-green-500" />
+      <>
+        <TopNav />
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl p-10 text-center max-w-md">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="w-8 h-8 text-green-500" />
+            </div>
+            <h2 className="text-xl font-bold text-gray-800 mb-2">All caught up!</h2>
+            <p className="text-gray-500 mb-6">No pending questions to review.</p>
+            <div className="flex items-center justify-center gap-4">
+              <button onClick={() => navigate(dashboardPath)} className="flex items-center gap-2 text-gray-600 hover:text-gray-800 font-medium">
+                <ArrowLeft className="w-4 h-4" /> Dashboard
+              </button>
+              <button onClick={() => fetchPending(0)} className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-medium">
+                <RefreshCw className="w-4 h-4" /> Refresh
+              </button>
+            </div>
           </div>
-          <h2 className="text-xl font-bold text-gray-800 mb-2">All caught up!</h2>
-          <p className="text-gray-500 mb-6">No pending questions to review.</p>
-          <button onClick={() => fetchPending(0)} className="flex items-center gap-2 mx-auto text-indigo-600 hover:text-indigo-700 font-medium">
-            <RefreshCw className="w-4 h-4" /> Refresh
-          </button>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -113,13 +125,14 @@ export default function QuestionReview() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
+      <TopNav />
       <div className="max-w-4xl mx-auto">
 
         {/* Header */}
         <div className="flex items-center justify-between mb-6 pt-2">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => navigate('/admin/dashboard')}
+              onClick={() => navigate(dashboardPath)}
               className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 border border-gray-200 rounded-xl px-3 py-2 transition-colors"
             >
               <ArrowLeft className="w-4 h-4" /> Dashboard

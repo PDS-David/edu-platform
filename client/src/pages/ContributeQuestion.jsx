@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import TopNav from '../components/TopNav';
 
 const CURRENT_YEAR  = new Date().getFullYear();
 const YEARS         = Array.from({ length: CURRENT_YEAR - 1989 }, (_, i) => CURRENT_YEAR - i);
@@ -148,7 +149,9 @@ export default function ContributeQuestion() {
   // ── Success State ─────────────────────────────────────────────────────────
   if (submitted) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center p-4">
+      <>
+        <TopNav />
+        <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-10 text-center">
           <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle className="w-10 h-10 text-green-500" />
@@ -192,6 +195,7 @@ export default function ContributeQuestion() {
           </div>
         </div>
       </div>
+      </>
     );
   }
 
@@ -203,12 +207,14 @@ export default function ContributeQuestion() {
     }`;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-50 p-4">
+    <>
+      <TopNav />
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-50 p-4">
       <div className="max-w-2xl mx-auto">
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-6 pt-2">
-          <button onClick={() => navigate(-1)} className="p-2 hover:bg-white rounded-lg transition-colors">
+          <button onClick={() => navigate(isTeacher ? '/teacher/dashboard' : '/student/dashboard')} className="p-2 hover:bg-white rounded-lg transition-colors">
             <ArrowLeft className="w-5 h-5 text-gray-600" />
           </button>
           <div className="flex-1">
@@ -483,5 +489,6 @@ export default function ContributeQuestion() {
         </div>
       </div>
     </div>
+    </>
   );
 }
