@@ -90,9 +90,10 @@ export default function SettingsPage() {
       }
       if (user.preferred_study_time) setStudyPrefs(p => ({ ...p, study_time: user.preferred_study_time }));
     }
-    // Load notification prefs from localStorage
+    // Load notification prefs from localStorage — keyed per user so accounts
+    // on the same browser don't see each other's toggle states.
     try {
-      const saved = JSON.parse(localStorage.getItem('notif_prefs') || '{}');
+      const saved = JSON.parse(localStorage.getItem(`notif_prefs_${user.id}`) || '{}');
       if (Object.keys(saved).length) setNotifs(n => ({ ...n, ...saved }));
     } catch {}
   }, [user]);
@@ -138,7 +139,7 @@ export default function SettingsPage() {
   };
 
   const handleNotifSave = () => {
-    localStorage.setItem('notif_prefs', JSON.stringify(notifs));
+    localStorage.setItem(`notif_prefs_${user.id}`, JSON.stringify(notifs));
     setNotifSaving(true);
     setTimeout(() => { setNotifSaving(false); showToast('Notification preferences saved'); }, 300);
   };
