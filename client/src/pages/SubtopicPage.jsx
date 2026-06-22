@@ -20,7 +20,6 @@ import {
   BookOpen, FileText, HelpCircle,
   Upload, Sigma,
   ArrowLeft } from 'lucide-react';
-import TopNav from '../components/TopNav';
 import AIChatWidget from '../components/AIChatWidget';
 import QuizTab from '../components/QuizTab';
 import api from '../services/apiClient';
@@ -715,7 +714,6 @@ export default function SubtopicPage() {
 
   if (loading) return (
     <div className={`min-h-screen ${activeTab === 'quiz' ? 'bg-[#0a4a3f]' : 'bg-gray-50'}`}>
-      <TopNav />
       <div className="flex justify-center pt-24">
         <Loader2 className={`w-8 h-8 animate-spin ${activeTab === 'quiz' ? 'text-white/60' : 'text-blue-400'}`} />
       </div>
@@ -730,7 +728,6 @@ export default function SubtopicPage() {
 
   return (
     <div className={`min-h-screen ${isQuizTab ? 'bg-[#0a4a3f]' : 'bg-gray-50'}`}>
-      <TopNav />
       <div className="max-w-3xl mx-auto px-4 pt-3 pb-0">
         <button onClick={() => navigate(-1)}
           className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 mb-2 transition-colors">

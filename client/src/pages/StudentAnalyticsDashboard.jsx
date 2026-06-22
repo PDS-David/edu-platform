@@ -24,7 +24,6 @@ import {
   AlertTriangle, Loader2, ArrowRight, Sparkles,
 } from 'lucide-react';
 import { useAuth }       from '../context/AuthContext';
-import TopNav            from '../components/TopNav';
 import GamificationBar   from '../components/GamificationBar';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -164,7 +163,6 @@ export default function StudentAnalyticsDashboard() {
   // ── Loading state ─────────────────────────────────────────────────────────
   if (loading) return (
     <div className="min-h-screen bg-gray-50">
-      <TopNav />
       <div className="flex justify-center pt-24">
         <Loader2 size={28} className="text-blue-400 animate-spin" />
       </div>
@@ -190,7 +188,6 @@ export default function StudentAnalyticsDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <TopNav />
 
       {/* Dark header with stat cards */}
       <div className="bg-[#0a4a3f]">
