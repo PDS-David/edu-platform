@@ -13,6 +13,7 @@
 
 const bcrypt      = require('bcryptjs');
 const crypto      = require('crypto');
+const jwt         = require('jsonwebtoken');
 const { QueryTypes } = require('sequelize');
 const db          = require('../config/database');
 const tokenService = require('../services/tokenService');
@@ -431,8 +432,25 @@ exports.refreshToken = async (req, res, next) => {
       return res.status(401).json({ success: false, error: 'No refresh token provided' });
     }
 
+    // The calling tab's own (possibly expired) access token, if it sent one.
+    // Decoded WITHOUT verifying signature/expiry — we only need the `id`
+    // claim as a same-session sanity check, not as proof of authentication.
+    // This lets rotateRefreshToken detect when the shared refresh_token
+    // cookie has been overwritten by a *different* logged-in account in
+    // another tab, instead of silently handing this tab someone else's
+    // session.
+    let expectedUserId = null;
+    if (req.body?.staleAccessToken) {
+      try {
+        const decoded = jwt.decode(req.body.staleAccessToken);
+        expectedUserId = decoded?.id || null;
+      } catch {
+        // Malformed token — ignore, fall back to no identity check
+      }
+    }
+
     const { accessToken, refreshToken: newRefresh, expiresIn } =
-      await tokenService.rotateRefreshToken({ rawRefreshToken, ipAddress, userAgent });
+      await tokenService.rotateRefreshToken({ rawRefreshToken, ipAddress, userAgent, expectedUserId });
 
     // Rotate cookie too
     setRefreshCookie(res, newRefresh, false);  // remember-me handled inside tokenService
@@ -443,9 +461,9 @@ exports.refreshToken = async (req, res, next) => {
 
   } catch (err) {
     const code = err.code || 'REFRESH_ERROR';
-    if (['REFRESH_INVALID', 'REFRESH_EXPIRED', 'REFRESH_REUSED'].includes(code)) {
+    if (['REFRESH_INVALID', 'REFRESH_EXPIRED', 'REFRESH_REUSED', 'SESSION_IDENTITY_MISMATCH'].includes(code)) {
       res.clearCookie('refresh_token', { httpOnly: true, secure: true, sameSite: 'Strict', path: '/api/auth' });
-      return res.status(401).json({ success: false, error: err.message });
+      return res.status(401).json({ success: false, error: err.message, code });
     }
     console.error('[refreshToken]', err.message);
     next(err);

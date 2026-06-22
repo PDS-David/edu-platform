@@ -928,22 +928,33 @@ function ResultsScreen({ subtopicId, subtopic, attemptId, submitError, onRevise,
 
 // ── Detailed Marking Scheme (expands inside left column) ───────────────────────
 function MarkingScheme({ qData }) {
-  const ai = qData.ai_explanation || qData.marking_scheme || qData.explanation || {};
-  const steps = ai.steps || ai.step_by_step || [];
+  // NOTE: the attempt-detail API (routes/quizzes.js) sends this data under
+  // `ai_marking_scheme` as { status, whyExplanation, markingPoints }. This
+  // component previously looked for `qData.ai_explanation` (a flat string,
+  // so none of the .verdict/.why/.steps/.model_answer reads below could
+  // ever resolve), then `qData.marking_scheme` (a key the backend never
+  // sends at all), then `qData.explanation` (flat string again) — meaning
+  // the placeholder showed unconditionally, regardless of whether data
+  // existed. `qData.ai_marking_scheme` is the field that's actually
+  // populated; `marking_scheme` is also accepted for forward-compat with any
+  // future endpoint that sends the richer verdict/steps/model_answer shape.
+  const ai = qData.ai_marking_scheme || qData.marking_scheme || {};
+  const why = ai.verdict || ai.why || ai.whyExplanation;
+  const steps = ai.steps || ai.step_by_step || ai.markingPoints || [];
   const bullets = Array.isArray(steps) ? steps : typeof steps === 'string' ? steps.split('\n').filter(Boolean) : [];
 
   return (
     <div className="mt-2 bg-white/5 border border-white/10 rounded-xl p-4 space-y-3 text-sm text-white/80">
       {/* Why right/wrong */}
-      {(ai.verdict || ai.why) && (
+      {why && (
         <div>
           <p className="font-bold text-white text-xs mb-1">Why your answer is {ai.status || (qData.is_correct ? 'correct' : 'incorrect')}?</p>
           <ul className="space-y-1 text-xs">
             {ai.status && (
               <li>• <strong>Status:</strong> {ai.status}</li>
             )}
-            {(ai.verdict || ai.why) && (
-              <li className="leading-relaxed"><BoldMarkdown text={ai.verdict || ai.why} /></li>
+            {why && (
+              <li className="leading-relaxed"><BoldMarkdown text={why} /></li>
             )}
           </ul>
         </div>
@@ -981,7 +992,7 @@ function MarkingScheme({ qData }) {
       )}
 
       {/* If no AI data yet */}
-      {!ai.verdict && !ai.why && bullets.length === 0 && !ai.model_answer && (
+      {!why && bullets.length === 0 && !ai.model_answer && (
         <p className="text-white/40 text-xs italic text-center py-2">
           Detailed marking scheme will appear here once generated.
         </p>
