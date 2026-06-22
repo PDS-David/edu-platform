@@ -281,11 +281,10 @@ router.post('/attempt', protect, async (req, res) => {
         const bRows = await sequelize.query(
           `SELECT
              ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 1) AS avg_score,
-             AVG(pa.time_taken_seconds)                                     AS avg_time_s
+             AVG(NULLIF(pa.time_taken_seconds, 0))                          AS avg_time_s
            FROM practice_attempts pa
            JOIN questions q ON q.id = pa.question_id
-           WHERE q.subtopic_id = :subtopicId
-             AND pa.time_taken_seconds IS NOT NULL`,
+           WHERE q.subtopic_id = :subtopicId`,
           { replacements: { subtopicId: subtopic_id }, type: QueryTypes.SELECT }
         );
         const row = bRows[0];
@@ -412,11 +411,10 @@ router.get('/attempt/:attemptId', protect, async (req, res) => {
         const bRows = await sequelize.query(
           `SELECT
              ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 1) AS avg_score,
-             AVG(pa.time_taken_seconds)                                     AS avg_time_s
+             AVG(NULLIF(pa.time_taken_seconds, 0))                          AS avg_time_s
            FROM practice_attempts pa
            JOIN questions q ON q.id = pa.question_id
-           WHERE q.subtopic_id = :subtopicId
-             AND pa.time_taken_seconds IS NOT NULL`,
+           WHERE q.subtopic_id = :subtopicId`,
           { replacements: { subtopicId: subtopic_id }, type: QueryTypes.SELECT }
         );
         const row = bRows[0];
