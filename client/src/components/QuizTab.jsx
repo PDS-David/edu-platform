@@ -306,15 +306,24 @@ function InProgressScreen({ subtopicId, subtopic, selectedPaper, onFinish, navig
       answersRef.current[i] = txt;
     });
     try {
+      const elapsedMs       = (TOTAL_SECS - remainingRef.current) * 1000;
+      const perQuestionMs   = questions.length > 0
+        ? Math.round(elapsedMs / questions.length)
+        : 0;
       const res = await api.post('/quizzes/attempt', {
         subtopic_id:   subtopicId,
         subject_id:    subtopic?.subject_id || null,
         paper_type:    selectedPaper,
-        total_time_ms: (TOTAL_SECS - remainingRef.current) * 1000,
+        total_time_ms: elapsedMs,
         answers: questions.map((q, i) => ({
           question_id:        q.id,
           selected_option_id: answersRef.current[i] ?? null,
-          time_taken_ms:      0,
+          // Distribute the real elapsed time evenly across every question.
+          // Per-question tracking would need a separate per-question timer
+          // (a future enhancement); for now this ensures the DB stores real
+          // values so GET /quizzes/attempt/:id recomputes a correct total
+          // instead of summing zeros and showing "0m 0s" every time.
+          time_taken_ms: perQuestionMs,
         })),
       });
       onFinish(res.data?.attempt_id ?? res.attempt_id ?? res.id ?? null);
@@ -865,7 +874,7 @@ function ResultsScreen({ subtopicId, subtopic, attemptId, submitError, onRevise,
               <div>
                 <p className="text-white/50 text-xs font-medium mb-1">Response</p>
                 <p className="text-white/80 text-sm bg-white/10 rounded-xl px-3 py-2 leading-relaxed">
-                  {qData.student_answer || qData.answer || <span className="text-white/30 italic">No answer given</span>}
+                  {qData.student_answer || qData.answer || qData.selected_option_text || <span className="text-white/30 italic">No answer given</span>}
                 </p>
               </div>
 
