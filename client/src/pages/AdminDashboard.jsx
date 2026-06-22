@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import api, { TIMEOUT_AI } from '../services/apiClient';
 import {
-  Users, School, BookOpen, LogOut,
+  Users, School, BookOpen, Settings, LogOut,
   Plus, Pencil, Trash2, ChevronDown, ChevronRight,
   Loader2, X, Check, AlertTriangle, RefreshCw, GraduationCap,
   UserCheck, ChevronUp, Sparkles, Zap, Upload
@@ -1065,6 +1065,56 @@ const AdminPastPapersPanel = () => {
   );
 };
 
+// ─── Admin Settings Panel ─────────────────────────────────────────────────────
+const AdminSettingsPanel = ({ setActivePanel }) => {
+  const navigate = useNavigate();
+  const sections = [
+    {
+      title: 'Account & Access',
+      items: [
+        { label: 'User Management',     desc: 'Manage roles, deactivate or delete users',      action: () => setActivePanel('users')    },
+        { label: 'Teacher Assignments', desc: 'Assign teachers to subjects and exam types',     action: () => setActivePanel('teachers') },
+      ],
+    },
+    {
+      title: 'Content',
+      items: [
+        { label: 'Catalog Management',  desc: 'Add or edit exam types and subjects',            action: () => setActivePanel('catalog')    },
+        { label: 'Past Papers',         desc: 'Manage past exam papers for students',           action: () => setActivePanel('pastpapers') },
+        { label: 'Question Review',     desc: 'Approve or reject AI-generated questions',       action: () => navigate('/admin/questions/review') },
+      ],
+    },
+    {
+      title: 'Platform Links',
+      items: [
+        { label: 'Student Dashboard',   desc: 'View the platform as a student would see it',   action: () => navigate('/student/dashboard') },
+        { label: 'Past Papers (public)', desc: 'See the public past papers page',              action: () => navigate('/past-papers')       },
+        { label: 'My Account Settings', desc: 'Update your admin profile and preferences',      action: () => navigate('/admin/settings')          },
+      ],
+    },
+  ];
+
+  return (
+    <div>
+      <div className="mb-6"><h2 className="text-xl font-bold text-gray-900">Settings</h2><p className="text-sm text-gray-400 mt-0.5">Platform configuration and quick links</p></div>
+      <div className="space-y-6">
+        {sections.map(sec => (
+          <div key={sec.title}>
+            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">{sec.title}</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {sec.items.map(item => (
+                <button key={item.label} onClick={item.action} className="text-left border border-gray-200 rounded-xl p-4 hover:border-violet-300 hover:bg-violet-50 transition-colors group">
+                  <p className="font-semibold text-gray-800 text-sm group-hover:text-violet-700">{item.label}</p>
+                  <p className="text-xs text-gray-400 mt-1 leading-relaxed">{item.desc}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 // ─── MAIN Admin Dashboard ─────────────────────────────────────────────────────
 const AdminDashboard = () => {
@@ -1098,6 +1148,7 @@ const AdminDashboard = () => {
     { key: 'aigenerate', icon: Sparkles,      label: 'AI Generate' },
     { key: 'bulkupload', icon: Upload,        label: 'Bulk Upload' },
     { key: 'pastpapers', icon: BookOpen,      label: 'Past Papers' },
+    { key: 'settings',   icon: Settings,      label: 'Settings'    },
   ];
 
   const Panel = ({ children }) => (
@@ -1213,6 +1264,7 @@ const AdminDashboard = () => {
             {activePanel === 'aigenerate' && <Panel><PanelErrorBoundary><AIGeneratePanel /></PanelErrorBoundary></Panel>}
             {activePanel === 'bulkupload' && <Panel><PanelErrorBoundary><AdminBulkUploadPanel /></PanelErrorBoundary></Panel>}
             {activePanel === 'pastpapers' && <Panel><PanelErrorBoundary><AdminPastPapersPanel /></PanelErrorBoundary></Panel>}
+            {activePanel === 'settings'   && <Panel><PanelErrorBoundary><AdminSettingsPanel setActivePanel={setActivePanel} /></PanelErrorBoundary></Panel>}
           </div>
         </main>
       </div>
