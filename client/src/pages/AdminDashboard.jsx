@@ -1148,7 +1148,7 @@ const AdminDashboard = () => {
     { key: 'aigenerate', icon: Sparkles,      label: 'AI Generate' },
     { key: 'bulkupload', icon: Upload,        label: 'Bulk Upload' },
     { key: 'pastpapers', icon: BookOpen,      label: 'Past Papers' },
-    { key: 'settings',   icon: Settings,      label: 'Settings'    },
+    { key: 'settings',   icon: Settings,      label: 'Quick Links' },
   ];
 
   const Panel = ({ children }) => (
