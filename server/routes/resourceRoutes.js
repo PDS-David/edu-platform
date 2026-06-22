@@ -630,6 +630,14 @@ router.get('/:id/download', protect, async (req, res) => {
       // R2: issue a 60-second signed URL
       const signedUrl = await getSignedDownloadUrl(key, 60);
       logger.info('[download] R2 signed URL issued', { resourceId: id, userId });
+
+      // ?direct=1 → return the signed URL as JSON so the client can open it
+      // in a new tab without a cross-origin fetch (which caused CORS errors
+      // manifesting as "No internet connection" on the View/Download buttons).
+      if (req.query.direct === '1') {
+        return res.json({ success: true, url: signedUrl });
+      }
+
       return res.redirect(302, signedUrl);
     }
 

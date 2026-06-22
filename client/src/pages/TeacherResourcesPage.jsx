@@ -501,21 +501,32 @@ function ResourcesTab({ showToast }) {
                 onClick={async (e) => {
                   e.preventDefault();
                   try {
-                    // Fetch the download URL authenticated so the Bearer token is sent.
-                    // The server returns a signed R2 URL (302 redirect) or streams the file.
                     const token = getToken() || '';
                     const rawBase = import.meta.env.VITE_API_URL || '';
                     const apiBase = rawBase.endsWith('/api') ? rawBase : (rawBase ? `${rawBase}/api` : '/api');
-                    const resp = await fetch(`${apiBase}/resources/${r.id}/download`, {
+                    // Use ?direct=1 so server returns the signed R2 URL as JSON
+                    // instead of a 302 redirect. Following a cross-origin redirect
+                    // via fetch() throws a CORS network error ("No internet connection").
+                    const resp = await fetch(`${apiBase}/resources/${r.id}/download?direct=1`, {
                       headers: token ? { Authorization: `Bearer ${token}` } : {},
-                      redirect: 'follow',
                     });
                     if (!resp.ok) { alert(`Could not open file (${resp.status}). Check your access.`); return; }
-                    const blob = await resp.blob();
-                    const url  = URL.createObjectURL(blob);
-                    window.open(url, '_blank');
-                    setTimeout(() => URL.revokeObjectURL(url), 60000);
-                  } catch { alert('Download failed. Check your connection.'); }
+                    const data = await resp.json().catch(() => null);
+                    if (data?.url) {
+                      window.open(data.url, '_blank', 'noopener');
+                    } else {
+                      // Local disk file — blob fallback
+                      const blobResp = await fetch(`${apiBase}/resources/${r.id}/download`, {
+                        headers: token ? { Authorization: `Bearer ${token}` } : {},
+                        redirect: 'follow',
+                      });
+                      if (!blobResp.ok) { alert(`Could not open file (${blobResp.status}).`); return; }
+                      const blob = await blobResp.blob();
+                      const url  = URL.createObjectURL(blob);
+                      window.open(url, '_blank', 'noopener');
+                      setTimeout(() => URL.revokeObjectURL(url), 60000);
+                    }
+                  } catch { alert('Could not open file. Please try again.'); }
                 }}
                 className="text-xs text-blue-600 hover:text-blue-800 font-medium px-3 py-1.5 border border-blue-200 rounded-lg transition-colors"
               >
