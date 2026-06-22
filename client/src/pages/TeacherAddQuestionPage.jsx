@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { CheckCircle, AlertCircle, Plus, Trash2, ChevronDown, X, Loader2 } from "lucide-react";
 import api from "../services/apiClient";
+import TopNav from "../components/TopNav";
+import { useAuth } from "../context/AuthContext";
 
 const DIFFICULTIES = ["easy", "medium", "hard"];
 
@@ -14,6 +16,8 @@ const CREATE_NEW = "__create_new__";
 
 export default function TeacherAddQuestionPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const dashboardPath = user?.role === 'admin' ? '/admin/dashboard' : '/teacher/dashboard';
 
   // Form state
   const [questionText, setQuestionText] = useState("");
@@ -208,13 +212,15 @@ export default function TeacherAddQuestionPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
+    <>
+      <TopNav />
+      <div className="min-h-screen bg-gray-50 py-8 px-4">
       <div className="max-w-2xl mx-auto">
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => navigate(dashboardPath)}
             className="text-sm text-gray-500 hover:text-gray-700"
           >
             ← Back
@@ -513,5 +519,6 @@ export default function TeacherAddQuestionPage() {
         </form>
       </div>
     </div>
+    </>
   );
 }

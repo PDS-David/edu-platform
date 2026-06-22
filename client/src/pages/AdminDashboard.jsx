@@ -1096,7 +1096,7 @@ const AdminSettingsPanel = ({ setActivePanel }) => {
 
   return (
     <div>
-      <div className="mb-6"><h2 className="text-xl font-bold text-gray-900">Settings</h2><p className="text-sm text-gray-400 mt-0.5">Platform configuration and quick links</p></div>
+      <div className="mb-6"><h2 className="text-xl font-bold text-gray-900">Quick Links</h2><p className="text-sm text-gray-400 mt-0.5">Platform configuration and shortcuts</p></div>
       <div className="space-y-6">
         {sections.map(sec => (
           <div key={sec.title}>
