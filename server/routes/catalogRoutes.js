@@ -166,23 +166,74 @@ router.put('/types/:id', protect, authorize('admin'), async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// DELETE /api/catalog/types/:id — soft-delete exam type
-// ---------------------------------------------------------------------------
+// DELETE /api/catalog/types/:id — deactivate exam type AND cascade to all subjects
+// No need to deactivate subjects manually first — this does it automatically.
+// Acts like a Recycle Bin: sets is_active=false, can be reactivated or permanently deleted.
 router.delete('/types/:id', protect, authorize('admin'), async (req, res) => {
   const { id } = req.params;
   try {
-    const cnt = await sequelize.query(
-      `SELECT COUNT(*)::INTEGER AS cnt FROM subjects WHERE exam_board_id::text = :id AND is_active = true`,
+    const typeRows = await sequelize.query(
+      `SELECT id, name FROM exam_boards WHERE id::text = :id`,
       { replacements: { id }, type: QueryTypes.SELECT }
     );
-    if (cnt[0].cnt > 0) return res.status(409).json({ success: false, error: `${cnt[0].cnt} active subject(s) exist. Deactivate them first.` });
-    await sequelize.query(`UPDATE exam_boards SET is_active = false, updated_at = NOW() WHERE id = :id`, { replacements: { id }, type: QueryTypes.UPDATE });
-    return res.status(200).json({ success: true, message: 'Exam type deactivated' });
+    if (!typeRows.length) return res.status(404).json({ success: false, error: 'Exam type not found' });
+
+    // Cascade: deactivate all subjects under this exam type first
+    await sequelize.query(
+      `UPDATE subjects SET is_active = false, updated_at = NOW() WHERE exam_board_id::text = :id`,
+      { replacements: { id }, type: QueryTypes.UPDATE }
+    );
+    // Then deactivate the exam type itself
+    await sequelize.query(
+      `UPDATE exam_boards SET is_active = false, updated_at = NOW() WHERE id::text = :id`,
+      { replacements: { id }, type: QueryTypes.UPDATE }
+    );
+    return res.status(200).json({ success: true, message: 'Exam type and all its subjects deactivated' });
   } catch (err) {
     console.error('[DELETE /catalog/types/:id]', err.message);
     return res.status(500).json({ success: false, error: err.message });
   }
 });
+
+// POST /api/catalog/types/:id/reactivate — restore a deactivated exam type
+// Subjects remain deactivated — admin re-activates subjects individually if needed.
+router.post('/types/:id/reactivate', protect, authorize('admin'), async (req, res) => {
+  const { id } = req.params;
+  try {
+    await sequelize.query(
+      `UPDATE exam_boards SET is_active = true, updated_at = NOW() WHERE id::text = :id`,
+      { replacements: { id }, type: QueryTypes.UPDATE }
+    );
+    return res.status(200).json({ success: true, message: 'Exam type reactivated' });
+  } catch (err) {
+    console.error('[POST /catalog/types/:id/reactivate]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// DELETE /api/catalog/types/:id/permanent — true hard delete, only allowed when inactive
+router.delete('/types/:id/permanent', protect, authorize('admin'), async (req, res) => {
+  const { id } = req.params;
+  try {
+    const typeRows = await sequelize.query(
+      `SELECT id, is_active FROM exam_boards WHERE id::text = :id`,
+      { replacements: { id }, type: QueryTypes.SELECT }
+    );
+    if (!typeRows.length) return res.status(404).json({ success: false, error: 'Exam type not found' });
+    if (typeRows[0].is_active) {
+      return res.status(409).json({ success: false, error: 'Deactivate the exam type before permanently deleting it.' });
+    }
+    // Hard delete subjects first, then the exam type
+    await sequelize.query(`DELETE FROM subjects WHERE exam_board_id::text = :id`, { replacements: { id }, type: QueryTypes.DELETE });
+    await sequelize.query(`DELETE FROM exam_boards WHERE id::text = :id`, { replacements: { id }, type: QueryTypes.DELETE });
+    return res.status(200).json({ success: true, message: 'Exam type permanently deleted' });
+  } catch (err) {
+    console.error('[DELETE /catalog/types/:id/permanent]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+
 
 // ---------------------------------------------------------------------------
 // GET /api/catalog/types/:id/subjects — subjects under an exam type

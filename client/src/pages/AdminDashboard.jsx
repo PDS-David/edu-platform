@@ -6,7 +6,7 @@ import {
   Users, School, BookOpen, Settings, LogOut,
   Plus, Pencil, Trash2, ChevronDown, ChevronRight,
   Loader2, X, Check, AlertTriangle, RefreshCw, GraduationCap,
-  UserCheck, ChevronUp, Sparkles, Zap, Upload
+  UserCheck, ChevronUp, Sparkles, Zap, Upload, CheckCircle
 } from 'lucide-react';
 import branding from '../config/branding';
 import TopNav from '../components/TopNav';
@@ -81,7 +81,8 @@ const CatalogPanel = () => {
   const [loadingSubjects, setLoadingSubjects] = useState({});
   const [showTypeModal, setShowTypeModal]       = useState(false);
   const [showSubjectModal, setShowSubjectModal] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);   // { kind, id, name, action: 'deactivate'|'permanent' }
+  const [showReactivateConfirm, setShowReactivateConfirm] = useState(null); // { id, name }
   const [editingType, setEditingType]           = useState(null);
   const [editingSubject, setEditingSubject]     = useState(null);
   const [activeTypeId, setActiveTypeId]         = useState(null);
@@ -144,10 +145,32 @@ const CatalogPanel = () => {
   const confirmDelete = async () => {
     if (!showDeleteConfirm) return;
     try {
-      if (showDeleteConfirm.kind === 'type') { await api.delete(`/catalog/types/${showDeleteConfirm.id}`); showToast('Examination type deactivated'); fetchTypes(); }
-      else { await api.delete(`/catalog/subjects/${showDeleteConfirm.id}`); showToast('Subject deactivated'); fetchSubjects(activeTypeId); fetchTypes(); bustSubjectCache(activeTypeId); }
-    } catch (err) { showToast(err?.message || 'Failed to deactivate', 'error'); }
+      if (showDeleteConfirm.kind === 'type') {
+        if (showDeleteConfirm.action === 'permanent') {
+          await api.delete(`/catalog/types/${showDeleteConfirm.id}/permanent`);
+          showToast('Exam type permanently deleted');
+        } else {
+          await api.delete(`/catalog/types/${showDeleteConfirm.id}`);
+          showToast('Exam type and all its subjects deactivated');
+        }
+        fetchTypes();
+      } else {
+        await api.delete(`/catalog/subjects/${showDeleteConfirm.id}`);
+        showToast('Subject deactivated');
+        fetchSubjects(activeTypeId); fetchTypes(); bustSubjectCache(activeTypeId);
+      }
+    } catch (err) { showToast(err?.message || 'Failed', 'error'); }
     finally { setShowDeleteConfirm(null); }
+  };
+
+  const confirmReactivate = async () => {
+    if (!showReactivateConfirm) return;
+    try {
+      await api.post(`/catalog/types/${showReactivateConfirm.id}/reactivate`);
+      showToast('Exam type reactivated — re-activate individual subjects as needed');
+      fetchTypes();
+    } catch (err) { showToast(err?.message || 'Failed to reactivate', 'error'); }
+    finally { setShowReactivateConfirm(null); }
   };
 
   if (loading) return <div className="flex items-center justify-center py-16"><Loader2 className="w-8 h-8 text-violet-400 animate-spin mr-3" /><span className="text-gray-500">Loading catalog...</span></div>;
@@ -183,9 +206,29 @@ const CatalogPanel = () => {
               </button>
               <span className="text-xs text-gray-400 shrink-0 hidden sm:block">{type.subject_count} subject{type.subject_count !== 1 ? 's' : ''}</span>
               <div className="flex gap-1 shrink-0">
-                <button onClick={() => openAddSubject(type.id)} className="flex items-center gap-1 text-xs text-violet-600 hover:text-violet-700 border border-violet-200 hover:border-violet-400 px-2.5 py-1.5 rounded-lg font-semibold"><Plus size={12} /> Subject</button>
-                <button onClick={() => openEditType(type)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><Pencil size={15} /></button>
-                <button onClick={() => setShowDeleteConfirm({ kind: 'type', id: type.id, name: type.name })} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 size={15} /></button>
+                {type.is_active ? (
+                  <>
+                    <button onClick={() => openAddSubject(type.id)} className="flex items-center gap-1 text-xs text-violet-600 hover:text-violet-700 border border-violet-200 hover:border-violet-400 px-2.5 py-1.5 rounded-lg font-semibold"><Plus size={12} /> Subject</button>
+                    <button onClick={() => openEditType(type)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><Pencil size={15} /></button>
+                    <button
+                      onClick={() => setShowDeleteConfirm({ kind: 'type', id: type.id, name: type.name, action: 'deactivate' })}
+                      title="Deactivate (move to recycle bin)"
+                      className="p-1.5 text-gray-400 hover:text-orange-500 hover:bg-orange-50 rounded-lg"
+                    ><Trash2 size={15} /></button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => setShowReactivateConfirm({ id: type.id, name: type.name })}
+                      className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 border border-emerald-200 hover:border-emerald-400 px-2.5 py-1.5 rounded-lg font-semibold"
+                    >↩ Reactivate</button>
+                    <button
+                      onClick={() => setShowDeleteConfirm({ kind: 'type', id: type.id, name: type.name, action: 'permanent' })}
+                      title="Permanently delete — cannot be undone"
+                      className="flex items-center gap-1 text-xs text-red-600 hover:text-red-700 border border-red-200 hover:border-red-400 px-2.5 py-1.5 rounded-lg font-semibold"
+                    ><Trash2 size={12} /> Delete Forever</button>
+                  </>
+                )}
               </div>
             </div>
             {expandedType === type.id && (
@@ -267,15 +310,62 @@ const CatalogPanel = () => {
         </Modal>
       )}
 
-      {showDeleteConfirm && (
-        <Modal title="Confirm Deactivation" onClose={() => setShowDeleteConfirm(null)}>
+      {/* Deactivate confirmation */}
+      {showDeleteConfirm && showDeleteConfirm.action === 'deactivate' && (
+        <Modal title="Deactivate Exam Type" onClose={() => setShowDeleteConfirm(null)}>
+          <div className="text-center">
+            <div className="w-14 h-14 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4"><Trash2 className="w-7 h-7 text-orange-500" /></div>
+            <p className="text-gray-700 mb-1">Deactivate <span className="font-bold">"{showDeleteConfirm.name}"</span>?</p>
+            <p className="text-sm text-gray-400 mb-2">All subjects under this exam type will also be deactivated automatically.</p>
+            <p className="text-sm text-orange-600 bg-orange-50 rounded-xl px-4 py-2 mb-6">This works like a Recycle Bin — the exam type will be hidden from students but can be reactivated or permanently deleted afterwards.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowDeleteConfirm(null)} className="flex-1 border border-gray-300 text-gray-700 font-semibold py-2.5 rounded-xl text-sm hover:bg-gray-50">Cancel</button>
+              <button onClick={confirmDelete} className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2.5 rounded-xl text-sm">Deactivate</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Subject deactivate confirmation */}
+      {showDeleteConfirm && showDeleteConfirm.kind === 'subject' && (
+        <Modal title="Deactivate Subject" onClose={() => setShowDeleteConfirm(null)}>
           <div className="text-center">
             <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4"><AlertTriangle className="w-7 h-7 text-red-500" /></div>
             <p className="text-gray-700 mb-1">Deactivate <span className="font-bold">"{showDeleteConfirm.name}"</span>?</p>
             <p className="text-sm text-gray-400 mb-6">It will be hidden from students but not permanently deleted.</p>
             <div className="flex gap-3">
               <button onClick={() => setShowDeleteConfirm(null)} className="flex-1 border border-gray-300 text-gray-700 font-semibold py-2.5 rounded-xl text-sm hover:bg-gray-50">Cancel</button>
-              <button onClick={confirmDelete} className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-2.5 rounded-xl text-sm">Yes, Deactivate</button>
+              <button onClick={confirmDelete} className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-2.5 rounded-xl text-sm">Deactivate</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Permanent delete confirmation */}
+      {showDeleteConfirm && showDeleteConfirm.action === 'permanent' && (
+        <Modal title="Permanently Delete" onClose={() => setShowDeleteConfirm(null)}>
+          <div className="text-center">
+            <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4"><AlertTriangle className="w-7 h-7 text-red-600" /></div>
+            <p className="text-gray-700 mb-1">Permanently delete <span className="font-bold">"{showDeleteConfirm.name}"</span>?</p>
+            <p className="text-sm text-red-600 bg-red-50 rounded-xl px-4 py-2 mb-6">⚠ This cannot be undone. The exam type and all its subjects will be removed from the database forever.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowDeleteConfirm(null)} className="flex-1 border border-gray-300 text-gray-700 font-semibold py-2.5 rounded-xl text-sm hover:bg-gray-50">Cancel</button>
+              <button onClick={confirmDelete} className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2.5 rounded-xl text-sm">Yes, Delete Forever</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Reactivate confirmation */}
+      {showReactivateConfirm && (
+        <Modal title="Reactivate Exam Type" onClose={() => setShowReactivateConfirm(null)}>
+          <div className="text-center">
+            <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4"><CheckCircle className="w-7 h-7 text-emerald-600" /></div>
+            <p className="text-gray-700 mb-1">Reactivate <span className="font-bold">"{showReactivateConfirm.name}"</span>?</p>
+            <p className="text-sm text-gray-400 mb-6">The exam type will become visible again. Individual subjects will need to be re-activated separately.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowReactivateConfirm(null)} className="flex-1 border border-gray-300 text-gray-700 font-semibold py-2.5 rounded-xl text-sm hover:bg-gray-50">Cancel</button>
+              <button onClick={confirmReactivate} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-xl text-sm">Reactivate</button>
             </div>
           </div>
         </Modal>
