@@ -142,26 +142,21 @@ router.post('/attempt', protect, async (req, res) => {
       results.push({
         question_id:          answer.question_id,
         question_text:        question.question_text,
-        selected_answer:      answer.selected_answer,
-        selected_option_text: answer.selected_answer ?? null,
+        selected_option_text: submittedAnswer || null,
         correct_answer:       question.correct_answer,
+        correct_options: question.correct_answer
+          ? [{ option_text: question.correct_answer }]
+          : [],
         is_correct:           isCorrect,
         marks_awarded:        marks,
         max_marks:            markValue,
         explanation:          question.explanation,
         ai_explanation:       question.explanation || '',
-        // Populate marking scheme from explanation so the UI shows content
-        // rather than "Detailed marking scheme will appear here once generated"
         ai_marking_scheme: question.explanation ? {
           status:          isCorrect ? 'correct' : 'incorrect',
           whyExplanation:  question.explanation,
           markingPoints:   [],
         } : {},
-        correct_options: correctOpt
-          ? [{ id: correctOpt.option_text, option_text: correctOpt.option_text }]
-          : (question.correct_answer
-            ? [{ id: question.correct_answer, option_text: question.correct_answer }]
-            : []),
         options: question.options,
       });
 
@@ -260,9 +255,6 @@ router.post('/attempt', protect, async (req, res) => {
         total_time_ms: total_time_ms || 0,
         passed:        accuracyPct >= 60,
         answers:       results,
-        // Include these so QuizResultsPage inlineResult path has full data
-        // (previously only returned by GET /quizzes/attempt/:id, leaving
-        // the inline path with no recommendation or benchmark data)
         examiner_recommendation: accuracyPct >= 70
           ? 'Excellent performance! You are well prepared for this topic.'
           : accuracyPct >= 50
