@@ -270,6 +270,39 @@ router.post('/attempt', protect, async (req, res) => {
       console.error('[POST /quizzes/attempt] attemptId resolution failed:', err.message);
     }
 
+    // ── Competitive Benchmark ────────────────────────────────────────────────
+    // Aggregate across ALL students' attempts for questions in this subtopic,
+    // giving the "class average" to compare this student's result against.
+    // Only computed when subtopic_id is present (mock exams span a whole
+    // subject, so a single-subtopic benchmark doesn't apply).
+    let benchmark = null;
+    if (subtopic_id) {
+      try {
+        const bRows = await sequelize.query(
+          `SELECT
+             ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 1) AS avg_score,
+             AVG(pa.time_taken_seconds)                                     AS avg_time_s
+           FROM practice_attempts pa
+           JOIN questions q ON q.id = pa.question_id
+           WHERE q.subtopic_id = :subtopicId
+             AND pa.time_taken_seconds IS NOT NULL`,
+          { replacements: { subtopicId: subtopic_id }, type: QueryTypes.SELECT }
+        );
+        const row = bRows[0];
+        if (row && row.avg_score != null) {
+          benchmark = {
+            accuracy_pct: Math.round(Number(row.avg_score)),
+            avg_time_ms:  row.avg_time_s != null
+              ? Math.round(Number(row.avg_time_s) * 1000)
+              : null,
+          };
+        }
+      } catch (benchErr) {
+        console.error('[POST /quizzes/attempt] benchmark query failed:', benchErr.message);
+        // Non-fatal — quiz result still returns; benchmark stays null
+      }
+    }
+
     return res.json({
       success:      true,
       attempt_id:   attemptId,
@@ -287,7 +320,7 @@ router.post('/attempt', protect, async (req, res) => {
           : accuracyPct >= 50
           ? 'Good effort. Review the questions you missed and try again.'
           : 'Keep practising. Focus on the explanations for incorrect answers.',
-        benchmark: null, // populated in future when enough attempts exist to aggregate
+        benchmark,
       },
     });
   } catch (err) {
@@ -372,6 +405,34 @@ router.get('/attempt/:attemptId', protect, async (req, res) => {
       subtopicName = stRows[0]?.name || '';
     }
 
+    // ── Competitive Benchmark ────────────────────────────────────────────────
+    let benchmark = null;
+    if (subtopic_id) {
+      try {
+        const bRows = await sequelize.query(
+          `SELECT
+             ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 1) AS avg_score,
+             AVG(pa.time_taken_seconds)                                     AS avg_time_s
+           FROM practice_attempts pa
+           JOIN questions q ON q.id = pa.question_id
+           WHERE q.subtopic_id = :subtopicId
+             AND pa.time_taken_seconds IS NOT NULL`,
+          { replacements: { subtopicId: subtopic_id }, type: QueryTypes.SELECT }
+        );
+        const row = bRows[0];
+        if (row && row.avg_score != null) {
+          benchmark = {
+            accuracy_pct: Math.round(Number(row.avg_score)),
+            avg_time_ms:  row.avg_time_s != null
+              ? Math.round(Number(row.avg_time_s) * 1000)
+              : null,
+          };
+        }
+      } catch (benchErr) {
+        console.error('[GET /quizzes/attempt/:id] benchmark query failed:', benchErr.message);
+      }
+    }
+
     return res.json({
       success: true,
       data: {
@@ -385,7 +446,7 @@ router.get('/attempt/:attemptId', protect, async (req, res) => {
           total_time_ms: totalTimeMs,
         },
         answers,
-        benchmark:                null,
+        benchmark,
         examiner_recommendation:  accuracyPct >= 70
           ? 'Excellent performance! You are well prepared for this topic.'
           : accuracyPct >= 50
