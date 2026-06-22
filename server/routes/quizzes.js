@@ -143,20 +143,26 @@ router.post('/attempt', protect, async (req, res) => {
         question_id:          answer.question_id,
         question_text:        question.question_text,
         selected_answer:      answer.selected_answer,
-        selected_option_text: answer.selected_answer ?? null, // alias — UI reads this field
+        selected_option_text: answer.selected_answer ?? null,
         correct_answer:       question.correct_answer,
         is_correct:           isCorrect,
         marks_awarded:        marks,
         max_marks:            markValue,
         explanation:          question.explanation,
-        ai_explanation:       question.explanation || '',     // alias — UI reads this field
-        ai_marking_scheme:    {},                             // empty object — UI checks Object.keys(ms).length
-        correct_options:      correctOpt
+        ai_explanation:       question.explanation || '',
+        // Populate marking scheme from explanation so the UI shows content
+        // rather than "Detailed marking scheme will appear here once generated"
+        ai_marking_scheme: question.explanation ? {
+          status:          isCorrect ? 'correct' : 'incorrect',
+          whyExplanation:  question.explanation,
+          markingPoints:   [],
+        } : {},
+        correct_options: correctOpt
           ? [{ id: correctOpt.option_text, option_text: correctOpt.option_text }]
           : (question.correct_answer
             ? [{ id: question.correct_answer, option_text: question.correct_answer }]
             : []),
-        options:              question.options,
+        options: question.options,
       });
 
       // Record attempt — AWAITED (was previously fire-and-forget, which
@@ -246,20 +252,23 @@ router.post('/attempt', protect, async (req, res) => {
       success:      true,
       attempt_id:   attemptId,
       data: {
-        attempt_id:   attemptId, // FIX: was bare shorthand `attempt_id`, which is a
-                                  // ReferenceError — no variable of that exact name
-                                  // exists, only camelCase `attemptId`. This threw on
-                                  // every quiz submission, caught by the outer catch,
-                                  // and returned as 500 "attempt_id is not defined" —
-                                  // exactly the crash now visible on the results page
-                                  // since the silent-swallow bug was fixed upstream.
+        attempt_id:   attemptId,
         subtopic_id,
         total_score:   totalScore,
         max_score:     maxScore,
         accuracy_pct:  accuracyPct,
-        total_time_ms: total_time_ms || 0,  // pass client-supplied total through
+        total_time_ms: total_time_ms || 0,
         passed:        accuracyPct >= 60,
         answers:       results,
+        // Include these so QuizResultsPage inlineResult path has full data
+        // (previously only returned by GET /quizzes/attempt/:id, leaving
+        // the inline path with no recommendation or benchmark data)
+        examiner_recommendation: accuracyPct >= 70
+          ? 'Excellent performance! You are well prepared for this topic.'
+          : accuracyPct >= 50
+          ? 'Good effort. Review the questions you missed and try again.'
+          : 'Keep practising. Focus on the explanations for incorrect answers.',
+        benchmark: null, // populated in future when enough attempts exist to aggregate
       },
     });
   } catch (err) {
