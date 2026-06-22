@@ -284,8 +284,8 @@ router.post('/attempt', protect, async (req, res) => {
              AVG(NULLIF(pa.time_taken_seconds, 0))                          AS avg_time_s
            FROM practice_attempts pa
            JOIN questions q ON q.id = pa.question_id
-           WHERE q.subtopic_id = :subtopicId`,
-          { replacements: { subtopicId: subtopic_id }, type: QueryTypes.SELECT }
+           WHERE q.subtopic_id = :subtopicId::integer`,
+          { replacements: { subtopicId: parseInt(subtopic_id, 10) }, type: QueryTypes.SELECT }
         );
         const row = bRows[0];
         if (row && row.avg_score != null) {
@@ -414,8 +414,8 @@ router.get('/attempt/:attemptId', protect, async (req, res) => {
              AVG(NULLIF(pa.time_taken_seconds, 0))                          AS avg_time_s
            FROM practice_attempts pa
            JOIN questions q ON q.id = pa.question_id
-           WHERE q.subtopic_id = :subtopicId`,
-          { replacements: { subtopicId: subtopic_id }, type: QueryTypes.SELECT }
+           WHERE q.subtopic_id = :subtopicId::integer`,
+          { replacements: { subtopicId: parseInt(subtopic_id, 10) }, type: QueryTypes.SELECT }
         );
         const row = bRows[0];
         if (row && row.avg_score != null) {
