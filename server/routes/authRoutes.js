@@ -123,4 +123,13 @@ router.put('/notifications', protect, (_req, res) =>
   res.json({ success: true, message: 'Preferences saved' })
 );
 
+// ── POST /api/auth/heartbeat ─────────────────────────────────────────────────
+// Called by the client every 5 minutes during long sessions (e.g. quiz timer).
+// Touches last_used_at on the auth_tokens row so inactivity TTL doesn't fire.
+// Returns 200 with { alive: true } — no user data needed.
+router.post('/heartbeat', protect, (req, res) => {
+  // protect middleware already called verifyAccessToken which updates last_used_at
+  return res.json({ success: true, alive: true });
+});
+
 module.exports = router;

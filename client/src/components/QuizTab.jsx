@@ -251,6 +251,17 @@ function SetupScreen({ subtopic, subtopicId, attemptCount, selectedPaper, setSel
 function InProgressScreen({ subtopicId, subtopic, selectedPaper, onFinish, navigate, onNoQuestions }) {
   const [questions,  setQuestions]  = useState([]);
   const [loading,    setLoading]    = useState(true);
+
+  // Heartbeat: ping the server every 4 minutes during the quiz so the
+  // auth token's last_used_at stays fresh. Without this, a 30-min quiz
+  // session looks "inactive" to the server and triggers a TOKEN_INACTIVE
+  // error when the student submits, causing a cascade of 401s.
+  useEffect(() => {
+    const id = setInterval(() => {
+      import('../services/apiClient').then(m => m.default.post('/auth/heartbeat').catch(() => {}));
+    }, 4 * 60 * 1000); // every 4 minutes
+    return () => clearInterval(id);
+  }, []);
   const [current,    setCurrent]    = useState(0);
   const [flagged,    setFlagged]    = useState(new Set());
   const [hintOpen,   setHintOpen]   = useState(false);
