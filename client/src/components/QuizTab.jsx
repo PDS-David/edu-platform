@@ -761,13 +761,29 @@ function ResultsScreen({ subtopicId, subtopic, attemptId, submitError, onRevise,
     </div>
   );
 
+  // NOTE: the server (GET /quizzes/attempt/:attemptId) returns
+  // { attempt: { total_score, max_score, accuracy_pct, total_time_ms, ... },
+  //   answers, benchmark: { accuracy_pct, avg_time_ms }, examiner_recommendation }
+  // — it never sends flat top-level score/total_marks/time_taken/accuracy/
+  // avg_score/avg_time fields. Reading those flat names unconditionally
+  // returned the ?? fallback every time, which is why Total Score/Accuracy
+  // always showed 0 and the benchmark always showed "--", regardless of
+  // whether real data existed. Read the actual nested shape, with the flat
+  // names kept as a fallback only in case an older response shape is ever
+  // returned.
+  const attempt       = results.attempt   || {};
+  const benchmark      = results.benchmark || {};
   const questions    = results.questions || results.answers || [];
-  const score        = results.score        ?? 0;
-  const totalMarks   = results.total_marks  ?? questions.length;
-  const timeTaken    = results.time_taken   ?? 0;
-  const accuracy     = results.accuracy     ?? (totalMarks > 0 ? Math.round((score / totalMarks) * 100) : 0);
-  const avgScore     = results.avg_score    ?? '--';
-  const avgTime      = results.avg_time     ?? '--';
+  const score        = attempt.total_score   ?? results.score        ?? 0;
+  const totalMarks   = attempt.max_score     ?? results.total_marks  ?? questions.length;
+  const timeTaken    = attempt.total_time_ms != null
+    ? Math.round(attempt.total_time_ms / 1000)
+    : (results.time_taken ?? 0);
+  const accuracy     = attempt.accuracy_pct  ?? results.accuracy     ?? (totalMarks > 0 ? Math.round((score / totalMarks) * 100) : 0);
+  const avgScore     = benchmark.accuracy_pct ?? results.avg_score   ?? '--';
+  const avgTime      = benchmark.avg_time_ms != null
+    ? `${Math.floor(benchmark.avg_time_ms / 60000)}m ${Math.round((benchmark.avg_time_ms % 60000) / 1000)}s`
+    : (results.avg_time ?? '--');
   const recommendation = results.recommendation || results.examiner_recommendation || '';
 
   const tm = Math.floor(timeTaken / 60);
