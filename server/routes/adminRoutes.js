@@ -17,6 +17,7 @@ const {
 } = require('../utils/registrationValidators');
 const { success, error } = require('../utils/response');
 const { ENROLLMENT_SOURCE, ENROLLMENT_STATUS } = require('../constants/enrollmentConstants');
+const { ensureEnrollmentColumns } = require('./studentRoutes');
 const audit = require('../services/auditLogger');
 const { requireConfirmHeader, requireAdminConfirm } = require('../middleware/confirmDestructive');
 
@@ -435,7 +436,7 @@ router.post('/send-notification', protect, adminOnly, adminActionLimiter, async 
     );
 
     if (users.length === 0) {
-      return res.json({ success: true, sent: 0, message: 'No matching users found' });
+      return success(res, { sent: 0, message: 'No matching users found' });
     }
 
     // Check if notifications table has updated_at column
@@ -458,7 +459,7 @@ router.post('/send-notification', protect, adminOnly, adminActionLimiter, async 
     await audit.log(req, audit.ACTIONS.NOTIFICATION_SEND, {
       metadata: { target, title, sent_count: users.length },
     });
-    return res.json({ success: true, sent: users.length });
+    return success(res, { sent: users.length });
   } catch (err) {
     console.error('[POST /admin/send-notification]', err.message);
     return res.status(500).json({ success: false, error: err.message });
@@ -1008,6 +1009,7 @@ router.get('/health', protect, adminOnly, async (req, res) => {
       w('9. register student', true, `id=${u.id}`);
 
       // 10. enrol
+      await ensureEnrollmentColumns();
       await sequelize.query(
         `INSERT INTO student_subjects (student_id, subject_id, is_active, status, enrollment_source)
          VALUES (:s, :sub, true, :approvedStatus, :explicitSource)

@@ -54,8 +54,7 @@ const TILE_COLOURS = [
 // ══════════════════════════════════════════════════════════════════════════════
 export default function QuizTab({ subtopicId, subtopic, onQuizComplete }) {
   const [phase, setPhase]           = useState('setup');   // setup | inprogress | results
-  const [attemptId, setAttemptId]       = useState(null);
-  const [directResults, setDirectResults] = useState(null);
+  const [attemptId, setAttemptId]   = useState(null);
   const [submitError, setSubmitError] = useState(null);
   const [selectedPaper, setSelectedPaper] = useState('all');
   const [attemptCount, setAttemptCount]   = useState(0);
@@ -85,7 +84,7 @@ export default function QuizTab({ subtopicId, subtopic, onQuizComplete }) {
       subtopicId={subtopicId}
       subtopic={subtopic}
       selectedPaper={selectedPaper}
-      onFinish={(id, error, directResults) => { setAttemptId(id); setSubmitError(error || null); setDirectResults(directResults || null); setPhase('results'); }}
+      onFinish={(id, error) => { setAttemptId(id); setSubmitError(error || null); setPhase('results'); }}
       navigate={navigate}
     />
   );
@@ -95,7 +94,6 @@ export default function QuizTab({ subtopicId, subtopic, onQuizComplete }) {
       subtopicId={subtopicId}
       subtopic={subtopic}
       attemptId={attemptId}
-        directResults={directResults}
       submitError={submitError}
       onRevise={() => navigate(`/student/subtopic/${subtopicId}?tab=practice`)}
       onQuizComplete={onQuizComplete}
@@ -308,34 +306,7 @@ function InProgressScreen({ subtopicId, subtopic, selectedPaper, onFinish, navig
           time_taken_ms:      0,
         })),
       });
-
-      // POST already returns full results in res.data — use them directly.
-      // This avoids a second GET call that can return 0/0 if the
-      // practice_attempts rows haven't been committed yet (race condition).
-      const payload = res?.data ?? res;
-      const directResults = payload && (payload.total_score != null || payload.answers)
-        ? {
-            score:          payload.total_score  ?? 0,
-            total_marks:    payload.max_score     ?? 0,
-            time_taken:     Math.round((TOTAL_SECS - remainingRef.current)),
-            accuracy:       payload.accuracy_pct  ?? 0,
-            avg_score:      payload.benchmark?.accuracy_pct  ?? '--',
-            avg_time:       payload.benchmark?.avg_time_ms != null
-                              ? Math.round(payload.benchmark.avg_time_ms / 1000)
-                              : '--',
-            recommendation: payload.examiner_recommendation
-                              ?? (payload.accuracy_pct >= 70
-                                ? 'Excellent performance! You are well prepared for this topic.'
-                                : payload.accuracy_pct >= 50
-                                ? 'Good effort. Review the questions you missed and try again.'
-                                : 'Keep practising. Focus on the explanations for incorrect answers.'),
-            answers:        payload.answers       ?? [],
-            questions:      payload.answers       ?? [],
-          }
-        : null;
-
-      const id = payload?.attempt_id ?? null;
-      onFinish(id, null, directResults);
+      onFinish(res.data?.attempt_id ?? res.attempt_id ?? res.id ?? null);
     } catch (err) {
       // BUG FIX: previously this swallowed every error and always called
       // onFinish(null), which sent the student to the results screen with
@@ -702,9 +673,9 @@ function HintModal({ question, onClose }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // PHASE 3 — RESULTS
 // ══════════════════════════════════════════════════════════════════════════════
-function ResultsScreen({ subtopicId, subtopic, attemptId, submitError, onRevise, onQuizComplete, directResults }) {
-  const [results,       setResults]       = useState(directResults || null);
-  const [loading,       setLoading]       = useState(!directResults);
+function ResultsScreen({ subtopicId, subtopic, attemptId, submitError, onRevise, onQuizComplete }) {
+  const [results,       setResults]       = useState(null);
+  const [loading,       setLoading]       = useState(true);
   const [loadError,     setLoadError]     = useState(null);
   const [submitProgress,setSubmitProgress]= useState(null); // "Submitting question X of Y..."
   const [selectedQ,     setSelectedQ]     = useState(0);
@@ -712,40 +683,18 @@ function ResultsScreen({ subtopicId, subtopic, attemptId, submitError, onRevise,
   const [reviseToast,   setReviseToast]   = useState(true);
 
   useEffect(() => {
-    // If POST response already has results, use them directly — skip GET
-    if (directResults) {
-      setResults(directResults);
-      setLoading(false);
-      if (subtopicId) {
-        api.post(`/subtopic-progress/${subtopicId}`, { task: 'quiz' }).catch(() => {});
-        onQuizComplete?.();
-      }
-      return;
-    }
     const load = async () => {
       if (!attemptId) { setLoading(false); return; }
       try {
         const r = await api.get(`/quizzes/attempt/${attemptId}`);
-        // Server returns { success, data: { attempt, answers, benchmark, examiner_recommendation } }
-        // apiClient wraps this as { data: { attempt, ... }, success, meta }.
-        // Normalise into the flat shape ResultsScreen reads:
-        //   results.score, results.total_marks, results.time_taken,
-        //   results.accuracy, results.answers, results.recommendation
-        const payload = r?.data ?? r;
-        const attempt = payload?.attempt ?? {};
-        setResults({
-          score:          attempt.total_score  ?? 0,
-          total_marks:    attempt.max_score    ?? 0,
-          time_taken:     Math.round((attempt.total_time_ms ?? 0) / 1000),
-          accuracy:       attempt.accuracy_pct ?? 0,
-          avg_score:      payload?.benchmark?.accuracy_pct ?? '--',
-          avg_time:       payload?.benchmark?.avg_time_ms != null
-                            ? Math.round(payload.benchmark.avg_time_ms / 1000)
-                            : '--',
-          recommendation: payload?.examiner_recommendation ?? '',
-          answers:        payload?.answers ?? [],
-          questions:      payload?.answers ?? [],
-        });
+        // BUG FIX: apiClient's response interceptor already unwraps
+        // response.data?.data into `.data` on the object it returns — so
+        // `r.data` here IS the server's { attempt, answers, benchmark,
+        // examiner_recommendation } payload. Previously this stored the
+        // full wrapper object (r) instead of r.data, so every field read
+        // below was looking one level too shallow and under the wrong
+        // property names, producing the permanent 0/0/0% display.
+        setResults(r.data);
         // Mark quiz complete
         await api.post(`/subtopic-progress/${subtopicId}`, { task: 'quiz' });
         onQuizComplete?.();
@@ -763,7 +712,7 @@ function ResultsScreen({ subtopicId, subtopic, attemptId, submitError, onRevise,
       }
     };
     load();
-  }, [attemptId, subtopicId, directResults]);
+  }, [attemptId, subtopicId]);
 
   if (loading) return (
     <div className="min-h-screen bg-[#0a4a3f] flex flex-col items-center justify-center gap-4 px-4">
@@ -889,7 +838,7 @@ function ResultsScreen({ subtopicId, subtopic, attemptId, submitError, onRevise,
               <div>
                 <p className="text-white/50 text-xs font-medium mb-1">Response</p>
                 <p className="text-white/80 text-sm bg-white/10 rounded-xl px-3 py-2 leading-relaxed">
-                  {qData.selected_option_text || qData.student_answer || qData.answer || <span className="text-white/30 italic">No answer given</span>}
+                  {qData.student_answer || qData.answer || <span className="text-white/30 italic">No answer given</span>}
                 </p>
               </div>
 
@@ -968,58 +917,24 @@ function ResultsScreen({ subtopicId, subtopic, attemptId, submitError, onRevise,
 
 // ── Detailed Marking Scheme (expands inside left column) ───────────────────────
 function MarkingScheme({ qData }) {
-  // ai_marking_scheme is the structured object from the server:
-  //   { status: 'correct'|'incorrect', whyExplanation: string, ... }
-  // ai_explanation is a plain string (same as qData.explanation).
-  // The component previously read qData.ai_explanation as if it were the
-  // object — it's not; that's why the scheme always showed the fallback
-  // "will appear here once generated" message.
-  const ms = qData.ai_marking_scheme || {};
-  const hasStructured = ms && typeof ms === 'object' && Object.keys(ms).length > 0;
-
-  // Normalise into a consistent shape regardless of which server path produced it
-  const ai = hasStructured ? {
-    status:               ms.status,
-    why:                  ms.whyExplanation || ms.why || ms.verdict,
-    steps:                ms.stepByStep     || ms.step_by_step || ms.steps || [],
-    examiner_requirement: ms.examinersRequirement || ms.examiner_requirement,
-    model_answer:         ms.modelAnswer    || ms.model_answer,
-  } : {};
-
-  // Plain-text fallback (explanation field) shown when there's no structured data
-  const plainExplanation = (!hasStructured || !ai.why)
-    ? (qData.ai_explanation || qData.explanation || '')
-    : '';
-
-  const steps = ai.steps || [];
+  const ai = qData.ai_explanation || qData.marking_scheme || qData.explanation || {};
+  const steps = ai.steps || ai.step_by_step || [];
   const bullets = Array.isArray(steps) ? steps : typeof steps === 'string' ? steps.split('\n').filter(Boolean) : [];
 
   return (
     <div className="mt-2 bg-white/5 border border-white/10 rounded-xl p-4 space-y-3 text-sm text-white/80">
-      {/* Status badge */}
-      {ai.status && (
-        <span className={`inline-block text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide text-white ${
-          ai.status === 'correct' ? 'bg-green-500' : ai.status === 'incorrect' ? 'bg-red-500' : 'bg-amber-500'
-        }`}>
-          {ai.status}
-        </span>
-      )}
-
       {/* Why right/wrong */}
-      {ai.why && (
+      {(ai.verdict || ai.why) && (
         <div>
-          <p className="font-bold text-white text-xs mb-1">
-            Why your answer is {ai.status || (qData.is_correct ? 'correct' : 'incorrect')}
-          </p>
-          <p className="text-xs leading-relaxed"><BoldMarkdown text={ai.why} /></p>
-        </div>
-      )}
-
-      {/* Plain explanation fallback */}
-      {!ai.why && plainExplanation && (
-        <div>
-          <p className="font-bold text-white text-xs mb-1">Explanation</p>
-          <p className="text-xs leading-relaxed">{plainExplanation}</p>
+          <p className="font-bold text-white text-xs mb-1">Why your answer is {ai.status || (qData.is_correct ? 'correct' : 'incorrect')}?</p>
+          <ul className="space-y-1 text-xs">
+            {ai.status && (
+              <li>• <strong>Status:</strong> {ai.status}</li>
+            )}
+            {(ai.verdict || ai.why) && (
+              <li className="leading-relaxed"><BoldMarkdown text={ai.verdict || ai.why} /></li>
+            )}
+          </ul>
         </div>
       )}
 
@@ -1054,8 +969,8 @@ function MarkingScheme({ qData }) {
         </div>
       )}
 
-      {/* If no data at all */}
-      {!ai.why && !plainExplanation && bullets.length === 0 && !ai.model_answer && (
+      {/* If no AI data yet */}
+      {!ai.verdict && !ai.why && bullets.length === 0 && !ai.model_answer && (
         <p className="text-white/40 text-xs italic text-center py-2">
           Detailed marking scheme will appear here once generated.
         </p>

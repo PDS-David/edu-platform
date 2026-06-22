@@ -44,10 +44,20 @@ apiClient.interceptors.response.use(
     data:    response.data?.data    ?? response.data,
     success: response.data?.success,
     meta:    response.data?.meta    ?? null,
-    total:   response.data?.total   ?? null,
-    count:   response.data?.count   ?? null,
-    message: response.data?.message ?? null,
-    status:  response.status,
+    total:        response.data?.total ?? response.data?.meta?.total ?? null,
+    count:        response.data?.count         ?? null,
+    message:      response.data?.message       ?? null,
+    // DEF-002: pagination fields (notification endpoint + future paginated routes)
+    unread_count: response.data?.unread_count  ?? null,
+    pagination:   response.data?.pagination    ?? null,
+    // Admin endpoints that return top-level fields outside a .data wrapper.
+    // Hoisting them here means frontend code can read res.sent / res.inserted
+    // directly without knowing whether the server wrapped them or not.
+    sent:         response.data?.sent          ?? null,
+    inserted:     response.data?.inserted      ?? null,
+    already_exists: response.data?.already_exists ?? null,
+    httpStatus:   response.status, // unambiguous HTTP code (avoids collision with
+    status:       response.status, // business-logic status strings in res.data)
   }),
 
   async (error) => {

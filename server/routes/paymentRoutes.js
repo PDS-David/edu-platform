@@ -25,6 +25,7 @@ const { QueryTypes } = require('sequelize');
 const sequelize = require('../config/database');
 const { protect } = require('../middleware/auth');
 const { ENROLLMENT_STATUS } = require('../constants/enrollmentConstants');
+const { ensureEnrollmentColumns } = require('./studentRoutes');
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY;
 const CLIENT_URL      = process.env.CLIENT_URL || 'http://localhost:5173';
@@ -696,6 +697,7 @@ router.post('/activate-exam-types', protect, async (req, res) => {
     }
 
     // Insert into student_exam_types, upsert on conflict
+    await ensureEnrollmentColumns();
     let activated = 0;
     for (const boardId of pendingIds) {
       await sequelize.query(

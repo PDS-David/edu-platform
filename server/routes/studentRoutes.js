@@ -20,31 +20,33 @@ const { ENROLLMENT_SOURCE, ENROLLMENT_STATUS } = require('../constants/enrollmen
 const UUID_REGEX  = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isValidUUID = (v) => UUID_REGEX.test(v);
 
-// ── Self-healing schema guard (Bug 1 fix) ─────────────────────────────────────
-// student_subjects and student_exam_types are created by run_complete_migration.js
-// WITHOUT status/enrollment_source columns. The patch file exists but may not
-// have been run on production. Run ALTER TABLE lazily and memoize so it only
-// fires once per server process, not on every request.
+// Bug 1 fix: run_complete_migration.js's CREATE TABLE IF NOT EXISTS for
+// student_subjects never defines status/enrollment_source (see
+// database/patch_enrollment_status_columns.sql, which documents this gap
+// but is not auto-applied anywhere). On any environment where that patch
+// was never manually run against the live DB, every INSERT below 500s with
+// "column status does not exist". Self-heal once per process, lazily, on
+// first use — same pattern as ensureExtraColumns() in resourceRoutes.js.
 let _enrollmentColumnsEnsured = false;
-async function ensureEnrollmentColumns() {
+const ensureEnrollmentColumns = async () => {
   if (_enrollmentColumnsEnsured) return;
   try {
     await sequelize.query(`
       ALTER TABLE student_subjects
-        ADD COLUMN IF NOT EXISTS status            TEXT NOT NULL DEFAULT 'approved',
-        ADD COLUMN IF NOT EXISTS enrollment_source TEXT NOT NULL DEFAULT 'explicit';
+        ADD COLUMN IF NOT EXISTS status            TEXT DEFAULT 'approved',
+        ADD COLUMN IF NOT EXISTS enrollment_source  TEXT DEFAULT 'explicit';
+      UPDATE student_subjects SET status = 'approved' WHERE status IS NULL;
+      UPDATE student_subjects SET enrollment_source = 'explicit' WHERE enrollment_source IS NULL;
       ALTER TABLE student_exam_types
-        ADD COLUMN IF NOT EXISTS status            TEXT NOT NULL DEFAULT 'approved';
+        ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'approved';
+      UPDATE student_exam_types SET status = 'approved' WHERE status IS NULL;
     `, { type: QueryTypes.RAW });
     _enrollmentColumnsEnsured = true;
-  } catch (e) {
-    // Log but don't crash — if the table doesn't exist yet it will be caught
-    // by the actual INSERT below
-    console.warn('[ensureEnrollmentColumns]', e.message);
+  } catch (err) {
+    console.error('[ensureEnrollmentColumns]', err.message);
+    // Don't set the flag — retry on the next call rather than caching a failure.
   }
-}
-// Export so users.js / adminRoutes.js / paymentRoutes.js can share it
-module.exports.ensureEnrollmentColumns = ensureEnrollmentColumns;
+};
 
 // ── (removed) POST /api/students/join-class ───────────────────────────────────
 // Join codes are no longer used. Teachers add students directly from the
@@ -319,6 +321,7 @@ router.post('/test/:testId/submit', protect, async (req, res) => {
 });
 
 module.exports = router;
+module.exports.ensureEnrollmentColumns = ensureEnrollmentColumns;
 
 // =============================================================================
 // STUDENT SUBJECT MANAGEMENT
@@ -361,7 +364,7 @@ router.get('/my-boards', protect, async (req, res) => {
 
 // ── GET /api/students/my-subjects ─────────────────────────────────────────────
 // Returns all subjects the student has selected (own selections + class-assigned).
-const getMySubjects = async (req, res) => {
+router.get('/my-subjects', protect, async (req, res) => {
   const studentId = req.user.id;
   try {
     // 1. Student's own selected subjects
@@ -423,7 +426,12 @@ const getMySubjects = async (req, res) => {
     // (subjects that have at least one topic) so they see content immediately
     if (result.length === 0) {
       try {
+        // Bug 1 fix: self-heal status/enrollment_source columns before the
+        // auto-enroll INSERT below, which is the route most likely to be
+        // hit by a fresh/first-time student — and therefore the most
+        // likely trigger for the reported 500.
         await ensureEnrollmentColumns();
+
         // Enroll in subjects that have topics
         await sequelize.query(
           `INSERT INTO student_subjects (student_id, subject_id, is_active, status, enrollment_source)
@@ -461,10 +469,9 @@ const getMySubjects = async (req, res) => {
     console.error('[GET /students/my-subjects]', err.message);
     return res.status(500).json({ success: false, error: err.message });
   }
-};
+});
 
-router.get('/my-subjects', protect, getMySubjects);
-router.get('/subjects', protect, getMySubjects);
+// ── POST /api/students/subjects ───────────────────────────────────────────────
 // Add a subject to the student's selected subjects.
 // Body: { subject_id: <integer> }
 router.post('/subjects', protect, async (req, res) => {
@@ -474,7 +481,10 @@ router.post('/subjects', protect, async (req, res) => {
     return res.status(400).json({ success: false, error: 'subject_id is required' });
   }
   try {
+    // Self-heal status/enrollment_source columns if they're missing on this
+    // environment's student_subjects/student_exam_types tables (Bug 1).
     await ensureEnrollmentColumns();
+
     await sequelize.query(
       `INSERT INTO student_subjects (student_id, subject_id, is_active, status, enrollment_source)
        VALUES (:studentId, :subjectId, true, :approvedStatus, :enrollmentSource)
@@ -482,20 +492,22 @@ router.post('/subjects', protect, async (req, res) => {
          SET is_active         = true,
              status            = :approvedStatus,
              enrollment_source = COALESCE(student_subjects.enrollment_source, :enrollmentSource)`,
-      { replacements: { studentId, subjectId: subject_id, enrollmentSource: ENROLLMENT_SOURCE.EXPLICIT, approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.INSERT }
+      { replacements: { studentId, subjectId: parseInt(subject_id), enrollmentSource: ENROLLMENT_SOURCE.EXPLICIT, approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.INSERT }
     );
 
     // Also ensure the board is in student_exam_types
     const boardRows = await sequelize.query(
       `SELECT exam_board_id FROM subjects WHERE id = :subjectId AND is_active = true`,
-      { replacements: { subjectId: subject_id }, type: QueryTypes.SELECT }
+      { replacements: { subjectId: parseInt(subject_id) }, type: QueryTypes.SELECT }
     );
     if (boardRows[0]?.exam_board_id) {
       await sequelize.query(
+        // exam_board_id in student_exam_types is INTEGER (exam_boards.id is INTEGER).
+        // Do NOT cast to ::uuid — that crashes with "invalid input syntax for type uuid".
         `INSERT INTO student_exam_types (student_id, exam_board_id, is_active, status)
          VALUES (:studentId, :boardId, true, :approvedStatus)
          ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active = true, status = :approvedStatus`,
-        { replacements: { studentId, boardId: boardRows[0].exam_board_id, approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.INSERT }
+        { replacements: { studentId, boardId: parseInt(boardRows[0].exam_board_id), approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.INSERT }
       );
     }
 

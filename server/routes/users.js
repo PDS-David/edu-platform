@@ -22,6 +22,7 @@ const { adminActionLimiter } = require('../middleware/rateLimiter');
 const { requireAdminConfirm } = require('../middleware/confirmDestructive');
 const audit = require('../services/auditLogger');
 const { ENROLLMENT_SOURCE, ENROLLMENT_STATUS } = require('../constants/enrollmentConstants');
+const { ensureEnrollmentColumns } = require('./studentRoutes');
 
 // ─────────────────────────────────────────────
 // GET /api/users/stats
@@ -226,6 +227,10 @@ router.patch('/preferences', protect, async (req, res) => {
   const userId = req.user.id;
 
   try {
+    // Bug 1 fix: self-heal status/enrollment_source columns before any
+    // INSERT into student_subjects/student_exam_types below.
+    await ensureEnrollmentColumns();
+
     if (Array.isArray(exam_boards) && exam_boards.length > 0) {
       for (const raw of exam_boards) {
         if (raw == null) continue;
