@@ -17,11 +17,10 @@ module.exports = (sequelize) => {
       },
 
       examBoardId: {
-        type: DataTypes.UUID,
+        type: DataTypes.INTEGER,
         allowNull: false,
         field: 'exam_board_id',
       },
-
       subscriptionId: {
         type: DataTypes.UUID,
         allowNull: true,

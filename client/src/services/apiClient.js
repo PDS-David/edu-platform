@@ -9,7 +9,7 @@
 import axios from 'axios';
 import { getToken, setToken, clearToken } from '../utils/token';
 
-const RAW_BASE = import.meta.env.VITE_API_URL || 'https://aischoolonair-api.onrender.com';
+const RAW_BASE = import.meta.env.VITE_API_URL || 'https://www.aischoolonair.ng';
 const normalised = RAW_BASE.replace(/\/$/, '');
 const API_BASE_URL = normalised.endsWith('/api') ? normalised : normalised + '/api';
 
