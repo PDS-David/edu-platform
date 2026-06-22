@@ -124,12 +124,28 @@ router.put('/notifications', protect, (_req, res) =>
 );
 
 // ── POST /api/auth/heartbeat ─────────────────────────────────────────────────
-// Called by the client every 5 minutes during long sessions (e.g. quiz timer).
-// Touches last_used_at on the auth_tokens row so inactivity TTL doesn't fire.
-// Returns 200 with { alive: true } — no user data needed.
-router.post('/heartbeat', protect, (req, res) => {
-  // protect middleware already called verifyAccessToken which updates last_used_at
-  return res.json({ success: true, alive: true });
+// Called by the client every 12 minutes during long sessions (e.g. quiz timer).
+// Issues a fresh access token (new JWT) so the 15-min TTL doesn't expire
+// mid-session. protect middleware has already verified the current token and
+// updated last_used_at; we just need to sign a new JWT with the same identity.
+router.post('/heartbeat', protect, async (req, res) => {
+  try {
+    const tokenService = require('../services/tokenService');
+    const pair = await tokenService.issueTokenPair({
+      userId:     req.user.id,
+      role:       req.user.role,
+      rememberMe: false,        // short-lived is fine; we'll refresh again in 12 min
+      deviceHint: req.headers['user-agent']?.slice(0, 64),
+      ipAddress:  req.ip,
+      userAgent:  req.headers['user-agent']?.slice(0, 255),
+    });
+    return res.json({ success: true, alive: true, token: pair.accessToken });
+  } catch (err) {
+    // Non-fatal — if token issuance fails, just return alive:true without
+    // a new token; the existing token will expire naturally and the refresh
+    // interceptor will handle it on the next real request.
+    return res.json({ success: true, alive: true });
+  }
 });
 
 module.exports = router;
