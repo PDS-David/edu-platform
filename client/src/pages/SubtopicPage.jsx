@@ -679,7 +679,11 @@ export default function SubtopicPage() {
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'resources');
 
   useEffect(() => {
-    if (!subtopicId) return;
+    // Guard on `user` so this never fires before auth context has populated.
+    // Without the guard, the component mounts and immediately fires API calls
+    // while getToken() still returns null (in-memory token not yet restored),
+    // producing 401s that show in the console even though the user IS logged in.
+    if (!user || !subtopicId) return;
     setLoading(true);
     Promise.all([
       api.get(`/subtopics/${subtopicId}`),
@@ -691,7 +695,7 @@ export default function SubtopicPage() {
       })
       .catch(err => console.error('SubtopicPage load error:', err))
       .finally(() => setLoading(false));
-  }, [subtopicId]);
+  }, [user, subtopicId]);
 
   useEffect(() => {
     if (!user || !subtopicId) return;
