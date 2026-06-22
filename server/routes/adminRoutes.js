@@ -154,8 +154,7 @@ router.get('/platform-stats', protect, adminOnly, async (req, res) => {
           COUNT(*) FILTER (WHERE attempted_at >= NOW() - INTERVAL '7 days')  AS answered_this_week,
           -- AI questions not yet approved/active
           (SELECT COUNT(*) FROM questions
-            WHERE COALESCE(is_ai_generated, false) = true
-              AND COALESCE(status, 'pending') NOT IN ('approved','active'))::INTEGER AS total_pending
+            WHERE COALESCE(status, 'pending') NOT IN ('approved','active','rejected'))::INTEGER AS total_pending
         FROM practice_attempts
       `, { type: QueryTypes.SELECT });
       if (_qRow) qRow = _qRow;
