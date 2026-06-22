@@ -70,6 +70,56 @@ router.put ('/password',        protect, updatePassword);
 router.post('/logout',          protect, logout);
 router.post('/logout-all',      protect, logoutAll);
 
+
+// PATCH /api/auth/email — change email address (requires password confirmation)
+router.patch('/email', protect, async (req, res) => {
+  const { QueryTypes } = require('sequelize');
+  const db      = require('../config/database');
+  const bcrypt  = require('bcryptjs');
+
+  try {
+    const { new_email, current_password } = req.body;
+    if (!new_email || !current_password) {
+      return res.status(400).json({ success: false, error: 'new_email and current_password are required' });
+    }
+
+    const normEmail = new_email.toLowerCase().trim();
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRe.test(normEmail)) {
+      return res.status(400).json({ success: false, error: 'Invalid email address' });
+    }
+
+    // Check not already taken
+    const taken = await db.query(
+      'SELECT id FROM users WHERE email = :email AND id != :id LIMIT 1',
+      { replacements: { email: normEmail, id: req.user.id }, type: QueryTypes.SELECT }
+    );
+    if (taken.length) {
+      return res.status(409).json({ success: false, error: 'That email address is already in use' });
+    }
+
+    // Verify current password
+    const rows = await db.query(
+      'SELECT password FROM users WHERE id = :id LIMIT 1',
+      { replacements: { id: req.user.id }, type: QueryTypes.SELECT }
+    );
+    if (!rows.length) return res.status(404).json({ success: false, error: 'User not found' });
+
+    const match = await bcrypt.compare(current_password, rows[0].password);
+    if (!match) return res.status(401).json({ success: false, error: 'Current password is incorrect' });
+
+    await db.query(
+      'UPDATE users SET email = :email, is_verified = false, updated_at = NOW() WHERE id = :id',
+      { replacements: { email: normEmail, id: req.user.id }, type: QueryTypes.UPDATE }
+    );
+
+    return res.json({ success: true, message: 'Email updated successfully', email: normEmail });
+  } catch (err) {
+    console.error('[PATCH /auth/email]', err.message);
+    return res.status(500).json({ success: false, error: 'Failed to update email' });
+  }
+});
+
 // PATCH /api/auth/profile — update name, phone, country
 // R-01: phone is normalised to E.164 before storing.
 // R-04: name fields are trimmed/collapsed.

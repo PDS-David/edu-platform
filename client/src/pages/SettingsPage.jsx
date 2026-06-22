@@ -63,6 +63,11 @@ export default function SettingsPage() {
   const [pwForm, setPwForm] = useState({ current_password: '', new_password: '', confirm_password: '' });
   const [showPw, setShowPw] = useState({ current: false, new: false, confirm: false });
   const [pwSaving, setPwSaving] = useState(false);
+
+  // Email change
+  const [emailForm, setEmailForm]   = useState({ new_email: '', current_password: '' });
+  const [emailErrors, setEmailErrors] = useState({});
+  const [emailSaving, setEmailSaving] = useState(false);
   const [pwErrors, setPwErrors] = useState({});
 
   // Notifications
@@ -142,6 +147,25 @@ export default function SettingsPage() {
     localStorage.setItem(`notif_prefs_${user.id}`, JSON.stringify(notifs));
     setNotifSaving(true);
     setTimeout(() => { setNotifSaving(false); showToast('Notification preferences saved'); }, 300);
+  };
+
+  const handleEmailChange = async () => {
+    const errs = {};
+    if (!emailForm.new_email)        errs.new_email        = 'Required';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailForm.new_email)) errs.new_email = 'Invalid email';
+    if (!emailForm.current_password) errs.current_password = 'Required';
+    setEmailErrors(errs);
+    if (Object.keys(errs).length) return;
+
+    setEmailSaving(true);
+    try {
+      const res = await api.patch('/auth/email', emailForm);
+      updateUser({ email: res.data?.email || emailForm.new_email });
+      showToast('Email updated successfully');
+      setEmailForm({ new_email: '', current_password: '' });
+    } catch (err) {
+      showToast(err?.message || 'Failed to update email', 'error');
+    } finally { setEmailSaving(false); }
   };
 
   const handleStudySave = async () => {
@@ -313,6 +337,44 @@ export default function SettingsPage() {
             )}
             <button onClick={handlePasswordChange} disabled={pwSaving} className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors">
               {pwSaving ? <><Loader2 size={14} className="animate-spin" /> Saving…</> : <><Lock size={14} /> Update Password</>}
+            </button>
+          </div>
+        </Section>
+
+        {/* ── Change Email ── */}
+        <Section title="Change Email Address" subtitle="Update the email used to sign in" icon={Mail} accent="blue">
+          <div className="space-y-4">
+            <div>
+              <p className="text-xs text-gray-400 mb-3 flex items-center gap-1.5">
+                <Mail size={12} /> Current email: <span className="font-semibold text-gray-700">{user?.email}</span>
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">New Email Address</label>
+                  <input
+                    type="email"
+                    value={emailForm.new_email}
+                    onChange={e => setEmailForm(f => ({ ...f, new_email: e.target.value }))}
+                    placeholder="new@email.com"
+                    className={`w-full border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 ${emailErrors.new_email ? 'border-red-300 focus:ring-red-200' : 'border-gray-200 focus:ring-blue-300'}`}
+                  />
+                  {emailErrors.new_email && <p className="text-xs text-red-500 mt-1">{emailErrors.new_email}</p>}
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Confirm with Current Password</label>
+                  <input
+                    type="password"
+                    value={emailForm.current_password}
+                    onChange={e => setEmailForm(f => ({ ...f, current_password: e.target.value }))}
+                    placeholder="Your current password"
+                    className={`w-full border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 ${emailErrors.current_password ? 'border-red-300 focus:ring-red-200' : 'border-gray-200 focus:ring-blue-300'}`}
+                  />
+                  {emailErrors.current_password && <p className="text-xs text-red-500 mt-1">{emailErrors.current_password}</p>}
+                </div>
+              </div>
+            </div>
+            <button onClick={handleEmailChange} disabled={emailSaving} className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors">
+              {emailSaving ? <><Loader2 size={14} className="animate-spin" /> Saving…</> : <><Mail size={14} /> Update Email</>}
             </button>
           </div>
         </Section>
