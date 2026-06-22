@@ -135,16 +135,28 @@ router.post('/attempt', protect, async (req, res) => {
       const marks     = isCorrect ? markValue : 0;
       totalScore     += marks;
 
+      // Resolve correct option for correct_options array (matches GET /attempt/:id shape)
+      const qOpts = Array.isArray(question.options) ? question.options : [];
+      const correctOpt = qOpts.find(o => o.is_correct);
+
       results.push({
-        question_id:    answer.question_id,
-        question_text:  question.question_text,
-        selected_answer: answer.selected_answer,
-        correct_answer:  question.correct_answer,
-        is_correct:      isCorrect,
-        marks_awarded:   marks,
-        max_marks:       markValue,
-        explanation:     question.explanation,
-        options:         question.options,
+        question_id:          answer.question_id,
+        question_text:        question.question_text,
+        selected_answer:      answer.selected_answer,
+        selected_option_text: answer.selected_answer ?? null, // alias — UI reads this field
+        correct_answer:       question.correct_answer,
+        is_correct:           isCorrect,
+        marks_awarded:        marks,
+        max_marks:            markValue,
+        explanation:          question.explanation,
+        ai_explanation:       question.explanation || '',     // alias — UI reads this field
+        ai_marking_scheme:    {},                             // empty object — UI checks Object.keys(ms).length
+        correct_options:      correctOpt
+          ? [{ id: correctOpt.option_text, option_text: correctOpt.option_text }]
+          : (question.correct_answer
+            ? [{ id: question.correct_answer, option_text: question.correct_answer }]
+            : []),
+        options:              question.options,
       });
 
       // Record attempt — AWAITED (was previously fire-and-forget, which
@@ -174,7 +186,7 @@ router.post('/attempt', protect, async (req, res) => {
             studentId:  req.user.id,
             questionId: answer.question_id,
             isCorrect,
-            timeTaken:  parseInt(answer.time_taken_seconds) || 0,
+            timeTaken:  parseInt(answer.time_taken_seconds ?? (answer.time_taken_ms / 1000)) || 0,
           },
           type: QueryTypes.INSERT,
         }
@@ -242,11 +254,12 @@ router.post('/attempt', protect, async (req, res) => {
                                   // exactly the crash now visible on the results page
                                   // since the silent-swallow bug was fixed upstream.
         subtopic_id,
-        total_score:  totalScore,
-        max_score:    maxScore,
-        accuracy_pct: accuracyPct,
-        passed:       accuracyPct >= 60,
-        answers:      results,
+        total_score:   totalScore,
+        max_score:     maxScore,
+        accuracy_pct:  accuracyPct,
+        total_time_ms: total_time_ms || 0,  // pass client-supplied total through
+        passed:        accuracyPct >= 60,
+        answers:       results,
       },
     });
   } catch (err) {
