@@ -218,7 +218,7 @@ function SubtopicList({ topic, subjectId, showToast }) {
           <div className="flex items-center gap-2 py-2 group">
             <div className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
 
-            {editingId === sub.id && sub.created_by_me ? (
+            {editingId === sub.id ? (
               <InlineEdit
                 value={sub.name}
                 onSave={v => handleEdit(sub.id, v)}
@@ -228,20 +228,16 @@ function SubtopicList({ topic, subjectId, showToast }) {
             ) : (
               <>
                 <span className="text-sm text-gray-700 flex-1">{sub.name}</span>
-                {sub.created_by_me ? (
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                    <button onClick={() => setEditingId(sub.id)}
-                      className="p-1 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
-                      <Pencil size={12} />
-                    </button>
-                    <button onClick={() => setConfirmDel(sub)}
-                      className="p-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
-                ) : (
-                  <Lock size={11} className="text-gray-300 shrink-0 opacity-0 group-hover:opacity-100" title="Admin-created" />
-                )}
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                  <button onClick={() => setEditingId(sub.id)}
+                    className="p-1 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
+                    <Pencil size={12} />
+                  </button>
+                  <button onClick={() => setConfirmDel(sub)}
+                    className="p-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                    <Trash2 size={12} />
+                  </button>
+                </div>
               </>
             )}
           </div>
@@ -307,7 +303,7 @@ function TopicCard({ topic, subjectId, showToast, onEdit, onDelete }) {
           </span>
         )}
 
-        {!editing && topic.created_by_me && (
+        {!editing && (
           <div className="flex gap-1 shrink-0">
             <button onClick={() => setEditing(true)}
               className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
@@ -320,7 +316,7 @@ function TopicCard({ topic, subjectId, showToast, onEdit, onDelete }) {
           </div>
         )}
 
-        {!editing && !topic.created_by_me && (
+        {false && !editing && !topic.created_by_me && (
           <span title="Created by admin — read only"
             className="flex items-center gap-1 text-xs text-gray-300 shrink-0">
             <Lock size={11} /> Admin
