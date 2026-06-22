@@ -41,7 +41,7 @@ const REFRESH_TTL_REMEMBER  = 30 * 24 * 3600;      // 30 days     (remember me)
 
 // Inactivity window — if last_used_at is older than this, the token is invalid
 const INACTIVITY_TTL = parseInt(process.env.AUTH_INACTIVITY_TTL_SECONDS, 10)
-  || 4 * 3600;  // 4 hours
+  || 24 * 3600;  // 24 hours — students spend 30+ min on quizzes without API calls
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -194,8 +194,12 @@ async function verifyAccessToken(token) {
   // Inactivity check
   const idleSecs = (Date.now() - new Date(row.last_used_at).getTime()) / 1000;
   if (idleSecs > INACTIVITY_TTL) {
-    // Auto-revoke the idle token
-    await revokeByJti(jti, 'inactivity');
+    // Do NOT auto-revoke here — just signal inactivity so the apiClient
+    // refresh interceptor can silently recover the session using the refresh
+    // token (HttpOnly cookie). Auto-revoking would invalidate the refresh
+    // token too, permanently locking the user out with no recovery path.
+    // Students spend 30+ minutes on quiz pages with no API calls —
+    // auto-revocation turns every completed quiz into a forced logout.
     throw Object.assign(new Error('Session expired due to inactivity'), { code: 'TOKEN_INACTIVE' });
   }
 

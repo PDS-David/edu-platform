@@ -124,7 +124,27 @@ apiClient.interceptors.response.use(
     }
 
     // 401 with no refresh path (login page, refresh endpoint itself, etc.)
+    // IMPORTANT: if a refresh is already in-flight (_refreshPromise exists),
+    // do NOT redirect yet — wait for it. Multiple simultaneous 401s (e.g. after
+    // a quiz completes and the page fires 6 requests at once) would otherwise
+    // all hit this branch and redirect even though the first request is already
+    // recovering the session via refresh.
     if (error?.response?.status === 401) {
+      if (_refreshPromise) {
+        // Another request is already refreshing — wait for it, then retry
+        try {
+          const refreshRes = await _refreshPromise;
+          const newToken = refreshRes.data?.token;
+          if (newToken) {
+            setToken(newToken);
+            original.headers = original.headers || {};
+            original.headers.Authorization = `Bearer ${newToken}`;
+            return apiClient(original);
+          }
+        } catch {
+          // Refresh failed — fall through to logout
+        }
+      }
       clearToken();
       if (!window.location.pathname.startsWith('/login') &&
           !window.location.pathname.startsWith('/register')) {
