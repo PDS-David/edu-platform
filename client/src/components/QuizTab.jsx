@@ -319,13 +319,16 @@ function InProgressScreen({ subtopicId, subtopic, selectedPaper, onFinish, navig
             total_marks:    payload.max_score     ?? 0,
             time_taken:     Math.round((TOTAL_SECS - remainingRef.current)),
             accuracy:       payload.accuracy_pct  ?? 0,
-            avg_score:      '--',
-            avg_time:       '--',
-            recommendation: payload.accuracy_pct >= 70
-              ? 'Excellent performance! You are well prepared for this topic.'
-              : payload.accuracy_pct >= 50
-              ? 'Good effort. Review the questions you missed and try again.'
-              : 'Keep practising. Focus on the explanations for incorrect answers.',
+            avg_score:      payload.benchmark?.accuracy_pct  ?? '--',
+            avg_time:       payload.benchmark?.avg_time_ms != null
+                              ? Math.round(payload.benchmark.avg_time_ms / 1000)
+                              : '--',
+            recommendation: payload.examiner_recommendation
+                              ?? (payload.accuracy_pct >= 70
+                                ? 'Excellent performance! You are well prepared for this topic.'
+                                : payload.accuracy_pct >= 50
+                                ? 'Good effort. Review the questions you missed and try again.'
+                                : 'Keep practising. Focus on the explanations for incorrect answers.'),
             answers:        payload.answers       ?? [],
             questions:      payload.answers       ?? [],
           }
