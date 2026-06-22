@@ -257,27 +257,25 @@ function InProgressScreen({ subtopicId, subtopic, selectedPaper, onFinish, navig
   // session looks "inactive" to the server and triggers a TOKEN_INACTIVE
   // error when the student submits, causing a cascade of 401s.
   // ── Token keep-alive during quiz ──────────────────────────────────────────
-  // Access token expires in 15 min (no remember-me). A 30-min quiz WILL
-  // expire the token mid-session, causing cascading 401s on every background
-  // request the parent page makes when results load. Fix: proactively refresh
-  // the JWT every 12 minutes so it's always valid for the quiz duration.
-  // The static `api` import is used (not dynamic) to share the same
-  // _refreshPromise deduplication state as all other requests.
+  // Access token TTL is 2 hours (server/services/tokenService.js). The
+  // heartbeat fires immediately on mount (so the token is refreshed at quiz
+  // start regardless of how old it was before the student got here) and then
+  // every 90 minutes — well within the 2-hour TTL. Server returns a fresh
+  // JWT in the response; we store it immediately to avoid any 401 gap.
   useEffect(() => {
-    const id = setInterval(async () => {
+    const doHeartbeat = async () => {
       try {
         const r = await api.post('/auth/heartbeat');
-        // Server now returns a fresh access token — store it immediately
-        // so subsequent requests use the renewed JWT without a round-trip 401.
         if (r?.token) {
           const { setToken } = await import('../utils/token');
           setToken(r.token);
         }
       } catch {
-        // Heartbeat failure is non-fatal — the 401 refresh interceptor in
-        // apiClient.js will recover when the next real request fires.
+        // Non-fatal — the 401 refresh interceptor handles recovery.
       }
-    }, 12 * 60 * 1000); // every 12 minutes — well within the 15-min JWT TTL
+    };
+    doHeartbeat(); // immediate on quiz start
+    const id = setInterval(doHeartbeat, 90 * 60 * 1000); // then every 90 min
     return () => clearInterval(id);
   }, []);
   const [current,    setCurrent]    = useState(0);
