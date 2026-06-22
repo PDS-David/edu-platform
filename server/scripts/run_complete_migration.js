@@ -1188,6 +1188,15 @@ async function run() {
     console.log('  (verification query failed:', e.message, ')');
   }
 
+  // Approve legacy questions with NULL status — these were imported before the
+  // status column was introduced. COALESCE(status,'pending') treats them as
+  // pending, inflating the review queue count (was showing 204) with questions
+  // that are already live/active and can never be found via the review UI.
+  await exec('questions: approve legacy NULL-status entries',
+    `UPDATE questions SET status = 'approved', updated_at = NOW()
+      WHERE status IS NULL AND is_active = true`
+  );
+
   // Ensure Platform Admin user has role='admin' — the seed in
   // migrate_roles_and_curricula.sql may not have run on the live DB,
   // leaving the account with the default 'student' role from registration,
@@ -1197,6 +1206,9 @@ async function run() {
       WHERE email = 'admin@aischoolonair.com'
         AND role != 'admin'`
   );
+
+  console.log('\n✅ Migration complete.\n');
+  await pool.end();
 
   // ── migration_006: subtopic_progress missing columns (2026-06-21) ──────────
   // resources_completed and practice_completed were referenced by the service

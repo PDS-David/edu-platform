@@ -370,13 +370,20 @@ const TeacherAssignmentPanel = () => {
     finally { setCreatingTeacher(false); }
   };
 
-  // Group assignments by teacher for a cleaner view
+  // Merge ALL teachers with their assignments — shows unassigned teachers too
+  const assignedTeacherIds = new Set(assignments.map(a => a.teacher_id));
   const byTeacher = assignments.reduce((acc, a) => {
     const key = a.teacher_id || a.teacher_name;
-    if (!acc[key]) acc[key] = { name: a.teacher_name, email: a.email, rows: [] };
+    if (!acc[key]) acc[key] = { id: a.teacher_id, name: a.teacher_name, email: a.email, rows: [] };
     acc[key].rows.push(a);
     return acc;
   }, {});
+  // Add teachers with no assignments
+  teachers.forEach(t => {
+    if (!assignedTeacherIds.has(t.id)) {
+      byTeacher[t.id] = { id: t.id, name: `${t.first_name || ''} ${t.last_name || ''}`.trim(), email: t.email, rows: [] };
+    }
+  });
 
   if (loading) return <div className="flex items-center justify-center py-12"><Loader2 className="w-7 h-7 text-violet-400 animate-spin mr-3" /><span className="text-gray-500">Loading…</span></div>;
 
@@ -395,7 +402,7 @@ const TeacherAssignmentPanel = () => {
       {Object.keys(byTeacher).length === 0 ? (
         <div className="text-center py-12 text-gray-400">
           <UserCheck className="w-10 h-10 mx-auto mb-3 opacity-30" />
-          <p className="text-sm font-medium mb-1">No teacher assignments yet.</p>
+          <p className="text-sm font-medium mb-1">No teachers yet.</p>
           <p className="text-xs">Create a teacher account first, then assign them to subjects.</p>
         </div>
       ) : (
@@ -413,10 +420,16 @@ const TeacherAssignmentPanel = () => {
                     <p className="text-xs text-gray-400">{teacher.email}</p>
                   </div>
                 </div>
-                <span className="text-xs text-gray-400">{teacher.rows.length} assignment{teacher.rows.length !== 1 ? 's' : ''}</span>
+                {teacher.rows.length === 0
+                  ? <span className="text-xs text-amber-500 bg-amber-50 border border-amber-200 px-2 py-1 rounded-full">No subjects assigned</span>
+                  : <span className="text-xs text-gray-400">{teacher.rows.length} assignment{teacher.rows.length !== 1 ? 's' : ''}</span>
+                }
               </div>
               {/* Subject chips */}
               <div className="px-4 py-3 flex flex-wrap gap-2">
+                {teacher.rows.length === 0 && (
+                  <p className="text-xs text-gray-400 italic">This teacher has no subject assignments yet. Use "Add Assignment" to assign them.</p>
+                )}
                 {teacher.rows.map(a => (
                   <span key={a.id}
                     className="inline-flex items-center gap-1.5 text-xs font-medium bg-violet-50 text-violet-700 border border-violet-100 px-2.5 py-1 rounded-full">
@@ -1003,11 +1016,16 @@ const AdminPastPapersPanel = () => {
     <div>
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       <div className="flex items-center justify-between mb-5">
-        <div><h2 className="text-xl font-bold text-gray-900">Past Papers</h2><p className="text-sm text-gray-400 mt-0.5">Manage past exam papers for students</p></div>
+        <div><h2 className="text-xl font-bold text-gray-900">Past Papers</h2><p className="text-sm text-gray-400 mt-0.5">Upload past exam papers for students to download and practise with</p></div>
         <div className="flex gap-2">
           <button onClick={fetchPapers} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 px-3 py-2 border border-gray-200 rounded-xl"><RefreshCw size={14} /> Refresh</button>
           <button onClick={() => navigate('/past-papers')} className="flex items-center gap-2 text-sm border border-violet-200 text-violet-700 hover:bg-violet-50 font-semibold px-4 py-2 rounded-xl"><BookOpen size={14} /> Student View</button>
         </div>
+      </div>
+      <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700 space-y-1">
+        <p><strong>How it works:</strong></p>
+        <p>• <strong>Import from URL</strong> — paste a webpage URL that contains links to PDF past papers. The system will scan the page and import all PDFs it finds automatically.</p>
+        <p>• <strong>Manage existing papers</strong> — view, search, and delete papers already in the system. Students see these on the Past Papers page.</p>
       </div>
       <ScrapePastPapersForm onImported={fetchPapers} showToast={showToast} />
       <div className="flex gap-3 mb-5 flex-wrap">
