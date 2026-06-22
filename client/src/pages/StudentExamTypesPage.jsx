@@ -6,7 +6,6 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/apiClient';
-import TopNav from '../components/TopNav';
 import {
   GraduationCap, ChevronDown, ChevronRight,
   Loader2, CheckCircle, Plus, ArrowLeft, BookOpen,
@@ -81,7 +80,6 @@ export default function StudentExamTypesPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <TopNav />
 
       <div className="max-w-2xl mx-auto px-4 py-6">
         {/* Header */}
