@@ -785,6 +785,11 @@ async function run() {
     CREATE INDEX IF NOT EXISTS idx_pa_question_id  ON practice_attempts(question_id);
     CREATE INDEX IF NOT EXISTS idx_pa_student_date ON practice_attempts(student_id, attempted_at DESC)`],
 
+    // C-1b: add selected_option_text to practice_attempts (stores what student chose)
+    ['practice_attempts: add selected_option_text', `
+      ALTER TABLE practice_attempts
+        ADD COLUMN IF NOT EXISTS selected_option_text TEXT`],
+
     // C-2: subtopic_progress column divergence between model and migration
     ['subtopic_progress: ensure all 5 task columns exist (C-2)', `
       ALTER TABLE subtopic_progress

@@ -203,14 +203,15 @@ router.post('/attempt', protect, async (req, res) => {
       // both timestamps are now supplied explicitly, same as attempted_at.
       await sequelize.query(
         `INSERT INTO practice_attempts
-           (student_id, question_id, is_correct, time_taken_seconds, attempted_at, created_at, updated_at)
-         VALUES (:studentId, :questionId, :isCorrect, :timeTaken, NOW(), NOW(), NOW())`,
+           (student_id, question_id, is_correct, time_taken_seconds, attempted_at, created_at, updated_at, selected_option_text)
+         VALUES (:studentId, :questionId, :isCorrect, :timeTaken, NOW(), NOW(), NOW(), :selectedText)`,
         {
           replacements: {
-            studentId:  req.user.id,
-            questionId: answer.question_id,
+            studentId:    req.user.id,
+            questionId:   answer.question_id,
             isCorrect,
-            timeTaken:  parseInt(answer.time_taken_seconds ?? (answer.time_taken_ms / 1000)) || 0,
+            timeTaken:    parseInt(answer.time_taken_seconds ?? (answer.time_taken_ms / 1000)) || 0,
+            selectedText: submittedAnswer || null,
           },
           type: QueryTypes.INSERT,
         }
@@ -356,6 +357,7 @@ router.get('/attempt/:attemptId', protect, async (req, res) => {
     const sessionRows = await sequelize.query(
       `SELECT pa.id, pa.question_id, pa.is_correct,
               pa.time_taken_seconds, pa.attempted_at,
+              pa.selected_option_text,
               q.question_text, q.correct_answer, q.explanation, q.marks, q.options
        FROM practice_attempts pa
        JOIN questions q ON q.id = pa.question_id
@@ -378,14 +380,15 @@ router.get('/attempt/:attemptId', protect, async (req, res) => {
         max_marks:           row.marks || 1,
         correct_answer:      row.correct_answer,
         explanation:         row.explanation,
-        selected_option_text: row.is_correct
-          ? row.correct_answer
-          : null, // we don't store what was selected — show null
+        selected_option_text: row.selected_option_text ?? null,
         correct_options: correctOpt
           ? [{ id: correctOpt.option_text, option_text: correctOpt.option_text }]
           : [],
-        ai_marking_scheme: {},
-        ai_explanation:    row.explanation || '',
+        ai_marking_scheme: row.explanation ? {
+          status:         row.is_correct ? 'correct' : 'incorrect',
+          whyExplanation: row.explanation,
+        } : {},
+        ai_explanation: row.explanation || '',
       };
     });
 
