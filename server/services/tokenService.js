@@ -32,8 +32,13 @@ const getSecret = () => {
 const ISSUER = 'edu-platform';
 
 // Access token TTL (seconds)
-const ACCESS_TTL_DEFAULT    = 15 * 60;            // 15 minutes  (no remember me)
-const ACCESS_TTL_REMEMBER   = 7  * 24 * 3600;     // 7 days      (remember me)
+// 2 hours for normal sessions. This is safe because every request is checked
+// against the server-side auth_tokens table (revocation + inactivity), so a
+// compromised token can be invalidated instantly regardless of this TTL.
+// A 15-min TTL only hurt legitimate long sessions (30-min quizzes, etc.)
+// without adding any meaningful security benefit on top of the DB check.
+const ACCESS_TTL_DEFAULT    = 2 * 60 * 60;        // 2 hours (no remember me)
+const ACCESS_TTL_REMEMBER   = 7  * 24 * 3600;     // 7 days  (remember me)
 
 // Refresh token TTL (seconds)
 const REFRESH_TTL_DEFAULT   = 24 * 3600;           // 1 day       (no remember me)
