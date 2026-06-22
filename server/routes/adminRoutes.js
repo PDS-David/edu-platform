@@ -311,6 +311,10 @@ router.get('/questions/pending-count', protect, adminOnly, async (req, res) => {
 // ─────────────────────────────────────────────
 
 // GET /api/admin/questions/pending  — list questions awaiting review
+// Shows ALL questions so admin can view them, but approval is only
+// required for AI-generated questions before they reach students.
+// Human-crafted questions (is_ai_generated = false/null) are shown
+// here for visibility but are already live without needing approval.
 router.get('/questions/pending', protect, adminOnly, async (req, res) => {
   try {
     const limit  = Math.min(parseInt(req.query.limit  || '10', 10), 100);
@@ -320,16 +324,22 @@ router.get('/questions/pending', protect, adminOnly, async (req, res) => {
       `SELECT
          q.id, q.question_text, q.options, q.correct_answer,
          q.difficulty, q.explanation, q.status, q.is_ai_generated,
-         q.created_at,
-         u.first_name, u.last_name, u.email AS submitted_by_email,
-         s.name AS subject_name, st.name AS subtopic_name
+         q.subtopic_id, q.created_at,
+         u.first_name AS submitter_first_name,
+         u.last_name  AS submitter_last_name,
+         u.email      AS submitter_email,
+         s.name       AS subject_name,
+         st.name      AS subtopic_name,
+         eb.code      AS exam_board_code,
+         eb.name      AS exam_board_name
        FROM questions q
-       LEFT JOIN users      u  ON q.submitted_by  = u.id
-       LEFT JOIN subtopics  st ON q.subtopic_id   = st.id
-       LEFT JOIN subjects   s  ON st.subject_id   = s.id
-       WHERE COALESCE(q.is_ai_generated, false) = true
-         AND COALESCE(q.status, 'pending') NOT IN ('approved', 'active', 'rejected')
-       ORDER BY q.created_at DESC
+       LEFT JOIN users       u  ON q.submitted_by = u.id
+       LEFT JOIN subtopics  st  ON q.subtopic_id  = st.id
+       LEFT JOIN topics      t  ON t.id            = st.topic_id
+       LEFT JOIN subjects    s  ON s.id            = t.subject_id
+       LEFT JOIN exam_boards eb ON eb.id           = s.exam_board_id
+       WHERE COALESCE(q.status, 'pending') NOT IN ('approved', 'active', 'rejected')
+       ORDER BY q.is_ai_generated DESC, q.created_at DESC
        LIMIT :limit OFFSET :offset`,
       { replacements: { limit, offset }, type: QueryTypes.SELECT }
     );
@@ -337,8 +347,7 @@ router.get('/questions/pending', protect, adminOnly, async (req, res) => {
     const [countRow] = await sequelize.query(
       `SELECT COUNT(*)::INTEGER AS count
        FROM questions
-       WHERE COALESCE(is_ai_generated, false) = true
-         AND COALESCE(status, 'pending') NOT IN ('approved', 'active', 'rejected')`,
+       WHERE COALESCE(status, 'pending') NOT IN ('approved', 'active', 'rejected')`,
       { type: QueryTypes.SELECT }
     );
 
