@@ -315,16 +315,19 @@ export default function QuizResultsPage() {
             <span className="text-white/60 text-xs">
               Your score: <span className="text-white font-semibold">{pct}%</span>
             </span>
-            {benchmark.avg_score !== undefined && (
+            {(benchmark.accuracy_pct ?? benchmark.avg_score) !== undefined && (
               <span className="text-white/60 text-xs">
-                Class average: <span className="text-white font-semibold">{Math.round(benchmark.avg_score)}%</span>
+                Class average: <span className="text-white font-semibold">{Math.round(benchmark.accuracy_pct ?? benchmark.avg_score)}%</span>
               </span>
             )}
-            {benchmark.avg_time_seconds !== undefined && (
-              <span className="text-white/60 text-xs">
-                Avg time: <span className="text-white font-semibold">{fmtTime(Math.round(benchmark.avg_time_seconds))}</span>
-              </span>
-            )}
+            {(benchmark.avg_time_ms ?? benchmark.avg_time_seconds) !== undefined && (() => {
+              const ms = benchmark.avg_time_ms ?? (benchmark.avg_time_seconds * 1000);
+              return ms != null ? (
+                <span className="text-white/60 text-xs">
+                  Avg time: <span className="text-white font-semibold">{fmtTime(Math.round(ms / 1000))}</span>
+                </span>
+              ) : null;
+            })()}
           </div>
         )}
 

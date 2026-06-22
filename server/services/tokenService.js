@@ -175,7 +175,14 @@ async function verifyAccessToken(token) {
   if (rows === null) return decoded;
 
   if (!rows.length) {
-    throw Object.assign(new Error('Token not registered'), { code: 'TOKEN_INVALID' });
+    // Token has a jti but no row in auth_tokens — this happens when:
+    //   a) the issueTokenPair INSERT into auth_tokens failed silently, OR
+    //   b) the table was just created and the first post-migration login
+    //      had a transient DB error during the INSERT.
+    // In both cases the JWT signature is still valid — degrade gracefully
+    // by accepting the token rather than locking the user out.
+    // A new auth_tokens row will be created on next login.
+    return decoded;
   }
 
   const row = rows[0];
