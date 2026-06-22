@@ -33,30 +33,53 @@ router.get('/attempt-count', protect, async (req, res) => {
 });
 
 // ── POST /api/quizzes/attempt ─────────────────────────────────────────────────
-// Body: { subtopic_id, answers: [{ question_id, selected_answer|selected_option_id, time_taken_seconds }] }
+// Body: { subtopic_id, answers: [...] } for a single-subtopic quiz, OR
+//       { subject_id,  answers: [...] } for a subject-wide mock exam.
+// Exactly one of subtopic_id / subject_id must be supplied.
 router.post('/attempt', protect, async (req, res) => {
-  const { subtopic_id, paper_type, total_time_ms, answers = [] } = req.body;
-  if (!subtopic_id || !answers.length) {
-    return res.status(400).json({ success: false, error: 'subtopic_id and answers required' });
+  const { subtopic_id, subject_id, paper_type, total_time_ms, answers = [] } = req.body;
+
+  // BUG FIX: this previously required subtopic_id unconditionally, but
+  // MockExamPage.jsx legitimately has no single subtopic to report — a mock
+  // exam spans an entire subject — and was always sending subtopic_id: null
+  // with subject_id set instead. Every mock exam submission failed with
+  // 400 "subtopic_id and answers required". Now accepts either.
+  if ((!subtopic_id && !subject_id) || !answers.length) {
+    return res.status(400).json({
+      success: false,
+      error: 'Either subtopic_id or subject_id, plus answers, are required',
+    });
   }
 
-  // Enrollment check: resolve subtopic_id to its real subject_id server-side
-  // (never trust a client-supplied subject_id for this — a mismatched pair
-  // could otherwise be used to bypass the check) and verify the student is
-  // actually enrolled in that subject before any question is scored or any
-  // attempt is recorded. Previously absent — a student could submit an
-  // attempt for any subtopic_id regardless of enrollment.
+  // Enrollment check: resolve to the real subject_id server-side (never
+  // trust a client-supplied subject_id paired with a subtopic_id — a
+  // mismatched pair could otherwise be used to bypass the check) and
+  // verify the student is actually enrolled in that subject before any
+  // question is scored or any attempt is recorded.
   if (req.user.role === 'student') {
-    const subjectRows = await sequelize.query(
-      `SELECT t.subject_id
-         FROM subtopics st
-         JOIN topics t ON t.id = st.topic_id
-        WHERE st.id = :subtopicId
-        LIMIT 1`,
-      { replacements: { subtopicId: subtopic_id }, type: QueryTypes.SELECT }
-    ).catch(() => []);
+    let resolvedSubjectId = null;
 
-    const resolvedSubjectId = subjectRows[0]?.subject_id;
+    if (subtopic_id) {
+      // Single-subtopic quiz: resolve subtopic_id -> subject_id ourselves.
+      const subjectRows = await sequelize.query(
+        `SELECT t.subject_id
+           FROM subtopics st
+           JOIN topics t ON t.id = st.topic_id
+          WHERE st.id = :subtopicId
+          LIMIT 1`,
+        { replacements: { subtopicId: subtopic_id }, type: QueryTypes.SELECT }
+      ).catch(() => []);
+      resolvedSubjectId = subjectRows[0]?.subject_id;
+    } else {
+      // Mock exam: no subtopic to resolve through — subject_id IS the
+      // entitlement scope. Still verify it's a real, active subject rather
+      // than trusting an arbitrary client-supplied value outright.
+      const subjectRows = await sequelize.query(
+        `SELECT id FROM subjects WHERE id = :subjectId AND is_active = true LIMIT 1`,
+        { replacements: { subjectId: subject_id }, type: QueryTypes.SELECT }
+      ).catch(() => []);
+      resolvedSubjectId = subjectRows[0]?.id;
+    }
 
     if (resolvedSubjectId) {
       const enrolled = await sequelize.query(
@@ -74,11 +97,11 @@ router.post('/attempt', protect, async (req, res) => {
         });
       }
     }
-    // If the subtopic doesn't resolve to a subject at all (orphaned/malformed
-    // catalog data), fail open here rather than block a quiz attempt for a
-    // data-integrity issue unrelated to enrollment — that's a separate
-    // problem the catalog data itself should surface, not something this
-    // entitlement check should mask as "not enrolled."
+    // If neither path resolves to a real subject (orphaned/malformed catalog
+    // data, or a genuinely invalid subject_id), fail open here rather than
+    // block an attempt for a data-integrity issue unrelated to enrollment —
+    // that's a separate problem the catalog data itself should surface, not
+    // something this entitlement check should mask as "not enrolled."
   }
 
   try {
@@ -135,16 +158,29 @@ router.post('/attempt', protect, async (req, res) => {
       const marks     = isCorrect ? markValue : 0;
       totalScore     += marks;
 
+      // Resolve correct option for correct_options array (matches GET /attempt/:id shape)
+      const qOpts = Array.isArray(question.options) ? question.options : [];
+      const correctOpt = qOpts.find(o => o.is_correct);
+
       results.push({
-        question_id:    answer.question_id,
-        question_text:  question.question_text,
-        selected_answer: answer.selected_answer,
-        correct_answer:  question.correct_answer,
-        is_correct:      isCorrect,
-        marks_awarded:   marks,
-        max_marks:       markValue,
-        explanation:     question.explanation,
-        options:         question.options,
+        question_id:          answer.question_id,
+        question_text:        question.question_text,
+        selected_option_text: submittedAnswer || null,
+        correct_answer:       question.correct_answer,
+        correct_options: question.correct_answer
+          ? [{ option_text: question.correct_answer }]
+          : [],
+        is_correct:           isCorrect,
+        marks_awarded:        marks,
+        max_marks:            markValue,
+        explanation:          question.explanation,
+        ai_explanation:       question.explanation || '',
+        ai_marking_scheme: question.explanation ? {
+          status:          isCorrect ? 'correct' : 'incorrect',
+          whyExplanation:  question.explanation,
+          markingPoints:   [],
+        } : {},
+        options: question.options,
       });
 
       // Record attempt — AWAITED (was previously fire-and-forget, which
@@ -174,7 +210,7 @@ router.post('/attempt', protect, async (req, res) => {
             studentId:  req.user.id,
             questionId: answer.question_id,
             isCorrect,
-            timeTaken:  parseInt(answer.time_taken_seconds) || 0,
+            timeTaken:  parseInt(answer.time_taken_seconds ?? (answer.time_taken_ms / 1000)) || 0,
           },
           type: QueryTypes.INSERT,
         }
@@ -183,9 +219,13 @@ router.post('/attempt', protect, async (req, res) => {
       });
     }
 
-    // Update subtopic_progress
+    // Update subtopic_progress — ONLY for the single-subtopic quiz path.
+    // subtopic_progress.subtopic_id is NOT NULL; a mock exam has no single
+    // subtopic to report against (subtopic_id is null in that case), so
+    // this insert is skipped entirely for mock exams rather than attempted
+    // and silently swallowed by the .catch() below.
     const accuracyPct = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
-    if (accuracyPct >= 60) {
+    if (subtopic_id && accuracyPct >= 60) {
       sequelize.query(
         `INSERT INTO subtopic_progress (student_id, subtopic_id, quiz_completed, updated_at)
          VALUES (:studentId, :subtopicId, true, NOW())
@@ -230,23 +270,56 @@ router.post('/attempt', protect, async (req, res) => {
       console.error('[POST /quizzes/attempt] attemptId resolution failed:', err.message);
     }
 
+    // ── Competitive Benchmark ────────────────────────────────────────────────
+    // Aggregate across ALL students' attempts for questions in this subtopic,
+    // giving the "class average" to compare this student's result against.
+    // Only computed when subtopic_id is present (mock exams span a whole
+    // subject, so a single-subtopic benchmark doesn't apply).
+    let benchmark = null;
+    if (subtopic_id) {
+      try {
+        const bRows = await sequelize.query(
+          `SELECT
+             ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 1) AS avg_score,
+             AVG(NULLIF(pa.time_taken_seconds, 0))                          AS avg_time_s
+           FROM practice_attempts pa
+           JOIN questions q ON q.id = pa.question_id
+           WHERE q.subtopic_id = :subtopicId::integer`,
+          { replacements: { subtopicId: parseInt(subtopic_id, 10) }, type: QueryTypes.SELECT }
+        );
+        const row = bRows[0];
+        if (row && row.avg_score != null) {
+          benchmark = {
+            accuracy_pct: Math.round(Number(row.avg_score)),
+            avg_time_ms:  row.avg_time_s != null
+              ? Math.round(Number(row.avg_time_s) * 1000)
+              : null,
+          };
+        }
+      } catch (benchErr) {
+        console.error('[POST /quizzes/attempt] benchmark query failed:', benchErr.message);
+        // Non-fatal — quiz result still returns; benchmark stays null
+      }
+    }
+
     return res.json({
       success:      true,
       attempt_id:   attemptId,
       data: {
-        attempt_id:   attemptId, // FIX: was bare shorthand `attempt_id`, which is a
-                                  // ReferenceError — no variable of that exact name
-                                  // exists, only camelCase `attemptId`. This threw on
-                                  // every quiz submission, caught by the outer catch,
-                                  // and returned as 500 "attempt_id is not defined" —
-                                  // exactly the crash now visible on the results page
-                                  // since the silent-swallow bug was fixed upstream.
+        attempt_id:   attemptId,
         subtopic_id,
-        total_score:  totalScore,
-        max_score:    maxScore,
-        accuracy_pct: accuracyPct,
-        passed:       accuracyPct >= 60,
-        answers:      results,
+        total_score:   totalScore,
+        max_score:     maxScore,
+        accuracy_pct:  accuracyPct,
+        total_time_ms: total_time_ms || 0,
+        passed:        accuracyPct >= 60,
+        answers:       results,
+        examiner_recommendation: accuracyPct >= 70
+          ? 'Excellent performance! You are well prepared for this topic.'
+          : accuracyPct >= 50
+          ? 'Good effort. Review the questions you missed and try again.'
+          : 'Keep practising. Focus on the explanations for incorrect answers.',
+        benchmark,
       },
     });
   } catch (err) {
@@ -331,6 +404,33 @@ router.get('/attempt/:attemptId', protect, async (req, res) => {
       subtopicName = stRows[0]?.name || '';
     }
 
+    // ── Competitive Benchmark ────────────────────────────────────────────────
+    let benchmark = null;
+    if (subtopic_id) {
+      try {
+        const bRows = await sequelize.query(
+          `SELECT
+             ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 1) AS avg_score,
+             AVG(NULLIF(pa.time_taken_seconds, 0))                          AS avg_time_s
+           FROM practice_attempts pa
+           JOIN questions q ON q.id = pa.question_id
+           WHERE q.subtopic_id = :subtopicId::integer`,
+          { replacements: { subtopicId: parseInt(subtopic_id, 10) }, type: QueryTypes.SELECT }
+        );
+        const row = bRows[0];
+        if (row && row.avg_score != null) {
+          benchmark = {
+            accuracy_pct: Math.round(Number(row.avg_score)),
+            avg_time_ms:  row.avg_time_s != null
+              ? Math.round(Number(row.avg_time_s) * 1000)
+              : null,
+          };
+        }
+      } catch (benchErr) {
+        console.error('[GET /quizzes/attempt/:id] benchmark query failed:', benchErr.message);
+      }
+    }
+
     return res.json({
       success: true,
       data: {
@@ -344,7 +444,7 @@ router.get('/attempt/:attemptId', protect, async (req, res) => {
           total_time_ms: totalTimeMs,
         },
         answers,
-        benchmark:                null,
+        benchmark,
         examiner_recommendation:  accuracyPct >= 70
           ? 'Excellent performance! You are well prepared for this topic.'
           : accuracyPct >= 50

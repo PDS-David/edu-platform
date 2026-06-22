@@ -5,7 +5,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../services/apiClient';
-import TopNav from '../components/TopNav';
 import { FileText, Video, Music, File, Download, ArrowLeft, BookOpen, Loader2, ExternalLink } from 'lucide-react';
 import { openResourceAuth } from '../utils/authenticatedDownload';
 
@@ -223,7 +222,6 @@ export default function StudentFilesPage() {
 
   return (
     <div className="min-h-screen bg-[#f9f7f4]">
-      <TopNav />
       <div className="max-w-3xl mx-auto px-4 py-6">
         <Link to="/student/dashboard"
           className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 mb-5 transition-colors">

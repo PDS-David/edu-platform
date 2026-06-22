@@ -1,32 +1,17 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 # AISchoolonair — Caddy reverse-proxy  (production + staging)
-#
-# How Caddy auto-TLS works:
-#   • Port 80 → ACME HTTP-01 challenge + permanent redirect to HTTPS
-#   • Port 443 → TLS terminated here; traffic forwarded to Docker services
-#   • Certificates are stored in the caddy_data Docker volume (persists restarts)
-#
-# DNS required BEFORE first boot:
-#   A  aischoolonair.ng          → <HETZNER_IP>
-#   A  www.aischoolonair.ng      → <HETZNER_IP>
-#   A  staging.aischoolonair.ng  → <HETZNER_IP>
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# ── Global options ─────────────────────────────────────────────────────────────
 {
-    # Production ACME endpoint. While testing DNS, swap to the staging URL below
-    # to avoid Let's Encrypt rate limits, then remove when going live:
-    # acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
-
     email admin@aischoolonair.ng
-    admin off   # disable Caddy admin API (no exposed port 2019 on prod)
+    admin off
 
     servers {
         trusted_proxies static private_ranges
     }
 }
 
-# ── Shared security headers (imported by each vhost) ──────────────────────────
+# ── Shared security headers ───────────────────────────────────────────────────
 (security_headers) {
     header {
         Strict-Transport-Security  "max-age=31536000; includeSubDomains; preload"
@@ -39,41 +24,42 @@
     }
 }
 
-# ── Redirect bare domain → www ─────────────────────────────────────────────────
+# ── Redirect bare domain → www ────────────────────────────────────────────────
 aischoolonair.ng {
     redir https://www.aischoolonair.ng{uri} permanent
 }
 
-# ── Production — www.aischoolonair.ng ─────────────────────────────────────────
+# ── Production ────────────────────────────────────────────────────────────────
 www.aischoolonair.ng {
     import security_headers
 
-    # Paystack webhook — raw body passthrough (HMAC verification in app)
+    # Paystack webhook
     @webhook path /api/payments/webhook
     route @webhook {
-        reverse_proxy api:5000 {
+        reverse_proxy http://api:5000 {
             header_up X-Forwarded-For {remote_host}
             header_up X-Real-IP       {remote_host}
         }
     }
 
-    # Socket.IO WebSocket upgrade (realtimeEngine)
+    # WebSocket (FIXED — scoped correctly)
     @ws {
-    header Upgrade websocket
+        header Connection *Upgrade*
+        header Upgrade websocket
+        path /socket.io/*
     }
     route @ws {
-        reverse_proxy api:5000 {
+        reverse_proxy http://api:5000 {
             transport http {
                 read_timeout 60s
             }
-         }
-
-     }
+        }
+    }
 
     # REST API
     @api path /api/*
     route @api {
-        reverse_proxy api:5000 {
+        reverse_proxy http://api:5000 {
             transport http {
                 read_timeout  120s
                 write_timeout 120s
@@ -83,40 +69,41 @@ www.aischoolonair.ng {
         }
     }
 
-    # File uploads proxied through API container
+    # Uploads
     @uploads path /uploads/*
     route @uploads {
-        reverse_proxy api:5000 {
+        reverse_proxy http://api:5000 {
             transport http {
                 read_timeout 60s
             }
-         }
-     }
-    
+        }
+    }
 
-    # React SPA — served by nginx inside the web container
+    # Frontend
     route {
         reverse_proxy web:80
         encode gzip zstd
     }
 }
 
-# ── Staging — staging.aischoolonair.ng ────────────────────────────────────────
+# ── Staging ───────────────────────────────────────────────────────────────────
 staging.aischoolonair.ng {
     import security_headers
 
     @webhook_stg path /api/payments/webhook
     route @webhook_stg {
-        reverse_proxy api_staging:5000 {
+        reverse_proxy http://api_staging:5000 {
             header_up X-Forwarded-For {remote_host}
         }
     }
 
     @ws_stg {
-    header Upgrade websocket
+        header Connection *Upgrade*
+        header Upgrade websocket
+        path /socket.io/*
     }
     route @ws_stg {
-        reverse_proxy api_staging:5000 {
+        reverse_proxy http://api_staging:5000 {
             transport http {
                 read_timeout 0
                 write_timeout 0
@@ -126,17 +113,17 @@ staging.aischoolonair.ng {
 
     @api_stg path /api/*
     route @api_stg {
-        reverse_proxy api_staging:5000 {
+        reverse_proxy http://api_staging:5000 {
             transport http {
                 read_timeout 0
                 write_timeout 0
-             }
+            }
         }
     }
 
     @uploads_stg path /uploads/*
     route @uploads_stg {
-        reverse_proxy api_staging:5000
+        reverse_proxy http://api_staging:5000
     }
 
     route {

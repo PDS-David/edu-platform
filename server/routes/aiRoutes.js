@@ -105,6 +105,7 @@ router.post('/explain', protect, async (req, res) => {
               ao.is_correct  AS selected_is_correct,
               q.correct_answer AS correct_text
        FROM questions q
+       LEFT JOIN answer_options ao ON ao.id = :selectedOptionId
        WHERE q.id = :questionId`,
       {
         replacements: {

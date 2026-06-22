@@ -84,7 +84,7 @@ function QuestionAccordion({ answer, index }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div className="bg-white/5 rounded-xl p-3">
               <p className="text-white/40 text-xs mb-1">Your answer</p>
-              <p className="text-white/80 text-sm">{answer.selected_option_text || '—'}</p>
+              <p className="text-white/80 text-sm">{answer.selected_option_text || answer.selected_answer || '—'}</p>
             </div>
             <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3">
               <p className="text-blue-400/70 text-xs mb-1">Correct answer</p>
@@ -289,7 +289,7 @@ export default function QuizResultsPage() {
               </div>
               <div className="flex justify-between text-white/70">
                 <span>Questions answered</span>
-                <span className="font-semibold">{answers.filter(a => a.selected_option_text).length} / {answers.length}</span>
+                <span className="font-semibold">{answers.filter(a => a.selected_option_text || a.selected_answer).length} / {answers.length}</span>
               </div>
               <div className="flex justify-between text-white/70">
                 <span>Correct answers</span>
