@@ -1,32 +1,30 @@
 /**
  * authenticatedDownload.js
  *
- * Replaces raw <a href="/api/resources/:id/download"> links, which send no
- * Authorization header and always receive a 401 Unauthorized from the server.
+ * Opens a resource for viewing/downloading with proper auth.
  *
- * Usage:
- *   import { openResourceAuth } from '../utils/authenticatedDownload';
- *   <button onClick={() => openResourceAuth(file.id)}>Open</button>
- *   <button onClick={() => openResourceAuth(null, file.file_url)}>Open</button>
+ * Root cause of "No internet connection" errors:
+ *   The server issues a 302 redirect to a Cloudflare R2 signed URL.
+ *   When fetch() follows that redirect cross-origin (to *.r2.cloudflarestorage.com),
+ *   the browser enforces CORS and throws a network error — not an HTTP error —
+ *   so it lands in our catch block as "Download failed. Check your connection."
+ *
+ * Fix:
+ *   Use ?direct=1 to get the signed URL as JSON, then open it in a new tab.
+ *   The signed URL is already authenticated (HMAC-signed, time-limited by R2)
+ *   so no Bearer token is needed for the actual file fetch.
+ *   For local-disk files (no R2), the server streams directly — we still use
+ *   fetch() + blob() for those, which works because it's same-origin.
  */
 
 import { getToken } from './token';
 
-/**
- * Fetch a resource through the authenticated download endpoint and open/download it.
- * Falls back to file_url for public URLs (legacy R2 public links).
- *
- * @param {string|null} resourceId  - The resource UUID (preferred)
- * @param {string|null} fallbackUrl - Direct URL fallback if no id
- */
 export async function openResourceAuth(resourceId, fallbackUrl = null) {
   if (!resourceId) {
     if (fallbackUrl) window.open(fallbackUrl, '_blank', 'noopener');
     return;
   }
 
-  // Read token from in-memory / sessionStorage store (token.js).
-  // Never use localStorage — tokens no longer live there.
   const token   = getToken() || '';
   const rawBase = import.meta.env.VITE_API_URL || '';
   const apiBase = rawBase.endsWith('/api')
@@ -34,39 +32,59 @@ export async function openResourceAuth(resourceId, fallbackUrl = null) {
     : rawBase ? `${rawBase}/api` : '/api';
 
   try {
-    const resp = await fetch(`${apiBase}/resources/${resourceId}/download`, {
+    // Step 1: ask the server for the download URL (with auth)
+    const resp = await fetch(`${apiBase}/resources/${resourceId}/download?direct=1`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
-      redirect: 'follow',
     });
 
     if (!resp.ok) {
       const body = await resp.json().catch(() => ({}));
-      const msg  = body?.error || `Could not open file (HTTP ${resp.status}).`;
       if (resp.status === 401) {
         alert('Your session has expired. Please log in again.');
       } else if (resp.status === 403) {
-        alert('You do not have access to this file. Ask your teacher to (re-)push it to you.');
+        alert('You do not have access to this file. Ask your teacher to push it to you.');
       } else {
-        alert(msg);
+        alert(body?.error || `Could not open file (HTTP ${resp.status}).`);
       }
       return;
     }
 
-    const blob      = await resp.blob();
+    const data = await resp.json().catch(() => null);
+
+    if (data?.url) {
+      // R2 path: server returned a signed URL — open it directly, no CORS issue
+      window.open(data.url, '_blank', 'noopener');
+      return;
+    }
+
+    // Local-disk path: server didn't return a URL (returned streamed bytes or JSON
+    // without a url field). Fall back to blob approach for same-origin streams.
+    const blobResp = await fetch(`${apiBase}/resources/${resourceId}/download`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      redirect: 'follow',
+    });
+
+    if (!blobResp.ok) {
+      alert(`Could not open file (HTTP ${blobResp.status}).`);
+      return;
+    }
+
+    const blob      = await blobResp.blob();
     const objectUrl = URL.createObjectURL(blob);
     const a         = document.createElement('a');
     a.href          = objectUrl;
     a.target        = '_blank';
     a.rel           = 'noopener';
-    const cd        = resp.headers.get('Content-Disposition') || '';
+    const cd        = blobResp.headers.get('Content-Disposition') || '';
     const nameMatch = cd.match(/filename="?([^";]+)"?/i);
     if (nameMatch) a.download = nameMatch[1];
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(objectUrl), 120_000);
+
   } catch (err) {
     console.error('[openResourceAuth]', err);
-    alert('Download failed — check your internet connection.');
+    alert('Could not open file. Please try again.');
   }
 }
