@@ -482,22 +482,20 @@ router.post('/subjects', protect, async (req, res) => {
          SET is_active         = true,
              status            = :approvedStatus,
              enrollment_source = COALESCE(student_subjects.enrollment_source, :enrollmentSource)`,
-      { replacements: { studentId, subjectId: parseInt(subject_id), enrollmentSource: ENROLLMENT_SOURCE.EXPLICIT, approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.INSERT }
+      { replacements: { studentId, subjectId: subject_id, enrollmentSource: ENROLLMENT_SOURCE.EXPLICIT, approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.INSERT }
     );
 
     // Also ensure the board is in student_exam_types
     const boardRows = await sequelize.query(
       `SELECT exam_board_id FROM subjects WHERE id = :subjectId AND is_active = true`,
-      { replacements: { subjectId: parseInt(subject_id) }, type: QueryTypes.SELECT }
+      { replacements: { subjectId: subject_id }, type: QueryTypes.SELECT }
     );
     if (boardRows[0]?.exam_board_id) {
       await sequelize.query(
-        // exam_board_id in student_exam_types is INTEGER (exam_boards.id is INTEGER).
-        // Do NOT cast to ::uuid — that crashes with "invalid input syntax for type uuid".
         `INSERT INTO student_exam_types (student_id, exam_board_id, is_active, status)
          VALUES (:studentId, :boardId, true, :approvedStatus)
          ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active = true, status = :approvedStatus`,
-        { replacements: { studentId, boardId: parseInt(boardRows[0].exam_board_id), approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.INSERT }
+        { replacements: { studentId, boardId: boardRows[0].exam_board_id, approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.INSERT }
       );
     }
 
