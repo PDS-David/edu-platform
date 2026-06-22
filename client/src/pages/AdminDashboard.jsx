@@ -751,7 +751,7 @@ const PlatformAnalyticsPanel = () => {
   const sendNotification = async () => {
     if (!notifTitle.trim() || !notifMessage.trim()) { showToast('Title and message are required', 'error'); return; }
     setNotifSending(true);
-    try { const res = await api.post('/admin/send-notification', { target: notifTarget, title: notifTitle.trim(), message: notifMessage.trim() }); showToast(`Notification sent to ${res.sent ?? 0} user(s)`); setNotifModal(false); setNotifTitle(''); setNotifMessage(''); setNotifTarget('all'); }
+    try { const res = await api.post('/admin/send-notification', { target: notifTarget, title: notifTitle.trim(), message: notifMessage.trim() }); showToast(`Notification sent to ${res.sent ?? res.data?.sent ?? 0} user(s)`); setNotifModal(false); setNotifTitle(''); setNotifMessage(''); setNotifTarget('all'); }
     catch (err) { showToast(err?.message || 'Failed to send notification', 'error'); }
     finally { setNotifSending(false); }
   };

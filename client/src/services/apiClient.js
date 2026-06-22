@@ -39,16 +39,51 @@ apiClient.interceptors.request.use(
 let _refreshPromise = null; // deduplicate concurrent refresh calls
 
 apiClient.interceptors.response.use(
-  // Normalise successful responses
-  (response) => ({
-    data:    response.data?.data    ?? response.data,
-    success: response.data?.success,
-    meta:    response.data?.meta    ?? null,
-    total:   response.data?.total   ?? null,
-    count:   response.data?.count   ?? null,
-    message: response.data?.message ?? null,
-    status:  response.status,
-  }),
+  // Normalise successful responses into a consistent shape.
+  //
+  // THE CORE RULE:
+  //   Every backend route must return { success: true, data: <payload> }.
+  //   The normaliser unwraps .data so callers just read r.data.
+  //
+  // For non-standard fields that some admin routes return at the top level
+  // (sent, inserted, count, total, etc.) we hoist them into the normalised
+  // object AND into r.data so callers using either pattern work.
+  //
+  // STATUS COLLISION FIX:
+  //   The HTTP status integer (200, 201, etc.) is exposed as r.httpStatus,
+  //   NOT as r.status — because several backend routes return a business-logic
+  //   status string (e.g. { success:true, status:'approved' }) at the top
+  //   level, and r.status = HTTP_INT would silently clobber it.
+  (response) => {
+    const raw = response.data || {};
+
+    // Standard unwrap: prefer raw.data, fall back to full raw body
+    const data = raw.data !== undefined ? raw.data : raw;
+
+    // Hoist every known top-level field so callers can use r.fieldName
+    // regardless of whether the server wrapped it in .data or not.
+    const hoisted = {
+      data,
+      success:        raw.success,
+      message:        raw.message        ?? null,
+      // Pagination / count fields
+      total:          raw.total          ?? (typeof data === 'object' && !Array.isArray(data) ? data?.total          : null) ?? null,
+      count:          raw.count          ?? (typeof data === 'object' && !Array.isArray(data) ? data?.count          : null) ?? null,
+      meta:           raw.meta           ?? null,
+      // Admin-specific fields that were previously swallowed
+      sent:           raw.sent           ?? data?.sent           ?? null,
+      inserted:       raw.inserted       ?? data?.inserted        ?? null,
+      already_exists: raw.already_exists ?? data?.already_exists ?? null,
+      unread_count:   raw.unread_count   ?? data?.unread_count   ?? null,
+      // Business-logic status string (e.g. 'approved', 'rejected')
+      // Must NOT be the HTTP integer — that's httpStatus below.
+      approval_status: raw.approval_status ?? raw.status ?? null,
+      // HTTP status integer — renamed to avoid collision with business status
+      httpStatus:     response.status,
+    };
+
+    return hoisted;
+  },
 
   async (error) => {
     const original = error.config;
