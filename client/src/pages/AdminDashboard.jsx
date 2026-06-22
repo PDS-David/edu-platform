@@ -677,7 +677,7 @@ const UserManagementPanel = () => {
   const toggleActive  = async (userId, currentActive)  => { try { await api.put(`/users/${userId}/deactivate`, { is_active: !currentActive }); showToast(!currentActive ? 'User activated' : 'User deactivated'); fetchUsers(); } catch { showToast('Failed to update user status', 'error'); } };
   const deleteUser    = async (userId, email)          => {
     if (!window.confirm(`Delete "${email}"? Cannot be undone.`)) return;
-    try { await api.delete(`/users/${userId}`); showToast(`User ${email} deleted`); fetchUsers(); } catch (err) { showToast(err?.message || 'Failed to delete', 'error'); }
+    try { await api.delete(`/users/${userId}`, { headers: { 'X-Admin-Action': '1' } }); showToast(`User ${email} deleted`); fetchUsers(); } catch (err) { showToast(err?.message || 'Failed to delete', 'error'); }
   };
 
   const roleBadge = (role) => ({ student: 'bg-blue-100 text-blue-700', teacher: 'bg-violet-100 text-violet-700', admin: 'bg-red-100 text-red-700' }[role] || 'bg-gray-100 text-gray-600');
