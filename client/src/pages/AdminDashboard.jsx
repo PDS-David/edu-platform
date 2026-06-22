@@ -1022,12 +1022,15 @@ const AdminPastPapersPanel = () => {
           <button onClick={() => navigate('/past-papers')} className="flex items-center gap-2 text-sm border border-violet-200 text-violet-700 hover:bg-violet-50 font-semibold px-4 py-2 rounded-xl"><BookOpen size={14} /> Student View</button>
         </div>
       </div>
-      <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700 space-y-1">
-        <p><strong>How it works:</strong></p>
-        <p>• <strong>Import from URL</strong> — paste a webpage URL that contains links to PDF past papers. The system will scan the page and import all PDFs it finds automatically.</p>
-        <p>• <strong>Manage existing papers</strong> — view, search, and delete papers already in the system. Students see these on the Past Papers page.</p>
+      <div className="mb-2">
+        <h3 className="text-sm font-bold text-gray-800">Import from URL</h3>
+        <p className="text-xs text-gray-400 mt-0.5">Paste a webpage that contains PDF links — the system will scan and import all past papers it finds automatically.</p>
       </div>
       <ScrapePastPapersForm onImported={fetchPapers} showToast={showToast} />
+      <div className="mt-6 mb-3 border-t border-gray-100 pt-5">
+        <h3 className="text-sm font-bold text-gray-800">Manage Existing Papers</h3>
+        <p className="text-xs text-gray-400 mt-0.5">View, filter, and delete papers already in the system. Students see these on the Past Papers page.</p>
+      </div>
       <div className="flex gap-3 mb-5 flex-wrap">
         <select value={filters.exam_board} onChange={e => setFilters(f => ({ ...f, exam_board: e.target.value }))} className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"><option value="">All Exam Types</option>{['JAMB','WAEC','NECO','GCE_OL','GCE_AL','IELTS','TOEFL','SAT','JUPEB'].map(c => <option key={c} value={c}>{c}</option>)}</select>
         <input type="number" min="1900" max="2099" placeholder="Year from" value={filters.year_from} onChange={e => setFilters(f => ({ ...f, year_from: e.target.value }))} className="w-28 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300" />
@@ -1144,7 +1147,7 @@ const AdminDashboard = () => {
     { key: 'schools',    icon: School,        label: 'Schools'     },
     { key: 'content',    icon: BookOpen,      label: 'Content'     },
     { key: 'catalog',    icon: GraduationCap, label: 'Catalog'     },
-    { key: 'teachers',   icon: UserCheck,     label: 'Teachers'    },
+    { key: 'teachers',   icon: UserCheck,     label: 'Assigned Teachers' },
     { key: 'aigenerate', icon: Sparkles,      label: 'AI Generate' },
     { key: 'bulkupload', icon: Upload,        label: 'Bulk Upload' },
     { key: 'pastpapers', icon: BookOpen,      label: 'Past Papers' },
