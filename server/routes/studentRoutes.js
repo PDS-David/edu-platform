@@ -361,7 +361,7 @@ router.get('/my-boards', protect, async (req, res) => {
 
 // ── GET /api/students/my-subjects ─────────────────────────────────────────────
 // Returns all subjects the student has selected (own selections + class-assigned).
-router.get('/my-subjects', protect, async (req, res) => {
+const getMySubjects = async (req, res) => {
   const studentId = req.user.id;
   try {
     // 1. Student's own selected subjects
@@ -461,9 +461,10 @@ router.get('/my-subjects', protect, async (req, res) => {
     console.error('[GET /students/my-subjects]', err.message);
     return res.status(500).json({ success: false, error: err.message });
   }
-});
+};
 
-// ── POST /api/students/subjects ───────────────────────────────────────────────
+router.get('/my-subjects', protect, getMySubjects);
+router.get('/subjects', protect, getMySubjects);
 // Add a subject to the student's selected subjects.
 // Body: { subject_id: <integer> }
 router.post('/subjects', protect, async (req, res) => {
