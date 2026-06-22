@@ -100,9 +100,15 @@ apiClient.interceptors.response.use(
       try {
         // Deduplicate if multiple requests 401 simultaneously
         if (!_refreshPromise) {
+          // staleAccessToken: this tab's own (now-expired/rejected) token.
+          // The refresh_token cookie is shared by every tab on this origin,
+          // so if a different account logged in in another tab, the cookie
+          // may now belong to THAT session. Sending our last known id lets
+          // the server detect the mismatch and force a clean re-login
+          // instead of silently handing this tab someone else's session.
           _refreshPromise = axios.post(
             `${API_BASE_URL}/auth/refresh`,
-            {},
+            { staleAccessToken: getToken() },
             { withCredentials: true }
           ).finally(() => { _refreshPromise = null; });
         }

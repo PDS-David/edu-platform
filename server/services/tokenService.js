@@ -224,7 +224,7 @@ async function verifyAccessToken(token) {
  *
  * @returns {{ accessToken, refreshToken, expiresIn }}
  */
-async function rotateRefreshToken({ rawRefreshToken, ipAddress, userAgent }) {
+async function rotateRefreshToken({ rawRefreshToken, ipAddress, userAgent, expectedUserId }) {
   const hashed = hashToken(rawRefreshToken);
 
   const rows = await db.query(
@@ -240,6 +240,26 @@ async function rotateRefreshToken({ rawRefreshToken, ipAddress, userAgent }) {
   }
 
   const row = rows[0];
+
+  // CROSS-SESSION GUARD — refresh_token is a single domain-wide cookie
+  // (path: /api/auth), shared by every tab open against this origin. If two
+  // different accounts are logged in across two tabs (e.g. an admin tab and
+  // a student tab), whichever tab refreshes most recently silently
+  // overwrites the cookie for BOTH tabs. The next tab to refresh would
+  // otherwise transparently receive a token for someone else's account —
+  // surfacing as unexplained 401/403 flapping, and as a real
+  // privilege-confusion risk (one tab could end up holding another
+  // account's access token). expectedUserId is the id embedded in the
+  // calling tab's own (expired) access token — its one piece of evidence
+  // about who IT believes it is. If it doesn't match the account the
+  // cookie actually belongs to, fail closed and force a clean re-login
+  // instead of silently swapping identity.
+  if (expectedUserId && String(expectedUserId) !== String(row.user_id)) {
+    throw Object.assign(
+      new Error('Session conflict detected — please log in again'),
+      { code: 'SESSION_IDENTITY_MISMATCH' }
+    );
+  }
 
   if (row.revoked) {
     // Possible token theft — revoke the entire user's sessions
