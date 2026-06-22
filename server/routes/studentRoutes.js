@@ -27,20 +27,36 @@ const isValidUUID = (v) => UUID_REGEX.test(v);
 // was never manually run against the live DB, every INSERT below 500s with
 // "column status does not exist". Self-heal once per process, lazily, on
 // first use — same pattern as ensureExtraColumns() in resourceRoutes.js.
+// SUPABASE NOTE: Supabase transaction pooler (port 6543) does not support
+// multi-statement queries. Each DDL statement must be a separate .query() call.
 let _enrollmentColumnsEnsured = false;
 const ensureEnrollmentColumns = async () => {
   if (_enrollmentColumnsEnsured) return;
   try {
-    await sequelize.query(`
-      ALTER TABLE student_subjects
-        ADD COLUMN IF NOT EXISTS status            TEXT DEFAULT 'approved',
-        ADD COLUMN IF NOT EXISTS enrollment_source  TEXT DEFAULT 'explicit';
-      UPDATE student_subjects SET status = 'approved' WHERE status IS NULL;
-      UPDATE student_subjects SET enrollment_source = 'explicit' WHERE enrollment_source IS NULL;
-      ALTER TABLE student_exam_types
-        ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'approved';
-      UPDATE student_exam_types SET status = 'approved' WHERE status IS NULL;
-    `, { type: QueryTypes.RAW });
+    await sequelize.query(
+      `ALTER TABLE student_subjects ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'approved'`,
+      { type: QueryTypes.RAW }
+    );
+    await sequelize.query(
+      `ALTER TABLE student_subjects ADD COLUMN IF NOT EXISTS enrollment_source TEXT DEFAULT 'explicit'`,
+      { type: QueryTypes.RAW }
+    );
+    await sequelize.query(
+      `UPDATE student_subjects SET status = 'approved' WHERE status IS NULL`,
+      { type: QueryTypes.RAW }
+    );
+    await sequelize.query(
+      `UPDATE student_subjects SET enrollment_source = 'explicit' WHERE enrollment_source IS NULL`,
+      { type: QueryTypes.RAW }
+    );
+    await sequelize.query(
+      `ALTER TABLE student_exam_types ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'approved'`,
+      { type: QueryTypes.RAW }
+    );
+    await sequelize.query(
+      `UPDATE student_exam_types SET status = 'approved' WHERE status IS NULL`,
+      { type: QueryTypes.RAW }
+    );
     _enrollmentColumnsEnsured = true;
   } catch (err) {
     console.error('[ensureEnrollmentColumns]', err.message);
@@ -484,6 +500,66 @@ router.post('/subjects', protect, async (req, res) => {
     // Self-heal status/enrollment_source columns if they're missing on this
     // environment's student_subjects/student_exam_types tables (Bug 1).
     await ensureEnrollmentColumns();
+
+    // ── S1: Subject limit enforcement ──────────────────────────────────────
+    // WAEC / NECO   → max 9 subjects
+    // JAMB / UTME   → max 4 subjects
+    // JUPEB         → max 4 subjects
+    // All others    → no limit (null)
+    const SUBJECT_LIMITS = {
+      JAMB:  4,
+      WAEC:  9,
+      NECO:  9,
+      JUPEB: 4,
+    };
+
+    // Get the exam board code for this subject
+    const boardInfo = await sequelize.query(
+      `SELECT eb.code, eb.name, s.id AS subject_id
+       FROM subjects s
+       JOIN exam_boards eb ON eb.id::text = s.exam_board_id::text
+       WHERE s.id = :subjectId AND s.is_active = true`,
+      { replacements: { subjectId: parseInt(subject_id) }, type: QueryTypes.SELECT }
+    );
+
+    if (boardInfo.length > 0) {
+      const boardCode = (boardInfo[0].code || '').toUpperCase();
+      const limit = SUBJECT_LIMITS[boardCode] ?? null;
+
+      if (limit !== null) {
+        // Count how many active subjects this student already has in this board
+        const countRows = await sequelize.query(
+          `SELECT COUNT(*) AS cnt
+           FROM student_subjects ss
+           JOIN subjects s ON s.id = ss.subject_id
+           JOIN exam_boards eb ON eb.id::text = s.exam_board_id::text
+           WHERE ss.student_id = :studentId
+             AND ss.status     = :approvedStatus
+             AND ss.is_active  = true
+             AND UPPER(eb.code) = :boardCode`,
+          {
+            replacements: {
+              studentId,
+              approvedStatus: ENROLLMENT_STATUS.APPROVED,
+              boardCode,
+            },
+            type: QueryTypes.SELECT,
+          }
+        );
+
+        const current = parseInt(countRows[0]?.cnt ?? 0);
+        if (current >= limit) {
+          return res.status(400).json({
+            success: false,
+            error: `You can only enrol in ${limit} subjects for ${boardInfo[0].name}. You have reached your limit.`,
+            code: 'SUBJECT_LIMIT_REACHED',
+            limit,
+            current,
+          });
+        }
+      }
+    }
+    // ── end S1 ──────────────────────────────────────────────────────────────
 
     await sequelize.query(
       `INSERT INTO student_subjects (student_id, subject_id, is_active, status, enrollment_source)
