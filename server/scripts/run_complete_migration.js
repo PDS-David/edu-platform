@@ -1197,23 +1197,14 @@ async function run() {
       WHERE status IS NULL AND is_active = true`
   );
 
-  // Ensure Platform Admin user has role='admin' — the seed in
-  // migrate_roles_and_curricula.sql may not have run on the live DB,
-  // leaving the account with the default 'student' role from registration,
-  // which causes 403 on all /api/admin/* endpoints.
+  // Ensure Platform Admin user has role='admin'
   await exec('Platform Admin: ensure role=admin',
     `UPDATE users SET role = 'admin', updated_at = NOW()
       WHERE email = 'admin@aischoolonair.com'
         AND role != 'admin'`
   );
 
-  console.log('\n✅ Migration complete.\n');
-  await pool.end();
-
-  // ── migration_006: subtopic_progress missing columns (2026-06-21) ──────────
-  // resources_completed and practice_completed were referenced by the service
-  // and many analytics queries but were never added to the original schema.
-  // completion_pct added for efficient progress-bar queries.
+  // ── migration_006: subtopic_progress missing columns ──────────────────────
   await exec('subtopic_progress: add resources_completed, practice_completed, completion_pct',
     `ALTER TABLE subtopic_progress
        ADD COLUMN IF NOT EXISTS resources_completed BOOLEAN NOT NULL DEFAULT false,
@@ -1221,8 +1212,6 @@ async function run() {
        ADD COLUMN IF NOT EXISTS completion_pct      SMALLINT NOT NULL DEFAULT 0
          CHECK (completion_pct BETWEEN 0 AND 100)`
   );
-
-  // Recompute completion_pct for existing rows that now have the column
   await exec('subtopic_progress: backfill completion_pct',
     `UPDATE subtopic_progress
      SET completion_pct = (
