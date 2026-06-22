@@ -154,8 +154,7 @@ router.get('/platform-stats', protect, adminOnly, async (req, res) => {
           COUNT(*) FILTER (WHERE attempted_at >= NOW() - INTERVAL '7 days')  AS answered_this_week,
           -- AI questions not yet approved/active
           (SELECT COUNT(*) FROM questions
-            WHERE COALESCE(is_ai_generated, false) = true
-              AND COALESCE(status, 'pending') NOT IN ('approved','active','rejected'))::INTEGER AS total_pending
+            WHERE COALESCE(status, 'pending') NOT IN ('approved','active','rejected'))::INTEGER AS total_pending
         FROM practice_attempts
       `, { type: QueryTypes.SELECT });
       if (_qRow) qRow = _qRow;
@@ -294,8 +293,7 @@ router.get('/questions/pending-count', protect, adminOnly, async (req, res) => {
     const [row] = await sequelize.query(
       `SELECT COUNT(*)::INTEGER AS count
        FROM questions
-       WHERE COALESCE(is_ai_generated, false) = true
-         AND COALESCE(status, 'pending') NOT IN ('approved', 'active', 'rejected')`,
+       WHERE COALESCE(status, 'pending') NOT IN ('approved', 'active', 'rejected')`,
       { type: QueryTypes.SELECT }
     );
     return res.json({ success: true, count: row.count || 0 });
@@ -327,8 +325,7 @@ router.get('/questions/pending', protect, adminOnly, async (req, res) => {
        LEFT JOIN users      u  ON q.submitted_by  = u.id
        LEFT JOIN subtopics  st ON q.subtopic_id   = st.id
        LEFT JOIN subjects   s  ON st.subject_id   = s.id
-       WHERE COALESCE(q.is_ai_generated, false) = true
-         AND COALESCE(q.status, 'pending') NOT IN ('approved', 'active', 'rejected')
+       WHERE COALESCE(q.status, 'pending') NOT IN ('approved', 'active', 'rejected')
        ORDER BY q.created_at DESC
        LIMIT :limit OFFSET :offset`,
       { replacements: { limit, offset }, type: QueryTypes.SELECT }
@@ -337,8 +334,7 @@ router.get('/questions/pending', protect, adminOnly, async (req, res) => {
     const [countRow] = await sequelize.query(
       `SELECT COUNT(*)::INTEGER AS count
        FROM questions
-       WHERE COALESCE(is_ai_generated, false) = true
-         AND COALESCE(status, 'pending') NOT IN ('approved', 'active', 'rejected')`,
+       WHERE COALESCE(status, 'pending') NOT IN ('approved', 'active', 'rejected')`,
       { type: QueryTypes.SELECT }
     );
 
