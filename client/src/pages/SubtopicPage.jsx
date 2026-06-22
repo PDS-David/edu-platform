@@ -20,7 +20,6 @@ import {
   BookOpen, FileText, HelpCircle,
   Upload, Sigma,
   ArrowLeft } from 'lucide-react';
-import TopNav from '../components/TopNav';
 import AIChatWidget from '../components/AIChatWidget';
 import QuizTab from '../components/QuizTab';
 import api from '../services/apiClient';
@@ -679,7 +678,11 @@ export default function SubtopicPage() {
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'resources');
 
   useEffect(() => {
-    if (!subtopicId) return;
+    // Guard on `user` so this never fires before auth context has populated.
+    // Without the guard, the component mounts and immediately fires API calls
+    // while getToken() still returns null (in-memory token not yet restored),
+    // producing 401s that show in the console even though the user IS logged in.
+    if (!user || !subtopicId) return;
     setLoading(true);
     Promise.all([
       api.get(`/subtopics/${subtopicId}`),
@@ -691,7 +694,7 @@ export default function SubtopicPage() {
       })
       .catch(err => console.error('SubtopicPage load error:', err))
       .finally(() => setLoading(false));
-  }, [subtopicId]);
+  }, [user, subtopicId]);
 
   useEffect(() => {
     if (!user || !subtopicId) return;
@@ -711,7 +714,6 @@ export default function SubtopicPage() {
 
   if (loading) return (
     <div className={`min-h-screen ${activeTab === 'quiz' ? 'bg-[#0a4a3f]' : 'bg-gray-50'}`}>
-      <TopNav />
       <div className="flex justify-center pt-24">
         <Loader2 className={`w-8 h-8 animate-spin ${activeTab === 'quiz' ? 'text-white/60' : 'text-blue-400'}`} />
       </div>
@@ -726,7 +728,6 @@ export default function SubtopicPage() {
 
   return (
     <div className={`min-h-screen ${isQuizTab ? 'bg-[#0a4a3f]' : 'bg-gray-50'}`}>
-      <TopNav />
       <div className="max-w-3xl mx-auto px-4 pt-3 pb-0">
         <button onClick={() => navigate(-1)}
           className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 mb-2 transition-colors">

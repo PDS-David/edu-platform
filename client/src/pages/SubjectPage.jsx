@@ -8,7 +8,6 @@ import {
   ChevronDown, ChevronRight, Loader2, BookOpen,
   ClipboardList, Zap, Trophy, CheckCircle,
 } from 'lucide-react';
-import TopNav from '../components/TopNav';
 
 export default function SubjectPage() {
   const { subjectId } = useParams();
@@ -71,7 +70,6 @@ export default function SubjectPage() {
 
   if (loading) return (
     <div className="min-h-screen bg-slate-50">
-      <TopNav />
       <div className="flex items-center justify-center h-64">
         <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
       </div>
@@ -84,7 +82,6 @@ export default function SubjectPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <TopNav />
 
       <div className="max-w-2xl mx-auto px-4 py-5">
 

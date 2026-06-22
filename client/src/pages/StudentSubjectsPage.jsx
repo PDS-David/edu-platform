@@ -6,7 +6,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../services/apiClient';
-import TopNav from '../components/TopNav';
 import { BookOpen, Loader2, Plus, ArrowLeft, ChevronRight } from 'lucide-react';
 
 export default function StudentSubjectsPage() {
@@ -31,7 +30,6 @@ export default function StudentSubjectsPage() {
 
   return (
     <div className="min-h-screen bg-[#f9f7f4]">
-      <TopNav />
 
       <div className="max-w-xl mx-auto px-4 py-6">
 

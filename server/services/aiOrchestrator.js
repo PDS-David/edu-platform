@@ -6,7 +6,7 @@ const { QueryTypes }                            = require('sequelize');
 const sequelize                                 = require('../config/database');
 const { generateQuizByTopic }                   = require('./quizGenerator');
 const { formatMemoryBlock }                     = require('./userMemory');
-const tools                                     = require('../tools');
+
 // v2: central AI hub — all Gemini calls routed through generate()
 const { generate }                              = require('./ai');
 
@@ -128,12 +128,7 @@ async function orchestrate({ message, context = {}, conversationHistory = [], us
 
   const intent = await detectIntent(message, context);
 
-  let weaknessProfile = null;
-  try {
-    const result = await tools.getWeaknessProfile(context.user_id);
-    if (result && result.ok) weaknessProfile = result.data;
-  } catch {}
-
+ 
   const memoryBlock = userMemory ? formatMemoryBlock(userMemory) : '';
 
   let structured = null;

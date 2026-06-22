@@ -696,20 +696,37 @@ async function run() {
       DO $$ DECLARE col_type TEXT; BEGIN
         SELECT data_type INTO col_type FROM information_schema.columns
         WHERE table_name='student_exam_types' AND column_name='exam_board_id';
-        IF col_type = 'integer' THEN
+        IF col_type IS NULL THEN
+          -- Table doesn't exist: create fresh with INTEGER
+          CREATE TABLE IF NOT EXISTS student_exam_types (
+            id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+            student_id      UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            exam_board_id   INTEGER     NOT NULL REFERENCES exam_boards(id) ON DELETE CASCADE,
+            subscription_id UUID,
+            status          TEXT        NOT NULL DEFAULT 'approved',
+            granted_at      TIMESTAMPTZ DEFAULT NOW(),
+            expires_at      TIMESTAMPTZ,
+            is_active       BOOLEAN     DEFAULT true,
+            UNIQUE(student_id, exam_board_id)
+          );
+        ELSIF col_type = 'uuid' THEN
+          -- Wrong type: drop and recreate with INTEGER
+          -- (existing data is unusable anyway — UUID values were never valid exam_board IDs)
           DROP TABLE IF EXISTS student_exam_types CASCADE;
+          CREATE TABLE student_exam_types (
+            id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+            student_id      UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            exam_board_id   INTEGER     NOT NULL REFERENCES exam_boards(id) ON DELETE CASCADE,
+            subscription_id UUID,
+            status          TEXT        NOT NULL DEFAULT 'approved',
+            granted_at      TIMESTAMPTZ DEFAULT NOW(),
+            expires_at      TIMESTAMPTZ,
+            is_active       BOOLEAN     DEFAULT true,
+            UNIQUE(student_id, exam_board_id)
+          );
         END IF;
+        -- If already integer, nothing to do
       EXCEPTION WHEN others THEN NULL; END $$;
-      CREATE TABLE IF NOT EXISTS student_exam_types (
-        id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-        student_id      UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        exam_board_id   UUID        NOT NULL,
-        subscription_id UUID,
-        granted_at      TIMESTAMPTZ DEFAULT NOW(),
-        expires_at      TIMESTAMPTZ,
-        is_active       BOOLEAN     DEFAULT true,
-        UNIQUE(student_id, exam_board_id)
-      );
       CREATE INDEX IF NOT EXISTS idx_set_sid ON student_exam_types(student_id);
       CREATE INDEX IF NOT EXISTS idx_set_bid ON student_exam_types(exam_board_id)`],
 
