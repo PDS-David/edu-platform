@@ -17,10 +17,8 @@ const BASE_URL = _RAW.startsWith('http') ? _RAW : '';
 function resolveUrl(rawUrl) {
   if (!rawUrl) return '#';
   if (rawUrl.startsWith('http')) {
-    // Rewrite any old server hostname to the current API base
-    return rawUrl
-      .replace(/https?:\/\/eacbuddy-api\.onrender\.com/, BASE_URL)
-      .replace(/https?:\/\/aischoolonair-api\.onrender\.com/, BASE_URL);
+    // Rewrite any legacy onrender.com hostname stored in the DB to the current API base
+    return rawUrl.replace(/https?:\/\/[^/]*onrender\.com/, BASE_URL);
   }
   return `${BASE_URL}${rawUrl}`;
 }
@@ -33,16 +31,14 @@ function FileIcon({ type }) {
   return <File size={18} className="text-gray-400 shrink-0" />;
 }
 
-// Detect whether the file URL is a public CDN URL that Google Docs Viewer
-// can reach. Render /uploads/ paths are served from the API server but are
-// NOT reachable by Google — exclude any *.onrender.com URL or /uploads/ path.
+// Detect whether the file URL is a public CDN URL that Google Docs Viewer can
+// reach. Files served from /uploads/ or /api/ behind Caddy (on the Hetzner
+// server) are NOT reachable by Google — only R2/S3 CDN links are.
 function isPublicUrl(url) {
   try {
-    // Relative URLs like /uploads/... are served from the same origin (behind Caddy)
-    // and cannot be reached by Google Docs Viewer — treat as non-public.
     if (!url.startsWith('http')) return false;
     const u = new URL(url);
-    if (u.hostname.endsWith('.onrender.com')) return false;
+    if (u.hostname.endsWith('.onrender.com')) return false; // legacy, dead
     if (u.pathname.startsWith('/uploads/')) return false;
     if (u.pathname.startsWith('/api/')) return false;
     return true;
@@ -68,16 +64,15 @@ function isOfficeMime(file) {
 }
 
 // Microsoft Office Online Viewer works with any publicly reachable URL —
-// including http:// — but NOT with localhost or private-network addresses.
-// Files served from /uploads/ behind Caddy are NOT publicly reachable
-// by Microsoft's servers, so we fall back to download UI for those.
+// but NOT with localhost, private-network addresses, /uploads/ paths behind
+// Caddy (not reachable by Microsoft's servers), or /api/ proxy paths.
 function isPubliclyReachable(url) {
   try {
-    if (!url.startsWith('http')) return false;          // relative path
+    if (!url.startsWith('http')) return false;
     const u = new URL(url);
     if (u.hostname === 'localhost')                return false;
     if (u.hostname.match(/^192\.168\.|^10\.|^172\.(1[6-9]|2\d|3[01])\./)) return false;
-    if (u.hostname.endsWith('.onrender.com'))       return false;
+    if (u.hostname.endsWith('.onrender.com'))       return false; // legacy, dead
     if (u.pathname.startsWith('/uploads/'))         return false;
     if (u.pathname.startsWith('/api/'))             return false;
     return true;

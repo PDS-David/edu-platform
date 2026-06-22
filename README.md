@@ -150,24 +150,21 @@ Open http://localhost:5173
 
 ---
 
-## Deploying to Render (simple, free tier)
+## Deploying (Hetzner + GitHub Actions)
 
-The `render.yaml` file in the root configures both the API and a static site.
+Production runs on a Hetzner CX23 (IP `178.104.51.118`) with Docker + Caddy as
+a reverse proxy and the database on Supabase (PostgreSQL via `DATABASE_URL`).
 
-1. Push the repo to GitHub
-2. Go to [render.com](https://render.com) → New → Blueprint
-3. Connect the repo — Render reads `render.yaml` automatically
-4. Add these env vars manually in the Render dashboard → API service → Environment:
-   - `JWT_SECRET` — generate with `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"`
-   - `GEMINI_API_KEY`
-   - `PAYSTACK_SECRET_KEY`
-   - `PAYSTACK_WEBHOOK_SECRET`
-   - `EMAIL_USER` / `EMAIL_PASS`
-5. Run the DB migrations from your local machine (pointing at the Render DB External URL):
-   ```bash
-   psql "postgresql://..." -f database/migration_001.sql
-   # repeat for 002, 003, migrate_roles_and_curricula.sql
-   ```
+Deployment is automated via GitHub Actions → SSH → `deploy.sh`:
+
+1. Push to `main` — `deploy.yml` SSHs into the Hetzner server and runs
+   `deploy.sh`, which builds the Docker image and runs DB migrations.
+2. Required GitHub Actions secrets: `HETZNER_HOST`, `HETZNER_USER`,
+   `HETZNER_SSH_KEY`, `REGISTRY_USER`, `REGISTRY_PASSWORD`.
+3. Server env vars live in `/opt/aischoolonair/server/.env` on the Hetzner
+   server. Required: `DATABASE_URL`, `JWT_SECRET`, `GEMINI_API_KEY`,
+   `PAYSTACK_SECRET_KEY`, `PAYSTACK_WEBHOOK_SECRET`, `EMAIL_USER`, `EMAIL_PASS`.
+4. The `render.yaml` file in the repo root is **stale and unused**.
 
 ---
 

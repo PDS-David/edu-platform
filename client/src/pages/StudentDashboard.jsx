@@ -66,8 +66,9 @@ function resolveFileUrl(rawUrl) {
     .replace(/\/$/, "") || window.location.origin;
   if (!rawUrl) return "";
   if (!rawUrl.startsWith("http")) return `${apiBase}${rawUrl}`;
-  if (/eacbuddy-api\.onrender\.com/.test(rawUrl)) {
-    return rawUrl.replace(/https?:\/\/eacbuddy-api\.onrender\.com/, apiBase);
+  // Rewrite any legacy onrender.com URLs stored in the DB to the current host.
+  if (/onrender\.com/.test(rawUrl)) {
+    return rawUrl.replace(/https?:\/\/[^/]*onrender\.com/, apiBase);
   }
   return rawUrl;
 }

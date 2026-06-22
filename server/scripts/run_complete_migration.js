@@ -580,12 +580,17 @@ async function run() {
       id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
       test_id     UUID        NOT NULL REFERENCES custom_tests(id) ON DELETE CASCADE,
       student_id  UUID        NOT NULL REFERENCES users(id)        ON DELETE CASCADE,
+      class_id    UUID,
       due_date    TIMESTAMPTZ,
       assigned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       UNIQUE(test_id, student_id)
     );
     CREATE INDEX IF NOT EXISTS idx_ta_tid ON test_assignments(test_id);
-    CREATE INDEX IF NOT EXISTS idx_ta_sid ON test_assignments(student_id)`],
+    CREATE INDEX IF NOT EXISTS idx_ta_sid ON test_assignments(student_id);
+    ALTER TABLE test_assignments
+      ADD COLUMN IF NOT EXISTS score         INTEGER,
+      ADD COLUMN IF NOT EXISTS completed_at  TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS total_time_ms BIGINT`],
 
     ['student_subjects', `CREATE TABLE IF NOT EXISTS student_subjects (
       id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -594,7 +599,11 @@ async function run() {
       is_active  BOOLEAN     NOT NULL DEFAULT true,
       added_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       UNIQUE(student_id, subject_id)
-    ); CREATE INDEX IF NOT EXISTS idx_ss_sid ON student_subjects(student_id)`],
+    );
+    CREATE INDEX IF NOT EXISTS idx_ss_sid ON student_subjects(student_id);
+    ALTER TABLE student_subjects
+      ADD COLUMN IF NOT EXISTS status            TEXT NOT NULL DEFAULT 'approved',
+      ADD COLUMN IF NOT EXISTS enrollment_source TEXT NOT NULL DEFAULT 'explicit'`],
 
     ['class_subjects', `CREATE TABLE IF NOT EXISTS class_subjects (
       id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
