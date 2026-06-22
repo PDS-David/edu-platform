@@ -256,10 +256,28 @@ function InProgressScreen({ subtopicId, subtopic, selectedPaper, onFinish, navig
   // auth token's last_used_at stays fresh. Without this, a 30-min quiz
   // session looks "inactive" to the server and triggers a TOKEN_INACTIVE
   // error when the student submits, causing a cascade of 401s.
+  // ── Token keep-alive during quiz ──────────────────────────────────────────
+  // Access token expires in 15 min (no remember-me). A 30-min quiz WILL
+  // expire the token mid-session, causing cascading 401s on every background
+  // request the parent page makes when results load. Fix: proactively refresh
+  // the JWT every 12 minutes so it's always valid for the quiz duration.
+  // The static `api` import is used (not dynamic) to share the same
+  // _refreshPromise deduplication state as all other requests.
   useEffect(() => {
-    const id = setInterval(() => {
-      import('../services/apiClient').then(m => m.default.post('/auth/heartbeat').catch(() => {}));
-    }, 4 * 60 * 1000); // every 4 minutes
+    const id = setInterval(async () => {
+      try {
+        const r = await api.post('/auth/heartbeat');
+        // Server now returns a fresh access token — store it immediately
+        // so subsequent requests use the renewed JWT without a round-trip 401.
+        if (r?.token) {
+          const { setToken } = await import('../utils/token');
+          setToken(r.token);
+        }
+      } catch {
+        // Heartbeat failure is non-fatal — the 401 refresh interceptor in
+        // apiClient.js will recover when the next real request fires.
+      }
+    }, 12 * 60 * 1000); // every 12 minutes — well within the 15-min JWT TTL
     return () => clearInterval(id);
   }, []);
   const [current,    setCurrent]    = useState(0);

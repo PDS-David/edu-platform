@@ -209,8 +209,8 @@ export default function QuestionReview() {
                   )}
                   <span className="ml-auto text-xs text-gray-400 flex items-center gap-1">
                     <User className="w-3 h-3" />
-                    {q.submitter_first_name} {q.submitter_last_name}
-                    {q.submitter_email && <span className="text-gray-300">· {q.submitter_email}</span>}
+                    {q.first_name} {q.last_name}
+                    {q.submitted_by_email && <span className="text-gray-300">· {q.submitted_by_email}</span>}
                   </span>
                 </div>
 

@@ -294,8 +294,7 @@ router.get('/questions/pending-count', protect, adminOnly, async (req, res) => {
     const [row] = await sequelize.query(
       `SELECT COUNT(*)::INTEGER AS count
        FROM questions
-       WHERE COALESCE(is_ai_generated, false) = true
-         AND COALESCE(status, 'pending') NOT IN ('approved', 'active')`,
+       WHERE COALESCE(status, 'pending') NOT IN ('approved', 'active', 'rejected')`,
       { type: QueryTypes.SELECT }
     );
     return res.json({ success: true, count: row.count || 0 });
