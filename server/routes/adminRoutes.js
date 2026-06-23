@@ -19,6 +19,7 @@ const { success, error } = require('../utils/response');
 const { ENROLLMENT_SOURCE, ENROLLMENT_STATUS } = require('../constants/enrollmentConstants');
 const { ensureEnrollmentColumns } = require('./studentRoutes');
 const audit = require('../services/auditLogger');
+const emailService = require('../services/emailService');
 const { requireConfirmHeader, requireAdminConfirm } = require('../middleware/confirmDestructive');
 
 // ─────────────────────────────────────────────
@@ -100,6 +101,20 @@ router.post('/create-teacher', protect, adminOnly, adminActionLimiter, async (re
       targetType: 'user', targetId: rows[0].id, targetEmail: rows[0].email,
       metadata: { first_name: rows[0].first_name, last_name: rows[0].last_name },
     });
+
+    // T3: send welcome email with login credentials.
+    // Non-fatal — a mail failure must never roll back account creation.
+    try {
+      await emailService.sendWelcomeEmail({
+        id:         rows[0].id,
+        email:      rows[0].email,
+        first_name: rows[0].first_name,
+        role:       'teacher',
+      });
+    } catch (mailErr) {
+      console.warn('[POST /admin/create-teacher] welcome email failed:', mailErr.message);
+    }
+
     return success(res, { user: rows[0] }, null, 201);
   } catch (err) {
     console.error('[POST /admin/create-teacher]', err.message);
