@@ -182,8 +182,12 @@ export default function QuizResultsPage() {
       setLoading(false);
       return;
     }
-    if (!attemptId || attemptId === 'inline') {
-      setError('No results data available.');
+    if (!attemptId || attemptId === 'inline' || attemptId === 'undefined') {
+      if (!inlineResult) {
+        setError('This results page cannot be refreshed directly. Please retake the quiz to see your results.');
+      } else {
+        setError('No results data available.');
+      }
       setLoading(false);
       return;
     }
@@ -202,12 +206,19 @@ export default function QuizResultsPage() {
 
   if (error || !data) return (
     <div className="min-h-screen bg-[#0a4a3f] flex flex-col items-center justify-center gap-4 px-6 text-center">
-      <div className="text-4xl"></div>
+      <div className="text-4xl">📋</div>
       <p className="text-white font-semibold">{error || 'No results found.'}</p>
-      <button onClick={() => navigate(-1)}
-        className="mt-2 text-blue-400 hover:text-blue-300 text-sm font-medium flex items-center gap-1">
-        <ArrowLeft size={14} /> Go back
-      </button>
+      <p className="text-white/50 text-sm">Quiz results are not saved for direct URL access or page refresh.</p>
+      <div className="flex gap-3 mt-2">
+        <button onClick={() => navigate(-1)}
+          className="text-blue-400 hover:text-blue-300 text-sm font-medium flex items-center gap-1">
+          <ArrowLeft size={14} /> Go back
+        </button>
+        <button onClick={() => navigate('/student/quiz-history')}
+          className="text-emerald-400 hover:text-emerald-300 text-sm font-medium">
+          View Quiz History →
+        </button>
+      </div>
     </div>
   );
 

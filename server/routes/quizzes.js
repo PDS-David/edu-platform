@@ -469,6 +469,46 @@ router.get('/attempt/:attemptId', protect, async (req, res) => {
   }
 });
 
+// ── GET /api/quizzes/all-history — global quiz history across ALL subjects ────
+// Returns one row per quiz session (grouped by attempted_at minute + subtopic)
+// so the student can see every quiz they have ever taken in one list.
+router.get('/all-history', protect, async (req, res) => {
+  const studentId = req.user.id;
+  const limit  = Math.min(parseInt(req.query.limit  || '50', 10), 200);
+  const offset = parseInt(req.query.offset || '0', 10);
+  try {
+    const rows = await sequelize.query(
+      `SELECT
+         MIN(pa.id)                                                            AS attempt_id,
+         q.subtopic_id,
+         st.name                                                               AS subtopic_name,
+         s.name                                                                AS subject_name,
+         eb.code                                                               AS exam_board_code,
+         DATE_TRUNC('minute', pa.attempted_at)                                AS session_start,
+         COUNT(*)::INTEGER                                                     AS questions_total,
+         SUM(CASE WHEN pa.is_correct THEN 1 ELSE 0 END)::INTEGER              AS questions_correct,
+         ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 0)::INTEGER AS accuracy_pct,
+         SUM(pa.time_taken_seconds)::INTEGER                                  AS total_time_secs,
+         MIN(pa.attempted_at)                                                  AS attempted_at
+       FROM practice_attempts pa
+       JOIN questions    q  ON q.id  = pa.question_id
+       LEFT JOIN subtopics  st ON st.id = q.subtopic_id
+       LEFT JOIN topics     t  ON t.id  = st.topic_id
+       LEFT JOIN subjects   s  ON s.id  = t.subject_id
+       LEFT JOIN exam_boards eb ON eb.id = s.exam_board_id
+       WHERE pa.student_id = :studentId
+       GROUP BY q.subtopic_id, st.name, s.name, eb.code, DATE_TRUNC('minute', pa.attempted_at)
+       ORDER BY session_start DESC
+       LIMIT :limit OFFSET :offset`,
+      { replacements: { studentId, limit, offset }, type: QueryTypes.SELECT }
+    );
+    return res.json({ success: true, data: rows });
+  } catch (err) {
+    console.error('[GET /quizzes/all-history]', err.message);
+    return res.json({ success: true, data: [] });
+  }
+});
+
 // ── GET /api/quizzes/history/:studentId/:subtopicId ──────────────────────────
 router.get('/history/:studentId/:subtopicId', protect, async (req, res) => {
   const { studentId, subtopicId } = req.params;
