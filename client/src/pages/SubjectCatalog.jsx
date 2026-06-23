@@ -137,6 +137,8 @@ const SubjectCatalog = () => {
                 key={subject.id}
                 subject={subject}
                 examBoard={selectedBoard}
+                isEnrolled={enrolledSubjects.some(e => String(e.id) === String(subject.id))}
+                onEnrolled={(id) => setEnrolledSubjects(prev => [...prev, subject])}
               />
             ))}
           </div>
