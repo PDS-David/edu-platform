@@ -144,6 +144,11 @@ router.post('/attempt', protect, async (req, res) => {
     let maxScore   = 0;
     const results  = [];
 
+    // Session ID groups all practice_attempts from this one submission
+    // so history queries can reconstruct per-session totals.
+    const { randomUUID } = require('crypto');
+    const sessionId = randomUUID();
+
     for (const answer of answers) {
       const question = questionMap[String(answer.question_id)];
       if (!question) continue;
@@ -203,8 +208,8 @@ router.post('/attempt', protect, async (req, res) => {
       // both timestamps are now supplied explicitly, same as attempted_at.
       await sequelize.query(
         `INSERT INTO practice_attempts
-           (student_id, question_id, is_correct, time_taken_seconds, attempted_at, created_at, updated_at, selected_option_text)
-         VALUES (:studentId, :questionId, :isCorrect, :timeTaken, NOW(), NOW(), NOW(), :selectedText)`,
+           (student_id, question_id, is_correct, time_taken_seconds, attempted_at, created_at, updated_at, selected_option_text, paper_type, subject_id, session_id)
+         VALUES (:studentId, :questionId, :isCorrect, :timeTaken, NOW(), NOW(), NOW(), :selectedText, :paperType, :subjectId, :sessionId)`,
         {
           replacements: {
             studentId:    req.user.id,
@@ -212,6 +217,9 @@ router.post('/attempt', protect, async (req, res) => {
             isCorrect,
             timeTaken:    parseInt(answer.time_taken_seconds ?? (answer.time_taken_ms / 1000)) || 0,
             selectedText: submittedAnswer || null,
+            paperType:    paper_type || 'quiz',
+            subjectId:    subject_id || null,
+            sessionId:    sessionId,
           },
           type: QueryTypes.INSERT,
         }
@@ -510,6 +518,39 @@ router.get('/history', protect, async (req, res) => {
 // ── GET /api/quizzes ──────────────────────────────────────────────────────────
 router.get('/', protect, async (_req, res) => {
   return res.json({ success: true, data: [], message: 'Use /quizzes/attempt to submit a quiz' });
+});
+
+// ── GET /api/quizzes/mock-history ────────────────────────────────────────────
+// Returns all mock exam sessions for the current student, grouped by session_id.
+// Each row: subject_name, date, score, total, accuracy_pct, time_taken_seconds.
+router.get('/mock-history', protect, async (req, res) => {
+  const studentId = req.user.id;
+  try {
+    const rows = await sequelize.query(
+      `SELECT
+          pa.session_id,
+          MIN(pa.attempted_at)                                        AS attempted_at,
+          COALESCE(s.name, 'Mock Exam')                               AS subject_name,
+          COUNT(*)::INTEGER                                            AS total,
+          SUM(CASE WHEN pa.is_correct THEN 1 ELSE 0 END)::INTEGER     AS correct,
+          ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END),1) AS accuracy_pct,
+          SUM(pa.time_taken_seconds)::INTEGER                          AS time_taken_seconds,
+          pa.paper_type
+       FROM practice_attempts pa
+       LEFT JOIN subjects s ON s.id::text = pa.subject_id::text
+       WHERE pa.student_id = :studentId
+         AND pa.paper_type = 'mock'
+         AND pa.session_id IS NOT NULL
+       GROUP BY pa.session_id, s.name, pa.paper_type
+       ORDER BY MIN(pa.attempted_at) DESC
+       LIMIT 50`,
+      { replacements: { studentId }, type: QueryTypes.SELECT }
+    );
+    return res.json({ success: true, data: rows });
+  } catch (err) {
+    console.error('[GET /quizzes/mock-history]', err.message);
+    return res.json({ success: true, data: [] });
+  }
 });
 
 module.exports = router;

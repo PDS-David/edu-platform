@@ -785,6 +785,13 @@ async function run() {
     CREATE INDEX IF NOT EXISTS idx_pa_question_id  ON practice_attempts(question_id);
     CREATE INDEX IF NOT EXISTS idx_pa_student_date ON practice_attempts(student_id, attempted_at DESC)`],
 
+    // C-1c: add paper_type, subject_id, session_id to practice_attempts for history features
+    ['practice_attempts: add paper_type, subject_id, session_id', `
+      ALTER TABLE practice_attempts
+        ADD COLUMN IF NOT EXISTS paper_type  VARCHAR(20) DEFAULT 'quiz',
+        ADD COLUMN IF NOT EXISTS subject_id  INTEGER,
+        ADD COLUMN IF NOT EXISTS session_id  UUID`],
+
     // C-1b: add selected_option_text to practice_attempts (stores what student chose)
     ['practice_attempts: add selected_option_text', `
       ALTER TABLE practice_attempts

@@ -215,6 +215,43 @@ router.get('/remediation/status', protect, async (req, res) => {
   }
 });
 
+// ── GET /api/students/my-tests ───────────────────────────────────────────────
+// Lists all tests assigned to the current student (direct or via class).
+router.get('/my-tests', protect, async (req, res) => {
+  const studentId = req.user.id;
+  try {
+    const rows = await sequelize.query(
+      `SELECT
+          ta.id                                                          AS assignment_id,
+          ct.id                                                          AS test_id,
+          ct.title,
+          ct.description,
+          ct.time_limit_minutes,
+          ct.created_at,
+          ta.assigned_at,
+          ta.due_date,
+          ta.completed_at,
+          ta.score,
+          COALESCE(u.first_name || ' ' || u.last_name, 'Your Teacher') AS teacher_name,
+          s.name                                                         AS subject_name
+       FROM test_assignments ta
+       JOIN custom_tests ct ON ct.id = ta.test_id
+       LEFT JOIN users u ON u.id = ct.created_by
+       LEFT JOIN subjects s ON s.id = ct.subject_id
+       WHERE ta.student_id = :studentId
+          OR ta.class_id IN (
+               SELECT class_id FROM class_memberships WHERE student_id = :studentId
+             )
+       ORDER BY ta.assigned_at DESC LIMIT 50`,
+      { replacements: { studentId }, type: QueryTypes.SELECT }
+    );
+    return res.json({ success: true, data: rows });
+  } catch (err) {
+    console.error('[GET /student/my-tests]', err.message);
+    return res.json({ success: true, data: [] });
+  }
+});
+
 // ── GET /api/students/test/:testId ───────────────────────────────────────────
 // Returns test details + questions for StudentTestPage.jsx
 router.get('/test/:testId', protect, async (req, res) => {
