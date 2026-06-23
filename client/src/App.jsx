@@ -39,6 +39,8 @@ import QuizResultsPage from "./pages/QuizResultsPage";
 import QuizHistoryPage from "./pages/QuizHistoryPage";
 import PracticeMode from "./pages/PracticeMode";
 import MockExamPage from "./pages/MockExamPage";
+import MockExamHistoryPage from "./pages/MockExamHistoryPage";
+import MyTestsPage from "./pages/MyTestsPage";
 import ImageMarkingPage from "./pages/ImageMarkingPage";
 import SettingsPage from "./pages/SettingsPage";
 
@@ -101,6 +103,8 @@ export default function App() {
             <Route path="quiz/:subtopicId" element={<QuizPage />} />
             <Route path="quiz-results/:attemptId" element={<QuizResultsPage />} />
             <Route path="mock/:subjectId" element={<MockExamPage />} />
+            <Route path="mock-history" element={<MockExamHistoryPage />} />
+            <Route path="my-tests" element={<MyTestsPage />} />
             <Route path="practice" element={<PracticeMode />} />
             <Route path="mark-image" element={<ImageMarkingPage />} />
             <Route path="test/:testId" element={<StudentTestPage />} />
