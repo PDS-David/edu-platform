@@ -1177,7 +1177,6 @@ const AdminSettingsPanel = ({ setActivePanel }) => {
     {
       title: 'Platform Links',
       items: [
-        { label: 'Student Dashboard',   desc: 'View the platform as a student would see it',   action: () => window.open('/student', '_blank') },
         { label: 'Past Papers (public)', desc: 'See the public past papers page',              action: () => navigate('/past-papers')       },
         { label: 'My Account Settings', desc: 'Update your admin profile and preferences',      action: () => navigate('/admin/settings')          },
       ],
