@@ -721,6 +721,7 @@ router.get('/questions', protect, teacherOnly, async (req, res) => {
     const rows = await sequelize.query(
       `SELECT q.id, q.question_text, q.difficulty, q.explanation,
               q.options, q.correct_answer, q.created_at,
+              q.status, q.feedback,
               s.name AS subject_name
        FROM questions q
        LEFT JOIN subtopics  st ON st.id = q.subtopic_id
@@ -775,14 +776,15 @@ router.post('/questions', protect, teacherOnly, async (req, res) => {
 
 // ── GET /api/teacher/students ─────────────────────────────────────────────────
 // Returns students visible to this teacher:
-//   • If the teacher has classes → students who are members of those classes.
-//   • Fallback (no classes yet) → all active students.
-// This replaces the broken GET /api/users?role=student call in TeacherResourcesPage
-// which requires admin role and always returns 403 for teachers.
+//   1. Students in this teacher's classes (via class_memberships)
+//   2. Students enrolled in subjects this teacher is assigned to (via teacher_subjects)
+// Deduplicated by student id. No fallback to full roster — IDOR risk removed.
 router.get('/students', protect, teacherOnly, async (req, res) => {
   await ensureClassTables();
   try {
-    // First try: students in this teacher's classes
+    const teacherId = req.user.id;
+
+    // Path 1: students in this teacher's classes
     const classStudents = await safeQuery(
       `SELECT DISTINCT u.id, u.first_name, u.last_name, u.email,
               c.id AS class_id, c.name AS class_name
@@ -790,24 +792,37 @@ router.get('/students', protect, teacherOnly, async (req, res) => {
        JOIN users   u ON u.id = cm.student_id
        JOIN classes c ON c.id = cm.class_id
        WHERE c.teacher_id = :teacherId
-         AND u.is_active  = true
-       ORDER BY u.last_name ASC, u.first_name ASC`,
-      { teacherId: req.user.id }
+         AND u.is_active  = true`,
+      { teacherId }
     );
 
-    if (classStudents.length > 0) {
-      return res.json({ success: true, data: classStudents, source: 'class_members' });
-    }
+    // Path 2: students enrolled in subjects this teacher is assigned to
+    // (covers teachers with subject assignments but no formal class structure — T4)
+    const subjectStudents = await safeQuery(
+      `SELECT DISTINCT u.id, u.first_name, u.last_name, u.email,
+              NULL::uuid AS class_id, NULL::text AS class_name
+       FROM teacher_subjects ts
+       JOIN student_subjects ss ON ss.subject_id = ts.subject_id
+       JOIN users u ON u.id = ss.student_id
+       WHERE ts.teacher_id = :teacherId
+         AND ts.is_active   = true
+         AND ss.is_active   = true
+         AND u.is_active    = true`,
+      { teacherId }
+    ).catch(() => []); // non-fatal — teacher_subjects may not exist yet
 
-    // Fallback: teacher has no classes yet — return all active students so push still works
-    const allStudents = await safeQuery(
-      `SELECT id, first_name, last_name, email
-       FROM users
-       WHERE role = 'student' AND is_active = true
-       ORDER BY last_name ASC, first_name ASC`,
-      {}
+    // Merge and deduplicate by student id
+    const seen = new Set();
+    const merged = [...classStudents, ...subjectStudents].filter(s => {
+      if (seen.has(s.id)) return false;
+      seen.add(s.id);
+      return true;
+    }).sort((a, b) =>
+      (a.last_name || '').localeCompare(b.last_name || '') ||
+      (a.first_name || '').localeCompare(b.first_name || '')
     );
-    return res.json({ success: true, data: allStudents, source: 'all_students' });
+
+    return res.json({ success: true, data: merged, source: 'class_and_subject_members' });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }

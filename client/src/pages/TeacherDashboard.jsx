@@ -297,6 +297,9 @@ function AnalyticsTab() {
   const [analytics,      setAnalytics]      = useState(null);
   const [loading,        setLoading]        = useState(false);
   const [loadingClasses, setLoadingClasses] = useState(true);
+  const [drillStudent,   setDrillStudent]   = useState(null); // { id, name }
+  const [drillData,      setDrillData]      = useState([]);
+  const [drillLoading,   setDrillLoading]   = useState(false);
 
   useEffect(() => {
     api.get('/teacher/classes').then(r => {
@@ -309,11 +312,22 @@ function AnalyticsTab() {
   useEffect(() => {
     if (!selectedClass) return;
     setLoading(true);
+    setDrillStudent(null);
     api.get(`/teacher/class/${selectedClass}/analytics`)
       .then(r => setAnalytics(r?.data || null))
       .catch(() => setAnalytics(null))
       .finally(() => setLoading(false));
   }, [selectedClass]);
+
+  const openDrill = (s) => {
+    if (drillStudent?.id === s.id) { setDrillStudent(null); setDrillData([]); return; }
+    setDrillStudent({ id: s.id, name: s.name });
+    setDrillLoading(true);
+    api.get(`/analytics/student/${s.id}/topics`)
+      .then(r => setDrillData(Array.isArray(r?.data) ? r.data : []))
+      .catch(() => setDrillData([]))
+      .finally(() => setDrillLoading(false));
+  };
 
   if (loadingClasses) return <div className="flex justify-center py-12"><Loader2 size={20} className="animate-spin text-violet-300" /></div>;
 
@@ -352,17 +366,67 @@ function AnalyticsTab() {
           </div>
           <div className="divide-y divide-gray-50">
             {analytics.students.map(s => (
-              <div key={s.id} className="grid grid-cols-12 items-center px-4 py-3 hover:bg-gray-50 transition-colors">
-                <div className="col-span-4 min-w-0">
-                  <p className="text-sm font-medium text-gray-800 truncate">{s.name}</p>
-                  <p className="text-xs text-gray-400 truncate">{s.email}</p>
+              <div key={s.id}>
+                <div
+                  className="grid grid-cols-12 items-center px-4 py-3 hover:bg-gray-50 transition-colors cursor-pointer"
+                  onClick={() => openDrill(s)}
+                  title="Click to see topic breakdown"
+                >
+                  <div className="col-span-4 min-w-0">
+                    <p className="text-sm font-medium text-gray-800 truncate flex items-center gap-1">
+                      {s.name}
+                      <span className={`text-[10px] ml-1 text-gray-400 transition-transform ${drillStudent?.id === s.id ? 'rotate-90' : ''}`}>▶</span>
+                    </p>
+                    <p className="text-xs text-gray-400 truncate">{s.email}</p>
+                  </div>
+                  <div className="col-span-2 text-center">
+                    <span className={`font-mono font-bold text-sm ${accColor(s.accuracy_pct)}`}>{s.accuracy_pct != null ? `${s.accuracy_pct}%` : '—'}</span>
+                  </div>
+                  <div className="col-span-2 text-center text-sm text-gray-600 font-mono">{s.attempts ?? 0}</div>
+                  <div className="col-span-2 text-center hidden sm:block text-sm text-amber-500 font-mono">{s.streak ?? 0}</div>
+                  <div className="col-span-2 text-center" onClick={e => e.stopPropagation()}><NudgeButton studentId={s.id} /></div>
                 </div>
-                <div className="col-span-2 text-center">
-                  <span className={`font-mono font-bold text-sm ${accColor(s.accuracy_pct)}`}>{s.accuracy_pct != null ? `${s.accuracy_pct}%` : '—'}</span>
-                </div>
-                <div className="col-span-2 text-center text-sm text-gray-600 font-mono">{s.attempts ?? 0}</div>
-                <div className="col-span-2 text-center hidden sm:block text-sm text-amber-500 font-mono">{s.streak ?? 0}</div>
-                <div className="col-span-2 text-center"><NudgeButton studentId={s.id} /></div>
+
+                {/* Topic drill-down panel */}
+                {drillStudent?.id === s.id && (
+                  <div className="bg-gray-50 border-t border-gray-100 px-6 py-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-xs font-mono font-semibold text-gray-500 uppercase">Topic breakdown — {s.name}</p>
+                      <button onClick={() => { setDrillStudent(null); setDrillData([]); }}
+                        className="text-xs text-gray-400 hover:text-gray-600">✕ Close</button>
+                    </div>
+                    {drillLoading ? (
+                      <div className="flex justify-center py-4"><Loader2 size={16} className="animate-spin text-violet-300" /></div>
+                    ) : drillData.length === 0 ? (
+                      <p className="text-xs text-gray-400 text-center py-3">No practice data yet for this student.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {drillData.map(t => (
+                          <div key={t.topic_id} className="flex items-center gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between mb-0.5">
+                                <span className="text-xs text-gray-700 truncate">{t.topic}</span>
+                                <span className={`text-xs font-mono font-bold ml-2 ${accColor(t.accuracy_pct)}`}>
+                                  {t.accuracy_pct != null ? `${t.accuracy_pct}%` : '—'}
+                                </span>
+                              </div>
+                              <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full transition-all ${
+                                    t.accuracy_pct >= 70 ? 'bg-green-400' :
+                                    t.accuracy_pct >= 40 ? 'bg-amber-400' : 'bg-red-400'
+                                  }`}
+                                  style={{ width: `${Math.min(t.accuracy_pct ?? 0, 100)}%` }}
+                                />
+                              </div>
+                            </div>
+                            <span className="text-[10px] text-gray-400 font-mono shrink-0">{t.attempt_count} attempts</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
