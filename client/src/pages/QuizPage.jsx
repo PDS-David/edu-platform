@@ -134,7 +134,7 @@ function QuizQuestion({ question, questionNumber, submitRef, onAnswered }) {
             }`}>
               {result.is_correct
                 ? <><CheckCircle size={14} /><span className="font-semibold">Correct! Well done.</span></>
-                : <><XCircle    size={14} /><span className="font-semibold">Incorrect. See correct answer above.</span></>}
+                : <><XCircle    size={14} /><span className="font-semibold">Incorrect. See the correct answer below.</span></>}
             </div>
 
             <div className="mx-5 mb-4 bg-blue-50 border border-blue-100 rounded-xl p-3">

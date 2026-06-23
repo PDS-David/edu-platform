@@ -331,7 +331,7 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
             }`}>
               {result.is_correct
                 ? <><CheckCircle className="w-4 h-4" /><span className="font-semibold">Correct! Well done.</span></>
-                : <><XCircle className="w-4 h-4" /><span className="font-semibold">Incorrect. See the correct answer above.</span></>}
+                : <><XCircle className="w-4 h-4" /><span className="font-semibold">Incorrect. See the correct answer below.</span></>}
             </div>
           )}
 
