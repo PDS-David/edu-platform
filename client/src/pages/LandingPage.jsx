@@ -14,11 +14,13 @@ import PublicNav from '../components/PublicNav';
 
 // ── Data ───────────────────────────────────────────────────────────────────────
 
-const STATS = [
-  { number: '50,000+', label: 'Practice Questions' },
-  { number: '8',       label: 'Subjects'            },
-  { number: 'AI',      label: 'Powered Marking'     },
-  { number: 'Instant', label: 'Grade Prediction'    },
+// X5: STATS now fetched live from /api/catalog/stats so they reflect real
+// platform growth. Fallback values shown while loading or on error.
+const STATS_FALLBACK = [
+  { number: '—',       label: 'Students'        },
+  { number: '—',       label: 'Subjects'         },
+  { number: 'AI',      label: 'Powered Marking'  },
+  { number: 'Instant', label: 'Grade Prediction' },
 ];
 
 const CHALLENGES = [
@@ -69,6 +71,22 @@ const CellIcon = ({ val }) => {
 
 // ══════════════════════════════════════════════════════════════════════════════
 export default function LandingPage() {
+  const [liveStats, setLiveStats] = React.useState(STATS_FALLBACK);
+  React.useEffect(() => {
+    fetch('/api/catalog/stats')
+      .then(r => r.json())
+      .then(json => {
+        if (!json.success) return;
+        const d = json.data || {};
+        setLiveStats([
+          { number: d.active_students ? d.active_students.toLocaleString() + '+' : '—', label: 'Students'         },
+          { number: d.total_subjects  ? d.total_subjects.toLocaleString()               : '—', label: 'Subjects'          },
+          { number: 'AI',      label: 'Powered Marking'  },
+          { number: 'Instant', label: 'Grade Prediction' },
+        ]);
+      })
+      .catch(() => {}); // keep fallback on error
+  }, []);
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
@@ -209,7 +227,7 @@ export default function LandingPage() {
       ══════════════════════════════════════════════════════════════════════ */}
       <section className="bg-[#1e3a8a] py-10 border-t border-white/10">
         <div className="max-w-5xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-          {STATS.map(({ number, label }) => (
+          {liveStats.map(({ number, label }) => (
             <div key={label} className="space-y-1">
               <p className="text-3xl sm:text-4xl font-extrabold text-blue-300">{number}</p>
               <p className="text-sm text-white/60 font-medium">{label}</p>

@@ -60,15 +60,28 @@ function useAudio() {
     utt.rate    = 0.8;
     utt.pitch   = 1.0;
     utt.volume  = 1.0;
-
-    // Prefer a British voice if available
-    const voices = window.speechSynthesis.getVoices();
-    const british = voices.find(v => v.lang === 'en-GB') || voices.find(v => v.lang.startsWith('en'));
-    if (british) utt.voice = british;
-
     utt.onend   = () => setPlaying(false);
     utt.onerror = () => setPlaying(false);
-    window.speechSynthesis.speak(utt);
+
+    // Voices are not synchronously available on first call in some browsers.
+    // Use onvoiceschanged to ensure we get a British voice when available.
+    function speakWithVoice() {
+      const voices  = window.speechSynthesis.getVoices();
+      const british = voices.find(v => v.lang === 'en-GB') || voices.find(v => v.lang.startsWith('en'));
+      if (british) utt.voice = british;
+      window.speechSynthesis.speak(utt);
+    }
+
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length > 0) {
+      speakWithVoice();
+    } else {
+      // Wait for voices to load (Chrome/Edge load them asynchronously)
+      window.speechSynthesis.onvoiceschanged = () => {
+        window.speechSynthesis.onvoiceschanged = null;
+        speakWithVoice();
+      };
+    }
   }
 
   return { playing, play };
@@ -129,9 +142,11 @@ function PracticeTab() {
     setLoadingExplain(true);
     setShowExplain(true);
     try {
+      const currentWord = words[currentIdx];
       const r = await api.post('/english-masterclass/word-explain', {
         word,
         context: selectedCat?.name,
+        word_id: currentWord?.id || null,  // GAP 2: pass word_id for DB backfill
       });
       setExplanation({ word, ...r.data });
     } catch {

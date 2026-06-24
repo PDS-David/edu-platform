@@ -387,10 +387,9 @@ function ResourcesTab({ showToast }) {
     setPushForm({ push_type: defaultPushType, student_ids: [], class_ids: [], assign_all: false });
     setPushSearch('');
     if (students.length === 0) {
-      // /teacher/students returns class members (fallback: all students)
-      api.get('/teacher/students').then(r => setStudents(extractList(r))).catch(() => {
-        api.get('/users', { params: { role: 'student', limit: 200 } }).then(r => setStudents(extractList(r))).catch(() => {});
-      });
+      // /teacher/students returns class members only — no fallback to full
+      // student list (that was an IDOR vulnerability: X11).
+      api.get('/teacher/students').then(r => setStudents(extractList(r))).catch(() => {});
     }
     if (classes.length === 0) {
       api.get('/teacher/classes').then(r => setClasses(extractList(r))).catch(() => {});
@@ -541,6 +540,23 @@ function ResourcesTab({ showToast }) {
                 }`}>
                 {pushing === r.id ? 'Cancel' : '↑ Push'}
               </button>
+              {renaming === r.id ? (
+                <form onSubmit={e => { e.preventDefault(); commitRename(r); }} className="flex items-center gap-1">
+                  <input autoFocus
+                    className="text-xs border border-blue-300 rounded px-2 py-1 w-32 focus:outline-none"
+                    value={renameValue}
+                    onChange={e => setRenameValue(e.target.value)}
+                    onBlur={() => commitRename(r)}
+                  />
+                  <button type="submit" className="text-xs text-blue-600 font-semibold px-1">Save</button>
+                  <button type="button" onClick={() => setRenaming(null)} className="text-xs text-gray-400 px-1">✕</button>
+                </form>
+              ) : (
+                <button onClick={() => startRename(r)} title="Rename"
+                  className="p-1.5 rounded-lg text-gray-300 hover:text-blue-500 hover:bg-blue-50 transition-colors">
+                  <Pencil size={14} />
+                </button>
+              )}
               <button onClick={() => handleDelete(r.id, r.title)} disabled={deleting === r.id}
                 className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50">
                 {deleting === r.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}

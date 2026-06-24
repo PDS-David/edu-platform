@@ -3,10 +3,10 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import api, { TIMEOUT_AI } from '../services/apiClient';
 import {
-  Users, School, BookOpen, Settings, LogOut,
+  Users, School, BookOpen, Settings, Languages, LogOut,
   Plus, Pencil, Trash2, ChevronDown, ChevronRight,
   Loader2, X, Check, AlertTriangle, RefreshCw, GraduationCap,
-  UserCheck, ChevronUp, Sparkles, Zap, Upload, CheckCircle
+  UserCheck, ChevronUp, Sparkles, Zap, Upload, CheckCircle, Shield
 } from 'lucide-react';
 import branding from '../config/branding';
 import TopNav from '../components/TopNav';
@@ -745,6 +745,233 @@ const AIGeneratePanel = () => {
 };
 
 // ─── User Management Panel ────────────────────────────────────────────────────
+// ─── Audit Log Panel ──────────────────────────────────────────────────────────
+const AuditLogPanel = () => {
+  const LIMIT = 50;
+
+  // ── All Logs tab state
+  const [logs,       setLogs]       = useState([]);
+  const [logsTotal,  setLogsTotal]  = useState(0);
+  const [logsPage,   setLogsPage]   = useState(1);
+  const [loadingL,   setLoadingL]   = useState(true);
+  const [actionF,    setActionF]    = useState('');
+  const [severityF,  setSeverityF]  = useState('');
+
+  // ── Security Events tab state
+  const [secLogs,    setSecLogs]    = useState([]);
+  const [secTotal,   setSecTotal]   = useState(0);
+  const [secPage,    setSecPage]    = useState(1);
+  const [loadingS,   setLoadingS]   = useState(true);
+  const [secHours,   setSecHours]   = useState(24);
+
+  const [tab,        setTab]        = useState('logs'); // 'logs' | 'security'
+  const [toast,      setToast]      = useState(null);
+
+  const showToast = (msg, type = 'success') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  // ── Fetch all logs
+  const fetchLogs = async (pg = logsPage) => {
+    setLoadingL(true);
+    try {
+      const params = { page: pg, limit: LIMIT };
+      if (actionF)   params.action   = actionF;
+      if (severityF) params.severity = severityF;
+      const r = await api.get('/audit/logs', { params });
+      setLogs(r.data || []);
+      setLogsTotal(r.meta?.total || 0);
+    } catch {
+      showToast('Failed to load audit logs', 'error');
+    } finally {
+      setLoadingL(false);
+    }
+  };
+
+  // ── Fetch security events
+  const fetchSecurity = async (pg = secPage) => {
+    setLoadingS(true);
+    try {
+      const r = await api.get('/audit/security', { params: { page: pg, limit: LIMIT, hours: secHours } });
+      setSecLogs(r.data || []);
+      setSecTotal(r.meta?.total || 0);
+    } catch {
+      showToast('Failed to load security events', 'error');
+    } finally {
+      setLoadingS(false);
+    }
+  };
+
+  useEffect(() => { fetchLogs(1); setLogsPage(1); }, [actionF, severityF]);   // eslint-disable-line
+  useEffect(() => { if (tab === 'logs')     fetchLogs(logsPage);   }, [logsPage]);   // eslint-disable-line
+  useEffect(() => { if (tab === 'security') fetchSecurity(secPage); }, [secPage]);   // eslint-disable-line
+  useEffect(() => { if (tab === 'security') { fetchSecurity(1); setSecPage(1); } }, [tab, secHours]); // eslint-disable-line
+  useEffect(() => { fetchLogs(); fetchSecurity(); }, []); // eslint-disable-line
+
+  const fmtDate = (d) =>
+    d ? new Date(d).toLocaleString('en-NG', {
+      day: '2-digit', month: 'short', year: '2-digit',
+      hour: '2-digit', minute: '2-digit', timeZone: 'UTC',
+    }) : '—';
+
+  const severityBadge = (s) => ({
+    info:     'bg-gray-100 text-gray-600',
+    warning:  'bg-amber-100 text-amber-700',
+    critical: 'bg-red-100 text-red-700',
+  }[s] || 'bg-gray-100 text-gray-500');
+
+  const ALL_ACTIONS = [
+    'LOGIN','LOGIN_FAILED','LOGOUT','USER_CREATE','USER_UPDATE',
+    'USER_DELETE','USER_RESTORE','ROLE_CHANGE','USER_DEACTIVATE',
+    'USER_REACTIVATE','TEACHER_CREATE','COURSE_APPROVE','QUESTION_APPROVE',
+    'QUESTION_REJECT','NOTIFICATION_SEND','SETTINGS_CHANGE','RESOURCE_PURGE',
+    'IDOR_ATTEMPT','RATE_LIMIT_HIT','UNAUTHORIZED_ACCESS','SUSPICIOUS_ACTIVITY',
+  ];
+
+  const LogTable = ({ rows, loading, total, page, setPage }) => {
+    const totalPages = Math.ceil(total / LIMIT);
+    if (loading) return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 text-violet-400 animate-spin" /></div>;
+    if (rows.length === 0) return <div className="text-center py-12 text-gray-400 text-sm">No events found.</div>;
+    return (
+      <>
+        <div className="overflow-x-auto rounded-xl border border-gray-100">
+          <table className="w-full text-xs">
+            <thead className="bg-gray-50 text-gray-400 font-medium">
+              <tr>
+                <th className="text-left px-3 py-2.5 whitespace-nowrap">Time</th>
+                <th className="text-left px-3 py-2.5 whitespace-nowrap">Actor</th>
+                <th className="text-left px-3 py-2.5 whitespace-nowrap">Action</th>
+                <th className="text-left px-3 py-2.5 whitespace-nowrap hidden sm:table-cell">Target</th>
+                <th className="text-left px-3 py-2.5 whitespace-nowrap">Severity</th>
+                <th className="text-left px-3 py-2.5 whitespace-nowrap hidden md:table-cell">IP</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {rows.map(log => (
+                <tr key={log.id} className="bg-white hover:bg-gray-50">
+                  <td className="px-3 py-2.5 text-gray-400 whitespace-nowrap">{fmtDate(log.created_at)}</td>
+                  <td className="px-3 py-2.5">
+                    <p className="font-medium text-gray-800 truncate max-w-[140px]">{log.actor_email || '—'}</p>
+                    <p className="text-gray-400">{log.actor_role || ''}</p>
+                  </td>
+                  <td className="px-3 py-2.5 font-mono text-gray-700 whitespace-nowrap">{log.action}</td>
+                  <td className="px-3 py-2.5 hidden sm:table-cell text-gray-500 truncate max-w-[120px]">
+                    {log.target_email || log.target_id || '—'}
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <span className={`px-2 py-0.5 rounded-full font-semibold capitalize ${severityBadge(log.severity)}`}>
+                      {log.severity}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2.5 hidden md:table-cell text-gray-400 font-mono">{log.ip_address || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between mt-4">
+            <span className="text-xs text-gray-400">Page {page} of {totalPages} · {total} events</span>
+            <div className="flex gap-2">
+              <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}
+                className="text-sm px-3 py-1.5 border border-gray-200 rounded-xl disabled:opacity-40 hover:bg-gray-50">← Prev</button>
+              <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}
+                className="text-sm px-3 py-1.5 border border-gray-200 rounded-xl disabled:opacity-40 hover:bg-gray-50">Next →</button>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  };
+
+  return (
+    <div>
+      {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+
+      {/* Header */}
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <Shield size={20} className="text-violet-500" /> Audit Log
+          </h2>
+          <p className="text-sm text-gray-400 mt-0.5">All admin and security events — append-only, tamper-resistant</p>
+        </div>
+        <button
+          onClick={() => { fetchLogs(1); fetchSecurity(1); }}
+          className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 px-3 py-2 border border-gray-200 rounded-xl">
+          <RefreshCw size={14} /> Refresh
+        </button>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 border-b border-gray-100 mb-5">
+        {[
+          { id: 'logs',     label: `All Events (${logsTotal})` },
+          { id: 'security', label: `Security Events (${secTotal})` },
+        ].map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              tab === t.id
+                ? 'border-violet-500 text-violet-600'
+                : 'border-transparent text-gray-400 hover:text-gray-600'
+            }`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* All Logs Tab */}
+      {tab === 'logs' && (
+        <>
+          <div className="flex gap-3 mb-4 flex-wrap">
+            <select value={actionF} onChange={e => { setActionF(e.target.value); setLogsPage(1); }}
+              className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300">
+              <option value="">All Actions</option>
+              {ALL_ACTIONS.map(a => <option key={a} value={a}>{a}</option>)}
+            </select>
+            <select value={severityF} onChange={e => { setSeverityF(e.target.value); setLogsPage(1); }}
+              className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300">
+              <option value="">All Severities</option>
+              <option value="info">Info</option>
+              <option value="warning">Warning</option>
+              <option value="critical">Critical</option>
+            </select>
+            {(actionF || severityF) && (
+              <button onClick={() => { setActionF(''); setSeverityF(''); setLogsPage(1); }}
+                className="text-sm text-gray-400 hover:text-gray-600 flex items-center gap-1">
+                <X size={13} /> Clear filters
+              </button>
+            )}
+          </div>
+          <LogTable rows={logs} loading={loadingL} total={logsTotal} page={logsPage} setPage={setLogsPage} />
+        </>
+      )}
+
+      {/* Security Events Tab */}
+      {tab === 'security' && (
+        <>
+          <div className="flex items-center gap-3 mb-4">
+            <label className="text-sm text-gray-500">Show last</label>
+            <select value={secHours} onChange={e => setSecHours(Number(e.target.value))}
+              className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300">
+              <option value={24}>24 hours</option>
+              <option value={72}>3 days</option>
+              <option value={168}>7 days</option>
+              <option value={720}>30 days</option>
+            </select>
+            {secTotal === 0 && !loadingS && (
+              <span className="text-sm text-emerald-600 font-medium">✓ No security events in this period</span>
+            )}
+          </div>
+          <LogTable rows={secLogs} loading={loadingS} total={secTotal} page={secPage} setPage={setSecPage} />
+        </>
+      )}
+    </div>
+  );
+};
+
+// ─── User Management Panel ────────────────────────────────────────────────────
 const UserManagementPanel = () => {
   const [userStats,  setUserStats]  = useState(null);
   const [users,      setUsers]      = useState([]);
@@ -1234,6 +1461,7 @@ const AdminDashboard = () => {
 
   const navItems = [
     { key: 'analytics',  icon: Zap,          label: 'Analytics'   },
+    { key: 'auditlog',   icon: Shield,       label: 'Audit Log'   },
     { key: 'users',      icon: Users,         label: 'Users'       },
     { key: 'content',    icon: BookOpen,      label: 'Content'     },
     { key: 'catalog',    icon: GraduationCap, label: 'Catalog'     },
@@ -1241,7 +1469,7 @@ const AdminDashboard = () => {
     { key: 'aigenerate',          icon: Sparkles,   label: 'AI Generate'        },
     { key: 'bulkupload',          icon: Upload,     label: 'Bulk Upload'        },
     { key: 'pastpapers',          icon: BookOpen,   label: 'Past Papers'        },
-    { key: 'english-masterclass', icon: null,       label: 'English Masterclass', href: '/admin/english-masterclass' },
+    { key: 'english-masterclass', icon: Languages,  label: 'English Masterclass', href: '/admin/english-masterclass' },
     { key: 'settings',            icon: Settings,   label: 'Quick Links'        },
   ];
 
@@ -1332,6 +1560,7 @@ const AdminDashboard = () => {
             )}
 
             {activePanel === 'analytics'  && <Panel><PanelErrorBoundary><PlatformAnalyticsPanel /></PanelErrorBoundary></Panel>}
+            {activePanel === 'auditlog'   && <Panel><PanelErrorBoundary><AuditLogPanel /></PanelErrorBoundary></Panel>}
             {activePanel === 'users'      && <Panel><PanelErrorBoundary><UserManagementPanel /></PanelErrorBoundary></Panel>}
             {activePanel === 'content'    && (
               <Panel>
