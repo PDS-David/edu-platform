@@ -20,7 +20,7 @@ import api, { TIMEOUT_DASHBOARD, TIMEOUT_ANALYTICS } from "../services/apiClient
 import { openResourceAuth } from "../utils/authenticatedDownload";
 import {
   FileText, Video, Music, File, Download,
-  Zap, ClipboardList, ClipboardCheck, History, BarChart2, BookOpen, TrendingUp,
+  Zap, ClipboardList, ClipboardCheck, History, BookMarked, BarChart2, BookOpen, TrendingUp,
   Flame, Target, GraduationCap, ScanLine, Menu, X,
   AlertCircle, RefreshCw, Languages,
 } from "lucide-react";
@@ -634,9 +634,10 @@ export default function StudentDashboard() {
     { label: "Practice",    icon: Zap,          path: "/student/practice"   },
     { label: "Past Papers", icon: FileText,     path: "/past-papers"        },
     { label: "Mock Exam",    icon: ClipboardList,  path: null, onClick: () => setShowMockPicker(true) },
-    { label: "Mock History", icon: History,        path: "/student/mock-history" },
-    { label: "My Tests",     icon: ClipboardCheck, path: "/student/my-tests"    },
-    { label: "Analytics",    icon: TrendingUp,     path: "/student/analytics"   },
+    { label: "Mock History", icon: History,        path: "/student/mock-history"  },
+    { label: "My Tests",     icon: ClipboardCheck, path: "/student/my-tests"     },
+    { label: "Quiz History", icon: BookMarked,     path: "/student/quiz-history" },
+    { label: "Analytics",    icon: TrendingUp,     path: "/student/analytics"    },
     { label: "AI Marking",  icon: ScanLine,     path: "/student/mark-image" },
     { label: "Exam Types",         icon: Download,   path: "/student/exam-types"         },
     { label: "English Masterclass", icon: Languages,  path: "/student/english-masterclass" },
