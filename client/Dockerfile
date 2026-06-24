@@ -1,6 +1,10 @@
 # ── Stage 1: build React app ──────────────────────────────────────────────────
 FROM node:22-alpine AS builder
 
+# Increase Node heap so esbuild/Rollup can handle large bundles without OOM.
+# Default is ~1.5GB which is too small for this bundle on a 4GB shared VPS.
+ENV NODE_OPTIONS="--max-old-space-size=3072"
+
 WORKDIR /app
 
 COPY package.json package-lock.json ./

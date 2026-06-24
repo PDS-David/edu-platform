@@ -5,6 +5,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../services/apiClient';
+import { setToken } from '../utils/token';
 import {
   ArrowLeft, Pencil, Clock, ChevronLeft, ChevronRight,
   X, Flag, Upload, Sigma, Lightbulb, Sparkles,
@@ -267,7 +268,6 @@ function InProgressScreen({ subtopicId, subtopic, selectedPaper, onFinish, navig
       try {
         const r = await api.post('/auth/heartbeat');
         if (r?.token) {
-          const { setToken } = await import('../utils/token');
           setToken(r.token);
         }
       } catch {
