@@ -707,11 +707,78 @@ router.get('/tests/:id/questions', protect, teacherOnly, async (req, res) => {
 router.post('/nudge/:userId', protect, teacherOnly, async (req, res) => {
   try {
     const users = await sequelize.query(
-      `SELECT first_name, email FROM users WHERE id=:id`,
+      `SELECT id, first_name, email FROM users WHERE id=:id AND is_active = true`,
       { replacements: { id: req.params.userId }, type: QueryTypes.SELECT }
     );
     if (!users.length) return res.status(404).json({ success: false, error: 'User not found' });
-    return res.json({ success: true, message: `Nudge queued for ${users[0].email}` });
+    const student = users[0];
+
+    // A7 fix: verify this student is actually scoped to the requesting
+    // teacher before sending anything — previously absent, meaning any
+    // teacher could nudge any student by ID. Checks both class membership
+    // and direct subject assignment, since GET /teacher/students above is
+    // class-only and would otherwise miss teachers scoped via
+    // teacher_subjects (the same gap T4/X4 describe for the student list).
+    const entitled = await sequelize.query(
+      `SELECT 1
+         FROM class_memberships cm
+         JOIN classes c ON c.id = cm.class_id
+        WHERE c.teacher_id = :teacherId AND cm.student_id = :studentId
+        UNION
+       SELECT 1
+         FROM student_subjects ss
+         JOIN teacher_subjects ts ON ts.subject_id = ss.subject_id
+        WHERE ts.teacher_id = :teacherId AND ss.student_id = :studentId AND ss.is_active = true
+        LIMIT 1`,
+      { replacements: { teacherId: req.user.id, studentId: student.id }, type: QueryTypes.SELECT }
+    ).catch(() => []);
+
+    if (!entitled.length) {
+      return res.status(403).json({ success: false, error: 'This student is not in one of your classes or subjects' });
+    }
+
+    // A7 fix: actually create the nudge instead of only returning a string
+    // claiming one was "queued". In-app notification row + best-effort email.
+    await sequelize.query(
+      `INSERT INTO notifications (user_id, title, message, type, created_at)
+       VALUES (:uid, 'Study Reminder', 'Your teacher wants you to keep up your study streak — jump back in!', 'nudge', NOW())`,
+      { replacements: { uid: student.id }, type: QueryTypes.INSERT }
+    );
+
+    let emailSent = false;
+    if (student.email) {
+      try {
+        const { send: sendEmail } = require('../services/emailService');
+        // Not reusing sendStreakNudge(): its template hard-codes "You
+        // haven't practised in {daysSince} days", which only makes sense
+        // for the automatic inactivity-based nudge it was built for. A
+        // manual teacher-initiated nudge has no actual day count behind
+        // it — forcing one through that template would literally render
+        // "null days" (or a made-up number) in a real email. Using the
+        // underlying send() directly with honest, generic copy instead.
+        const name = student.first_name || 'there';
+        await sendEmail(
+          student.email,
+          'A study reminder from your teacher',
+          `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px;text-align:center">
+             <h1 style="color:#0a4a3f;font-size:20px">Hi ${name}, your teacher sent you a reminder!</h1>
+             <p style="color:#555;line-height:1.6">
+               Your teacher wanted to nudge you to keep up your study streak on AISchoolOnair. Jump back in when you get a chance!
+             </p>
+           </div>`
+        );
+        emailSent = true;
+      } catch (emailErr) {
+        // Email is best-effort — the in-app notification above already
+        // succeeded, so a missing/misconfigured email service shouldn't
+        // make this endpoint report failure. send() also already swallows
+        // its own errors when email isn't configured, so this catch mainly
+        // covers an unexpected throw elsewhere.
+        console.warn('[nudge] email send failed:', emailErr.message);
+      }
+    }
+
+    return res.json({ success: true, delivered: true, email_sent: emailSent, message: `Study reminder sent to ${student.email}` });
   } catch (err) { return res.status(500).json({ success: false, error: err.message }); }
 });
 
