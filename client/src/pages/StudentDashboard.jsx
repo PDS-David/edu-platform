@@ -376,6 +376,10 @@ export function DashboardContent() {
   const dailyTarget   = user?.daily_goal || 20; // DEF-010: daily_goal now fetched via protect middleware
   const todayAttempts = summary.today_attempts ?? 0;
   const dailyPct      = Math.min(100, Math.round((todayAttempts / dailyTarget) * 100));
+  // X13: activity breakdown
+  const todayQuiz     = summary.today_quiz_attempts     ?? 0;
+  const todayMock     = summary.today_mock_attempts     ?? 0;
+  const todayPractice = summary.today_practice_attempts ?? 0;
 
   return (
     <div className="px-4 md:px-6 py-5 space-y-6 max-w-2xl">
@@ -417,6 +421,26 @@ export function DashboardContent() {
           <p className="text-[11px] text-gray-400 mt-1">
             {dailyPct >= 100 ? "✓ Daily goal complete — great work!" : `${dailyTarget - todayAttempts} more questions to hit today's goal`}
           </p>
+          {/* X13 — activity type breakdown */}
+          {todayAttempts > 0 && (
+            <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+              {todayQuiz > 0 && (
+                <span className="text-[10px] text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">
+                  Quiz: {todayQuiz}
+                </span>
+              )}
+              {todayPractice > 0 && (
+                <span className="text-[10px] text-violet-500 bg-violet-50 px-2 py-0.5 rounded-full">
+                  Practice: {todayPractice}
+                </span>
+              )}
+              {todayMock > 0 && (
+                <span className="text-[10px] text-amber-500 bg-amber-50 px-2 py-0.5 rounded-full">
+                  Mock: {todayMock}
+                </span>
+              )}
+            </div>
+          )}
         </div>
       )}
 

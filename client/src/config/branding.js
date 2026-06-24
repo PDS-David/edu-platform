@@ -30,6 +30,12 @@ export const branding = {
   // The footer (LandingPage.jsx) only renders an icon when the value here
   // is a real URL, so this safely hides all four until populated, rather
   // than linking to addresses that may 404 or belong to someone else.
+  //
+  // NOTE: a later commit (90e45be) attempted to change twitter -> x.com
+  // under the same unverified handle, asserting "platform rebranded; old
+  // URL still works" with no actual evidence. Re-checked via a second,
+  // targeted web search specifically for that handle on x.com — found no
+  // matching account. Reverted back to null pending real confirmation.
   social: {
     twitter:   null,
     facebook:  null,
