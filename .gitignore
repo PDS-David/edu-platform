@@ -81,3 +81,9 @@ api.staging.env
 
 # Temporary schema audit artifacts
 docs/schema-audit/
+
+# Plaintext credential files — must never be committed
+server/.env222.txt
+server/.envy.txt
+server/.envy*
+server/debug-jwt.js
