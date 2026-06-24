@@ -79,7 +79,20 @@ www.aischoolonair.ng {
         }
     }
 
-    # Frontend
+    # Frontend — serve from nginx container.
+    # index.html must never be cached: if a browser serves stale index.html
+    # referencing old chunk filenames (from a previous split-bundle deploy),
+    # it loads chunks that no longer exist → "React is not defined".
+    # We enforce no-cache at BOTH the nginx level (nginx-spa.conf) AND here
+    # so neither Caddy's own response cache nor any intermediate proxy caches it.
+    @index_html path /index.html /
+    route @index_html {
+        reverse_proxy web:80
+        header Cache-Control "no-store, no-cache, must-revalidate"
+        header Pragma "no-cache"
+        header Clear-Site-Data `"cache"`
+    }
+
     route {
         reverse_proxy web:80
         encode gzip zstd
