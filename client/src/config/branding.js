@@ -24,7 +24,7 @@ export const branding = {
   },
 
   social: {
-    twitter:   'https://twitter.com/aischoolonair',
+    twitter:   'https://x.com/aischoolonair',
     facebook:  'https://facebook.com/aischoolonair',
     linkedin:  'https://linkedin.com/company/aischoolonair',
     instagram: 'https://instagram.com/aischoolonair'
