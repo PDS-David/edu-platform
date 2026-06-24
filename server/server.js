@@ -342,4 +342,13 @@ if (authCleanup) authCleanup.register();
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server bound to PORT = ${PORT}`);
+
+  // X1: scheduled jobs were written but never started — wire them up here
+  try {
+    const scheduledJobs = require('./jobs/scheduledJobs');
+    (scheduledJobs.startJobs || scheduledJobs.start || (() => {}))();
+    console.log('✅ Scheduled jobs started');
+  } catch (e) {
+    console.warn('[startup] Scheduled jobs could not start:', e.message);
+  }
 });
