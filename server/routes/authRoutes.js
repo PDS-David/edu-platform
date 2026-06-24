@@ -241,4 +241,60 @@ router.post('/heartbeat', protect, async (req, res) => {
   }
 });
 
+// ── POST /api/auth/avatar — upload / replace profile photo ───────────────────
+// Accepts a single image file (JPEG/PNG/WebP/GIF, max 5 MB).
+// Saves it under server/uploads/avatars/<userId>.<ext> and updates
+// users.avatar_url so the change is immediately reflected everywhere.
+router.post('/avatar', protect, async (req, res) => {
+  const { createUploadMiddleware } = require('../middleware/uploadSecurity');
+  const path = require('path');
+  const fs   = require('fs');
+  const { QueryTypes } = require('sequelize');
+  const db   = require('../config/database');
+
+  const uploader = createUploadMiddleware({
+    maxSizeMB:    5,
+    allowedTypes: ['.jpg', '.jpeg', '.png', '.webp', '.gif'],
+    maxFiles:     1,
+  });
+
+  uploader.single('avatar')(req, res, async (err) => {
+    if (err) {
+      return res.status(400).json({ success: false, error: err.message });
+    }
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No image file provided.' });
+    }
+
+    try {
+      // Save to disk
+      const avatarsDir = path.join(__dirname, '../uploads/avatars');
+      if (!fs.existsSync(avatarsDir)) fs.mkdirSync(avatarsDir, { recursive: true });
+
+      const ext     = path.extname(req.file.originalname).toLowerCase() || '.jpg';
+      const filename = `${req.user.id}${ext}`;
+      const filepath = path.join(avatarsDir, filename);
+
+      // Delete any previous avatar for this user (different extension)
+      for (const e of ['.jpg', '.jpeg', '.png', '.webp', '.gif']) {
+        const old = path.join(avatarsDir, `${req.user.id}${e}`);
+        if (old !== filepath && fs.existsSync(old)) fs.unlinkSync(old);
+      }
+
+      fs.writeFileSync(filepath, req.file.buffer);
+
+      const avatarUrl = `/uploads/avatars/${filename}`;
+      await db.query(
+        `UPDATE users SET avatar_url = :avatarUrl, updated_at = NOW() WHERE id = :id`,
+        { replacements: { avatarUrl, id: req.user.id }, type: QueryTypes.UPDATE }
+      );
+
+      return res.json({ success: true, avatar_url: avatarUrl });
+    } catch (e) {
+      console.error('[POST /auth/avatar]', e.message);
+      return res.status(500).json({ success: false, error: 'Failed to save avatar.' });
+    }
+  });
+});
+
 module.exports = router;

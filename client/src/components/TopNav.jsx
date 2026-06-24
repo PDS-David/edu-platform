@@ -137,9 +137,13 @@ export default function TopNav() {
         <div ref={dropRef} className="relative">
           <button onClick={() => setDropOpen(o => !o)}
             className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-gray-100 transition-colors">
-            <div className={`w-7 h-7 rounded-full ${roleColor} flex items-center justify-center text-[11px] font-bold text-white`}>
-              {initials}
-            </div>
+            {user?.avatar_url ? (
+              <img src={user.avatar_url} alt={fullName} className="w-7 h-7 rounded-full object-cover shrink-0" />
+            ) : (
+              <div className={`w-7 h-7 rounded-full ${roleColor} flex items-center justify-center text-[11px] font-bold text-white`}>
+                {initials}
+              </div>
+            )}
             <span className="text-gray-700 text-sm hidden sm:block max-w-[140px] truncate font-medium">{fullName}</span>
             <ChevronDown size={13} className="text-gray-400" />
           </button>
