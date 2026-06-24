@@ -470,7 +470,8 @@ router.post('/send-notification', protect, adminOnly, adminActionLimiter, async 
     await audit.log(req, audit.ACTIONS.NOTIFICATION_SEND, {
       metadata: { target, title, sent_count: users.length },
     });
-    return success(res, { sent: users.length });
+    const emailEnabled = !!(process.env.EMAIL_HOST && process.env.EMAIL_USER);
+    return success(res, { sent: users.length, email_enabled: emailEnabled });
   } catch (err) {
     console.error('[POST /admin/send-notification]', err.message);
     return res.status(500).json({ success: false, error: err.message });

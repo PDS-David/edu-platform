@@ -326,6 +326,7 @@ router.post('/:id/answer', protect, async (req, res) => {
 router.post('/submit', protect, async (req, res) => {
   const { question_text, subtopic_id, difficulty = 'medium', explanation, options, correct_answer } = req.body;
   if (!question_text?.trim()) return res.status(400).json({ success: false, error: 'question_text is required' });
+  if (question_text.trim().length < 10) return res.status(400).json({ success: false, error: 'Question text must be at least 10 characters' });
   if (!Array.isArray(options) || options.length < 2) return res.status(400).json({ success: false, error: 'At least 2 options required' });
 
   const correctOpt = options.find(o => o.is_correct);
