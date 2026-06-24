@@ -125,8 +125,9 @@ export default function App() {
         {/* TEACHER */}
         <Route element={<PrivateRoute allowedRoles={["teacher", "admin"]} />}>
           <Route path="/teacher" element={<TeacherLayout />}>
+            <Route index element={<Navigate to="/teacher/dashboard" replace />} />
             <Route path="dashboard" element={<TeacherDashboard />} />
-            <Route path="assignments" element={<TeacherAssignmentPage />} />
+            <Route path="assignments" element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="content" element={<TeacherContentPage />} />
             <Route path="pending-questions" element={<TeacherPendingQuestions />} />
             <Route path="resources" element={<TeacherResourcesPage />} />
@@ -140,6 +141,7 @@ export default function App() {
         {/* ADMIN */}
         <Route element={<PrivateRoute allowedRoles={["admin"]} />}>
           <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="dashboard" element={<AdminDashboard />} />
             <Route path="home" element={<DashboardHome />} />
             <Route path="questions/review" element={<QuestionReview />} />

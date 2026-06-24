@@ -716,6 +716,11 @@ const AIGeneratePanel = () => {
         {subtopics.length > 0 && (
           <div><label className="block text-xs font-semibold text-gray-600 mb-1">Link to Subtopic <span className="text-gray-400 font-normal">(recommended — ensures students see questions in quiz)</span></label><select value={form.subtopic_id} onChange={e => setForm(f => ({ ...f, subtopic_id: e.target.value }))} className={inputCls}><option value="">— None (questions won't appear in subtopic quiz) —</option>{subtopics.map(st => <option key={st.id} value={st.id}>{st.name}</option>)}</select></div>
         )}
+        {form.subject_id && subtopics.length === 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-700">
+            ⚠ This subject has no subtopics yet. Generated questions will not appear in student quizzes until you create at least one subtopic under a topic in the <button onClick={() => setActivePanel('catalog')} className="underline font-semibold">Catalog panel</button>.
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <div><label className="block text-xs font-semibold text-gray-600 mb-1">Difficulty</label><select value={form.difficulty} onChange={e => setForm(f => ({ ...f, difficulty: e.target.value }))} className={inputCls}><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option></select></div>
           <div><label className="block text-xs font-semibold text-gray-600 mb-1">Count</label><select value={form.count} onChange={e => setForm(f => ({ ...f, count: Number(e.target.value) }))} className={inputCls}><option value={5}>5</option><option value={10}>10</option><option value={15}>15</option></select></div>
@@ -758,7 +763,7 @@ const UserManagementPanel = () => {
 
   const fetchUsers = async () => {
     setLoading(true);
-    try { const r = await api.get('/users', { params: { search, role: roleFilter, page, limit: LIMIT } }); setUsers(r.data || []); setTotal(r.total || 0); }
+    try { const r = await api.get('/users', { params: { search, role: roleFilter, page, limit: LIMIT } }); setUsers(r.data || []); setTotal(r.meta?.total || r.total || 0); }
     catch { setUsers([]); }
     finally { setLoading(false); }
   };
@@ -854,7 +859,7 @@ const PlatformAnalyticsPanel = () => {
   const sendNotification = async () => {
     if (!notifTitle.trim() || !notifMessage.trim()) { showToast('Title and message are required', 'error'); return; }
     setNotifSending(true);
-    try { const res = await api.post('/admin/send-notification', { target: notifTarget, title: notifTitle.trim(), message: notifMessage.trim() }); showToast(`Notification sent to ${res.sent ?? res.data?.sent ?? 0} user(s)`); setNotifModal(false); setNotifTitle(''); setNotifMessage(''); setNotifTarget('all'); }
+    try { const res = await api.post('/admin/send-notification', { target: notifTarget, title: notifTitle.trim(), message: notifMessage.trim() }); const sent = res.sent ?? res.data?.sent ?? 0; const emailOk = res.email_enabled ?? res.data?.email_enabled ?? true; showToast(emailOk ? `Notification sent to ${sent} user(s).` : `Notification saved for ${sent} user(s). ⚠ Email delivery is not configured on this server.`); setNotifModal(false); setNotifTitle(''); setNotifMessage(''); setNotifTarget('all'); }
     catch (err) { showToast(err?.message || 'Failed to send notification', 'error'); }
     finally { setNotifSending(false); }
   };
@@ -1230,7 +1235,6 @@ const AdminDashboard = () => {
   const navItems = [
     { key: 'analytics',  icon: Zap,          label: 'Analytics'   },
     { key: 'users',      icon: Users,         label: 'Users'       },
-    { key: 'schools',    icon: School,        label: 'Schools'     },
     { key: 'content',    icon: BookOpen,      label: 'Content'     },
     { key: 'catalog',    icon: GraduationCap, label: 'Catalog'     },
     { key: 'teachers',   icon: UserCheck,     label: 'Teachers'    },
@@ -1329,14 +1333,6 @@ const AdminDashboard = () => {
 
             {activePanel === 'analytics'  && <Panel><PanelErrorBoundary><PlatformAnalyticsPanel /></PanelErrorBoundary></Panel>}
             {activePanel === 'users'      && <Panel><PanelErrorBoundary><UserManagementPanel /></PanelErrorBoundary></Panel>}
-            {activePanel === 'schools'    && (
-              <Panel>
-                <div className="text-center py-16">
-                  <School className="w-8 h-8 mx-auto mb-3 text-gray-200" />
-                  <p className="text-sm text-gray-400">School management coming soon.</p>
-                </div>
-              </Panel>
-            )}
             {activePanel === 'content'    && (
               <Panel>
                 <div className="mb-4">
