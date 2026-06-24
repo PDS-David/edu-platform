@@ -130,7 +130,20 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
 // CLIENT BUILD
 const clientDist = path.join(__dirname, '..', 'client', 'dist');
 if (fs.existsSync(clientDist)) {
-  app.use(express.static(clientDist));
+  // Content-hashed assets (JS/CSS/fonts) can be cached aggressively.
+  // index.html must never be cached — it must always load fresh so the
+  // browser picks up new asset hashes after a deploy.
+  app.use(express.static(clientDist, {
+    setHeaders(res, filePath) {
+      if (filePath.endsWith('index.html')) {
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        // Tell the browser to discard ALL cached JS/CSS so stale chunks
+        // from a previous build never cause "React is not defined".
+        res.setHeader('Clear-Site-Data', '"cache"');
+      }
+    },
+  }));
 }
 
 // MIDDLEWARES
@@ -280,6 +293,9 @@ app.get('/api/health', (_req, res) => {
 if (fs.existsSync(clientDist)) {
   app.get('*', (req, res) => {
     if (!req.path.startsWith('/api') && !req.path.startsWith('/uploads')) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Clear-Site-Data', '"cache"');
       res.sendFile(path.join(clientDist, 'index.html'));
     }
   });
