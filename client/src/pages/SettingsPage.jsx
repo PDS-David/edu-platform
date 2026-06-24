@@ -59,6 +59,10 @@ export default function SettingsPage() {
   const [profile, setProfile] = useState({ first_name: '', last_name: '', phone: '', country: '' });
   const [profileSaving, setProfileSaving] = useState(false);
 
+  // Avatar
+  const [avatarUrl,       setAvatarUrl]       = useState(user?.avatar_url || null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+
   // Password
   const [pwForm, setPwForm] = useState({ current_password: '', new_password: '', confirm_password: '' });
   const [showPw, setShowPw] = useState({ current: false, new: false, confirm: false });
@@ -124,7 +128,31 @@ export default function SettingsPage() {
     return null;
   };
 
-  const handleProfileSave = async () => {
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Image must be under 5 MB', 'error');
+      return;
+    }
+    setAvatarUploading(true);
+    try {
+      const form = new FormData();
+      form.append('avatar', file);
+      const res = await api.post('/auth/avatar', form);
+      const url = res.avatar_url || res.data?.avatar_url;
+      setAvatarUrl(url);
+      updateUser({ avatar_url: url });
+      showToast('Profile photo updated', 'success');
+    } catch (err) {
+      showToast(err?.message || 'Upload failed', 'error');
+    } finally {
+      setAvatarUploading(false);
+      e.target.value = '';
+    }
+  };
+
+
     setProfileSaving(true);
     try {
       await api.patch('/auth/profile', profile);
@@ -238,9 +266,34 @@ export default function SettingsPage() {
         {/* ── Profile ── */}
         <Section title="Profile" subtitle="Update your personal information" icon={User}>
           <div className="flex items-center gap-4 mb-5">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-2xl font-bold shrink-0">
-              {fullName.charAt(0).toUpperCase()}
-            </div>
+            {/* Clickable avatar — click to upload a new photo */}
+            <label className="relative w-16 h-16 rounded-2xl shrink-0 cursor-pointer group" title="Click to change photo">
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="sr-only"
+                onChange={handleAvatarChange}
+                disabled={avatarUploading}
+              />
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt="Profile"
+                  className="w-16 h-16 rounded-2xl object-cover"
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-2xl font-bold">
+                  {fullName.charAt(0).toUpperCase()}
+                </div>
+              )}
+              {/* Hover overlay */}
+              <div className="absolute inset-0 rounded-2xl bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                {avatarUploading
+                  ? <Loader2 size={18} className="text-white animate-spin" />
+                  : <span className="text-white text-xs font-semibold">📷</span>
+                }
+              </div>
+            </label>
             <div>
               <p className="font-bold text-gray-900 text-lg">{fullName}</p>
               <p className="text-sm text-gray-400 flex items-center gap-1.5 mt-0.5"><Mail size={12} /> {user?.email}</p>

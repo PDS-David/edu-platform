@@ -124,11 +124,24 @@ export default function OnboardingPage() {
     loadSubjects();
   }, []); // eslint-disable-line
 
+  // S4: per-exam-type subject limits enforced at selection time.
+  // The detected boards are fetched from the user's pending_exam_board_ids during
+  // mount and stored as board codes in detectedBoards.
+  // JAMB/UTME → 4, WAEC/NECO → 9, JUPEB → 4, others → 10 (generous fallback)
+  const ONBOARDING_LIMITS = { JAMB: 4, UTME: 4, WAEC: 9, NECO: 9, JUPEB: 4 };
+  const subjectLimit = (() => {
+    for (const code of detectedBoards) {
+      const limit = ONBOARDING_LIMITS[String(code).toUpperCase()];
+      if (limit !== undefined) return limit;
+    }
+    return 10;
+  })();
+
   const toggleSubject = (id) => {
     if (subjects.includes(id)) {
       setSubjects(prev => prev.filter(s => s !== id));
     } else {
-      if (subjects.length >= 10) return; // max 10 subjects
+      if (subjects.length >= subjectLimit) return;
       setSubjects(prev => [...prev, id]);
     }
   };
@@ -213,7 +226,7 @@ export default function OnboardingPage() {
                 <div className="grid grid-cols-2 gap-2 max-h-72 overflow-y-auto">
                   {allSubs.map(s => {
                     const sel    = subjects.includes(s.id);
-                    const locked = !sel && subjects.length >= 10;
+                    const locked = !sel && subjects.length >= subjectLimit;
                     return (
                       <button
                         key={s.id}
@@ -235,8 +248,8 @@ export default function OnboardingPage() {
                 </div>
               )}
 
-              {subjects.length >= 10 && (
-                <p className="text-xs text-amber-600 mt-2">Maximum 10 subjects selected</p>
+              {subjects.length >= subjectLimit && (
+                <p className="text-xs text-amber-600 mt-2">Maximum {subjectLimit} subjects selected for your exam type</p>
               )}
             </>
           )}
