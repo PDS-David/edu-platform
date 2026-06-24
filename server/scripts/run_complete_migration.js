@@ -215,9 +215,14 @@ async function run() {
   // Cambridge boards (CAMBAL, CAMBOL) and others were missing from the DB,
   // causing them to not appear in the registration curriculum dropdown even
   // though they were in the frontend fallback list.
+  // esc() doubles embedded single quotes (SQL string-literal escaping) — without
+  // it, "GCE A' Levels" interpolated directly into '${name}' breaks the
+  // generated SQL at the embedded apostrophe. exec() swallows errors per
+  // statement, so this was failing silently rather than crashing the deploy.
+  const esc = (s) => String(s).replace(/'/g, "''");
   const BOARD_UPSERT = (code, name, fullName, displayOrder) => `
     INSERT INTO exam_boards (code, name, full_name, country, is_active, display_order, created_at, updated_at)
-    VALUES ('${code}', '${name}', '${fullName}', 'NG', true, ${displayOrder}, NOW(), NOW())
+    VALUES ('${esc(code)}', '${esc(name)}', '${esc(fullName)}', 'NG', true, ${displayOrder}, NOW(), NOW())
     ON CONFLICT (code) DO UPDATE SET
       name          = EXCLUDED.name,
       full_name     = EXCLUDED.full_name,
@@ -240,6 +245,7 @@ async function run() {
   await exec('exam_boards: seed SAT',           BOARD_UPSERT('SAT',     'SAT',                    'Scholastic Assessment Test',                                  13));
   await exec('exam_boards: seed LANG_EN',       BOARD_UPSERT('LANG_EN', 'Language Lab – English', 'English Language Laboratory',                                 14));
   await exec('exam_boards: seed LANG_FR',       BOARD_UPSERT('LANG_FR', 'Language Lab – French',  'French Language Laboratory',                                  15));
+  await exec('exam_boards: seed LANG_YO',       BOARD_UPSERT('LANG_YO', 'Language Lab – Yoruba',  'Yoruba Language Laboratory',                                  16));
   await exec('classes: student_count', `
     ALTER TABLE classes ADD COLUMN IF NOT EXISTS student_count INTEGER DEFAULT 0`);
 
