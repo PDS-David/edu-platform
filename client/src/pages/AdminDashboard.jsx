@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import api, { TIMEOUT_AI } from '../services/apiClient';
 import {
-  Users, School, BookOpen, Settings, LogOut,
+  Users, School, BookOpen, Settings, Languages, LogOut,
   Plus, Pencil, Trash2, ChevronDown, ChevronRight,
   Loader2, X, Check, AlertTriangle, RefreshCw, GraduationCap,
   UserCheck, ChevronUp, Sparkles, Zap, Upload, CheckCircle, Shield
@@ -1469,7 +1469,7 @@ const AdminDashboard = () => {
     { key: 'aigenerate',          icon: Sparkles,   label: 'AI Generate'        },
     { key: 'bulkupload',          icon: Upload,     label: 'Bulk Upload'        },
     { key: 'pastpapers',          icon: BookOpen,   label: 'Past Papers'        },
-    { key: 'english-masterclass', icon: null,       label: 'English Masterclass', href: '/admin/english-masterclass' },
+    { key: 'english-masterclass', icon: Languages,  label: 'English Masterclass', href: '/admin/english-masterclass' },
     { key: 'settings',            icon: Settings,   label: 'Quick Links'        },
   ];
 
