@@ -1,75 +1,86 @@
+/**
+ * realtimeClient.js
+ * ─────────────────
+ * X2 FIX: replaced native WebSocket with socket.io-client.
+ *
+ * The server uses socket.io (Server from 'socket.io'), which requires its own
+ * handshake protocol — it is NOT compatible with a plain `new WebSocket(url)`.
+ * socket.io-client is already in client/package.json (^4.8.3).
+ *
+ * API is intentionally identical to the old native-WS version so that
+ * useRealtimeSync.js needs zero changes:
+ *   initRealtime() — connect (idempotent)
+ *   on(event, fn)  — subscribe
+ *   off(event, fn) — unsubscribe
+ *   emit(event, data) — send to server (optional)
+ *   getSocket()    — raw socket.io Socket instance
+ */
+
+import { io } from 'socket.io-client';
+
 let socket = null;
-let listeners = new Map();
+const listeners = new Map();
 
 /**
- * Native WebSocket client (matches backend ws server)
+ * Derive the server origin.  socket.io connects to the HTTP(S) origin, not a
+ * ws:// URL — it upgrades the transport internally after the handshake.
  */
-export function initRealtime() {
-  if (socket && socket.readyState === WebSocket.OPEN) {
-    return socket;
+function getServerOrigin() {
+  if (import.meta.env.VITE_WS_URL) {
+    // VITE_WS_URL may be a ws:// URL from old config — convert to https://
+    return import.meta.env.VITE_WS_URL
+      .replace(/^wss?:\/\//, 'https://')
+      .replace(/^http:\/\//, 'http://');
   }
+  return window.location.origin; // e.g. https://www.aischoolonair.ng
+}
 
-  // Derive WebSocket URL from the current page origin (works behind Caddy)
-  const wsUrl = import.meta.env.VITE_WS_URL ||
-    (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host;
-  socket = new WebSocket(wsUrl);
+export function initRealtime() {
+  if (socket && socket.connected) return socket;
 
-  socket.onopen = () => {
-    console.log("[realtime] connected");
-  };
+  socket = io(getServerOrigin(), {
+    withCredentials: true,
+    transports: ['websocket', 'polling'], // try WebSocket first, fall back to long-poll
+    reconnectionAttempts: 5,
+    reconnectionDelay: 2000,
+  });
 
-  socket.onclose = () => {
-    console.log("[realtime] disconnected");
-  };
+  socket.on('connect', () => {
+    console.log('[realtime] connected', socket.id);
+  });
 
-  socket.onerror = (err) => {
-    console.warn("[realtime] error", err);
-  };
+  socket.on('disconnect', (reason) => {
+    console.log('[realtime] disconnected', reason);
+  });
 
-  socket.onmessage = (message) => {
-    try {
-      const { event, data } = JSON.parse(message.data);
+  socket.on('connect_error', (err) => {
+    // Suppress noisy errors — realtime is an enhancement, not a hard requirement
+    console.warn('[realtime] connection error:', err.message);
+  });
 
-      const handlers = listeners.get(event);
-      if (handlers) {
-        handlers.forEach((fn) => fn(data));
-      }
-    } catch (e) {
-      console.warn("[realtime] invalid message", message.data);
-    }
-  };
+  // Forward all incoming socket.io events to our listener map
+  // so existing on()/off() callers work without any changes.
+  socket.onAny((event, data) => {
+    const handlers = listeners.get(event);
+    if (handlers) handlers.forEach((fn) => fn(data));
+  });
 
   return socket;
 }
 
-/**
- * Subscribe to event
- */
 export function on(event, handler) {
-  if (!listeners.has(event)) {
-    listeners.set(event, new Set());
-  }
-
+  if (!listeners.has(event)) listeners.set(event, new Set());
   listeners.get(event).add(handler);
 }
 
-/**
- * Unsubscribe
- */
 export function off(event, handler) {
   const handlers = listeners.get(event);
-  if (handlers) {
-    handlers.delete(handler);
-  }
+  if (handlers) handlers.delete(handler);
 }
 
-/**
- * Emit event (optional client → server usage)
- */
 export function emit(event, data) {
-  if (!socket || socket.readyState !== WebSocket.OPEN) return;
-
-  socket.send(JSON.stringify({ event, data }));
+  if (!socket || !socket.connected) return;
+  socket.emit(event, data);
 }
 
 export function getSocket() {
