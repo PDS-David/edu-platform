@@ -268,6 +268,7 @@ async function sendPasswordResetEmail({ email, first_name, token }) {
 }
 
 module.exports = {
+  send,
   sendWelcomeEmail,
   sendWeeklyDigest,
   sendStreakNudge,

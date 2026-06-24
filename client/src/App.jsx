@@ -57,7 +57,6 @@ import TeacherAddQuestionPage from "./pages/TeacherAddQuestionPage";
 
 // Admin
 import AdminDashboard from "./pages/AdminDashboard";
-import DashboardHome from "./pages/Dashboard/DashboardHome";
 
 // Global floating widget
 import WhatsAppButton from "./components/WhatsAppButton";
@@ -137,8 +136,8 @@ export default function App() {
         {/* ADMIN */}
         <Route element={<PrivateRoute allowedRoles={["admin"]} />}>
           <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="dashboard" element={<AdminDashboard />} />
-            <Route path="home" element={<DashboardHome />} />
             <Route path="questions/review" element={<QuestionReview />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
