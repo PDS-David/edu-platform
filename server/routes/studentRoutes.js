@@ -475,47 +475,11 @@ router.get('/my-subjects', protect, async (req, res) => {
 
     let result = [...merged.values()];
 
-    // If student has no subjects at all, auto-enroll them in all active seeded subjects
-    // (subjects that have at least one topic) so they see content immediately
-    if (result.length === 0) {
-      try {
-        // Bug 1 fix: self-heal status/enrollment_source columns before the
-        // auto-enroll INSERT below, which is the route most likely to be
-        // hit by a fresh/first-time student — and therefore the most
-        // likely trigger for the reported 500.
-        await ensureEnrollmentColumns();
-
-        // Enroll in subjects that have topics
-        await sequelize.query(
-          `INSERT INTO student_subjects (student_id, subject_id, is_active, status, enrollment_source)
-           SELECT :studentId, s.id, true, :approvedStatus, :autoEnrolledSource
-           FROM subjects s
-           WHERE s.is_active = true
-             AND EXISTS (SELECT 1 FROM topics t WHERE t.subject_id = s.id)
-           ON CONFLICT (student_id, subject_id) DO NOTHING`,
-          { replacements: { studentId, approvedStatus: ENROLLMENT_STATUS.APPROVED, autoEnrolledSource: ENROLLMENT_SOURCE.AUTO_ENROLLED }, type: QueryTypes.INSERT }
-        );
-
-        // Re-fetch
-        ownSubjects = await sequelize.query(
-          `SELECT DISTINCT
-             s.id, s.name, s.code, s.level, s.icon_emoji, s.is_active,
-             eb.code  AS exam_board_code,
-             eb.name  AS exam_board_name,
-             eb.id    AS exam_board_id,
-             'own'    AS source
-           FROM student_subjects ss
-           JOIN subjects   s  ON s.id  = ss.subject_id
-           JOIN exam_boards eb ON eb.id = s.exam_board_id
-           WHERE ss.student_id = :studentId AND ss.status = :approvedStatus AND s.is_active = true
-           ORDER BY s.name`,
-          { replacements: { studentId, approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.SELECT }
-        );
-        result = ownSubjects;
-      } catch (e) {
-        // Non-fatal — return empty list
-      }
-    }
+    // REMOVED: auto-enroll-all fallback that was enrolling students in every
+    // subject on the platform when their student_subjects rows were missing or
+    // had the wrong status. This caused any student with enrollment issues to
+    // see the entire subject catalog as "their" subjects.
+    // Correct behaviour: return empty array — onboarding handles initial enrollment.
 
     return res.status(200).json({ success: true, data: result });
   } catch (err) {
