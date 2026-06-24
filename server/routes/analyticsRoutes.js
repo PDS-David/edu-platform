@@ -233,7 +233,26 @@ router.get('/summary', protect, async (req, res) => {
            COUNT(*) FILTER (
              WHERE pa.attempted_at >= CURRENT_DATE
                AND pa.attempted_at <  CURRENT_DATE + INTERVAL '1 day'
-           )::INTEGER AS today_attempts
+           )::INTEGER AS today_attempts,
+
+           -- X13: break today_attempts by activity type
+           COUNT(*) FILTER (
+             WHERE pa.attempted_at >= CURRENT_DATE
+               AND pa.attempted_at <  CURRENT_DATE + INTERVAL '1 day'
+               AND (pa.paper_type = 'quiz' OR pa.paper_type IS NULL)
+           )::INTEGER AS today_quiz_attempts,
+
+           COUNT(*) FILTER (
+             WHERE pa.attempted_at >= CURRENT_DATE
+               AND pa.attempted_at <  CURRENT_DATE + INTERVAL '1 day'
+               AND pa.paper_type = 'mock'
+           )::INTEGER AS today_mock_attempts,
+
+           COUNT(*) FILTER (
+             WHERE pa.attempted_at >= CURRENT_DATE
+               AND pa.attempted_at <  CURRENT_DATE + INTERVAL '1 day'
+               AND pa.paper_type = 'practice'
+           )::INTEGER AS today_practice_attempts
 
          FROM practice_attempts pa
          -- Join chain: questions → subtopics → topics (needed for subjects_practiced)
@@ -253,7 +272,10 @@ router.get('/summary', protect, async (req, res) => {
       xp_points:          parseInt(u.xp_points,          10) || 0,
       subjects_practiced: parseInt(a.subjects_practiced, 10) || 0,
       total_time_seconds: parseInt(a.total_time_seconds, 10) || 0,
-      today_attempts:     parseInt(a.today_attempts,     10) || 0,
+      today_attempts:          parseInt(a.today_attempts,          10) || 0,
+      today_quiz_attempts:     parseInt(a.today_quiz_attempts,     10) || 0,
+      today_mock_attempts:     parseInt(a.today_mock_attempts,     10) || 0,
+      today_practice_attempts: parseInt(a.today_practice_attempts, 10) || 0,
     }});
   } catch (err) {
     console.error('[GET /analytics/summary]', err.message);

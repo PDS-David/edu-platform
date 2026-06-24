@@ -20,7 +20,7 @@ import api, { TIMEOUT_DASHBOARD, TIMEOUT_ANALYTICS } from "../services/apiClient
 import { openResourceAuth } from "../utils/authenticatedDownload";
 import {
   FileText, Video, Music, File, Download,
-  Zap, ClipboardList, ClipboardCheck, History, BarChart2, BookOpen, TrendingUp,
+  Zap, ClipboardList, ClipboardCheck, History, BookMarked, BarChart2, BookOpen, TrendingUp,
   Flame, Target, GraduationCap, ScanLine, Menu, X,
   AlertCircle, RefreshCw, Languages,
 } from "lucide-react";
@@ -328,6 +328,9 @@ export function DashboardContent() {
 
   const [showMockPicker,   setShowMockPicker]   = useState(false);
 
+  // GAP 1: English Masterclass progress card
+  const [emStats,          setEmStats]          = useState(null);
+
   // DEF-006: loadAll uses per-request timeouts and surfaces errors instead of
   //          swallowing them.  Each section independently tracks its error state.
   const loadAll = useCallback(async () => {
@@ -360,6 +363,11 @@ export function DashboardContent() {
         .then(r => { setRecentScores(r.data || []); })
         .catch(e => { setErrorScores(e.message || "Failed to load activity"); setRecentScores([]); })
         .finally(() => setLoadingScores(false)),
+
+      // GAP 1: English Masterclass teaser stats
+      api.get("/english-masterclass/progress", { timeout: TIMEOUT_ANALYTICS })
+        .then(r => setEmStats(r.data?.stats || null))
+        .catch(() => setEmStats(null)),
     ]);
   }, []);
 
@@ -368,6 +376,10 @@ export function DashboardContent() {
   const dailyTarget   = user?.daily_goal || 20; // DEF-010: daily_goal now fetched via protect middleware
   const todayAttempts = summary.today_attempts ?? 0;
   const dailyPct      = Math.min(100, Math.round((todayAttempts / dailyTarget) * 100));
+  // X13: activity breakdown
+  const todayQuiz     = summary.today_quiz_attempts     ?? 0;
+  const todayMock     = summary.today_mock_attempts     ?? 0;
+  const todayPractice = summary.today_practice_attempts ?? 0;
 
   return (
     <div className="px-4 md:px-6 py-5 space-y-6 max-w-2xl">
@@ -409,6 +421,26 @@ export function DashboardContent() {
           <p className="text-[11px] text-gray-400 mt-1">
             {dailyPct >= 100 ? "✓ Daily goal complete — great work!" : `${dailyTarget - todayAttempts} more questions to hit today's goal`}
           </p>
+          {/* X13 — activity type breakdown */}
+          {todayAttempts > 0 && (
+            <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+              {todayQuiz > 0 && (
+                <span className="text-[10px] text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">
+                  Quiz: {todayQuiz}
+                </span>
+              )}
+              {todayPractice > 0 && (
+                <span className="text-[10px] text-violet-500 bg-violet-50 px-2 py-0.5 rounded-full">
+                  Practice: {todayPractice}
+                </span>
+              )}
+              {todayMock > 0 && (
+                <span className="text-[10px] text-amber-500 bg-amber-50 px-2 py-0.5 rounded-full">
+                  Mock: {todayMock}
+                </span>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -483,6 +515,48 @@ export function DashboardContent() {
             })}
           </div>
         )}
+      </section>
+
+      {/* ── ENGLISH MASTERCLASS TEASER ── */}
+      <section>
+        <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+          <Languages size={13} className="text-gray-400" /> English Masterclass
+        </h2>
+        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 rounded-xl p-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center shrink-0 shadow-sm">
+              <span className="text-lg">🇬🇧</span>
+            </div>
+            <div>
+              {emStats && (emStats.total_sessions > 0) ? (
+                <div className="flex gap-4">
+                  <div className="text-center">
+                    <p className="text-lg font-bold text-indigo-700 font-mono">{emStats.words_learned || 0}</p>
+                    <p className="text-[10px] text-indigo-500 font-medium">Words</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-lg font-bold text-purple-700 font-mono">{emStats.practice_streak || 0}d</p>
+                    <p className="text-[10px] text-purple-500 font-medium">Streak</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-lg font-bold text-indigo-700 font-mono">{Math.round(emStats.overall_accuracy || 0)}%</p>
+                    <p className="text-[10px] text-indigo-500 font-medium">Accuracy</p>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-sm font-semibold text-indigo-900">British English Training</p>
+                  <p className="text-xs text-indigo-600">Start practising vocabulary today</p>
+                </div>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={() => navigate("/student/english-masterclass")}
+            className="shrink-0 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg transition-colors whitespace-nowrap">
+            {emStats?.total_sessions > 0 ? "Continue →" : "Start →"}
+          </button>
+        </div>
       </section>
 
       {/* ── ASSIGNED RESOURCES ── */}
@@ -584,9 +658,10 @@ export default function StudentDashboard() {
     { label: "Practice",    icon: Zap,          path: "/student/practice"   },
     { label: "Past Papers", icon: FileText,     path: "/past-papers"        },
     { label: "Mock Exam",    icon: ClipboardList,  path: null, onClick: () => setShowMockPicker(true) },
-    { label: "Mock History", icon: History,        path: "/student/mock-history" },
-    { label: "My Tests",     icon: ClipboardCheck, path: "/student/my-tests"    },
-    { label: "Analytics",    icon: TrendingUp,     path: "/student/analytics"   },
+    { label: "Mock History", icon: History,        path: "/student/mock-history"  },
+    { label: "My Tests",     icon: ClipboardCheck, path: "/student/my-tests"     },
+    { label: "Quiz History", icon: BookMarked,     path: "/student/quiz-history" },
+    { label: "Analytics",    icon: TrendingUp,     path: "/student/analytics"    },
     { label: "AI Marking",  icon: ScanLine,     path: "/student/mark-image" },
     { label: "Exam Types",         icon: Download,   path: "/student/exam-types"         },
     { label: "English Masterclass", icon: Languages,  path: "/student/english-masterclass" },

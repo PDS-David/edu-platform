@@ -317,11 +317,14 @@ app.use((err, _req, res, _next) => {
 const server = http.createServer(app);
 
 // REALTIME SAFE LOAD
+// X2 FIX: realtimeEngine exports a singleton instance (module.exports = new RealtimeEngine())
+// so the correct call is .init(server), not new RealtimeEngine(server).
 try {
-  const RealtimeEngine = require('./services/realtimeEngine');
-  new RealtimeEngine(server);
-} catch {
-  logger.warn('Realtime not initialized');
+  const realtimeEngine = require('./services/realtimeEngine');
+  realtimeEngine.init(server);
+  logger.info('Realtime engine initialised (socket.io)');
+} catch (e) {
+  logger.warn('Realtime not initialized:', e.message);
 }
 
 /*

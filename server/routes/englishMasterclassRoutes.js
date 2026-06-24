@@ -124,9 +124,11 @@ Say only the word, nothing else: "${word}"`
 });
 
 // POST /api/english-masterclass/word-explain
-// AI generates definition, example sentence, and usage tip for a word
+// AI generates definition, example sentence, and usage tip for a word.
+// Accepts optional word_id — if supplied and the word's DB fields are empty,
+// the AI result is backfilled so subsequent students get it instantly (GAP 2).
 router.post('/word-explain', async (req, res) => {
-  const { word, context } = req.body;
+  const { word, context, word_id } = req.body;
   if (!word) return res.status(400).json({ success: false, error: 'word is required' });
 
   try {
@@ -147,6 +149,26 @@ Respond in this exact JSON format (no markdown, no extra text):
     const raw = await generate(prompt, 'explain');
     const cleaned = raw.replace(/```json|```/g, '').trim();
     const data = JSON.parse(cleaned);
+
+    // GAP 2: Backfill DB — only write if the word row has empty/null fields
+    // (never overwrite admin-curated content)
+    if (word_id) {
+      try {
+        await db.query(`
+          UPDATE em_words
+          SET
+            definition       = CASE WHEN (definition IS NULL OR definition = '') THEN $1 ELSE definition END,
+            example_sentence = CASE WHEN (example_sentence IS NULL OR example_sentence = '') THEN $2 ELSE example_sentence END,
+            phonetic         = CASE WHEN (phonetic IS NULL OR phonetic = '') THEN $3 ELSE phonetic END,
+            updated_at       = NOW()
+          WHERE id = $4
+        `, [data.definition || null, data.example_sentence || null, data.phonetic || null, word_id]);
+      } catch (backfillErr) {
+        // Non-fatal: backfill failure must not break the student's explain response
+        console.warn('[EM] word-explain backfill failed:', backfillErr.message);
+      }
+    }
+
     res.json({ success: true, data });
   } catch (err) {
     console.error('[EM] POST /word-explain', err.message);
