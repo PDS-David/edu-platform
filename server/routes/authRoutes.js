@@ -70,6 +70,49 @@ router.put ('/password',        protect, updatePassword);
 router.post('/logout',          protect, logout);
 router.post('/logout-all',      protect, logoutAll);
 
+// ── GET /api/auth/notification-preferences ────────────────────────────────────
+// S2: load notification prefs from DB so they persist across devices/browsers.
+router.get('/notification-preferences', protect, async (req, res) => {
+  const { QueryTypes } = require('sequelize');
+  const db = require('../config/database');
+  try {
+    const rows = await db.query(
+      `SELECT notification_preferences FROM users WHERE id = :id LIMIT 1`,
+      { replacements: { id: req.user.id }, type: QueryTypes.SELECT }
+    );
+    const prefs = rows[0]?.notification_preferences || {
+      email_updates: true, weekly_digest: true, new_assignments: true,
+    };
+    return res.json({ success: true, data: prefs });
+  } catch (err) {
+    console.error('[GET /auth/notification-preferences]', err.message);
+    return res.status(500).json({ success: false, error: 'Failed to load preferences' });
+  }
+});
+
+// ── PATCH /api/auth/notification-preferences ──────────────────────────────────
+// S2: save notification prefs to DB so they sync across every device.
+router.patch('/notification-preferences', protect, async (req, res) => {
+  const { QueryTypes } = require('sequelize');
+  const db = require('../config/database');
+  const { email_updates, weekly_digest, new_assignments } = req.body;
+  const prefs = {
+    email_updates:   email_updates   !== undefined ? !!email_updates   : true,
+    weekly_digest:   weekly_digest   !== undefined ? !!weekly_digest   : true,
+    new_assignments: new_assignments !== undefined ? !!new_assignments : true,
+  };
+  try {
+    await db.query(
+      `UPDATE users SET notification_preferences = :prefs, updated_at = NOW() WHERE id = :id`,
+      { replacements: { prefs: JSON.stringify(prefs), id: req.user.id }, type: QueryTypes.UPDATE }
+    );
+    return res.json({ success: true, data: prefs, message: 'Preferences saved' });
+  } catch (err) {
+    console.error('[PATCH /auth/notification-preferences]', err.message);
+    return res.status(500).json({ success: false, error: 'Failed to save preferences' });
+  }
+});
+
 
 // PATCH /api/auth/email — change email address (requires password confirmation)
 router.patch('/email', protect, async (req, res) => {
@@ -196,6 +239,62 @@ router.post('/heartbeat', protect, async (req, res) => {
     // interceptor will handle it on the next real request.
     return res.json({ success: true, alive: true });
   }
+});
+
+// ── POST /api/auth/avatar — upload / replace profile photo ───────────────────
+// Accepts a single image file (JPEG/PNG/WebP/GIF, max 5 MB).
+// Saves it under server/uploads/avatars/<userId>.<ext> and updates
+// users.avatar_url so the change is immediately reflected everywhere.
+router.post('/avatar', protect, async (req, res) => {
+  const { createUploadMiddleware } = require('../middleware/uploadSecurity');
+  const path = require('path');
+  const fs   = require('fs');
+  const { QueryTypes } = require('sequelize');
+  const db   = require('../config/database');
+
+  const uploader = createUploadMiddleware({
+    maxSizeMB:    5,
+    allowedTypes: ['.jpg', '.jpeg', '.png', '.webp', '.gif'],
+    maxFiles:     1,
+  });
+
+  uploader.single('avatar')(req, res, async (err) => {
+    if (err) {
+      return res.status(400).json({ success: false, error: err.message });
+    }
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No image file provided.' });
+    }
+
+    try {
+      // Save to disk
+      const avatarsDir = path.join(__dirname, '../uploads/avatars');
+      if (!fs.existsSync(avatarsDir)) fs.mkdirSync(avatarsDir, { recursive: true });
+
+      const ext     = path.extname(req.file.originalname).toLowerCase() || '.jpg';
+      const filename = `${req.user.id}${ext}`;
+      const filepath = path.join(avatarsDir, filename);
+
+      // Delete any previous avatar for this user (different extension)
+      for (const e of ['.jpg', '.jpeg', '.png', '.webp', '.gif']) {
+        const old = path.join(avatarsDir, `${req.user.id}${e}`);
+        if (old !== filepath && fs.existsSync(old)) fs.unlinkSync(old);
+      }
+
+      fs.writeFileSync(filepath, req.file.buffer);
+
+      const avatarUrl = `/uploads/avatars/${filename}`;
+      await db.query(
+        `UPDATE users SET avatar_url = :avatarUrl, updated_at = NOW() WHERE id = :id`,
+        { replacements: { avatarUrl, id: req.user.id }, type: QueryTypes.UPDATE }
+      );
+
+      return res.json({ success: true, avatar_url: avatarUrl });
+    } catch (e) {
+      console.error('[POST /auth/avatar]', e.message);
+      return res.status(500).json({ success: false, error: 'Failed to save avatar.' });
+    }
+  });
 });
 
 module.exports = router;

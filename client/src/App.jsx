@@ -27,6 +27,8 @@ import SubjectCatalog from "./pages/SubjectCatalog";
 
 // Student
 import StudentDashboard, { DashboardContent } from "./pages/StudentDashboard";
+import EnglishMasterclass from "./pages/EnglishMasterclass";
+import AdminEnglishMasterclass from "./pages/AdminEnglishMasterclass";
 import StudentSubjectsPage from "./pages/StudentSubjectsPage";
 import StudentFilesPage from "./pages/StudentFilesPage";
 import StudentExamTypesPage from "./pages/StudentExamTypesPage";
@@ -115,6 +117,7 @@ export default function App() {
             <Route path="files"      element={<Navigate to="/student/resources" replace />} />
             <Route path="resources"  element={<StudentFilesPage />} />
             <Route path="exam-types" element={<StudentExamTypesPage />} />
+            <Route path="english-masterclass" element={<EnglishMasterclass />} />
           </Route>
         </Route>
 
@@ -140,6 +143,7 @@ export default function App() {
             <Route path="dashboard" element={<AdminDashboard />} />
             <Route path="questions/review" element={<QuestionReview />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="english-masterclass" element={<AdminEnglishMasterclass />} />
           </Route>
         </Route>
 

@@ -209,6 +209,37 @@ async function run() {
       ADD COLUMN IF NOT EXISTS full_name     VARCHAR(255),
       ADD COLUMN IF NOT EXISTS country       VARCHAR(100) DEFAULT 'Nigeria'`);
 
+  // Seed all exam boards the platform supports.
+  // ON CONFLICT (code) DO UPDATE means this is safe to re-run — it only
+  // adds missing boards and reactivates any that were accidentally deactivated.
+  // Cambridge boards (CAMBAL, CAMBOL) and others were missing from the DB,
+  // causing them to not appear in the registration curriculum dropdown even
+  // though they were in the frontend fallback list.
+  const BOARD_UPSERT = (code, name, fullName, displayOrder) => `
+    INSERT INTO exam_boards (code, name, full_name, country, is_active, display_order, created_at, updated_at)
+    VALUES ('${code}', '${name}', '${fullName}', 'NG', true, ${displayOrder}, NOW(), NOW())
+    ON CONFLICT (code) DO UPDATE SET
+      name          = EXCLUDED.name,
+      full_name     = EXCLUDED.full_name,
+      is_active     = true,
+      display_order = EXCLUDED.display_order,
+      updated_at    = NOW()`;
+
+  await exec('exam_boards: seed JAMB',          BOARD_UPSERT('JAMB',    'JAMB/UTME',             'Joint Admissions and Matriculation Board',                    1));
+  await exec('exam_boards: seed WAEC',          BOARD_UPSERT('WAEC',    'WAEC/NECO (SSCE)',       'West African Examinations Council Senior School Certificate',  2));
+  await exec('exam_boards: seed NECO',          BOARD_UPSERT('NECO',    'NECO',                   'National Examinations Council',                               3));
+  await exec('exam_boards: seed BECE',          BOARD_UPSERT('BECE',    'Junior WAEC (BECE)',     'Basic Education Certificate Examination',                     4));
+  await exec('exam_boards: seed GCE_AL',        BOARD_UPSERT('GCE_AL',  "GCE A' Levels",         'General Certificate of Education Advanced Level',             5));
+  await exec('exam_boards: seed JUPEB',         BOARD_UPSERT('JUPEB',   'JUPEB',                  'Joint Universities Preliminary Examinations Board',           6));
+  await exec('exam_boards: seed CAMBAL',        BOARD_UPSERT('CAMBAL',  'Cambridge A Level',      'Cambridge International AS & A Level',                        7));
+  await exec('exam_boards: seed CAMBOL',        BOARD_UPSERT('CAMBOL',  'Cambridge O Level',      'Cambridge International O Level / IGCSE',                     8));
+  await exec('exam_boards: seed AQAAL',         BOARD_UPSERT('AQAAL',   'AQA A Level',            'AQA Advanced Level Qualifications',                           9));
+  await exec('exam_boards: seed EDXAL',         BOARD_UPSERT('EDXAL',   'Edexcel A Level',        'Pearson Edexcel Advanced Level Qualifications',               10));
+  await exec('exam_boards: seed IELTS',         BOARD_UPSERT('IELTS',   'IELTS',                  'International English Language Testing System',               11));
+  await exec('exam_boards: seed TOEFL',         BOARD_UPSERT('TOEFL',   'TOEFL',                  'Test of English as a Foreign Language',                       12));
+  await exec('exam_boards: seed SAT',           BOARD_UPSERT('SAT',     'SAT',                    'Scholastic Assessment Test',                                  13));
+  await exec('exam_boards: seed LANG_EN',       BOARD_UPSERT('LANG_EN', 'Language Lab – English', 'English Language Laboratory',                                 14));
+  await exec('exam_boards: seed LANG_FR',       BOARD_UPSERT('LANG_FR', 'Language Lab – French',  'French Language Laboratory',                                  15));
   await exec('classes: student_count', `
     ALTER TABLE classes ADD COLUMN IF NOT EXISTS student_count INTEGER DEFAULT 0`);
 
@@ -759,6 +790,7 @@ async function run() {
         ADD COLUMN IF NOT EXISTS phone                 VARCHAR(30),
         ADD COLUMN IF NOT EXISTS country               VARCHAR(100),
         ADD COLUMN IF NOT EXISTS subscription_expires_at TIMESTAMPTZ,
+        ADD COLUMN IF NOT EXISTS notification_preferences JSONB DEFAULT '{"email_updates":true,"weekly_digest":true,"new_assignments":true}',
         ADD COLUMN IF NOT EXISTS subscription_status   VARCHAR(20)  DEFAULT 'free_trial'`],
 
     ['expire stale free trials', `

@@ -1244,10 +1244,11 @@ const AdminDashboard = () => {
     { key: 'content',    icon: BookOpen,      label: 'Content'     },
     { key: 'catalog',    icon: GraduationCap, label: 'Catalog'     },
     { key: 'teachers',   icon: UserCheck,     label: 'Teachers'    },
-    { key: 'aigenerate', icon: Sparkles,      label: 'AI Generate' },
-    { key: 'bulkupload', icon: Upload,        label: 'Bulk Upload' },
-    { key: 'pastpapers', icon: BookOpen,      label: 'Past Papers' },
-    { key: 'settings',   icon: Settings,      label: 'Quick Links' },
+    { key: 'aigenerate',          icon: Sparkles,   label: 'AI Generate'        },
+    { key: 'bulkupload',          icon: Upload,     label: 'Bulk Upload'        },
+    { key: 'pastpapers',          icon: BookOpen,   label: 'Past Papers'        },
+    { key: 'english-masterclass', icon: null,       label: 'English Masterclass', href: '/admin/english-masterclass' },
+    { key: 'settings',            icon: Settings,   label: 'Quick Links'        },
   ];
 
   const Panel = ({ children }) => (
@@ -1273,8 +1274,18 @@ const AdminDashboard = () => {
               <p className="text-xs font-semibold text-gray-700 mt-0.5 truncate">{firstName}</p>
             </div>
             <nav className="space-y-0.5">
-              {navItems.map(({ key, icon: Icon, label }) => {
+              {navItems.map(({ key, icon: Icon, label, href }) => {
                 const active = activePanel === key;
+                if (href) {
+                  // Items with href navigate to a dedicated page instead of opening an inline panel
+                  return (
+                    <a key={key} href={href}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all text-left text-[#6b6259] hover:text-[#1a1a1a] hover:bg-white/60">
+                      <span className="text-base leading-none">🇬🇧</span>
+                      {label}
+                    </a>
+                  );
+                }
                 return (
                   <button key={key} onClick={() => setActivePanel(active ? null : key)}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all text-left ${
@@ -1282,7 +1293,7 @@ const AdminDashboard = () => {
                         ? 'bg-white text-[#1a1a1a] font-semibold shadow-sm border border-[#e8e4dd]'
                         : 'text-[#6b6259] hover:text-[#1a1a1a] hover:bg-white/60'
                     }`}>
-                    <Icon size={14} className={active ? 'text-[#d97757]' : 'text-[#b5a99a]'} />
+                    {Icon && <Icon size={14} className={active ? 'text-[#d97757]' : 'text-[#b5a99a]'} />}
                     {label}
                   </button>
                 );

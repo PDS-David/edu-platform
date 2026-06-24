@@ -202,6 +202,7 @@ const enrollmentRoutes = safeRequire('./routes/enrollments');
 const courseRoutes = safeRequire('./routes/courses');
 const curriculumRoutes = safeRequire('./routes/curriculumRoutes');
 const replayRoutes = safeRequire('./routes/eventReplayRoutes');
+const englishMasterclassRoutes = safeRequire('./routes/englishMasterclassRoutes');
 const dashboardRoutes = safeRequire('./routes/dashboardRoutes');
 const aiQuestionGenRoutes = safeRequire('./routes/aiQuestionGenerationRoutes');
 const engineValidationRoutes = safeRequire('./routes/engineValidationRoutes');
@@ -247,6 +248,7 @@ if (recommendationRoutes) app.use('/api/recommendations', protect, recommendatio
 if (sessionRoutes) app.use('/api/sessions', protect, sessionRoutes);
 if (dashboardRoutes) app.use('/api/dashboard', protect, dashboardRoutes);
 if (replayRoutes) app.use('/api/replay', protect, replayRoutes);
+if (englishMasterclassRoutes) app.use('/api/english-masterclass', protect, englishMasterclassRoutes);
 if (aiQuestionGenRoutes) app.use('/api/ai-question-gen', protect, aiQuestionGenRoutes);
 if (engineValidationRoutes) app.use('/api/engine', protect, engineValidationRoutes);
 if (examIntelligenceRoutes) app.use('/api/exam-intelligence', protect, examIntelligenceRoutes);
