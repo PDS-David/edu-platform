@@ -95,12 +95,22 @@ export default function SettingsPage() {
       }
       if (user.preferred_study_time) setStudyPrefs(p => ({ ...p, study_time: user.preferred_study_time }));
     }
-    // Load notification prefs from localStorage — keyed per user so accounts
-    // on the same browser don't see each other's toggle states.
-    try {
-      const saved = JSON.parse(localStorage.getItem(`notif_prefs_${user.id}`) || '{}');
-      if (Object.keys(saved).length) setNotifs(n => ({ ...n, ...saved }));
-    } catch {}
+    // S2: load notification prefs from DB so they persist across devices.
+    // Falls back to defaults gracefully if the column doesn't exist yet.
+    api.get('/auth/notification-preferences')
+      .then(r => {
+        const prefs = r.data || r;
+        if (prefs && typeof prefs === 'object') {
+          setNotifs(n => ({ ...n, ...prefs }));
+        }
+      })
+      .catch(() => {
+        // DB column not yet migrated on this env — fall back to localStorage
+        try {
+          const saved = JSON.parse(localStorage.getItem(`notif_prefs_${user.id}`) || '{}');
+          if (Object.keys(saved).length) setNotifs(n => ({ ...n, ...saved }));
+        } catch {}
+      });
   }, [user]);
 
   const fullName = `${user?.first_name || user?.firstName || ''} ${user?.last_name || user?.lastName || ''}`.trim() || 'User';
@@ -143,10 +153,16 @@ export default function SettingsPage() {
     } finally { setPwSaving(false); }
   };
 
-  const handleNotifSave = () => {
-    localStorage.setItem(`notif_prefs_${user.id}`, JSON.stringify(notifs));
+  const handleNotifSave = async () => {
     setNotifSaving(true);
-    setTimeout(() => { setNotifSaving(false); showToast('Notification preferences saved'); }, 300);
+    try {
+      await api.patch('/auth/notification-preferences', notifs);
+      // Also write to localStorage as a cache so the next load is instant
+      try { localStorage.setItem(`notif_prefs_${user.id}`, JSON.stringify(notifs)); } catch {}
+      showToast('Notification preferences saved');
+    } catch (err) {
+      showToast(err?.message || 'Failed to save preferences', 'error');
+    } finally { setNotifSaving(false); }
   };
 
   const handleEmailChange = async () => {

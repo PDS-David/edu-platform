@@ -70,6 +70,49 @@ router.put ('/password',        protect, updatePassword);
 router.post('/logout',          protect, logout);
 router.post('/logout-all',      protect, logoutAll);
 
+// ── GET /api/auth/notification-preferences ────────────────────────────────────
+// S2: load notification prefs from DB so they persist across devices/browsers.
+router.get('/notification-preferences', protect, async (req, res) => {
+  const { QueryTypes } = require('sequelize');
+  const db = require('../config/database');
+  try {
+    const rows = await db.query(
+      `SELECT notification_preferences FROM users WHERE id = :id LIMIT 1`,
+      { replacements: { id: req.user.id }, type: QueryTypes.SELECT }
+    );
+    const prefs = rows[0]?.notification_preferences || {
+      email_updates: true, weekly_digest: true, new_assignments: true,
+    };
+    return res.json({ success: true, data: prefs });
+  } catch (err) {
+    console.error('[GET /auth/notification-preferences]', err.message);
+    return res.status(500).json({ success: false, error: 'Failed to load preferences' });
+  }
+});
+
+// ── PATCH /api/auth/notification-preferences ──────────────────────────────────
+// S2: save notification prefs to DB so they sync across every device.
+router.patch('/notification-preferences', protect, async (req, res) => {
+  const { QueryTypes } = require('sequelize');
+  const db = require('../config/database');
+  const { email_updates, weekly_digest, new_assignments } = req.body;
+  const prefs = {
+    email_updates:   email_updates   !== undefined ? !!email_updates   : true,
+    weekly_digest:   weekly_digest   !== undefined ? !!weekly_digest   : true,
+    new_assignments: new_assignments !== undefined ? !!new_assignments : true,
+  };
+  try {
+    await db.query(
+      `UPDATE users SET notification_preferences = :prefs, updated_at = NOW() WHERE id = :id`,
+      { replacements: { prefs: JSON.stringify(prefs), id: req.user.id }, type: QueryTypes.UPDATE }
+    );
+    return res.json({ success: true, data: prefs, message: 'Preferences saved' });
+  } catch (err) {
+    console.error('[PATCH /auth/notification-preferences]', err.message);
+    return res.status(500).json({ success: false, error: 'Failed to save preferences' });
+  }
+});
+
 
 // PATCH /api/auth/email — change email address (requires password confirmation)
 router.patch('/email', protect, async (req, res) => {
