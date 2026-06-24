@@ -2,8 +2,9 @@
 // Full marketing landing page — no auth required.
 // 8 sections: Hero, Stats, Challenges, Features, Subjects, Pricing Preview, Comparison, Footer
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import api from '../services/apiClient';
 import {
   Lightbulb, BookOpen, TrendingUp, BarChart3, PenTool,
   FileText, Check, X, Menu, ChevronRight,
@@ -14,11 +15,18 @@ import PublicNav from '../components/PublicNav';
 
 // ── Data ───────────────────────────────────────────────────────────────────────
 
-const STATS = [
-  { number: '50,000+', label: 'Practice Questions' },
-  { number: '8',       label: 'Subjects'            },
-  { number: 'AI',      label: 'Powered Marking'     },
-  { number: 'Instant', label: 'Grade Prediction'    },
+// Fallback shown immediately and if the live-stats fetch fails — never
+// blank, never a loading flicker. The two genuinely numeric entries
+// (Practice Questions, Subjects) are overwritten with real platform counts
+// once GET /api/catalog/stats resolves (X5 fix — these used to be
+// permanently hardcoded and never reflected real growth). The two
+// qualitative entries are feature callouts, not counts, and intentionally
+// stay static.
+const STATS_FALLBACK = [
+  { key: 'questions', number: '50,000+', label: 'Practice Questions' },
+  { key: 'subjects',  number: '8',       label: 'Subjects'            },
+  { key: 'marking',   number: 'AI',      label: 'Powered Marking'     },
+  { key: 'grading',   number: 'Instant', label: 'Grade Prediction'    },
 ];
 
 const CHALLENGES = [
@@ -70,6 +78,30 @@ const CellIcon = ({ val }) => {
 // ══════════════════════════════════════════════════════════════════════════════
 export default function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [stats, setStats] = useState(STATS_FALLBACK);
+
+  // X5 fix: replace the two genuinely-numeric placeholder entries with real
+  // counts once available. Intentionally fails silently — a landing page's
+  // stats strip is decorative, not critical; if this fetch fails for any
+  // reason the fallback values above remain on screen, which is correct
+  // behaviour, not a bug to surface to the visitor.
+  useEffect(() => {
+    api.get('/catalog/stats')
+      .then((res) => {
+        const data = res?.data || res;
+        if (!data) return;
+        setStats((prev) => prev.map((s) => {
+          if (s.key === 'questions' && data.total_questions != null) {
+            return { ...s, number: `${Number(data.total_questions).toLocaleString()}+` };
+          }
+          if (s.key === 'subjects' && data.total_subjects != null) {
+            return { ...s, number: String(data.total_subjects) };
+          }
+          return s;
+        }));
+      })
+      .catch(() => {}); // keep fallback on any failure
+  }, []);
 
   return (
     <div className="min-h-screen bg-white font-sans">
@@ -209,8 +241,8 @@ export default function LandingPage() {
       ══════════════════════════════════════════════════════════════════════ */}
       <section className="bg-[#1e3a8a] py-10 border-t border-white/10">
         <div className="max-w-5xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-          {STATS.map(({ number, label }) => (
-            <div key={label} className="space-y-1">
+          {stats.map(({ key, number, label }) => (
+            <div key={key} className="space-y-1">
               <p className="text-3xl sm:text-4xl font-extrabold text-blue-300">{number}</p>
               <p className="text-sm text-white/60 font-medium">{label}</p>
             </div>
@@ -450,7 +482,7 @@ export default function LandingPage() {
                 { href: branding.social.facebook,  Icon: Facebook  },
                 { href: branding.social.linkedin,  Icon: Linkedin  },
                 { href: branding.social.instagram, Icon: Instagram },
-              ].map(({ href, Icon }) => (
+              ].filter(({ href }) => href).map(({ href, Icon }) => (
                 <a key={href} href={href} target="_blank" rel="noreferrer"
                   className="w-8 h-8 rounded-lg bg-white/10 hover:bg-blue-600 flex items-center justify-center transition-colors">
                   <Icon size={14} className="text-white" />

@@ -23,11 +23,18 @@ export const branding = {
     address: 'Ibadan, Nigeria'
   },
 
+  // X4 fix: these were unverified, guessed URLs (e.g. https://twitter.com/
+  // aischoolonair) with no confirmation a matching real account exists —
+  // checked via web search, found no verified AISchoolonair social presence.
+  // Set to null until a real, confirmed account exists for each platform.
+  // The footer (LandingPage.jsx) only renders an icon when the value here
+  // is a real URL, so this safely hides all four until populated, rather
+  // than linking to addresses that may 404 or belong to someone else.
   social: {
-    twitter:   'https://twitter.com/aischoolonair',
-    facebook:  'https://facebook.com/aischoolonair',
-    linkedin:  'https://linkedin.com/company/aischoolonair',
-    instagram: 'https://instagram.com/aischoolonair'
+    twitter:   null,
+    facebook:  null,
+    linkedin:  null,
+    instagram: null,
   },
 
   features: {

@@ -14,6 +14,8 @@ const { protect, authorize } = require('../middleware/auth');
 
 // ---------------------------------------------------------------------------
 // GET /api/catalog/stats  — admin dashboard summary cards (public, no auth)
+// Also powers the public landing page's stats strip (X5 fix — these used
+// to be hardcoded strings in branding.js that never reflected real growth).
 // ---------------------------------------------------------------------------
 router.get('/stats', async (req, res) => {
   try {
@@ -21,8 +23,11 @@ router.get('/stats', async (req, res) => {
       `SELECT
          (SELECT COUNT(*)::INTEGER FROM users WHERE is_active = true)                      AS total_users,
          (SELECT COUNT(*)::INTEGER FROM users WHERE role = 'student' AND is_active = true) AS active_students,
+         (SELECT COUNT(*)::INTEGER FROM users WHERE role = 'teacher' AND is_active = true) AS total_teachers,
          (SELECT COUNT(*)::INTEGER FROM exam_boards WHERE is_active = true)                AS total_exam_types,
-         (SELECT COUNT(*)::INTEGER FROM subjects WHERE is_active = true)                   AS total_subjects`,
+         (SELECT COUNT(*)::INTEGER FROM subjects WHERE is_active = true)                   AS total_subjects,
+         (SELECT COUNT(*)::INTEGER FROM questions
+            WHERE is_active = true AND COALESCE(status, 'pending') IN ('approved', 'active')) AS total_questions`,
       { type: QueryTypes.SELECT }
     );
     return res.status(200).json({ success: true, data: rows[0] || {} });
