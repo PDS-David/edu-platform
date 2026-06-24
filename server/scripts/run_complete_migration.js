@@ -1268,6 +1268,154 @@ async function run() {
        AND (quiz_completed = true)`
   );
 
+  // ── English Masterclass tables ────────────────────────────────────────────
+  await exec('em_categories: create table',
+    `CREATE TABLE IF NOT EXISTS em_categories (
+      id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      name        TEXT NOT NULL,
+      description TEXT,
+      difficulty  TEXT NOT NULL DEFAULT 'Beginner'
+                    CHECK (difficulty IN ('Beginner','Intermediate','Advanced')),
+      icon_emoji  TEXT DEFAULT '📚',
+      order_index INT  NOT NULL DEFAULT 0,
+      is_active   BOOLEAN NOT NULL DEFAULT true,
+      created_by  UUID REFERENCES users(id) ON DELETE SET NULL,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`
+  );
+  await exec('em_words: create table',
+    `CREATE TABLE IF NOT EXISTS em_words (
+      id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      category_id      UUID NOT NULL REFERENCES em_categories(id) ON DELETE CASCADE,
+      word             TEXT NOT NULL,
+      phonetic         TEXT,
+      definition       TEXT,
+      example_sentence TEXT,
+      audio_url        TEXT,
+      difficulty       TEXT NOT NULL DEFAULT 'Beginner'
+                         CHECK (difficulty IN ('Beginner','Intermediate','Advanced')),
+      order_index      INT  NOT NULL DEFAULT 0,
+      is_active        BOOLEAN NOT NULL DEFAULT true,
+      created_by       UUID REFERENCES users(id) ON DELETE SET NULL,
+      created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`
+  );
+  await exec('em_words: add unique constraint',
+    `DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'em_words_category_word_unique'
+      ) THEN
+        ALTER TABLE em_words ADD CONSTRAINT em_words_category_word_unique
+          UNIQUE (category_id, word);
+      END IF;
+    END $$`
+  );
+  await exec('em_word_progress: create table',
+    `CREATE TABLE IF NOT EXISTS em_word_progress (
+      id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id          UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      word_id          UUID NOT NULL REFERENCES em_words(id) ON DELETE CASCADE,
+      correct_attempts INT NOT NULL DEFAULT 0,
+      total_attempts   INT NOT NULL DEFAULT 0,
+      mastered         BOOLEAN NOT NULL DEFAULT false,
+      last_practiced   TIMESTAMPTZ,
+      created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (user_id, word_id)
+    )`
+  );
+  await exec('em_practice_sessions: create table',
+    `CREATE TABLE IF NOT EXISTS em_practice_sessions (
+      id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      category_id   UUID REFERENCES em_categories(id) ON DELETE SET NULL,
+      category_name TEXT,
+      total_words   INT NOT NULL DEFAULT 0,
+      correct_words INT NOT NULL DEFAULT 0,
+      accuracy      NUMERIC(5,2) NOT NULL DEFAULT 0,
+      duration_secs INT NOT NULL DEFAULT 0,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`
+  );
+  await exec('em_user_stats: create table',
+    `CREATE TABLE IF NOT EXISTS em_user_stats (
+      user_id             UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      words_learned       INT          NOT NULL DEFAULT 0,
+      words_mastered      INT          NOT NULL DEFAULT 0,
+      practice_streak     INT          NOT NULL DEFAULT 0,
+      longest_streak      INT          NOT NULL DEFAULT 0,
+      total_sessions      INT          NOT NULL DEFAULT 0,
+      total_practice_secs INT          NOT NULL DEFAULT 0,
+      overall_accuracy    NUMERIC(5,2) NOT NULL DEFAULT 0,
+      last_practice_date  DATE,
+      updated_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    )`
+  );
+  await exec('em_*: create indexes',
+    `CREATE INDEX IF NOT EXISTS idx_em_words_category ON em_words(category_id) WHERE is_active = true;
+     CREATE INDEX IF NOT EXISTS idx_em_word_progress_user ON em_word_progress(user_id);
+     CREATE INDEX IF NOT EXISTS idx_em_sessions_user ON em_practice_sessions(user_id, created_at DESC)`
+  );
+  await exec('em_categories: seed default categories',
+    `INSERT INTO em_categories (name, description, difficulty, icon_emoji, order_index)
+     VALUES
+       ('Everyday British',  'Common words used in everyday British conversation',  'Beginner',     '🇬🇧', 1),
+       ('British Idioms',    'Popular idioms and expressions used in Britain',      'Intermediate', '💬',  2),
+       ('Formal English',    'Vocabulary for professional and formal settings',     'Intermediate', '📝',  3),
+       ('British Slang',     'Informal slang terms used across Britain',            'Advanced',     '😄',  4),
+       ('Pronunciation',     'Words commonly mispronounced by non-native speakers', 'Advanced',     '🎙️', 5),
+       ('Spelling Patterns', 'Common British spelling patterns vs American',        'Beginner',     '✏️', 6)
+     ON CONFLICT DO NOTHING`
+  );
+  await exec('em_words: seed default words',
+    `INSERT INTO em_words (category_id, word, phonetic, definition, example_sentence)
+     SELECT c.id, v.word, v.phonetic, v.definition, v.example_sentence
+     FROM em_categories c
+     JOIN (VALUES
+       ('Everyday British','queue','/kjuː/','A line of people or vehicles waiting','Please join the queue at the bus stop.'),
+       ('Everyday British','fortnight','/ˈfɔːtnaɪt/','A period of two weeks','I shall return in a fortnight.'),
+       ('Everyday British','biscuit','/ˈbɪskɪt/','A small flat crisp baked cake','Would you like a biscuit with your tea?'),
+       ('Everyday British','rubbish','/ˈrʌbɪʃ/','Waste material; also means nonsense','Please put the rubbish in the bin.'),
+       ('Everyday British','brilliant','/ˈbrɪliənt/','Excellent; very good (informal British)','That film was absolutely brilliant!'),
+       ('Everyday British','bloke','/bləʊk/','An informal British word for a man','He seems like a decent bloke.'),
+       ('Everyday British','flat','/flæt/','An apartment in British English','She lives in a flat in London.'),
+       ('Everyday British','jumper','/ˈdʒʌmpə/','A knitted sweater','It''s cold — put your jumper on.'),
+       ('Everyday British','autumn','/ˈɔːtəm/','The season between summer and winter','The leaves are beautiful in autumn.'),
+       ('Everyday British','pavement','/ˈpeɪvmənt/','A raised path for pedestrians','Please walk on the pavement, not the road.'),
+       ('British Idioms','chuffed','/tʃʌft/','Very pleased or satisfied','She was chuffed to bits with her results.'),
+       ('British Idioms','gobsmacked','/ˈɡɒbsmækt/','Utterly astonished','I was absolutely gobsmacked by the news.'),
+       ('British Idioms','over the moon','/ˌəʊvə ðə ˈmuːn/','Extremely happy','He was over the moon when he got the job.'),
+       ('British Idioms','gutted','/ˈɡʌtɪd/','Bitterly disappointed','I was gutted when we lost the match.'),
+       ('British Idioms','knackered','/ˈnækəd/','Extremely tired; worn out','I''m absolutely knackered after that shift.'),
+       ('British Idioms','blimey','/ˈblaɪmi/','An exclamation of surprise','Blimey, that''s a lot of money!'),
+       ('Formal English','commence','/kəˈmens/','To begin or start something','The ceremony will commence at noon.'),
+       ('Formal English','endeavour','/ɪnˈdevə/','To try hard to achieve something','We shall endeavour to resolve this promptly.'),
+       ('Formal English','subsequently','/ˈsʌbsɪkwəntli/','At a later time','He subsequently withdrew his application.'),
+       ('Formal English','forthwith','/ˌfɔːθˈwɪð/','Immediately; without delay','You are required to respond forthwith.'),
+       ('Formal English','notwithstanding','/ˌnɒtwɪθˈstændɪŋ/','Despite; in spite of','Notwithstanding the difficulties, progress was made.'),
+       ('British Slang','cheeky','/ˈtʃiːki/','Slightly rude but playful','Don''t be cheeky to your teacher!'),
+       ('British Slang','dodgy','/ˈdɒdʒi/','Dishonest or of poor quality','That restaurant looks a bit dodgy.'),
+       ('British Slang','peckish','/ˈpekɪʃ/','Slightly hungry','I''m feeling a bit peckish — fancy a biscuit?'),
+       ('British Slang','naff','/næf/','Lacking taste or style; inferior','That outfit is a bit naff.'),
+       ('British Slang','faff','/fæf/','To waste time on unimportant things','Stop faffing about and get ready!'),
+       ('Pronunciation','colonel','/ˈkɜːnl/','A senior military officer rank','The colonel gave the order to advance.'),
+       ('Pronunciation','choir','/ˈkwaɪə/','A group of singers','She sings in the school choir.'),
+       ('Pronunciation','Wednesday','/ˈwenzdɪ/','The day between Tuesday and Thursday','The meeting is on Wednesday.'),
+       ('Pronunciation','Leicester','/ˈlɛstə/','A city in the East Midlands','Leicester is known for its football club.'),
+       ('Pronunciation','Edinburgh','/ˈedɪnbrə/','The capital city of Scotland','Edinburgh Castle sits atop an ancient volcano.'),
+       ('Spelling Patterns','colour','/ˈkʌlə/','British spelling of color','The colour of the sky is deep blue.'),
+       ('Spelling Patterns','honour','/ˈɒnə/','British spelling of honor','It is an honour to meet you.'),
+       ('Spelling Patterns','realise','/ˈrɪəlaɪz/','British spelling of realize','I didn''t realise you were here.'),
+       ('Spelling Patterns','centre','/ˈsentə/','British spelling of center','Meet me at the town centre.'),
+       ('Spelling Patterns','defence','/dɪˈfens/','British spelling of defense','The country''s defence budget increased.'),
+       ('Spelling Patterns','licence','/ˈlaɪsns/','British noun form (license is verb)','You need a licence to drive in the UK.')
+     ) AS v(category_name, word, phonetic, definition, example_sentence)
+       ON c.name = v.category_name
+     ON CONFLICT (category_id, word) DO NOTHING`
+  );
+
   console.log('\n✅ Migration complete.\n');
   await pool.end();
 }
