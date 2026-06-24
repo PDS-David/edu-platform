@@ -449,20 +449,43 @@ router.get('/class/:classId/analytics', protect, teacherOnly, requireTeacherClas
 router.get('/students', protect, teacherOnly, async (req, res) => {
   await ensureClassTables();
   try {
+    // Path 1: students in classes this teacher owns
     const classStudents = await safeQuery(
       `SELECT DISTINCT u.id, u.first_name, u.last_name, u.email,
-              c.id AS class_id, c.name AS class_name
+              c.id AS class_id, c.name AS class_name, 'class' AS source
        FROM class_memberships cm
        JOIN users   u ON u.id = cm.student_id
        JOIN classes c ON c.id = cm.class_id
        WHERE c.teacher_id = :teacherId
-         AND u.is_active  = true
-       ORDER BY u.last_name ASC, u.first_name ASC`,
+         AND u.is_active  = true`,
       { teacherId: req.user.id }
     );
 
-    // Return scoped list — may be empty if teacher has no classes assigned yet.
-    return res.json({ success: true, data: classStudents, source: 'class_members' });
+    // T4: Path 2: students enrolled in subjects this teacher is assigned to
+    // (teachers with direct subject assignments but no formal class still see their students)
+    const subjectStudents = await safeQuery(
+      `SELECT DISTINCT u.id, u.first_name, u.last_name, u.email,
+              NULL AS class_id, NULL AS class_name, 'subject' AS source
+       FROM teacher_subjects ts
+       JOIN student_subjects ss ON ss.subject_id = ts.subject_id
+       JOIN users u ON u.id = ss.student_id
+       WHERE ts.teacher_id = :teacherId
+         AND ss.is_active  = true
+         AND u.is_active   = true`,
+      { teacherId: req.user.id }
+    );
+
+    // Merge and deduplicate by id — class entry wins if same student appears in both
+    const seen = new Map();
+    for (const s of [...classStudents, ...subjectStudents]) {
+      if (!seen.has(s.id)) seen.set(s.id, s);
+    }
+    const combined = [...seen.values()].sort((a, b) =>
+      (a.last_name || '').localeCompare(b.last_name || '') ||
+      (a.first_name || '').localeCompare(b.first_name || '')
+    );
+
+    return res.json({ success: true, data: combined, source: 'merged' });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
@@ -721,7 +744,6 @@ router.get('/questions', protect, teacherOnly, async (req, res) => {
     const rows = await sequelize.query(
       `SELECT q.id, q.question_text, q.difficulty, q.explanation,
               q.options, q.correct_answer, q.created_at,
-              q.status, q.feedback,
               s.name AS subject_name
        FROM questions q
        LEFT JOIN subtopics  st ON st.id = q.subtopic_id
@@ -775,57 +797,4 @@ router.post('/questions', protect, teacherOnly, async (req, res) => {
 });
 
 // ── GET /api/teacher/students ─────────────────────────────────────────────────
-// Returns students visible to this teacher:
-//   1. Students in this teacher's classes (via class_memberships)
-//   2. Students enrolled in subjects this teacher is assigned to (via teacher_subjects)
-// Deduplicated by student id. No fallback to full roster — IDOR risk removed.
-router.get('/students', protect, teacherOnly, async (req, res) => {
-  await ensureClassTables();
-  try {
-    const teacherId = req.user.id;
-
-    // Path 1: students in this teacher's classes
-    const classStudents = await safeQuery(
-      `SELECT DISTINCT u.id, u.first_name, u.last_name, u.email,
-              c.id AS class_id, c.name AS class_name
-       FROM class_memberships cm
-       JOIN users   u ON u.id = cm.student_id
-       JOIN classes c ON c.id = cm.class_id
-       WHERE c.teacher_id = :teacherId
-         AND u.is_active  = true`,
-      { teacherId }
-    );
-
-    // Path 2: students enrolled in subjects this teacher is assigned to
-    // (covers teachers with subject assignments but no formal class structure — T4)
-    const subjectStudents = await safeQuery(
-      `SELECT DISTINCT u.id, u.first_name, u.last_name, u.email,
-              NULL::uuid AS class_id, NULL::text AS class_name
-       FROM teacher_subjects ts
-       JOIN student_subjects ss ON ss.subject_id = ts.subject_id
-       JOIN users u ON u.id = ss.student_id
-       WHERE ts.teacher_id = :teacherId
-         AND ts.is_active   = true
-         AND ss.is_active   = true
-         AND u.is_active    = true`,
-      { teacherId }
-    ).catch(() => []); // non-fatal — teacher_subjects may not exist yet
-
-    // Merge and deduplicate by student id
-    const seen = new Set();
-    const merged = [...classStudents, ...subjectStudents].filter(s => {
-      if (seen.has(s.id)) return false;
-      seen.add(s.id);
-      return true;
-    }).sort((a, b) =>
-      (a.last_name || '').localeCompare(b.last_name || '') ||
-      (a.first_name || '').localeCompare(b.first_name || '')
-    );
-
-    return res.json({ success: true, data: merged, source: 'class_and_subject_members' });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
-  }
-});
-
 module.exports = router;
