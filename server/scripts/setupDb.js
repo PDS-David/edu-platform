@@ -36,6 +36,7 @@ async function runMigrations() {
     'eac_courses_topics_enrollments.sql',
     'notifications_and_healthcheck.sql',
     'eac_explanations.sql',
+    'migration_english_masterclass.sql',
   ];
   for (const file of order) {
     const fp = path.join(dir, file);

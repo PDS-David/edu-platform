@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/apiClient';
 import {
   ChevronDown, ChevronRight, Loader2, BookOpen,
-  ClipboardList, Zap, Trophy, CheckCircle,
+  ClipboardList, Zap, Trophy, CheckCircle, Search,
 } from 'lucide-react';
 
 export default function SubjectPage() {
@@ -19,6 +19,7 @@ export default function SubjectPage() {
   const [expandedId,   setExpandedId]   = useState(null);
   const [loading,      setLoading]      = useState(true);
   const [activeMode,   setActiveMode]   = useState('resources'); // resources|practice|quiz
+  const [search,       setSearch]       = useState('');
 
   useEffect(() => {
     if (!subjectId) return;
@@ -149,23 +150,58 @@ export default function SubjectPage() {
 
         {/* Topic accordion — the main event */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="px-5 py-3 border-b border-gray-100">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+          <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex-1">
               Choose a topic to {modeConfig[activeMode].label.toLowerCase()}
             </p>
+            {/* S5 — inline search */}
+            {topics.length > 4 && (
+              <div className="relative">
+                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Search topics…"
+                  className="pl-7 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200 w-36 sm:w-48"
+                />
+              </div>
+            )}
           </div>
 
-          {topics.length === 0 ? (
-            <div className="p-10 text-center">
-              <BookOpen size={28} className="mx-auto mb-3 text-gray-200" />
-              <p className="text-sm font-semibold text-gray-600 mb-1">No topics yet</p>
-              <p className="text-xs text-gray-400 max-w-xs mx-auto">
-                Your teacher hasn't added topics for this subject yet. Check back soon.
-              </p>
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-100">
-              {topics.map((topic, ti) => {
+          {(() => {
+            const q = search.trim().toLowerCase();
+            const filteredTopics = q
+              ? topics.filter(t =>
+                  t.name.toLowerCase().includes(q) ||
+                  (t.subtopics || []).some(s => s.name.toLowerCase().includes(q))
+                )
+              : topics;
+
+            if (filteredTopics.length === 0) {
+              return (
+                <div className="p-10 text-center">
+                  <BookOpen size={28} className="mx-auto mb-3 text-gray-200" />
+                  {q ? (
+                    <>
+                      <p className="text-sm font-semibold text-gray-600 mb-1">No matches for "{search}"</p>
+                      <button onClick={() => setSearch('')} className="text-xs text-blue-500 hover:underline mt-1">Clear search</button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm font-semibold text-gray-600 mb-1">No topics yet</p>
+                      <p className="text-xs text-gray-400 max-w-xs mx-auto">
+                        Your teacher hasn't added topics for this subject yet. Check back soon.
+                      </p>
+                    </>
+                  )}
+                </div>
+              );
+            }
+
+            return (
+              <div className="divide-y divide-gray-100">
+                {filteredTopics.map((topic, ti) => {
                 const open = expandedId === topic.id;
                 const subtopics = topic.subtopics || [];
                 return (
@@ -221,7 +257,8 @@ export default function SubjectPage() {
                 );
               })}
             </div>
-          )}
+            );
+          })()}
         </div>
 
         {/* Quick action — skip topic picking and go directly */}
