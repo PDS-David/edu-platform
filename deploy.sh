@@ -34,7 +34,7 @@ docker compose ps || true
 # 4. Build new images
 echo ""
 echo "▶ 4/6  Building api and web images..."
-docker compose build --no-cache --progress=plain api web
+docker compose build --progress=plain api web
 
 # ── Verify the new images were actually built ─────────────────────────────
 # Get the image ID that was just built. If docker compose build failed
