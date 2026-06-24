@@ -19,7 +19,6 @@ const { success, error } = require('../utils/response');
 const { ENROLLMENT_SOURCE, ENROLLMENT_STATUS } = require('../constants/enrollmentConstants');
 const { ensureEnrollmentColumns } = require('./studentRoutes');
 const audit = require('../services/auditLogger');
-const emailService = require('../services/emailService');
 const { requireConfirmHeader, requireAdminConfirm } = require('../middleware/confirmDestructive');
 
 // ─────────────────────────────────────────────
@@ -102,17 +101,16 @@ router.post('/create-teacher', protect, adminOnly, adminActionLimiter, async (re
       metadata: { first_name: rows[0].first_name, last_name: rows[0].last_name },
     });
 
-    // T3: send welcome email with login credentials.
-    // Non-fatal — a mail failure must never roll back account creation.
+    // T3: send welcome email to the new teacher (non-fatal — account is already created)
     try {
-      await emailService.sendWelcomeEmail({
-        id:         rows[0].id,
+      const emailSvc = require('../services/emailService');
+      await emailSvc.sendTeacherWelcomeEmail({
         email:      rows[0].email,
         first_name: rows[0].first_name,
-        role:       'teacher',
+        password:   password,   // plain-text password before hashing, safe to send once
       });
-    } catch (mailErr) {
-      console.warn('[POST /admin/create-teacher] welcome email failed:', mailErr.message);
+    } catch (emailErr) {
+      console.warn('[create-teacher] welcome email failed:', emailErr.message);
     }
 
     return success(res, { user: rows[0] }, null, 201);
