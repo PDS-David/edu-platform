@@ -152,7 +152,7 @@ export default function SettingsPage() {
     }
   };
 
-
+  const handleProfileSave = async () => {
     setProfileSaving(true);
     try {
       await api.patch('/auth/profile', profile);
