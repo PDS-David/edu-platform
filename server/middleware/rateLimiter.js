@@ -13,7 +13,7 @@ const { ipKeyGenerator } = rateLimit;
 // ── Global limiter ────────────────────────────────────────────────────────────
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
+  max: 600,  // raised from 200 — a student doing a quiz fires ~30 req/session
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, error: 'Too many requests, please try again later.' },
