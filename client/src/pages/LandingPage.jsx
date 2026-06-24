@@ -15,16 +15,23 @@ import PublicNav from '../components/PublicNav';
 
 // ── Data ───────────────────────────────────────────────────────────────────────
 
-// Fallback shown immediately and if the live-stats fetch fails — never
-// blank, never a loading flicker. The two genuinely numeric entries
-// (Practice Questions, Subjects) are overwritten with real platform counts
-// once GET /api/catalog/stats resolves (X5 fix — these used to be
-// permanently hardcoded and never reflected real growth). The two
-// qualitative entries are feature callouts, not counts, and intentionally
-// stay static.
+// Fallback shown immediately and while the live-stats fetch is in flight or
+// if it fails. The two genuinely numeric entries (Practice Questions,
+// Subjects) are overwritten with real platform counts once
+// GET /api/catalog/stats resolves (X5 fix — these used to be permanently
+// hardcoded and never reflected real growth). The two qualitative entries
+// are feature callouts, not counts, and intentionally stay static.
+//
+// Label note: kept "Practice Questions" / "Subjects" rather than
+// "Students" — confirmed via git history this was the genuinely live label
+// before this fix, and total enrolled students is a materially different,
+// more exposure-sensitive number to put on a public page before the
+// platform has meaningful real usage to show (a later commit attempted to
+// switch this to "Students" without that being part of what X5 asked for;
+// reverted).
 const STATS_FALLBACK = [
-  { key: 'questions', number: '50,000+', label: 'Practice Questions' },
-  { key: 'subjects',  number: '8',       label: 'Subjects'            },
+  { key: 'questions', number: '—', label: 'Practice Questions' },
+  { key: 'subjects',  number: '—', label: 'Subjects'            },
   { key: 'marking',   number: 'AI',      label: 'Powered Marking'     },
   { key: 'grading',   number: 'Instant', label: 'Grade Prediction'    },
 ];
