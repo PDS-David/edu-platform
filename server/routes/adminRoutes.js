@@ -470,7 +470,6 @@ router.post('/send-notification', protect, adminOnly, adminActionLimiter, async 
     await audit.log(req, audit.ACTIONS.NOTIFICATION_SEND, {
       metadata: { target, title, sent_count: users.length },
     });
-
     // A6 fix: this endpoint only ever writes in-app notification rows — it
     // never sends email. The admin UI previously had no way to know that,
     // so a "Notification sent" success message implied email delivery that
