@@ -69,6 +69,7 @@ router.get('/types', async (req, res) => {
          COUNT(s.id)::INTEGER AS subject_count
        FROM exam_boards eb
        LEFT JOIN subjects s ON s.exam_board_id = eb.id AND s.is_active = true
+       WHERE eb.is_active = true
        GROUP BY eb.id
        ORDER BY eb.display_order ASC NULLS LAST, eb.name ASC`,
       { type: QueryTypes.SELECT }
