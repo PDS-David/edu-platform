@@ -8,6 +8,9 @@
 
     servers {
         trusted_proxies static private_ranges
+        # Disable HTTP/3 (QUIC) — prevents ERR_QUIC_PROTOCOL_ERROR when
+        # browsers try to reuse a cached QUIC connection after a restart.
+        protocols h1 h2
     }
 }
 
@@ -21,6 +24,7 @@
         Permissions-Policy         "camera=(), microphone=(), geolocation=(), payment=()"
         Content-Security-Policy    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' wss://www.aischoolonair.ng wss://staging.aischoolonair.ng https://api.paystack.co; frame-src 'self' https://docs.google.com; object-src 'none'; upgrade-insecure-requests"
         -Server
+        -Alt-Svc
     }
 }
 
