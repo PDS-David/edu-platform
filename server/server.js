@@ -268,7 +268,7 @@ if (notificationRoutes) app.use('/api/notifications', protect, notificationRoute
 if (pastPaperRoutes) app.use('/api/past-papers', pastPaperRoutes);
 if (videosRoutes) app.use('/api/videos', protect, videosRoutes);
 if (conceptRoutes) app.use('/api/concepts', protect, conceptRoutes);
-if (catalogRoutes) app.use('/api/catalog', protect, catalogRoutes);
+if (catalogRoutes) app.use('/api/catalog', catalogRoutes);
 if (examBoardRoutes) app.use('/api/exam-boards', examBoardRoutes);
 if (aiChatRoute) app.use('/api/ai', protect, aiChatRoute);
 if (aiRoutes) app.use('/api/ai', protect, aiRoutes);
