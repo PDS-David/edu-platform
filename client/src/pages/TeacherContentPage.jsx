@@ -176,7 +176,9 @@ function SubtopicList({ topic, subjectId, showToast }) {
     try {
       const r = await api.put(`/teacher/subtopics/${id}`, { name: newName.trim() });
       const updated = r.data ?? r;
-      setSubtopics(prev => prev.map(s => s.id === id ? { ...s, name: updated.name } : s));
+      // Use name from server response; fall back to what we sent if server returns null
+      const resolvedName = updated?.name || newName.trim();
+      setSubtopics(prev => prev.map(s => s.id === id ? { ...s, name: resolvedName } : s));
       setEditingId(null);
       showToast('Subtopic updated!');
     } catch (err) {

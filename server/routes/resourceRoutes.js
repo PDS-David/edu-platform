@@ -445,7 +445,8 @@ router.get('/my-assignments', async (req, res) => {
               r.subject_id, r.topic_id, r.subtopic_id,
               r.created_at, r.updated_at,
               s.name  AS subject_name, t.name AS topic_name, st.name AS subtopic_name,
-              TRIM(COALESCE(ab.first_name, '') || ' ' || COALESCE(ab.last_name, '')) AS assigned_by_name
+              TRIM(COALESCE(ab.first_name, '') || ' ' || COALESCE(ab.last_name, '')) AS assigned_by_name,
+              TRIM(COALESCE(ub.first_name, '') || ' ' || COALESCE(ub.last_name, '')) AS uploaded_by_name
          FROM resources r
          LEFT JOIN subjects  s  ON s.id  = r.subject_id
          LEFT JOIN topics    t  ON t.id  = r.topic_id
@@ -462,6 +463,7 @@ router.get('/my-assignments', async (req, res) => {
            ) _ab WHERE assigned_by IS NOT NULL LIMIT 1
          ) assigner ON true
          LEFT JOIN users ab ON ab.id = assigner.assigned_by
+         LEFT JOIN users ub ON ub.id = r.uploaded_by
         WHERE r.is_active = true
           AND (r.is_staged = false OR r.is_staged IS NULL)
           AND (
