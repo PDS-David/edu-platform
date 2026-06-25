@@ -21,10 +21,21 @@ const ADMIN_WHITELIST = (process.env.ADMIN_WHITELIST_IPS || '')
   .map(ip => ip.trim())
   .filter(Boolean);
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 if (ADMIN_WHITELIST.length > 0) {
   console.log(` Admin IP whitelist active: ${ADMIN_WHITELIST.join(', ')}`);
+} else if (isProduction) {
+  // In production, a missing whitelist is a misconfiguration — log loudly.
+  // We do NOT crash the server (that would take down the whole app) but we
+  // log at ERROR level so it appears in monitoring.
+  console.error(
+    '[SECURITY] ADMIN_WHITELIST_IPS is not set in production. ' +
+    'Admin API routes are accessible from any IP address. ' +
+    'Set ADMIN_WHITELIST_IPS in api.env to restrict access.'
+  );
 } else {
-  console.warn('  ADMIN_WHITELIST_IPS not set — admin routes are IP-unrestricted');
+  console.warn('  ADMIN_WHITELIST_IPS not set — admin routes are IP-unrestricted (development mode)');
 }
 
 module.exports = function ipWhitelist(req, res, next) {

@@ -4,28 +4,24 @@ import { queryClient } from "../providers/queryClient";
 
 export default function useRealtimeSync() {
   useEffect(() => {
-    const socket = initRealtime();
-
     const invalidateDashboard = () => {
-      queryClient.invalidateQueries({
-        queryKey: ["dashboard"],
-      });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     };
 
-    const events = [
-      "progress.updated",
-      "quiz.completed",
-      "resource.viewed",
-    ];
+    const events = ["progress.updated", "quiz.completed", "resource.viewed"];
 
-    events.forEach((event) => {
-      on(event, invalidateDashboard);
+    // initRealtime is now async (dynamic import) — connect then subscribe.
+    let cancelled = false;
+    initRealtime().then(() => {
+      if (cancelled) return;
+      events.forEach((event) => on(event, invalidateDashboard));
+    }).catch(() => {
+      // Realtime is an enhancement — failure must never crash the app.
     });
 
     return () => {
-      events.forEach((event) => {
-        off(event, invalidateDashboard);
-      });
+      cancelled = true;
+      events.forEach((event) => off(event, invalidateDashboard));
     };
   }, []);
 }

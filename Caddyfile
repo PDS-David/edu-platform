@@ -79,7 +79,10 @@ www.aischoolonair.ng {
         }
     }
 
-    # Frontend
+    # Frontend — serve from nginx container.
+    # index.html is served with no-cache headers by nginx (nginx-spa.conf).
+    # We do not add Caddy-level cache headers here — nginx handles it correctly
+    # and double-setting headers causes conflicts.
     route {
         reverse_proxy web:80
         encode gzip zstd
