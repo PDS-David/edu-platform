@@ -406,6 +406,11 @@ router.get('/', async (req, res) => {
         )`;
     }
 
+    if (role === 'teacher') {
+      // Teachers only see resources they uploaded — not other teachers' files
+      where += ` AND r.uploaded_by = :user_id`;
+    }
+
     const rows = await sequelize.query(
       `SELECT r.id, r.title, r.resource_type, r.file_url, r.file_size_bytes,
               r.original_filename, r.mime_type, r.is_staged, r.is_active,
