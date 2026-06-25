@@ -124,7 +124,12 @@ router.put('/topics/:id', protect, teacherOnly, async (req, res) => {
        WHERE id = :id AND is_active = true`,
       { replacements: { id: parseInt(req.params.id), name: name || '', description: description ?? null, orderIndex: order_index != null ? parseInt(order_index) : null }, type: QueryTypes.UPDATE }
     );
-    return res.json({ success: true, message: 'Topic updated' });
+    // Return the updated row so the frontend can update state without a refetch
+    const updated = await sequelize.query(
+      `SELECT id, name, description, order_index FROM topics WHERE id = :id LIMIT 1`,
+      { replacements: { id: parseInt(req.params.id) }, type: QueryTypes.SELECT }
+    );
+    return res.json({ success: true, message: 'Topic updated', data: updated[0] || null });
   } catch (err) { return res.status(500).json({ success: false, error: err.message }); }
 });
 
@@ -184,7 +189,12 @@ router.put('/subtopics/:id', protect, teacherOnly, async (req, res) => {
       `UPDATE subtopics SET name = COALESCE(NULLIF(:name,''), name), description = COALESCE(:description, description), order_index = COALESCE(:oi, order_index), updated_at = NOW() WHERE id = :id`,
       { replacements: { id: parseInt(req.params.id), name: name || '', description: description ?? null, oi: order_index != null ? parseInt(order_index) : null }, type: QueryTypes.UPDATE }
     );
-    return res.json({ success: true, message: 'Subtopic updated' });
+    // Return the updated row so the frontend can update state without a refetch
+    const updated = await sequelize.query(
+      `SELECT id, name, description, order_index FROM subtopics WHERE id = :id LIMIT 1`,
+      { replacements: { id: parseInt(req.params.id) }, type: QueryTypes.SELECT }
+    );
+    return res.json({ success: true, message: 'Subtopic updated', data: updated[0] || null });
   } catch (err) { return res.status(500).json({ success: false, error: err.message }); }
 });
 

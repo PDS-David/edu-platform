@@ -685,9 +685,11 @@ export default function TeacherDashboard() {
   const hasSubjects     = (assignedSubjects?.length ?? 0) > 0;
 
   const tabs = [
-    { id: 'classes',     label: 'Classes',  icon: Users    },
-    { id: 'analytics',   label: 'Analytics',icon: BarChart2},
-    { id: 'testbuilder', label: 'Tests',     icon: PenTool  },
+    { id: 'classes',     label: 'Classes',   icon: Users    },
+    { id: 'analytics',   label: 'Analytics', icon: BarChart2},
+    { id: 'testbuilder', label: 'Tests',      icon: PenTool  },
+    { id: 'content',     label: 'Content',    icon: BookOpen, link: '/teacher/content'   },
+    { id: 'resources',   label: 'Resources',  icon: Upload,   link: '/teacher/resources' },
   ];
 
   // ── Sidebar items — all wired ─────────────────────────────────────────────
@@ -785,15 +787,24 @@ export default function TeacherDashboard() {
           )}
 
           {/* Mobile tab bar */}
-          <div className="border-b border-gray-100 px-4 md:hidden sticky top-12 bg-white z-10">
-            <div className="flex">
+          <div className="border-b border-gray-100 md:hidden sticky top-12 bg-white z-10 overflow-x-auto">
+            <div className="flex min-w-max px-2">
               {tabs.map(t => (
-                <button key={t.id} onClick={() => setActiveTab(t.id)}
-                  className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium border-b-2 transition-colors ${
-                    activeTab === t.id ? 'border-violet-600 text-violet-600' : 'border-transparent text-gray-400 hover:text-gray-600'
-                  }`}>
-                  <t.icon size={13} /> {t.label}
-                </button>
+                t.link ? (
+                  <button key={t.id} onClick={() => navigate(t.link)}
+                    className={`flex items-center gap-1.5 px-3 py-3 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
+                      location.pathname.startsWith(t.link) ? 'border-violet-600 text-violet-600' : 'border-transparent text-gray-400 hover:text-gray-600'
+                    }`}>
+                    <t.icon size={13} /> {t.label}
+                  </button>
+                ) : (
+                  <button key={t.id} onClick={() => setActiveTab(t.id)}
+                    className={`flex items-center gap-1.5 px-3 py-3 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
+                      activeTab === t.id ? 'border-violet-600 text-violet-600' : 'border-transparent text-gray-400 hover:text-gray-600'
+                    }`}>
+                    <t.icon size={13} /> {t.label}
+                  </button>
+                )
               ))}
             </div>
           </div>
