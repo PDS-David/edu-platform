@@ -50,18 +50,9 @@ router.get('/my-subjects', protect, teacherOnly, async (req, res) => {
        ORDER BY s.name ASC`,
       { teacherId: req.user.id }
     );
-    // Fallback: if teacher_subjects missing or empty, return all subjects
-    if (!rows.length) {
-      const allSubjects = await safeQuery(
-        `SELECT s.id, s.name, s.code, s.level,
-                eb.code AS exam_board_code, eb.name AS exam_board_name
-         FROM subjects s
-         LEFT JOIN exam_boards eb ON eb.id = s.exam_board_id
-         WHERE s.is_active = true ORDER BY s.name ASC`,
-        {}
-      );
-      return res.json({ success: true, count: allSubjects.length, data: allSubjects });
-    }
+    // No fallback to all-subjects — a teacher with no assignments
+    // sees an empty list. The UI already handles this with a "No subjects assigned"
+    // message and prompts the teacher to contact admin.
     return res.json({ success: true, count: rows.length, data: rows });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
@@ -74,6 +65,10 @@ router.get('/topics', protect, teacherOnly, async (req, res) => {
   const { subject_id } = req.query;
   if (!subject_id) return res.status(400).json({ success: false, error: 'subject_id is required' });
   try {
+    // Confirm this teacher is assigned to the requested subject
+    const owned = await teacherOwnsSubject(req.user.id, subject_id);
+    if (!owned) return res.status(403).json({ success: false, error: 'Not assigned to this subject' });
+
     const rows = await sequelize.query(
       `SELECT t.id, t.name, t.description, t.order_index,
               COUNT(st.id)::INTEGER AS subtopic_count
