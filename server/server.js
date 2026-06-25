@@ -130,7 +130,20 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
 // CLIENT BUILD
 const clientDist = path.join(__dirname, '..', 'client', 'dist');
 if (fs.existsSync(clientDist)) {
-  app.use(express.static(clientDist));
+  // Content-hashed assets (JS/CSS/fonts) can be cached aggressively.
+  // index.html must never be cached — it must always load fresh so the
+  // browser picks up new asset hashes after a deploy.
+  app.use(express.static(clientDist, {
+    setHeaders(res, filePath) {
+      if (filePath.endsWith('index.html')) {
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        // Tell the browser to discard ALL cached JS/CSS so stale chunks
+        // from a previous build never cause "React is not defined".
+        res.setHeader('Clear-Site-Data', '"cache"');
+      }
+    },
+  }));
 }
 
 // MIDDLEWARES
@@ -139,13 +152,15 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc:  ["'self'"],
-      scriptSrc:   ["'self'"],
-      styleSrc:    ["'self'", "'unsafe-inline'"],
+      scriptSrc:   ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      styleSrc:    ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      styleSrcElem:["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
       imgSrc:      ["'self'", 'data:', 'blob:', 'https:'],
-      connectSrc:  ["'self'"],
-      fontSrc:     ["'self'", 'data:'],
+      connectSrc:  ["'self'", 'https://fonts.googleapis.com', 'https://fonts.gstatic.com',
+                    'wss://www.aischoolonair.ng', 'wss://staging.aischoolonair.ng',
+                    'https://api.paystack.co'],
+      fontSrc:     ["'self'", 'data:', 'https://fonts.gstatic.com'],
       objectSrc:   ["'none'"],
-      // Google Docs Viewer needed for office file previews (R2-hosted docx/pptx)
       frameSrc:    ["'self'", 'https://docs.google.com'],
       upgradeInsecureRequests: [],
     },
@@ -154,8 +169,8 @@ app.use(helmet({
 }));
 app.use(globalLimiter);
 
-app.use(express.json({ limit: '15mb' }));
-app.use(express.urlencoded({ extended: true, limit: '15mb' }));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(requestLogger);
 
 // DB
@@ -176,6 +191,7 @@ const sessionRoutes = safeRequire('./routes/sessionRoutes');
 const analyticsRoutes = safeRequire('./routes/analyticsRoutes');
 const questionsRoutes = safeRequire('./routes/questionsRoutes');
 const resourceRoutes = safeRequire('./routes/resourceRoutes');
+const ipWhitelist = safeRequire('./middleware/ipWhitelist');
 const adminRoutes = safeRequire('./routes/adminRoutes');
 const auditRoutes = safeRequire('./routes/auditRoutes');
 const studentRoutes = safeRequire('./routes/studentRoutes');
@@ -240,7 +256,7 @@ if (courseRoutes) app.use('/api/courses', courseRoutes);
 if (curriculumRoutes) app.use('/api/curriculum', protect, curriculumRoutes);
 if (studentRoutes) app.use('/api/students', protect, studentRoutes);
 if (teacherRoutes) app.use('/api/teacher', protect, teacherRoutes);
-if (adminRoutes) app.use('/api/admin', protect, adminRoutes);
+if (adminRoutes) app.use('/api/admin', protect, ...(ipWhitelist ? [ipWhitelist] : []), adminRoutes);
 if (auditRoutes) app.use('/api/audit', protect, auditRoutes);
 if (paymentRoutes) app.use('/api/payments', protect, paymentRoutes);
 if (weakTopicRoutes) app.use('/api/weak-topics', protect, weakTopicRoutes);
@@ -280,6 +296,9 @@ app.get('/api/health', (_req, res) => {
 if (fs.existsSync(clientDist)) {
   app.get('*', (req, res) => {
     if (!req.path.startsWith('/api') && !req.path.startsWith('/uploads')) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Clear-Site-Data', '"cache"');
       res.sendFile(path.join(clientDist, 'index.html'));
     }
   });

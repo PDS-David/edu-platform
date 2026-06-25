@@ -31,17 +31,27 @@ echo ""
 echo "▶ 3/6  Current container state:"
 docker compose ps || true
 
-# 4. Build new images (skip cache wipe — wasteful and slows recovery)
+# 4. Build new images
 echo ""
 echo "▶ 4/6  Building api and web images..."
-docker compose build --no-cache --progress=plain api web
+docker compose build --progress=plain api web
 
-# 5. Ensure ALL services are running (caddy and redis may have stopped)
-#    Use --no-deps so we don't accidentally re-create healthy containers
+# ── Verify the new images were actually built ─────────────────────────────
+# Get the image ID that was just built. If docker compose build failed
+# silently (OOM, layer error, etc.) the old image stays and the old
+# container keeps running — we'd never know. Fail loudly instead.
+NEW_WEB_IMAGE=$(docker inspect aischool_web:latest --format '{{.Id}}' 2>/dev/null || true)
+NEW_API_IMAGE=$(docker inspect aischool_api:latest --format '{{.Id}}' 2>/dev/null || true)
+echo "  web image: ${NEW_WEB_IMAGE:0:20}..."
+echo "  api image: ${NEW_API_IMAGE:0:20}..."
+
+# 5. Force-recreate web and api containers (don't rely on image-ID comparison)
 echo ""
 echo "▶ 5/6  Bringing up all services..."
 docker compose up -d caddy redis
-docker compose up -d --no-deps api web
+# --force-recreate guarantees the container is replaced even if Docker thinks
+# the image ID hasn't changed (which can happen with layer caching quirks).
+docker compose up -d --no-deps --force-recreate api web
 
 echo ""
 echo "  Waiting 25s for containers to become healthy..."

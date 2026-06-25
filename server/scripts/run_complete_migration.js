@@ -166,8 +166,9 @@ async function run() {
       ADD COLUMN IF NOT EXISTS category        VARCHAR(50),
       ADD COLUMN IF NOT EXISTS image_url       TEXT`);
 
-  await exec('questions: status/difficulty/type columns', `
+  await exec('questions: submitted_by + status/difficulty/type columns', `
     ALTER TABLE questions
+      ADD COLUMN IF NOT EXISTS submitted_by          UUID         REFERENCES users(id) ON DELETE SET NULL,
       ADD COLUMN IF NOT EXISTS status               VARCHAR(20)  NOT NULL DEFAULT 'approved',
       ADD COLUMN IF NOT EXISTS difficulty           VARCHAR(10)  DEFAULT 'medium',
       ADD COLUMN IF NOT EXISTS question_type        VARCHAR(50)  DEFAULT 'mcq',

@@ -20,7 +20,7 @@ jobs:
   deploy:
     name: SSH Deploy
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Checkout code (for reference only)
@@ -33,7 +33,7 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_KEY }}
           port: 22
-          timeout: 600s
+          timeout: 1200s
 
           script: |
             set -e
