@@ -152,13 +152,15 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc:  ["'self'"],
-      scriptSrc:   ["'self'"],
-      styleSrc:    ["'self'", "'unsafe-inline'"],
+      scriptSrc:   ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      styleSrc:    ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      styleSrcElem:["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
       imgSrc:      ["'self'", 'data:', 'blob:', 'https:'],
-      connectSrc:  ["'self'"],
-      fontSrc:     ["'self'", 'data:'],
+      connectSrc:  ["'self'", 'https://fonts.googleapis.com', 'https://fonts.gstatic.com',
+                    'wss://www.aischoolonair.ng', 'wss://staging.aischoolonair.ng',
+                    'https://api.paystack.co'],
+      fontSrc:     ["'self'", 'data:', 'https://fonts.gstatic.com'],
       objectSrc:   ["'none'"],
-      // Google Docs Viewer needed for office file previews (R2-hosted docx/pptx)
       frameSrc:    ["'self'", 'https://docs.google.com'],
       upgradeInsecureRequests: [],
     },
@@ -167,8 +169,8 @@ app.use(helmet({
 }));
 app.use(globalLimiter);
 
-app.use(express.json({ limit: '15mb' }));
-app.use(express.urlencoded({ extended: true, limit: '15mb' }));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(requestLogger);
 
 // DB
@@ -189,6 +191,7 @@ const sessionRoutes = safeRequire('./routes/sessionRoutes');
 const analyticsRoutes = safeRequire('./routes/analyticsRoutes');
 const questionsRoutes = safeRequire('./routes/questionsRoutes');
 const resourceRoutes = safeRequire('./routes/resourceRoutes');
+const ipWhitelist = safeRequire('./middleware/ipWhitelist');
 const adminRoutes = safeRequire('./routes/adminRoutes');
 const auditRoutes = safeRequire('./routes/auditRoutes');
 const studentRoutes = safeRequire('./routes/studentRoutes');
@@ -253,7 +256,7 @@ if (courseRoutes) app.use('/api/courses', courseRoutes);
 if (curriculumRoutes) app.use('/api/curriculum', protect, curriculumRoutes);
 if (studentRoutes) app.use('/api/students', protect, studentRoutes);
 if (teacherRoutes) app.use('/api/teacher', protect, teacherRoutes);
-if (adminRoutes) app.use('/api/admin', protect, adminRoutes);
+if (adminRoutes) app.use('/api/admin', protect, ...(ipWhitelist ? [ipWhitelist] : []), adminRoutes);
 if (auditRoutes) app.use('/api/audit', protect, auditRoutes);
 if (paymentRoutes) app.use('/api/payments', protect, paymentRoutes);
 if (weakTopicRoutes) app.use('/api/weak-topics', protect, weakTopicRoutes);
