@@ -441,7 +441,7 @@ function NudgeButton({ studentId }) {
   const [busy, setBusy] = useState(false);
   const nudge = async () => {
     setBusy(true);
-    try { const r = await api.post(`/teacher/nudge/${studentId}`); setSent(true); setTimeout(() => setSent(false), 3000); console.log(r?.message || 'Nudge sent'); }
+    try { const r = await api.post(`/teacher/nudge/${studentId}`); setSent(true); setTimeout(() => setSent(false), 3000); }
     catch {} finally { setBusy(false); }
   };
   return (

@@ -46,11 +46,11 @@ export function initRealtime() {
   });
 
   socket.on('connect', () => {
-    console.log('[realtime] connected', socket.id);
+    // connected — no console output in production
   });
 
   socket.on('disconnect', (reason) => {
-    console.log('[realtime] disconnected', reason);
+    // disconnected — no console output in production
   });
 
   socket.on('connect_error', (err) => {
