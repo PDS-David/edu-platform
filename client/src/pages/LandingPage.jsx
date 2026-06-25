@@ -2,7 +2,7 @@
 // Full marketing landing page — no auth required.
 // 8 sections: Hero, Stats, Challenges, Features, Subjects, Pricing Preview, Comparison, Footer
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Lightbulb, BookOpen, TrendingUp, BarChart3, PenTool,
