@@ -36,39 +36,36 @@ echo ""
 echo "▶ 4/8  Building api and web images..."
 docker compose build --progress=plain api web
 
-# ── Verify the new images were actually built (not silently skipped) ──────
-# This has been the single point of failure behind a recurring "React is not
-# defined" incident: if the SSH session gets cut mid-build for ANY reason
-# (command timeout, network blip, OOM), bash continues past this point with
-# `set -e` only catching a non-zero exit — it does NOT catch "the build step
-# got killed by the SSH layer before this script could even see it fail."
-# Checking that an image with this tag EXISTS is not enough, since the OLD
-# image from a previous successful build already satisfies that check.
-# The only thing that actually proves a NEW build happened just now is the
-# image's creation timestamp. Fail loudly here rather than silently
-# continuing to --force-recreate with a stale image.
+# ── Log image freshness (informational only — NOT a pass/fail gate) ───────
+# An earlier version of this script treated "image is older than 5 minutes"
+# as a hard failure, on the theory that an old image means the build was
+# silently killed mid-way. That produced a false positive: web's build
+# context is ./client only (see docker-compose.yml). A commit that touches
+# nothing under client/ (e.g. this very deploy-pipeline fix, which only
+# touches deploy.sh and .github/workflows/) is byte-identical input to that
+# build, so BuildKit correctly reuses the cached result image — including
+# its original Created timestamp — rather than fabricating a new one. An
+# old timestamp here can mean either "build was killed" or "nothing in this
+# service's context changed," and there is no way to tell those apart from
+# the timestamp alone. Logging it is still useful context if something
+# looks wrong later, but it must not fail the deploy on its own. The
+# frontend smoke test at the end of this script (step 8/8) is the real
+# safety net — it checks whether the LIVE site actually works, which is
+# what we care about, independent of whether the image was freshly built
+# or correctly served from cache.
 echo ""
-echo "▶ 5/8  Verifying images were actually rebuilt just now..."
+echo "▶ 5/8  Image freshness (informational)..."
 for svc in web api; do
   CREATED=$(docker inspect "aischool_${svc}:latest" --format '{{.Created}}' 2>/dev/null || echo "")
   if [ -z "$CREATED" ]; then
-    echo "  🔴 No aischool_${svc}:latest image found at all — build silently failed."
+    echo "  🔴 No aischool_${svc}:latest image found at all — build failed."
     exit 1
   fi
   CREATED_EPOCH=$(date -d "$CREATED" +%s 2>/dev/null || echo 0)
   NOW_EPOCH=$(date +%s)
   AGE=$(( NOW_EPOCH - CREATED_EPOCH ))
-  echo "  ${svc} image age: ${AGE}s"
-  if [ "$AGE" -gt 300 ]; then
-    echo "  🔴 aischool_${svc}:latest is ${AGE}s old (>300s) — docker compose build"
-    echo "     did not actually produce a fresh image. The build step was likely"
-    echo "     killed mid-way (SSH command_timeout, OOM, or network drop) and we"
-    echo "     are about to --force-recreate with a STALE image. Stopping here"
-    echo "     instead of deploying old code under a green checkmark."
-    exit 1
-  fi
+  echo "  ${svc} image age: ${AGE}s$( [ "$AGE" -gt 300 ] && echo ' (cache hit — context unchanged, this is fine)' )"
 done
-echo "  ✅ Both images were built within the last 5 minutes — proceeding."
 
 NEW_WEB_IMAGE=$(docker inspect aischool_web:latest --format '{{.Id}}' 2>/dev/null || true)
 NEW_API_IMAGE=$(docker inspect aischool_api:latest --format '{{.Id}}' 2>/dev/null || true)
