@@ -4,26 +4,20 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   build: {
-    chunkSizeWarningLimit: 2000,
-    rollupOptions: {
-      output: {
-        // Split heavy vendor libs into separate chunks so esbuild/Rollup
-        // never has to hold the entire bundle in memory at once.
-        //
-        // IMPORTANT: react + react-dom + react-router-dom must stay together
-        // in one chunk (vendor-react) so they share a single React instance.
-        // Do NOT put socket.io-client in the same chunk as React — it caused
-        // "React is not defined" on production due to module init order.
-        // socket.io-client is already dynamic-imported in realtimeClient.js
-        // so it will be code-split automatically; no entry needed here.
-        manualChunks: {
-          'vendor-react':  ['react', 'react-dom', 'react-router-dom'],
-          'vendor-charts': ['recharts'],
-          'vendor-ui':     ['lucide-react'],
-          'vendor-http':   ['axios'],
-        },
-      },
-    },
+    // Single bundle, deliberately. manualChunks was tried (3dcb368) to
+    // reduce build memory pressure, but chunk splitting caused
+    // "React is not defined" twice, via two unrelated mechanisms:
+    //   1. Module init-order bugs within a single fresh page load — see the
+    //      removed comment that documented socket.io-client breaking React
+    //      when grouped into the same chunk, independent of any caching.
+    //   2. A deploy that changes the chunk graph produces new chunk
+    //      filenames; a browser with the old index.html cached (referencing
+    //      chunk names that no longer exist) gets a 404 instead of React.
+    // The OOM build crash this was solving is handled via NODE_OPTIONS in
+    // client/Dockerfile instead — a heap ceiling increase is a much smaller,
+    // more contained change than restructuring the bundle graph, and it does
+    // not introduce either of the failure modes above.
+    chunkSizeWarningLimit: 2500,
   },
   server: {
     host: '0.0.0.0',
