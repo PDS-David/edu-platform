@@ -114,13 +114,15 @@ apiClient.interceptors.response.use(
         }
 
         const refreshRes = await _refreshPromise;
-        const newToken   = refreshRes.data?.token;
+        const newToken   = refreshRes.data?.token || refreshRes.data?.data?.token;
 
         if (newToken) {
           setToken(newToken);
           original.headers.Authorization = `Bearer ${newToken}`;
           return apiClient(original); // retry original request
         }
+        // Refresh succeeded but returned no token — treat as failure
+        throw new Error('No token in refresh response');
       } catch {
         // Refresh failed — log the user out
         clearToken();

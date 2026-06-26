@@ -351,7 +351,7 @@ function InProgressScreen({ subtopicId, subtopic, selectedPaper, onFinish, navig
       // error (e.g. "These questions are no longer available") is passed
       // through and shown directly, and the failure is logged so it's
       // diagnosable instead of silent.
-      console.error('[QuizTab] submitQuiz failed:', err);
+      console.error('[QuizTab] submitQuiz failed:', err?.message);
       onFinish(null, err?.message || 'Failed to submit your answers. Please try again.');
     }
   };

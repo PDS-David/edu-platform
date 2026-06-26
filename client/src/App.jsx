@@ -49,7 +49,6 @@ import SettingsPage from "./pages/SettingsPage";
 
 // Teacher
 import TeacherDashboard from "./pages/TeacherDashboard";
-import TeacherAssignmentPage from "./pages/TeacherAssignmentPage";
 import TeacherContentPage from "./pages/TeacherContentPage";
 import TeacherPendingQuestions from "./pages/TeacherPendingQuestions";
 import TeacherResourcesPage from "./pages/TeacherResourcesPage";

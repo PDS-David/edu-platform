@@ -2,20 +2,18 @@
 // Route: /past-papers  (public — no auth required, good for SEO)
 // Filterable grid of past papers: exam board, subject, year range.
 //
-// FIX v1.1 — BUG 1:
-//   Replaced undefined `API` variable with `BASE_URL` derived from VITE_API_URL.
-//   Line was: href={`${API.replace('/api', '')}${p.file_url}`}
-//   Now:      href={`${BASE_URL}${p.file_url}`}
+// Model B download gate (v1.2):
+//   - In-browser preview (file_url) stays public — good for SEO
+//   - Download requires login → /api/past-papers/:id/download (authenticated)
+//   - Guests see "Login to Download" button that redirects to /login?next=...
 
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import api from '../services/apiClient';
 import useAuth from '../hooks/useAuth';
-import { FileText, Download, Filter, Loader2, BookOpen, ArrowLeft } from 'lucide-react';
+import { FileText, Download, Filter, Loader2, BookOpen, Lock } from 'lucide-react';
 import PublicNav from '../components/PublicNav';
-
-// ── BUG 1 FIX: derive base URL from env var (strip /api suffix) ────────────────
-const BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '').replace(/\/api$/, '');
+import TopNav from '../components/TopNav';
 
 const EXAM_BOARDS = [
   { code: 'JAMB',    name: ' JAMB/UTME' },
@@ -42,7 +40,6 @@ function formatSize(bytes) {
 
 export default function PastPapersPage() {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [papers,   setPapers]   = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [loading,  setLoading]  = useState(true);
@@ -99,25 +96,26 @@ export default function PastPapersPage() {
   return (
     <div className="min-h-screen bg-gray-50">
 
-      <PublicNav
-        right={
-          !user ? (
+      {/* Role-aware nav:
+          - Authenticated users (teacher, admin, student) get TopNav so their
+            dashboard nav is preserved and session survives a page refresh.
+          - Unauthenticated visitors get PublicNav with sign-in / register links.
+          Previously hardcoded to PublicNav, which stripped the teacher's nav
+          bar and caused 401 redirects on refresh. */}
+      {user ? (
+        <TopNav />
+      ) : (
+        <PublicNav
+          right={
             <>
               <Link to="/login"    className="text-sm text-gray-500 hover:text-gray-800">Sign in</Link>
               <Link to="/register" className="text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-xl transition-colors">
                 Start Free
               </Link>
             </>
-          ) : (
-            <Link
-              to={user.role === 'teacher' ? '/teacher/dashboard' : user.role === 'admin' ? '/admin/dashboard' : '/student/dashboard'}
-              className="text-sm text-gray-500 hover:text-gray-900 flex items-center gap-1.5 font-medium"
-            >
-              <ArrowLeft size={14} /> Dashboard
-            </Link>
-          )
-        }
-      />
+          }
+        />
+      )}
 
       <div className="max-w-5xl mx-auto px-4 py-8">
 
@@ -223,14 +221,24 @@ export default function PastPapersPage() {
                   )}
                 </div>
 
-                {/* BUG 1 FIX: was `${API.replace('/api', '')}${p.file_url}` — API was undefined */}
-                <a
-                  href={`${BASE_URL}${p.file_url}`}
-                  download
-                  className="flex items-center justify-center gap-2 w-full bg-gray-900 hover:bg-gray-800 text-white text-xs font-semibold py-2 rounded-xl transition-colors"
-                >
-                  <Download size={13} /> Download PDF
-                </a>
+                {/* Model B download gate:
+                    - Logged-in users  → authenticated /api/past-papers/:id/download
+                    - Guests           → prompt to login (paper is still viewable inline) */}
+                {user ? (
+                  <a
+                    href={`/api/past-papers/${p.id}/download`}
+                    className="flex items-center justify-center gap-2 w-full bg-gray-900 hover:bg-gray-800 text-white text-xs font-semibold py-2 rounded-xl transition-colors"
+                  >
+                    <Download size={13} /> Download PDF
+                  </a>
+                ) : (
+                  <Link
+                    to={`/login?next=${encodeURIComponent('/past-papers')}`}
+                    className="flex items-center justify-center gap-2 w-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold py-2 rounded-xl transition-colors"
+                  >
+                    <Lock size={13} /> Login to Download
+                  </Link>
+                )}
               </div>
             ))}
           </div>

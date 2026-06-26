@@ -4,7 +4,7 @@ import api from '../services/apiClient';
 import {
   Users, Plus, CheckCircle, Loader2, AlertTriangle,
   BarChart2, X, PenTool, BookOpen, Upload, Send,
-  ChevronDown, AlertCircle, Search, UserPlus, Settings, Check,
+  ChevronDown, AlertCircle, Search, UserPlus, Settings, Check, Trash2, Pencil,
 } from 'lucide-react';
 import TopNav from '../components/TopNav';
 import { useAuth } from '../context/AuthContext';
@@ -441,7 +441,7 @@ function NudgeButton({ studentId }) {
   const [busy, setBusy] = useState(false);
   const nudge = async () => {
     setBusy(true);
-    try { const r = await api.post(`/teacher/nudge/${studentId}`); setSent(true); setTimeout(() => setSent(false), 3000); console.log(r?.message || 'Nudge sent'); }
+    try { const r = await api.post(`/teacher/nudge/${studentId}`); setSent(true); setTimeout(() => setSent(false), 3000); }
     catch {} finally { setBusy(false); }
   };
   return (
@@ -498,6 +498,44 @@ function TestBuilderTab() {
     finally { setPublishing(null); }
   };
 
+  const [confirmDel, setConfirmDel] = useState(null);
+  const [deleting,   setDeleting]   = useState(null);
+  const [editingTest, setEditingTest] = useState(null);  // test object being edited
+  const [editForm,    setEditForm]    = useState({});
+  const [saving,      setSaving]      = useState(false);
+
+  const deleteTest = async () => {
+    if (!confirmDel) return;
+    setDeleting(confirmDel.id);
+    try {
+      await api.delete(`/teacher/tests/${confirmDel.id}`);
+      showToast('Test deleted.');
+      setConfirmDel(null);
+      load();
+    } catch (err) {
+      showToast(err?.message || 'Failed to delete test.', 'error');
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  const startEdit = t => {
+    setEditingTest(t.id);
+    setEditForm({ title: t.title, duration_minutes: t.duration_minutes, total_marks: t.total_marks });
+  };
+
+  const saveEdit = async () => {
+    if (!editForm.title?.trim()) { showToast('Title cannot be blank.', 'error'); return; }
+    setSaving(true);
+    try {
+      await api.patch(`/teacher/tests/${editingTest}`, editForm);
+      showToast('Test updated.');
+      setEditingTest(null);
+      load();
+    } catch (err) { showToast(err?.message || 'Failed to update.', 'error'); }
+    finally { setSaving(false); }
+  };
+
   const assignTest = async testId => {
     if (!assignClass) { showToast('Select a class first.', 'error'); return; }
     try { await api.post(`/teacher/tests/${testId}/assign`, { class_id: assignClass }); showToast('Assigned!'); setAssigning(null); setAssignClass(''); }
@@ -538,6 +576,7 @@ function TestBuilderTab() {
   if (loading) return <div className="flex justify-center py-12"><Loader2 size={20} className="animate-spin text-violet-300" /></div>;
 
   return (
+    <>
     <div className="space-y-4">
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
 
@@ -606,6 +645,12 @@ function TestBuilderTab() {
                       {publishing === t.id ? <Loader2 size={12} className="animate-spin" /> : 'Publish'}
                     </button>
                   )}
+                  {/* D3: edit button — pencil icon opens inline edit form */}
+                  <button onClick={() => editingTest === t.id ? setEditingTest(null) : startEdit(t)}
+                    title="Edit test"
+                    className={`text-xs px-2.5 py-1.5 border font-semibold rounded-lg transition-colors ${editingTest === t.id ? 'bg-violet-50 border-violet-300 text-violet-600' : 'border-gray-200 text-gray-400 hover:text-violet-600 hover:border-violet-200'}`}>
+                    <Pencil size={12} />
+                  </button>
                   <button onClick={() => toggleQuestionPanel(t.id)}
                     className="text-xs px-3 py-1.5 border border-gray-200 text-gray-500 hover:text-violet-600 hover:border-violet-200 font-semibold rounded-lg">
                     Questions ({t.question_count ?? 0})
@@ -614,8 +659,58 @@ function TestBuilderTab() {
                     className="text-xs px-3 py-1.5 border border-gray-200 text-gray-500 hover:text-violet-600 hover:border-violet-200 font-semibold rounded-lg">
                     Assign
                   </button>
+                  {!t.is_published && (
+                    <button
+                      onClick={() => setConfirmDel(t)}
+                      disabled={deleting === t.id}
+                      title="Delete this draft test"
+                      className="text-xs px-2.5 py-1.5 border border-red-200 text-red-400 hover:bg-red-50 hover:text-red-600 font-semibold rounded-lg disabled:opacity-40">
+                      {deleting === t.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                    </button>
+                  )}
                 </div>
               </div>
+
+              {/* D3: inline edit form */}
+              {editingTest === t.id && (
+                <div className="border-t border-gray-100 bg-violet-50 px-4 py-3 space-y-3">
+                  <p className="text-xs font-mono text-violet-500 uppercase tracking-widest">Edit Test</p>
+                  <input
+                    value={editForm.title}
+                    onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))}
+                    placeholder="Test title *"
+                    className={inp}
+                  />
+                  {!t.is_published && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-gray-400 mb-1 block font-mono">DURATION (min)</label>
+                        <input type="number" min={1} value={editForm.duration_minutes}
+                          onChange={e => setEditForm(f => ({ ...f, duration_minutes: parseInt(e.target.value) || 60 }))}
+                          className={inp} />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-400 mb-1 block font-mono">TOTAL MARKS</label>
+                        <input type="number" min={1} value={editForm.total_marks}
+                          onChange={e => setEditForm(f => ({ ...f, total_marks: parseInt(e.target.value) || 100 }))}
+                          className={inp} />
+                      </div>
+                    </div>
+                  )}
+                  {t.is_published && (
+                    <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                      This test is live — only the title can be edited.
+                    </p>
+                  )}
+                  <div className="flex gap-2">
+                    <button onClick={saveEdit} disabled={saving}
+                      className="flex-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-40 text-white text-xs font-semibold py-2 rounded-lg flex items-center justify-center gap-2">
+                      {saving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} Save
+                    </button>
+                    <button onClick={() => setEditingTest(null)} className="px-4 py-2 border border-gray-200 rounded-lg text-xs text-gray-400 hover:text-gray-600">Cancel</button>
+                  </div>
+                </div>
+              )}
               {assigning === t.id && (
                 <div className="border-t border-gray-100 bg-violet-50 px-4 py-3 flex items-center gap-2">
                   <select value={assignClass} onChange={e => setAssignClass(e.target.value)}
@@ -662,6 +757,35 @@ function TestBuilderTab() {
         </div>
       )}
     </div>
+
+      {/* ── Delete confirmation dialog ─────────────────────────────────── */}
+      {confirmDel && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
+            <h3 className="font-bold text-gray-900 mb-1">Delete test?</h3>
+            <p className="text-sm text-gray-500 mb-1">
+              <span className="font-semibold text-gray-800">"{confirmDel.title}"</span> will be permanently removed
+              along with all its questions.
+            </p>
+            <p className="text-xs text-amber-600 mb-5">This cannot be undone.</p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setConfirmDel(null)}
+                className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 border border-gray-200 rounded-xl">
+                Cancel
+              </button>
+              <button
+                onClick={deleteTest}
+                disabled={!!deleting}
+                className="px-4 py-2 text-sm font-semibold text-white bg-red-500 hover:bg-red-600 rounded-xl disabled:opacity-40 flex items-center gap-2">
+                {deleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -685,9 +809,12 @@ export default function TeacherDashboard() {
   const hasSubjects     = (assignedSubjects?.length ?? 0) > 0;
 
   const tabs = [
-    { id: 'classes',     label: 'Classes',  icon: Users    },
-    { id: 'analytics',   label: 'Analytics',icon: BarChart2},
-    { id: 'testbuilder', label: 'Tests',     icon: PenTool  },
+    { id: 'classes',     label: 'Classes',   icon: Users    },
+    { id: 'analytics',   label: 'Analytics', icon: BarChart2},
+    { id: 'testbuilder', label: 'Tests',      icon: PenTool  },
+    { id: 'content',     label: 'Content',    icon: BookOpen, link: '/teacher/content'      },
+    { id: 'resources',   label: 'Resources',  icon: Upload,   link: '/teacher/resources'    },
+    { id: 'addq',        label: 'Add Q',      icon: Plus,     link: '/teacher/questions/add' },
   ];
 
   // ── Sidebar items — all wired ─────────────────────────────────────────────
@@ -785,15 +912,24 @@ export default function TeacherDashboard() {
           )}
 
           {/* Mobile tab bar */}
-          <div className="border-b border-gray-100 px-4 md:hidden sticky top-12 bg-white z-10">
-            <div className="flex">
+          <div className="border-b border-gray-100 md:hidden sticky top-12 bg-white z-10 overflow-x-auto">
+            <div className="flex min-w-max px-2">
               {tabs.map(t => (
-                <button key={t.id} onClick={() => setActiveTab(t.id)}
-                  className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium border-b-2 transition-colors ${
-                    activeTab === t.id ? 'border-violet-600 text-violet-600' : 'border-transparent text-gray-400 hover:text-gray-600'
-                  }`}>
-                  <t.icon size={13} /> {t.label}
-                </button>
+                t.link ? (
+                  <button key={t.id} onClick={() => navigate(t.link)}
+                    className={`flex items-center gap-1.5 px-3 py-3 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
+                      location.pathname.startsWith(t.link) ? 'border-violet-600 text-violet-600' : 'border-transparent text-gray-400 hover:text-gray-600'
+                    }`}>
+                    <t.icon size={13} /> {t.label}
+                  </button>
+                ) : (
+                  <button key={t.id} onClick={() => setActiveTab(t.id)}
+                    className={`flex items-center gap-1.5 px-3 py-3 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
+                      activeTab === t.id ? 'border-violet-600 text-violet-600' : 'border-transparent text-gray-400 hover:text-gray-600'
+                    }`}>
+                    <t.icon size={13} /> {t.label}
+                  </button>
+                )
               ))}
             </div>
           </div>

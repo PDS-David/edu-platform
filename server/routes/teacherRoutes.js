@@ -50,18 +50,9 @@ router.get('/my-subjects', protect, teacherOnly, async (req, res) => {
        ORDER BY s.name ASC`,
       { teacherId: req.user.id }
     );
-    // Fallback: if teacher_subjects missing or empty, return all subjects
-    if (!rows.length) {
-      const allSubjects = await safeQuery(
-        `SELECT s.id, s.name, s.code, s.level,
-                eb.code AS exam_board_code, eb.name AS exam_board_name
-         FROM subjects s
-         LEFT JOIN exam_boards eb ON eb.id = s.exam_board_id
-         WHERE s.is_active = true ORDER BY s.name ASC`,
-        {}
-      );
-      return res.json({ success: true, count: allSubjects.length, data: allSubjects });
-    }
+    // No fallback to all-subjects — a teacher with no assignments
+    // sees an empty list. The UI already handles this with a "No subjects assigned"
+    // message and prompts the teacher to contact admin.
     return res.json({ success: true, count: rows.length, data: rows });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
@@ -74,6 +65,10 @@ router.get('/topics', protect, teacherOnly, async (req, res) => {
   const { subject_id } = req.query;
   if (!subject_id) return res.status(400).json({ success: false, error: 'subject_id is required' });
   try {
+    // Confirm this teacher is assigned to the requested subject
+    const owned = await teacherOwnsSubject(req.user.id, subject_id);
+    if (!owned) return res.status(403).json({ success: false, error: 'Not assigned to this subject' });
+
     const rows = await sequelize.query(
       `SELECT t.id, t.name, t.description, t.order_index,
               COUNT(st.id)::INTEGER AS subtopic_count
@@ -124,7 +119,12 @@ router.put('/topics/:id', protect, teacherOnly, async (req, res) => {
        WHERE id = :id AND is_active = true`,
       { replacements: { id: parseInt(req.params.id), name: name || '', description: description ?? null, orderIndex: order_index != null ? parseInt(order_index) : null }, type: QueryTypes.UPDATE }
     );
-    return res.json({ success: true, message: 'Topic updated' });
+    // Return the updated row so the frontend can update state without a refetch
+    const updated = await sequelize.query(
+      `SELECT id, name, description, order_index FROM topics WHERE id = :id LIMIT 1`,
+      { replacements: { id: parseInt(req.params.id) }, type: QueryTypes.SELECT }
+    );
+    return res.json({ success: true, message: 'Topic updated', data: updated[0] || null });
   } catch (err) { return res.status(500).json({ success: false, error: err.message }); }
 });
 
@@ -184,7 +184,12 @@ router.put('/subtopics/:id', protect, teacherOnly, async (req, res) => {
       `UPDATE subtopics SET name = COALESCE(NULLIF(:name,''), name), description = COALESCE(:description, description), order_index = COALESCE(:oi, order_index), updated_at = NOW() WHERE id = :id`,
       { replacements: { id: parseInt(req.params.id), name: name || '', description: description ?? null, oi: order_index != null ? parseInt(order_index) : null }, type: QueryTypes.UPDATE }
     );
-    return res.json({ success: true, message: 'Subtopic updated' });
+    // Return the updated row so the frontend can update state without a refetch
+    const updated = await sequelize.query(
+      `SELECT id, name, description, order_index FROM subtopics WHERE id = :id LIMIT 1`,
+      { replacements: { id: parseInt(req.params.id) }, type: QueryTypes.SELECT }
+    );
+    return res.json({ success: true, message: 'Subtopic updated', data: updated[0] || null });
   } catch (err) { return res.status(500).json({ success: false, error: err.message }); }
 });
 
@@ -530,6 +535,61 @@ router.post('/tests', protect, teacherOnly, async (req, res) => {
   }
 });
 
+// ── PATCH /api/teacher/tests/:id — edit title / duration / total_marks ────────
+// D3: teachers can edit a test after creation.
+// Both draft and published tests can be renamed; marks/duration can only be
+// changed while the test is still a draft (once live, changing marks would
+// invalidate student attempts already stored against the old value).
+router.patch('/tests/:id', protect, teacherOnly, async (req, res) => {
+  const { title, duration_minutes, total_marks } = req.body;
+
+  if (title !== undefined && !String(title).trim()) {
+    return res.status(400).json({ success: false, error: 'Title cannot be blank' });
+  }
+
+  try {
+    // Confirm the teacher owns this test and get current published state
+    const rows = await safeQuery(
+      `SELECT id, is_published FROM custom_tests WHERE id = :id AND teacher_id = :teacherId`,
+      { id: req.params.id, teacherId: req.user.id }
+    );
+    if (!rows.length) return res.status(404).json({ success: false, error: 'Test not found' });
+
+    const isPublished = rows[0].is_published;
+
+    // Build SET clause from whichever fields were supplied
+    const sets = [];
+    const replacements = { id: req.params.id, teacherId: req.user.id };
+
+    if (title !== undefined) {
+      sets.push('title = :title');
+      replacements.title = String(title).trim();
+    }
+    if (duration_minutes !== undefined) {
+      if (isPublished) return res.status(400).json({ success: false, error: 'Duration cannot be changed after publishing' });
+      sets.push('duration_minutes = :duration_minutes');
+      replacements.duration_minutes = Math.max(1, parseInt(duration_minutes) || 60);
+    }
+    if (total_marks !== undefined) {
+      if (isPublished) return res.status(400).json({ success: false, error: 'Total marks cannot be changed after publishing' });
+      sets.push('total_marks = :total_marks');
+      replacements.total_marks = Math.max(1, parseInt(total_marks) || 100);
+    }
+
+    if (sets.length === 0) return res.status(400).json({ success: false, error: 'Nothing to update' });
+    sets.push('updated_at = NOW()');
+
+    await sequelize.query(
+      `UPDATE custom_tests SET ${sets.join(', ')} WHERE id = :id AND teacher_id = :teacherId`,
+      { replacements, type: QueryTypes.UPDATE }
+    );
+    return res.json({ success: true, message: 'Test updated.' });
+  } catch (err) {
+    console.error('[PATCH /teacher/tests/:id]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ── PUT /api/teacher/tests/:id/publish ────────────────────────────────────────
 router.put('/tests/:id/publish', protect, teacherOnly, async (req, res) => {
   try {
@@ -722,6 +782,35 @@ router.get('/tests/:id/questions', protect, teacherOnly, async (req, res) => {
     );
     return res.json({ success: true, data: rows });
   } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── DELETE /api/teacher/tests/:id ────────────────────────────────────────────
+// Deletes a draft test owned by this teacher.
+// SAFETY: published tests are blocked — deleting a live test would break
+//         any student currently taking it and orphan their submissions.
+router.delete('/tests/:id', protect, teacherOnly, async (req, res) => {
+  const { id: testId } = req.params;
+  try {
+    // Ownership + publish-state check in one query
+    const [test] = await sequelize.query(
+      `SELECT id, is_published FROM custom_tests
+       WHERE id = :testId AND teacher_id = :teacherId
+       LIMIT 1`,
+      { replacements: { testId, teacherId: req.user.id }, type: QueryTypes.SELECT }
+    );
+    if (!test)           return res.status(404).json({ success: false, error: 'Test not found' });
+    if (test.is_published) return res.status(400).json({ success: false, error: 'Cannot delete a published test. Unpublish it first.' });
+
+    // Cascade: remove attached questions and assignments, then the test itself
+    await sequelize.query(`DELETE FROM test_questions   WHERE test_id = :testId`, { replacements: { testId }, type: QueryTypes.DELETE });
+    await sequelize.query(`DELETE FROM test_assignments WHERE test_id = :testId`, { replacements: { testId }, type: QueryTypes.DELETE });
+    await sequelize.query(`DELETE FROM custom_tests     WHERE id = :testId`,      { replacements: { testId }, type: QueryTypes.DELETE });
+
+    return res.json({ success: true, message: 'Test deleted.' });
+  } catch (err) {
+    console.error('[DELETE /teacher/tests/:id]', err.message);
     return res.status(500).json({ success: false, error: err.message });
   }
 });

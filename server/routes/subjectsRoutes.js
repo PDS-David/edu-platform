@@ -74,7 +74,7 @@ router.get('/search', protect, async (req, res) => {
        JOIN subjects s  ON s.id  = t.subject_id
        JOIN student_subjects ss ON ss.subject_id = s.id
          AND ss.student_id = :userId AND ss.is_active = true
-       WHERE st.is_active = true AND t.is_active = true AND s.is_active = true
+       WHERE COALESCE(st.is_active, true) = true AND t.is_active = true AND s.is_active = true
          AND LOWER(st.name) LIKE :pattern
 
        ORDER BY
