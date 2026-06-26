@@ -556,6 +556,7 @@ function TestBuilderTab() {
   if (loading) return <div className="flex justify-center py-12"><Loader2 size={20} className="animate-spin text-violet-300" /></div>;
 
   return (
+    <>
     <div className="space-y-4">
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
 
@@ -717,6 +718,7 @@ function TestBuilderTab() {
           </div>
         </div>
       )}
+    </>
   );
 }
 
