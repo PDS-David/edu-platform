@@ -184,6 +184,10 @@ function UploadTab({ showToast }) {
       }
 
       showToast('Resource uploaded successfully!');
+      // Warn if no subject was selected — file is staged and invisible to students
+      if (!form.subject_id) {
+        setTimeout(() => showToast('⚠️ No subject selected — file is saved but not visible to students yet. Go to My Resources to assign it.', 'error'), 1000);
+      }
       setFile(null);
       setProgress(0);
       setForm(f => ({ ...f, title: '', topic_id: '', subtopic_id: '' }));
