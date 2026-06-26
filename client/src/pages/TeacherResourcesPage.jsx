@@ -66,7 +66,7 @@ function subjectLabel(s) {
 // ══════════════════════════════════════════════════════════════════════════════
 // TAB 1 — Upload Resource
 // ══════════════════════════════════════════════════════════════════════════════
-function UploadTab({ showToast }) {
+function UploadTab({ showToast, onSuccess }) {
   const [subjects,  setSubjects]  = useState([]);
   const [topics,    setTopics]    = useState([]);
   const [subtopics, setSubtopics] = useState([]);
@@ -184,6 +184,7 @@ function UploadTab({ showToast }) {
       }
 
       showToast('Resource uploaded successfully!');
+      onSuccess?.();
       // Warn if no subject was selected — file is staged and invisible to students
       if (!form.subject_id) {
         setTimeout(() => showToast('⚠️ No subject selected — file is saved but not visible to students yet. Go to My Resources to assign it.', 'error'), 1000);
@@ -362,7 +363,7 @@ function UploadTab({ showToast }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // TAB 2 — My Resources
 // ══════════════════════════════════════════════════════════════════════════════
-function ResourcesTab({ showToast }) {
+function ResourcesTab({ showToast, refreshKey }) {
   const [resources,   setResources]   = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [deleting,    setDeleting]    = useState(null);
