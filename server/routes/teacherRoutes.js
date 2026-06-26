@@ -731,6 +731,35 @@ router.get('/tests/:id/questions', protect, teacherOnly, async (req, res) => {
   }
 });
 
+// ── DELETE /api/teacher/tests/:id ────────────────────────────────────────────
+// Deletes a draft test owned by this teacher.
+// SAFETY: published tests are blocked — deleting a live test would break
+//         any student currently taking it and orphan their submissions.
+router.delete('/tests/:id', protect, teacherOnly, async (req, res) => {
+  const { id: testId } = req.params;
+  try {
+    // Ownership + publish-state check in one query
+    const [test] = await sequelize.query(
+      `SELECT id, is_published FROM custom_tests
+       WHERE id = :testId AND teacher_id = :teacherId
+       LIMIT 1`,
+      { replacements: { testId, teacherId: req.user.id }, type: QueryTypes.SELECT }
+    );
+    if (!test)           return res.status(404).json({ success: false, error: 'Test not found' });
+    if (test.is_published) return res.status(400).json({ success: false, error: 'Cannot delete a published test. Unpublish it first.' });
+
+    // Cascade: remove attached questions and assignments, then the test itself
+    await sequelize.query(`DELETE FROM test_questions   WHERE test_id = :testId`, { replacements: { testId }, type: QueryTypes.DELETE });
+    await sequelize.query(`DELETE FROM test_assignments WHERE test_id = :testId`, { replacements: { testId }, type: QueryTypes.DELETE });
+    await sequelize.query(`DELETE FROM custom_tests     WHERE id = :testId`,      { replacements: { testId }, type: QueryTypes.DELETE });
+
+    return res.json({ success: true, message: 'Test deleted.' });
+  } catch (err) {
+    console.error('[DELETE /teacher/tests/:id]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ── POST /api/teacher/nudge/:userId ──────────────────────────────────────────
 router.post('/nudge/:userId', protect, teacherOnly, async (req, res) => {
   try {

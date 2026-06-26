@@ -4,7 +4,7 @@ import api from '../services/apiClient';
 import {
   Users, Plus, CheckCircle, Loader2, AlertTriangle,
   BarChart2, X, PenTool, BookOpen, Upload, Send,
-  ChevronDown, AlertCircle, Search, UserPlus, Settings, Check,
+  ChevronDown, AlertCircle, Search, UserPlus, Settings, Check, Trash2,
 } from 'lucide-react';
 import TopNav from '../components/TopNav';
 import { useAuth } from '../context/AuthContext';
@@ -498,6 +498,24 @@ function TestBuilderTab() {
     finally { setPublishing(null); }
   };
 
+  const [confirmDel, setConfirmDel] = useState(null); // test object to confirm-delete
+  const [deleting,   setDeleting]   = useState(null); // test id being deleted
+
+  const deleteTest = async () => {
+    if (!confirmDel) return;
+    setDeleting(confirmDel.id);
+    try {
+      await api.delete(`/teacher/tests/${confirmDel.id}`);
+      showToast('Test deleted.');
+      setConfirmDel(null);
+      load();
+    } catch (err) {
+      showToast(err?.message || 'Failed to delete test.', 'error');
+    } finally {
+      setDeleting(null);
+    }
+  };
+
   const assignTest = async testId => {
     if (!assignClass) { showToast('Select a class first.', 'error'); return; }
     try { await api.post(`/teacher/tests/${testId}/assign`, { class_id: assignClass }); showToast('Assigned!'); setAssigning(null); setAssignClass(''); }
@@ -614,6 +632,15 @@ function TestBuilderTab() {
                     className="text-xs px-3 py-1.5 border border-gray-200 text-gray-500 hover:text-violet-600 hover:border-violet-200 font-semibold rounded-lg">
                     Assign
                   </button>
+                  {!t.is_published && (
+                    <button
+                      onClick={() => setConfirmDel(t)}
+                      disabled={deleting === t.id}
+                      title="Delete this draft test"
+                      className="text-xs px-2.5 py-1.5 border border-red-200 text-red-400 hover:bg-red-50 hover:text-red-600 font-semibold rounded-lg disabled:opacity-40">
+                      {deleting === t.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                    </button>
+                  )}
                 </div>
               </div>
               {assigning === t.id && (
@@ -662,6 +689,34 @@ function TestBuilderTab() {
         </div>
       )}
     </div>
+
+      {/* ── Delete confirmation dialog ─────────────────────────────────── */}
+      {confirmDel && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
+            <h3 className="font-bold text-gray-900 mb-1">Delete test?</h3>
+            <p className="text-sm text-gray-500 mb-1">
+              <span className="font-semibold text-gray-800">"{confirmDel.title}"</span> will be permanently removed
+              along with all its questions.
+            </p>
+            <p className="text-xs text-amber-600 mb-5">This cannot be undone.</p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setConfirmDel(null)}
+                className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 border border-gray-200 rounded-xl">
+                Cancel
+              </button>
+              <button
+                onClick={deleteTest}
+                disabled={!!deleting}
+                className="px-4 py-2 text-sm font-semibold text-white bg-red-500 hover:bg-red-600 rounded-xl disabled:opacity-40 flex items-center gap-2">
+                {deleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
   );
 }
 
