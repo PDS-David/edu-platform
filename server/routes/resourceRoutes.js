@@ -406,16 +406,24 @@ router.get('/', async (req, res) => {
         )`;
     }
 
+    if (role === 'teacher') {
+      // Teachers only see resources they uploaded — not other teachers' files
+      where += ` AND r.uploaded_by = :user_id`;
+    }
+
     const rows = await sequelize.query(
       `SELECT r.id, r.title, r.resource_type, r.file_url, r.file_size_bytes,
               r.original_filename, r.mime_type, r.is_staged, r.is_active,
               r.uploaded_by, r.subject_id, r.topic_id, r.subtopic_id, r.push_type,
               r.content_kind, r.questions_extracted_at, r.created_at, r.updated_at,
-              s.name AS subject_name, t.name AS topic_name, st.name AS subtopic_name
+              s.name AS subject_name, t.name AS topic_name, st.name AS subtopic_name,
+              TRIM(COALESCE(u.first_name,'') || ' ' || COALESCE(u.last_name,'')) AS uploader_name,
+              u.role AS uploader_role
          FROM resources r
          LEFT JOIN subjects  s ON s.id = r.subject_id
          LEFT JOIN topics    t ON t.id = r.topic_id
          LEFT JOIN subtopics st ON st.id = r.subtopic_id
+         LEFT JOIN users     u  ON u.id  = r.uploaded_by
          ${where}
         ORDER BY r.created_at DESC LIMIT 1000`,
       { replacements, type: QueryTypes.SELECT }
@@ -445,7 +453,8 @@ router.get('/my-assignments', async (req, res) => {
               r.subject_id, r.topic_id, r.subtopic_id,
               r.created_at, r.updated_at,
               s.name  AS subject_name, t.name AS topic_name, st.name AS subtopic_name,
-              TRIM(COALESCE(ab.first_name, '') || ' ' || COALESCE(ab.last_name, '')) AS assigned_by_name
+              TRIM(COALESCE(ab.first_name, '') || ' ' || COALESCE(ab.last_name, '')) AS assigned_by_name,
+              TRIM(COALESCE(ub.first_name, '') || ' ' || COALESCE(ub.last_name, '')) AS uploaded_by_name
          FROM resources r
          LEFT JOIN subjects  s  ON s.id  = r.subject_id
          LEFT JOIN topics    t  ON t.id  = r.topic_id
@@ -462,6 +471,7 @@ router.get('/my-assignments', async (req, res) => {
            ) _ab WHERE assigned_by IS NOT NULL LIMIT 1
          ) assigner ON true
          LEFT JOIN users ab ON ab.id = assigner.assigned_by
+         LEFT JOIN users ub ON ub.id = r.uploaded_by
         WHERE r.is_active = true
           AND (r.is_staged = false OR r.is_staged IS NULL)
           AND (
@@ -480,6 +490,37 @@ router.get('/my-assignments', async (req, res) => {
   } catch (err) {
     logger.error('[my-assignments]', err.message);
     return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/* ================================
+   RENAME  (PUT /api/resources/:id/rename)
+   ================================ */
+router.put('/:id/rename', authorize('admin', 'teacher'), async (req, res) => {
+  const { id } = req.params;
+  const { title } = req.body;
+  if (!title || !title.trim()) {
+    return res.status(400).json({ success: false, error: 'title is required' });
+  }
+  try {
+    // Teachers can only rename resources they uploaded
+    if (req.user.role === 'teacher') {
+      const owned = await sequelize.query(
+        `SELECT id FROM resources WHERE id = :id AND uploaded_by = :uid LIMIT 1`,
+        { replacements: { id, uid: req.user.id }, type: QueryTypes.SELECT }
+      );
+      if (!owned.length) {
+        return res.status(403).json({ success: false, error: 'Not authorised to rename this resource' });
+      }
+    }
+    await sequelize.query(
+      `UPDATE resources SET title = :title, updated_at = NOW() WHERE id = :id`,
+      { replacements: { title: title.trim(), id }, type: QueryTypes.UPDATE }
+    );
+    return res.json({ success: true, message: 'Resource renamed' });
+  } catch (err) {
+    console.error('[PUT /resources/:id/rename]', err.message);
+    return res.status(500).json({ success: false, error: 'Failed to rename resource' });
   }
 });
 
@@ -772,7 +813,7 @@ router.put('/:id/assign-users', authorize('admin', 'teacher'), async (req, res) 
     let eligibleIds = candidateIds;
     if (meta.subject_id && candidateIds.length > 0) {
       const enrolledRows = await sequelize.query(
-        `SELECT student_id FROM student_subjects WHERE subject_id = :sid AND status = :approvedStatus AND student_id IN (:cids)`,
+        `SELECT student_id FROM student_subjects WHERE subject_id = :sid AND (status = :approvedStatus OR status IS NULL) AND student_id IN (:cids)`,
         { replacements: { sid: meta.subject_id, cids: candidateIds, approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.SELECT }
       );
       const enrolledSet = new Set(enrolledRows.map(r => r.student_id));

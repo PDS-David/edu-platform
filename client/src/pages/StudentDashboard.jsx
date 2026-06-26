@@ -223,8 +223,8 @@ function AssignedFilesSection({ resources, loading, error, onRetry, totalResourc
                             <FileIcon type={fileType} size={15} />
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-gray-800 truncate">{file.title}</p>
-                              {file.assigned_by_name && (
-                                <p className="text-[10px] text-gray-400">From: {file.assigned_by_name}</p>
+                              {(file.uploaded_by_name || file.assigned_by_name) && (
+                                <p className="text-[10px] text-gray-400">From: {file.uploaded_by_name || file.assigned_by_name}</p>
                               )}
                             </div>
                             <div className="flex gap-1.5 shrink-0">

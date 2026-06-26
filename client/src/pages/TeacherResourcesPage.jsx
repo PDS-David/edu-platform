@@ -1,5 +1,5 @@
 // client/src/pages/TeacherResourcesPage.jsx
-// URL: /teacher/resources
+// URL: /teacher/resources  [build:cache-bust]
 // Tab 1 — Upload Resource → POST /api/resources/bulk-upload (multipart)
 // Tab 2 — My Resources   → GET/DELETE /api/resources
 // Tab 3 — Add Question   → POST /api/teacher/questions
@@ -12,7 +12,7 @@ import TopNav from '../components/TopNav';
 import {
   Upload, FileText, Video, Music, Trash2, Loader2,
   CheckCircle, AlertTriangle, X, Plus, BookOpen,
-  File,
+  File, Pencil,
 } from 'lucide-react';
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
@@ -66,7 +66,7 @@ function subjectLabel(s) {
 // ══════════════════════════════════════════════════════════════════════════════
 // TAB 1 — Upload Resource
 // ══════════════════════════════════════════════════════════════════════════════
-function UploadTab({ showToast }) {
+function UploadTab({ showToast, onSuccess }) {
   const [subjects,  setSubjects]  = useState([]);
   const [topics,    setTopics]    = useState([]);
   const [subtopics, setSubtopics] = useState([]);
@@ -184,6 +184,11 @@ function UploadTab({ showToast }) {
       }
 
       showToast('Resource uploaded successfully!');
+      onSuccess?.();
+      // Warn if no subject was selected — file is staged and invisible to students
+      if (!form.subject_id) {
+        setTimeout(() => showToast('⚠️ No subject selected — file is saved but not visible to students yet. Go to My Resources to assign it.', 'error'), 1000);
+      }
       setFile(null);
       setProgress(0);
       setForm(f => ({ ...f, title: '', topic_id: '', subtopic_id: '' }));
@@ -358,7 +363,7 @@ function UploadTab({ showToast }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // TAB 2 — My Resources
 // ══════════════════════════════════════════════════════════════════════════════
-function ResourcesTab({ showToast }) {
+function ResourcesTab({ showToast, refreshKey }) {
   const [resources,   setResources]   = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [deleting,    setDeleting]    = useState(null);
@@ -368,6 +373,27 @@ function ResourcesTab({ showToast }) {
   const [pushForm,    setPushForm]    = useState({ push_type: 'learning_material', student_ids: [], class_ids: [], assign_all: false });
   const [pushSearch,  setPushSearch]  = useState('');
   const [pushSaving,  setPushSaving]  = useState(false);
+  const [renaming,    setRenaming]    = useState(null);   // resource id being renamed
+  const [renameValue, setRenameValue] = useState('');
+
+  const startRename = (resource) => {
+    setRenameValue(resource.title || '');
+    setRenaming(resource.id);
+  };
+
+  const commitRename = async (resource) => {
+    const trimmed = renameValue.trim();
+    if (!trimmed || trimmed === resource.title) { setRenaming(null); return; }
+    try {
+      await api.put(`/resources/${resource.id}/rename`, { title: trimmed });
+      setResources(prev => prev.map(r => r.id === resource.id ? { ...r, title: trimmed } : r));
+      showToast('Resource renamed');
+    } catch (err) {
+      showToast(err?.message || 'Failed to rename', 'error');
+    } finally {
+      setRenaming(null);
+    }
+  };
 
   const load = useCallback(() => {
     setLoading(true);
@@ -377,7 +403,7 @@ function ResourcesTab({ showToast }) {
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(load, [load]);
+  useEffect(load, [load, refreshKey]); // re-fetch when upload completes
 
   // Lazy-load students & classes when push panel opens
   const openPush = (id) => {
@@ -895,8 +921,14 @@ function QuestionsTab({ showToast }) {
 export default function TeacherResourcesPage({ defaultTab = 'upload' }) {
   const [activeTab, setActiveTab] = useState(defaultTab);
   const [toast,     setToast]     = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const showToast = useCallback((msg, type = 'success') => setToast({ msg, type }), []);
+
+  const handleUploadSuccess = useCallback(() => {
+    setRefreshKey(k => k + 1);
+    setActiveTab('resources');
+  }, []);
 
   const tabs = [
     { id: 'upload',    label: 'Upload Resource', icon: Upload   },
@@ -949,8 +981,8 @@ export default function TeacherResourcesPage({ defaultTab = 'upload' }) {
       </div>
 
       <div className="max-w-4xl mx-auto px-4 py-6">
-        {activeTab === 'upload'    && <UploadTab    showToast={showToast} />}
-        {activeTab === 'resources' && <ResourcesTab showToast={showToast} />}
+        {activeTab === 'upload'    && <UploadTab    showToast={showToast} onSuccess={handleUploadSuccess} />}
+        {activeTab === 'resources' && <ResourcesTab showToast={showToast} refreshKey={refreshKey} />}
         {activeTab === 'questions' && <QuestionsTab showToast={showToast} />}
       </div>
 

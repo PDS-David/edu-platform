@@ -20,7 +20,7 @@ jobs:
   deploy:
     name: SSH Deploy
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 35
 
     steps:
       - name: Checkout code (for reference only)
@@ -33,7 +33,25 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_KEY }}
           port: 22
-          timeout: 600s
+          # 'timeout' below is the SSH CONNECTION dial timeout (time to
+          # establish the connection itself) — it does NOT limit how long the
+          # remote script is allowed to run. That is controlled by
+          # command_timeout, which was never set here and therefore silently
+          # defaulted to appleboy/ssh-action's default of 600s (10 min).
+          # A previous fix (febab6d1) correctly diagnosed that builds were
+          # exceeding a 10-minute limit and getting killed mid-build (with
+          # the job still reporting ✓ success, since the SSH layer treats a
+          # command-timeout kill differently from a connection failure) —
+          # but it bumped 'timeout' (600s→1200s), the wrong parameter.
+          # command_timeout remained at the unchanged 600s default the whole
+          # time, so the actual constraint never moved. This is why
+          # "React is not defined" kept recurring even after that fix:
+          # any deploy whose build took >10 min (cache miss, or contention
+          # from the concurrent staging stack on the same VPS) was silently
+          # truncated mid-build, leaving the old container running while
+          # GitHub Actions still showed a green check.
+          timeout: 60s
+          command_timeout: 1800s
 
           script: |
             set -e

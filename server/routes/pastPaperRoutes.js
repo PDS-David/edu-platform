@@ -175,6 +175,42 @@ router.post('/', protect, teacherOrAdmin, upload.single('file'), async (req, res
   }
 });
 
+// ── GET /api/past-papers/:id/download ────────────────────────────────────────
+// Model B: login required to download, but download is free.
+// Verifies the user is authenticated, then redirects to the actual file URL.
+// The public GET / list still exposes file_url for in-browser preview (iframe/
+// embed) which stays unauthenticated — good for SEO and discoverability.
+// Only the download action (triggering a file save) is gated behind login.
+router.get('/:id/download', protect, async (req, res) => {
+  try {
+    const rows = await sequelize.query(
+      `SELECT file_url, title FROM past_papers WHERE id = :id`,
+      { replacements: { id: req.params.id }, type: QueryTypes.SELECT }
+    );
+    if (!rows.length) return res.status(404).json({ success: false, error: 'Paper not found' });
+
+    const { file_url, title } = rows[0];
+
+    // If stored on R2 (or any https URL), redirect directly — the browser
+    // follows the redirect and the Content-Disposition header on the file
+    // makes it a save-as download.
+    if (/^https?:\/\//i.test(file_url)) {
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(title || 'paper')}.pdf"`);
+      return res.redirect(302, file_url);
+    }
+
+    // Local disk fallback
+    const diskPath = path.join(__dirname, '..', file_url);
+    if (!fs.existsSync(diskPath)) return res.status(404).json({ success: false, error: 'File not found on disk' });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(title || 'paper')}.pdf"`);
+    return res.sendFile(diskPath);
+  } catch (err) {
+    logger.error('[GET /api/past-papers/:id/download]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ── DELETE /api/past-papers/:id ───────────────────────────────────────────────
 router.delete('/:id', protect, (req, res, next) => {
   if (req.user?.role !== 'admin') return res.status(403).json({ success: false, error: 'Admin only' });
