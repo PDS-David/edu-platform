@@ -4,7 +4,7 @@ import api from '../services/apiClient';
 import {
   Users, Plus, CheckCircle, Loader2, AlertTriangle,
   BarChart2, X, PenTool, BookOpen, Upload, Send,
-  ChevronDown, AlertCircle, Search, UserPlus, Settings, Check, Trash2,
+  ChevronDown, AlertCircle, Search, UserPlus, Settings, Check, Trash2, Pencil,
 } from 'lucide-react';
 import TopNav from '../components/TopNav';
 import { useAuth } from '../context/AuthContext';
@@ -498,8 +498,11 @@ function TestBuilderTab() {
     finally { setPublishing(null); }
   };
 
-  const [confirmDel, setConfirmDel] = useState(null); // test object to confirm-delete
-  const [deleting,   setDeleting]   = useState(null); // test id being deleted
+  const [confirmDel, setConfirmDel] = useState(null);
+  const [deleting,   setDeleting]   = useState(null);
+  const [editingTest, setEditingTest] = useState(null);  // test object being edited
+  const [editForm,    setEditForm]    = useState({});
+  const [saving,      setSaving]      = useState(false);
 
   const deleteTest = async () => {
     if (!confirmDel) return;
@@ -514,6 +517,23 @@ function TestBuilderTab() {
     } finally {
       setDeleting(null);
     }
+  };
+
+  const startEdit = t => {
+    setEditingTest(t.id);
+    setEditForm({ title: t.title, duration_minutes: t.duration_minutes, total_marks: t.total_marks });
+  };
+
+  const saveEdit = async () => {
+    if (!editForm.title?.trim()) { showToast('Title cannot be blank.', 'error'); return; }
+    setSaving(true);
+    try {
+      await api.patch(`/teacher/tests/${editingTest}`, editForm);
+      showToast('Test updated.');
+      setEditingTest(null);
+      load();
+    } catch (err) { showToast(err?.message || 'Failed to update.', 'error'); }
+    finally { setSaving(false); }
   };
 
   const assignTest = async testId => {
@@ -625,6 +645,12 @@ function TestBuilderTab() {
                       {publishing === t.id ? <Loader2 size={12} className="animate-spin" /> : 'Publish'}
                     </button>
                   )}
+                  {/* D3: edit button — pencil icon opens inline edit form */}
+                  <button onClick={() => editingTest === t.id ? setEditingTest(null) : startEdit(t)}
+                    title="Edit test"
+                    className={`text-xs px-2.5 py-1.5 border font-semibold rounded-lg transition-colors ${editingTest === t.id ? 'bg-violet-50 border-violet-300 text-violet-600' : 'border-gray-200 text-gray-400 hover:text-violet-600 hover:border-violet-200'}`}>
+                    <Pencil size={12} />
+                  </button>
                   <button onClick={() => toggleQuestionPanel(t.id)}
                     className="text-xs px-3 py-1.5 border border-gray-200 text-gray-500 hover:text-violet-600 hover:border-violet-200 font-semibold rounded-lg">
                     Questions ({t.question_count ?? 0})
@@ -644,6 +670,47 @@ function TestBuilderTab() {
                   )}
                 </div>
               </div>
+
+              {/* D3: inline edit form */}
+              {editingTest === t.id && (
+                <div className="border-t border-gray-100 bg-violet-50 px-4 py-3 space-y-3">
+                  <p className="text-xs font-mono text-violet-500 uppercase tracking-widest">Edit Test</p>
+                  <input
+                    value={editForm.title}
+                    onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))}
+                    placeholder="Test title *"
+                    className={inp}
+                  />
+                  {!t.is_published && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-gray-400 mb-1 block font-mono">DURATION (min)</label>
+                        <input type="number" min={1} value={editForm.duration_minutes}
+                          onChange={e => setEditForm(f => ({ ...f, duration_minutes: parseInt(e.target.value) || 60 }))}
+                          className={inp} />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-400 mb-1 block font-mono">TOTAL MARKS</label>
+                        <input type="number" min={1} value={editForm.total_marks}
+                          onChange={e => setEditForm(f => ({ ...f, total_marks: parseInt(e.target.value) || 100 }))}
+                          className={inp} />
+                      </div>
+                    </div>
+                  )}
+                  {t.is_published && (
+                    <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                      This test is live — only the title can be edited.
+                    </p>
+                  )}
+                  <div className="flex gap-2">
+                    <button onClick={saveEdit} disabled={saving}
+                      className="flex-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-40 text-white text-xs font-semibold py-2 rounded-lg flex items-center justify-center gap-2">
+                      {saving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} Save
+                    </button>
+                    <button onClick={() => setEditingTest(null)} className="px-4 py-2 border border-gray-200 rounded-lg text-xs text-gray-400 hover:text-gray-600">Cancel</button>
+                  </div>
+                </div>
+              )}
               {assigning === t.id && (
                 <div className="border-t border-gray-100 bg-violet-50 px-4 py-3 flex items-center gap-2">
                   <select value={assignClass} onChange={e => setAssignClass(e.target.value)}
