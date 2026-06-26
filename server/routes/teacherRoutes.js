@@ -535,6 +535,61 @@ router.post('/tests', protect, teacherOnly, async (req, res) => {
   }
 });
 
+// ── PATCH /api/teacher/tests/:id — edit title / duration / total_marks ────────
+// D3: teachers can edit a test after creation.
+// Both draft and published tests can be renamed; marks/duration can only be
+// changed while the test is still a draft (once live, changing marks would
+// invalidate student attempts already stored against the old value).
+router.patch('/tests/:id', protect, teacherOnly, async (req, res) => {
+  const { title, duration_minutes, total_marks } = req.body;
+
+  if (title !== undefined && !String(title).trim()) {
+    return res.status(400).json({ success: false, error: 'Title cannot be blank' });
+  }
+
+  try {
+    // Confirm the teacher owns this test and get current published state
+    const rows = await safeQuery(
+      `SELECT id, is_published FROM custom_tests WHERE id = :id AND teacher_id = :teacherId`,
+      { id: req.params.id, teacherId: req.user.id }
+    );
+    if (!rows.length) return res.status(404).json({ success: false, error: 'Test not found' });
+
+    const isPublished = rows[0].is_published;
+
+    // Build SET clause from whichever fields were supplied
+    const sets = [];
+    const replacements = { id: req.params.id, teacherId: req.user.id };
+
+    if (title !== undefined) {
+      sets.push('title = :title');
+      replacements.title = String(title).trim();
+    }
+    if (duration_minutes !== undefined) {
+      if (isPublished) return res.status(400).json({ success: false, error: 'Duration cannot be changed after publishing' });
+      sets.push('duration_minutes = :duration_minutes');
+      replacements.duration_minutes = Math.max(1, parseInt(duration_minutes) || 60);
+    }
+    if (total_marks !== undefined) {
+      if (isPublished) return res.status(400).json({ success: false, error: 'Total marks cannot be changed after publishing' });
+      sets.push('total_marks = :total_marks');
+      replacements.total_marks = Math.max(1, parseInt(total_marks) || 100);
+    }
+
+    if (sets.length === 0) return res.status(400).json({ success: false, error: 'Nothing to update' });
+    sets.push('updated_at = NOW()');
+
+    await sequelize.query(
+      `UPDATE custom_tests SET ${sets.join(', ')} WHERE id = :id AND teacher_id = :teacherId`,
+      { replacements, type: QueryTypes.UPDATE }
+    );
+    return res.json({ success: true, message: 'Test updated.' });
+  } catch (err) {
+    console.error('[PATCH /teacher/tests/:id]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ── PUT /api/teacher/tests/:id/publish ────────────────────────────────────────
 router.put('/tests/:id/publish', protect, teacherOnly, async (req, res) => {
   try {
