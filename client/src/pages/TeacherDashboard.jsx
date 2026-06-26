@@ -397,12 +397,35 @@ function AnalyticsTab() {
   const [drillStudent,   setDrillStudent]   = useState(null); // { id, name }
   const [drillData,      setDrillData]      = useState([]);
   const [drillLoading,   setDrillLoading]   = useState(false);
+  // D6: subject-assigned students when teacher has no classes
+  const [subjectStudents,    setSubjectStudents]    = useState([]);
+  const [subjectStudentsLoaded, setSubjectStudentsLoaded] = useState(false);
 
   useEffect(() => {
     api.get('/teacher/classes').then(r => {
       const cls = Array.isArray(r?.data) ? r.data : [];
       setClasses(cls);
-      if (cls.length > 0) setSelectedClass(cls[0].id);
+      if (cls.length > 0) {
+        setSelectedClass(cls[0].id);
+      } else {
+        // D6: no classes — fetch students via subject assignments instead
+        api.get('/teacher/students')
+          .then(r2 => {
+            const list = Array.isArray(r2?.data) ? r2.data : [];
+            // Build analytics rows from basic user data
+            const rows = list.map(u => ({
+              id:           u.id,
+              name:         `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.email,
+              email:        u.email,
+              accuracy_pct: null,
+              attempts:     0,
+              streak:       0,
+            }));
+            setSubjectStudents(rows);
+          })
+          .catch(() => setSubjectStudents([]))
+          .finally(() => setSubjectStudentsLoaded(true));
+      }
     }).catch(() => {}).finally(() => setLoadingClasses(false));
   }, []);
 
@@ -428,12 +451,38 @@ function AnalyticsTab() {
 
   if (loadingClasses) return <div className="flex justify-center py-12"><Loader2 size={20} className="animate-spin text-violet-300" /></div>;
 
-  if (classes.length === 0) return (
-    <div className="text-center py-16 border border-dashed border-gray-200 rounded-xl">
-      <BarChart2 size={28} className="mx-auto mb-2 text-gray-200" />
-      <p className="text-sm text-gray-400">No classes yet — create one first.</p>
-    </div>
-  );
+  // D6: teacher has no classes but has subject-assigned students
+  if (classes.length === 0) {
+    if (!subjectStudentsLoaded) return (
+      <div className="flex justify-center py-12"><Loader2 size={20} className="animate-spin text-violet-300" /></div>
+    );
+    if (subjectStudents.length === 0) return (
+      <div className="text-center py-16 border border-dashed border-gray-200 rounded-xl">
+        <Users size={28} className="mx-auto mb-2 text-gray-200" />
+        <p className="text-sm font-medium text-gray-500 mb-1">No students yet</p>
+        <p className="text-xs text-gray-400">Students enrolled in your assigned subjects will appear here.</p>
+      </div>
+    );
+    // Render subject-assigned students with drill-down — reuses same student rows UI below
+    const subjectAnalytics = { students: subjectStudents };
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 px-1">
+          <Users size={13} className="text-violet-400" />
+          <span className="text-xs text-gray-500 font-mono uppercase">Students via subject assignments ({subjectStudents.length})</span>
+        </div>
+        <StudentTable
+          analytics={subjectAnalytics}
+          drillStudent={drillStudent}
+          drillData={drillData}
+          drillLoading={drillLoading}
+          openDrill={openDrill}
+          setDrillStudent={setDrillStudent}
+          setDrillData={setDrillData}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -450,85 +499,101 @@ function AnalyticsTab() {
 
       {loading ? (
         <div className="flex justify-center py-8"><Loader2 size={20} className="animate-spin text-violet-300" /></div>
-      ) : !analytics || analytics.students?.length === 0 ? (
-        <div className="text-center py-8 text-gray-400 text-sm border border-dashed border-gray-200 rounded-xl">No student data yet.</div>
       ) : (
-        <div className="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm">
-          <div className="grid grid-cols-12 text-[10px] font-mono text-gray-400 uppercase px-4 py-2.5 border-b border-gray-100">
-            <span className="col-span-4">Student</span>
-            <span className="col-span-2 text-center">Accuracy</span>
-            <span className="col-span-2 text-center">Attempts</span>
-            <span className="col-span-2 text-center hidden sm:block">Streak</span>
-            <span className="col-span-2 text-center">Nudge</span>
-          </div>
-          <div className="divide-y divide-gray-50">
-            {analytics.students.map(s => (
-              <div key={s.id}>
-                <div
-                  className="grid grid-cols-12 items-center px-4 py-3 hover:bg-gray-50 transition-colors cursor-pointer"
-                  onClick={() => openDrill(s)}
-                  title="Click to see topic breakdown"
-                >
-                  <div className="col-span-4 min-w-0">
-                    <p className="text-sm font-medium text-gray-800 truncate flex items-center gap-1">
-                      {s.name}
-                      <span className={`text-[10px] ml-1 text-gray-400 transition-transform ${drillStudent?.id === s.id ? 'rotate-90' : ''}`}>▶</span>
-                    </p>
-                    <p className="text-xs text-gray-400 truncate">{s.email}</p>
-                  </div>
-                  <div className="col-span-2 text-center">
-                    <span className={`font-mono font-bold text-sm ${accColor(s.accuracy_pct)}`}>{s.accuracy_pct != null ? `${s.accuracy_pct}%` : '—'}</span>
-                  </div>
-                  <div className="col-span-2 text-center text-sm text-gray-600 font-mono">{s.attempts ?? 0}</div>
-                  <div className="col-span-2 text-center hidden sm:block text-sm text-amber-500 font-mono">{s.streak ?? 0}</div>
-                  <div className="col-span-2 text-center" onClick={e => e.stopPropagation()}><NudgeButton studentId={s.id} /></div>
-                </div>
+        <StudentTable
+          analytics={analytics}
+          drillStudent={drillStudent}
+          drillData={drillData}
+          drillLoading={drillLoading}
+          openDrill={openDrill}
+          setDrillStudent={setDrillStudent}
+          setDrillData={setDrillData}
+        />
+      )}
+    </div>
+  );
+}
 
-                {/* Topic drill-down panel */}
-                {drillStudent?.id === s.id && (
-                  <div className="bg-gray-50 border-t border-gray-100 px-6 py-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <p className="text-xs font-mono font-semibold text-gray-500 uppercase">Topic breakdown — {s.name}</p>
-                      <button onClick={() => { setDrillStudent(null); setDrillData([]); }}
-                        className="text-xs text-gray-400 hover:text-gray-600">✕ Close</button>
-                    </div>
-                    {drillLoading ? (
-                      <div className="flex justify-center py-4"><Loader2 size={16} className="animate-spin text-violet-300" /></div>
-                    ) : drillData.length === 0 ? (
-                      <p className="text-xs text-gray-400 text-center py-3">No practice data yet for this student.</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {drillData.map(t => (
-                          <div key={t.topic_id} className="flex items-center gap-3">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between mb-0.5">
-                                <span className="text-xs text-gray-700 truncate">{t.topic}</span>
-                                <span className={`text-xs font-mono font-bold ml-2 ${accColor(t.accuracy_pct)}`}>
-                                  {t.accuracy_pct != null ? `${t.accuracy_pct}%` : '—'}
-                                </span>
-                              </div>
-                              <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                                <div
-                                  className={`h-full rounded-full transition-all ${
-                                    t.accuracy_pct >= 70 ? 'bg-green-400' :
-                                    t.accuracy_pct >= 40 ? 'bg-amber-400' : 'bg-red-400'
-                                  }`}
-                                  style={{ width: `${Math.min(t.accuracy_pct ?? 0, 100)}%` }}
-                                />
-                              </div>
-                            </div>
-                            <span className="text-[10px] text-gray-400 font-mono shrink-0">{t.attempt_count} attempts</span>
+// ── Shared student analytics table ───────────────────────────────────────────
+function StudentTable({ analytics, drillStudent, drillData, drillLoading, openDrill, setDrillStudent, setDrillData }) {
+  if (!analytics || analytics.students?.length === 0) return (
+    <div className="text-center py-8 text-gray-400 text-sm border border-dashed border-gray-200 rounded-xl">No student data yet.</div>
+  );
+  return (
+    <div className="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm">
+      <div className="grid grid-cols-12 text-[10px] font-mono text-gray-400 uppercase px-4 py-2.5 border-b border-gray-100">
+        <span className="col-span-4">Student</span>
+        <span className="col-span-2 text-center">Accuracy</span>
+        <span className="col-span-2 text-center">Attempts</span>
+        <span className="col-span-2 text-center hidden sm:block">Streak</span>
+        <span className="col-span-2 text-center">Nudge</span>
+      </div>
+      <div className="divide-y divide-gray-50">
+        {analytics.students.map(s => (
+          <div key={s.id}>
+            <div
+              className="grid grid-cols-12 items-center px-4 py-3 hover:bg-gray-50 transition-colors cursor-pointer"
+              onClick={() => openDrill(s)}
+              title="Click to see topic breakdown"
+            >
+              <div className="col-span-4 min-w-0">
+                <p className="text-sm font-medium text-gray-800 truncate flex items-center gap-1">
+                  {s.name}
+                  <span className={`text-[10px] ml-1 text-gray-400 transition-transform ${drillStudent?.id === s.id ? 'rotate-90' : ''}`}>▶</span>
+                </p>
+                <p className="text-xs text-gray-400 truncate">{s.email}</p>
+              </div>
+              <div className="col-span-2 text-center">
+                <span className={`font-mono font-bold text-sm ${accColor(s.accuracy_pct)}`}>{s.accuracy_pct != null ? `${s.accuracy_pct}%` : '—'}</span>
+              </div>
+              <div className="col-span-2 text-center text-sm text-gray-600 font-mono">{s.attempts ?? 0}</div>
+              <div className="col-span-2 text-center hidden sm:block text-sm text-amber-500 font-mono">{s.streak ?? 0}</div>
+              <div className="col-span-2 text-center" onClick={e => e.stopPropagation()}><NudgeButton studentId={s.id} /></div>
+            </div>
+
+            {/* Topic drill-down panel */}
+            {drillStudent?.id === s.id && (
+              <div className="bg-gray-50 border-t border-gray-100 px-6 py-4">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs font-mono font-semibold text-gray-500 uppercase">Topic breakdown — {s.name}</p>
+                  <button onClick={() => { setDrillStudent(null); setDrillData([]); }}
+                    className="text-xs text-gray-400 hover:text-gray-600">✕ Close</button>
+                </div>
+                {drillLoading ? (
+                  <div className="flex justify-center py-4"><Loader2 size={16} className="animate-spin text-violet-300" /></div>
+                ) : drillData.length === 0 ? (
+                  <p className="text-xs text-gray-400 text-center py-3">No practice data yet for this student.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {drillData.map(t => (
+                      <div key={t.topic_id} className="flex items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-0.5">
+                            <span className="text-xs text-gray-700 truncate">{t.topic}</span>
+                            <span className={`text-xs font-mono font-bold ml-2 ${accColor(t.accuracy_pct)}`}>
+                              {t.accuracy_pct != null ? `${t.accuracy_pct}%` : '—'}
+                            </span>
                           </div>
-                        ))}
+                          <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all ${
+                                t.accuracy_pct >= 70 ? 'bg-green-400' :
+                                t.accuracy_pct >= 40 ? 'bg-amber-400' : 'bg-red-400'
+                              }`}
+                              style={{ width: `${Math.min(t.accuracy_pct ?? 0, 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                        <span className="text-[10px] text-gray-400 font-mono shrink-0">{t.attempt_count} attempts</span>
                       </div>
-                    )}
+                    ))}
                   </div>
                 )}
               </div>
-            ))}
+            )}
           </div>
-        </div>
-      )}
+        ))}
+      </div>
     </div>
   );
 }
