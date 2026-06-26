@@ -2,9 +2,24 @@
 FROM node:22-alpine AS builder
 
 # Increase Node heap for esbuild/Rollup on the shared 4GB VPS.
-# manualChunks in vite.config.js splits the bundle so peak memory is lower,
-# but we keep this ceiling high as a safety net.
-ENV NODE_OPTIONS="--max-old-space-size=2048"
+# manualChunks (which reduced peak build memory by splitting the bundle)
+# was reverted — it caused two separate "React is not defined" incidents,
+# via module-init-order bugs and stale-chunk-reference issues after a
+# deploy changes the chunk graph. See client/vite.config.js for details.
+# Building as a single ~1.7-2MB+ bundle again needs more heap room than
+# the chunked build did, hence the bump from 2048 to 3584.
+#
+# NOTE: this VPS runs api + api_staging + web + web_staging + caddy + redis
+# concurrently (see docker-compose.yml). --max-old-space-size is a CEILING
+# on what Node may use, not a reservation — it only helps if the host
+# actually has that much physical RAM free when the build runs. If OOM
+# crashes recur after this change, the next things to try, in order, are:
+#   1. Bump this further (headroom permitting).
+#   2. Stop the *_staging containers for the duration of `docker compose
+#      build` in deploy.sh, freeing several hundred MB on the host.
+#   3. Upsize the VPS — splitting the bundle to dodge a memory ceiling
+#      caused more total engineering cost this week than the ceiling itself.
+ENV NODE_OPTIONS="--max-old-space-size=3584"
 
 WORKDIR /app
 
