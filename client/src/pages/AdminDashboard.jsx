@@ -635,7 +635,7 @@ const TeacherAssignmentPanel = () => {
   );
 };
 
-const AIGeneratePanel = () => {
+const AIGeneratePanel = ({ setActivePanel }) => {
   const [subjects, setSubjects] = useState([]);
   const [subtopics, setSubtopics] = useState([]);
   const [subjectsLoad, setSubjectsLoad] = useState(false);
@@ -1586,7 +1586,7 @@ const AdminDashboard = () => {
             )}
             {activePanel === 'catalog'    && <Panel><PanelErrorBoundary><CatalogPanel /></PanelErrorBoundary></Panel>}
             {activePanel === 'teachers'   && <Panel><PanelErrorBoundary><TeacherAssignmentPanel /></PanelErrorBoundary></Panel>}
-            {activePanel === 'aigenerate' && <Panel><PanelErrorBoundary><AIGeneratePanel /></PanelErrorBoundary></Panel>}
+            {activePanel === 'aigenerate' && <Panel><PanelErrorBoundary><AIGeneratePanel setActivePanel={setActivePanel} /></PanelErrorBoundary></Panel>}
             {activePanel === 'bulkupload' && <Panel><PanelErrorBoundary><AdminBulkUploadPanel /></PanelErrorBoundary></Panel>}
             {activePanel === 'pastpapers' && <Panel><PanelErrorBoundary><AdminPastPapersPanel /></PanelErrorBoundary></Panel>}
             {activePanel === 'settings'   && <Panel><PanelErrorBoundary><AdminSettingsPanel setActivePanel={setActivePanel} /></PanelErrorBoundary></Panel>}
