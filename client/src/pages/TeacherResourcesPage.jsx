@@ -8,6 +8,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/apiClient';
 import { getToken } from '../utils/token';
+import { openResourceAuth } from '../utils/authenticatedDownload';
 import TopNav from '../components/TopNav';
 import {
   Upload, FileText, Video, Music, Trash2, Loader2,
@@ -360,6 +361,122 @@ function UploadTab({ showToast, onSuccess }) {
   );
 }
 
+// ── Helper: detect Office MIME / publicly reachable URL ───────────────────────
+function isOfficeMime(file) {
+  const mime = (file.mime_type || '').toLowerCase();
+  const url  = (file.file_url || '').toLowerCase();
+  return (
+    mime.includes('wordprocessingml') || mime.includes('presentationml') ||
+    mime.includes('spreadsheetml')    || mime.includes('msword')          ||
+    mime.includes('ms-powerpoint')    || mime.includes('ms-excel')        ||
+    /\.(docx?|pptx?|xlsx?)(\?|$)/.test(url)
+  );
+}
+function isPubliclyReachable(url) {
+  try {
+    if (!url?.startsWith('http')) return false;
+    const u = new URL(url);
+    if (u.hostname === 'localhost') return false;
+    if (/^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(u.hostname)) return false;
+    if (u.hostname.endsWith('.onrender.com')) return false;
+    if (u.pathname.startsWith('/uploads/') || u.pathname.startsWith('/api/')) return false;
+    return true;
+  } catch { return false; }
+}
+
+// ── Inline viewer — mirrors StudentFilesPage InlineViewer exactly ──────────────
+function TeacherInlineViewer({ resource, onClose }) {
+  const rawUrl = `/api/resources/${resource.id}/download`;
+  const type   = (resource.resource_type || resource.type || '').toLowerCase();
+
+  if (type === 'video') return (
+    <div className="border-t border-blue-100 bg-black">
+      <div className="flex justify-end p-1 bg-gray-900">
+        <button onClick={onClose} className="text-white/60 hover:text-white text-xs px-2 py-0.5">✕ close</button>
+      </div>
+      <video src={rawUrl} controls className="w-full max-h-72" />
+    </div>
+  );
+
+  if (type === 'audio') return (
+    <div className="border-t border-blue-100 p-4 bg-gray-50">
+      <div className="flex justify-between items-center mb-2">
+        <span className="text-xs text-gray-500 font-medium">Audio preview</span>
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xs">✕ close</button>
+      </div>
+      <audio src={rawUrl} controls className="w-full" />
+    </div>
+  );
+
+  if (type === 'image') return (
+    <div className="border-t border-blue-100 p-4 bg-gray-50">
+      <div className="flex justify-between items-center mb-2">
+        <span className="text-xs text-gray-500 font-medium">Image preview</span>
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xs">✕ close</button>
+      </div>
+      <img src={rawUrl} alt={resource.title} className="max-h-64 mx-auto rounded-xl object-contain bg-white border border-gray-100" />
+    </div>
+  );
+
+  const isPdf = type === 'pdf' || /\.pdf(\?|$)/i.test(resource.file_url || '');
+  if (isPdf) return (
+    <div className="border-t border-blue-100 p-4 bg-gray-50">
+      <div className="flex justify-between items-center mb-3">
+        <span className="text-xs text-gray-500 font-medium">PDF file</span>
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xs">✕ close</button>
+      </div>
+      <p className="text-xs text-gray-400 mb-3">PDF preview requires downloading. Click to open in your PDF viewer.</p>
+      <button onClick={() => openResourceAuth(resource.id, resource.file_url)}
+        className="text-xs font-semibold px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-1.5">
+        <FileText size={12} /> Open PDF
+      </button>
+    </div>
+  );
+
+  if (isOfficeMime(resource)) {
+    const publicUrl = resource.file_url && isPubliclyReachable(resource.file_url) ? resource.file_url : null;
+    if (publicUrl) {
+      const viewerSrc = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(publicUrl)}`;
+      return (
+        <div className="border-t border-blue-100">
+          <div className="flex justify-between items-center px-4 py-2 bg-gray-50 border-b border-gray-100">
+            <span className="text-xs text-gray-500">Office document preview</span>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xs">✕ close</button>
+          </div>
+          <iframe src={viewerSrc} title={resource.title} className="w-full" style={{ height: 480 }} frameBorder="0" allowFullScreen />
+        </div>
+      );
+    }
+    return (
+      <div className="border-t border-blue-100 p-4 bg-amber-50">
+        <div className="flex justify-between items-center mb-2">
+          <span className="text-xs text-amber-700 font-medium">Office document</span>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xs">✕ close</button>
+        </div>
+        <p className="text-xs text-gray-500 mb-3">Online preview needs a public URL. Download to open in Office or Google Docs.</p>
+        <button onClick={() => openResourceAuth(resource.id, resource.file_url)}
+          className="text-xs font-semibold px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-1.5">
+          <FileText size={12} /> Download
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="border-t border-blue-100 p-4 bg-gray-50">
+      <div className="flex justify-between items-center mb-3">
+        <span className="text-xs text-gray-500 font-medium">File download</span>
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xs">✕ close</button>
+      </div>
+      <p className="text-xs text-gray-400 mb-3">In-browser preview is not available for this file type.</p>
+      <button onClick={() => openResourceAuth(resource.id, resource.file_url)}
+        className="text-xs font-semibold px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-1.5">
+        <Upload size={12} className="rotate-180" /> Download
+      </button>
+    </div>
+  );
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // TAB 2 — My Resources
 // ══════════════════════════════════════════════════════════════════════════════
@@ -367,7 +484,7 @@ function ResourcesTab({ showToast, refreshKey }) {
   const [resources,   setResources]   = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [deleting,    setDeleting]    = useState(null);
-  const [pushing,     setPushing]     = useState(null); // resource id being pushed
+  const [viewing,     setViewing]     = useState(null); // resource id currently shown inline // resource id being pushed
   const [students,    setStudents]    = useState([]);
   const [classes,     setClasses]     = useState([]);
   const [pushForm,    setPushForm]    = useState({ push_type: 'learning_material', student_ids: [], class_ids: [], assign_all: false });
@@ -521,42 +638,17 @@ function ResourcesTab({ showToast, refreshKey }) {
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <a
-                href="#"
-                onClick={async (e) => {
-                  e.preventDefault();
-                  try {
-                    const token = getToken() || '';
-                    const rawBase = import.meta.env.VITE_API_URL || '';
-                    const apiBase = rawBase.endsWith('/api') ? rawBase : (rawBase ? `${rawBase}/api` : '/api');
-                    // Use ?direct=1 so server returns the signed R2 URL as JSON
-                    // instead of a 302 redirect. Following a cross-origin redirect
-                    // via fetch() throws a CORS network error ("No internet connection").
-                    const resp = await fetch(`${apiBase}/resources/${r.id}/download?direct=1`, {
-                      headers: token ? { Authorization: `Bearer ${token}` } : {},
-                    });
-                    if (!resp.ok) { alert(`Could not open file (${resp.status}). Check your access.`); return; }
-                    const data = await resp.json().catch(() => null);
-                    if (data?.url) {
-                      window.open(data.url, '_blank', 'noopener');
-                    } else {
-                      // Local disk file — blob fallback
-                      const blobResp = await fetch(`${apiBase}/resources/${r.id}/download`, {
-                        headers: token ? { Authorization: `Bearer ${token}` } : {},
-                        redirect: 'follow',
-                      });
-                      if (!blobResp.ok) { alert(`Could not open file (${blobResp.status}).`); return; }
-                      const blob = await blobResp.blob();
-                      const url  = URL.createObjectURL(blob);
-                      window.open(url, '_blank', 'noopener');
-                      setTimeout(() => URL.revokeObjectURL(url), 60000);
-                    }
-                  } catch { alert('Could not open file. Please try again.'); }
-                }}
-                className="text-xs text-blue-600 hover:text-blue-800 font-medium px-3 py-1.5 border border-blue-200 rounded-lg transition-colors"
+              {/* View — toggle inline viewer (matches student experience) */}
+              <button
+                onClick={() => setViewing(v => v === r.id ? null : r.id)}
+                className={`text-xs font-medium px-3 py-1.5 border rounded-lg transition-colors ${
+                  viewing === r.id
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'text-blue-600 hover:text-blue-800 border-blue-200 hover:bg-blue-50'
+                }`}
               >
-                View
-              </a>
+                {viewing === r.id ? 'Hide' : 'View'}
+              </button>
               <button
                 onClick={() => pushing === r.id ? setPushing(null) : openPush(r.id)}
                 className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
@@ -589,6 +681,11 @@ function ResourcesTab({ showToast, refreshKey }) {
               </button>
             </div>
           </div>
+
+          {/* Inline viewer — shown when teacher clicks View */}
+          {viewing === r.id && (
+            <TeacherInlineViewer resource={r} onClose={() => setViewing(null)} />
+          )}
 
           {/* Push panel */}
           {pushing === r.id && (
