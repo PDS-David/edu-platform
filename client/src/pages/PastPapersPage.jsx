@@ -13,6 +13,7 @@ import api from '../services/apiClient';
 import useAuth from '../hooks/useAuth';
 import { FileText, Download, Filter, Loader2, BookOpen, ArrowLeft } from 'lucide-react';
 import PublicNav from '../components/PublicNav';
+import TopNav from '../components/TopNav';
 
 // ── BUG 1 FIX: derive base URL from env var (strip /api suffix) ────────────────
 const BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '').replace(/\/api$/, '');
@@ -99,25 +100,26 @@ export default function PastPapersPage() {
   return (
     <div className="min-h-screen bg-gray-50">
 
-      <PublicNav
-        right={
-          !user ? (
+      {/* Role-aware nav:
+          - Authenticated users (teacher, admin, student) get TopNav so their
+            dashboard nav is preserved and session survives a page refresh.
+          - Unauthenticated visitors get PublicNav with sign-in / register links.
+          Previously hardcoded to PublicNav, which stripped the teacher's nav
+          bar and caused 401 redirects on refresh. */}
+      {user ? (
+        <TopNav />
+      ) : (
+        <PublicNav
+          right={
             <>
               <Link to="/login"    className="text-sm text-gray-500 hover:text-gray-800">Sign in</Link>
               <Link to="/register" className="text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-xl transition-colors">
                 Start Free
               </Link>
             </>
-          ) : (
-            <Link
-              to={user.role === 'teacher' ? '/teacher/dashboard' : user.role === 'admin' ? '/admin/dashboard' : '/student/dashboard'}
-              className="text-sm text-gray-500 hover:text-gray-900 flex items-center gap-1.5 font-medium"
-            >
-              <ArrowLeft size={14} /> Dashboard
-            </Link>
-          )
-        }
-      />
+          }
+        />
+      )}
 
       <div className="max-w-5xl mx-auto px-4 py-8">
 
