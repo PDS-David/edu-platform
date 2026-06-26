@@ -484,7 +484,8 @@ function ResourcesTab({ showToast, refreshKey }) {
   const [resources,   setResources]   = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [deleting,    setDeleting]    = useState(null);
-  const [viewing,     setViewing]     = useState(null); // resource id currently shown inline // resource id being pushed
+  const [viewing,     setViewing]     = useState(null); // resource id currently shown inline
+  const [pushing,     setPushing]     = useState(null); // resource id being pushed
   const [students,    setStudents]    = useState([]);
   const [classes,     setClasses]     = useState([]);
   const [pushForm,    setPushForm]    = useState({ push_type: 'learning_material', student_ids: [], class_ids: [], assign_all: false });
