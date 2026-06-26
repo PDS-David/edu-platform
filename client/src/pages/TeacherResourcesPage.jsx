@@ -372,6 +372,27 @@ function ResourcesTab({ showToast }) {
   const [pushForm,    setPushForm]    = useState({ push_type: 'learning_material', student_ids: [], class_ids: [], assign_all: false });
   const [pushSearch,  setPushSearch]  = useState('');
   const [pushSaving,  setPushSaving]  = useState(false);
+  const [renaming,    setRenaming]    = useState(null);   // resource id being renamed
+  const [renameValue, setRenameValue] = useState('');
+
+  const startRename = (resource) => {
+    setRenameValue(resource.title || '');
+    setRenaming(resource.id);
+  };
+
+  const commitRename = async (resource) => {
+    const trimmed = renameValue.trim();
+    if (!trimmed || trimmed === resource.title) { setRenaming(null); return; }
+    try {
+      await api.put(`/resources/${resource.id}/rename`, { title: trimmed });
+      setResources(prev => prev.map(r => r.id === resource.id ? { ...r, title: trimmed } : r));
+      showToast('Resource renamed');
+    } catch (err) {
+      showToast(err?.message || 'Failed to rename', 'error');
+    } finally {
+      setRenaming(null);
+    }
+  };
 
   const load = useCallback(() => {
     setLoading(true);
@@ -381,7 +402,7 @@ function ResourcesTab({ showToast }) {
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(load, [load]);
+  useEffect(load, [load, refreshKey]); // re-fetch when upload completes
 
   // Lazy-load students & classes when push panel opens
   const openPush = (id) => {
@@ -899,8 +920,14 @@ function QuestionsTab({ showToast }) {
 export default function TeacherResourcesPage({ defaultTab = 'upload' }) {
   const [activeTab, setActiveTab] = useState(defaultTab);
   const [toast,     setToast]     = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const showToast = useCallback((msg, type = 'success') => setToast({ msg, type }), []);
+
+  const handleUploadSuccess = useCallback(() => {
+    setRefreshKey(k => k + 1);
+    setActiveTab('resources');
+  }, []);
 
   const tabs = [
     { id: 'upload',    label: 'Upload Resource', icon: Upload   },
@@ -953,8 +980,8 @@ export default function TeacherResourcesPage({ defaultTab = 'upload' }) {
       </div>
 
       <div className="max-w-4xl mx-auto px-4 py-6">
-        {activeTab === 'upload'    && <UploadTab    showToast={showToast} />}
-        {activeTab === 'resources' && <ResourcesTab showToast={showToast} />}
+        {activeTab === 'upload'    && <UploadTab    showToast={showToast} onSuccess={handleUploadSuccess} />}
+        {activeTab === 'resources' && <ResourcesTab showToast={showToast} refreshKey={refreshKey} />}
         {activeTab === 'questions' && <QuestionsTab showToast={showToast} />}
       </div>
 

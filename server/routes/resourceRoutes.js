@@ -494,6 +494,37 @@ router.get('/my-assignments', async (req, res) => {
 });
 
 /* ================================
+   RENAME  (PUT /api/resources/:id/rename)
+   ================================ */
+router.put('/:id/rename', authorize('admin', 'teacher'), async (req, res) => {
+  const { id } = req.params;
+  const { title } = req.body;
+  if (!title || !title.trim()) {
+    return res.status(400).json({ success: false, error: 'title is required' });
+  }
+  try {
+    // Teachers can only rename resources they uploaded
+    if (req.user.role === 'teacher') {
+      const owned = await sequelize.query(
+        `SELECT id FROM resources WHERE id = :id AND uploaded_by = :uid LIMIT 1`,
+        { replacements: { id, uid: req.user.id }, type: QueryTypes.SELECT }
+      );
+      if (!owned.length) {
+        return res.status(403).json({ success: false, error: 'Not authorised to rename this resource' });
+      }
+    }
+    await sequelize.query(
+      `UPDATE resources SET title = :title, updated_at = NOW() WHERE id = :id`,
+      { replacements: { title: title.trim(), id }, type: QueryTypes.UPDATE }
+    );
+    return res.json({ success: true, message: 'Resource renamed' });
+  } catch (err) {
+    console.error('[PUT /resources/:id/rename]', err.message);
+    return res.status(500).json({ success: false, error: 'Failed to rename resource' });
+  }
+});
+
+/* ================================
    ASSIGN METADATA  (PUT /api/resources/:id/assign-meta)
    ================================ */
 router.put('/:id/assign-meta', authorize('admin', 'teacher'), async (req, res) => {
