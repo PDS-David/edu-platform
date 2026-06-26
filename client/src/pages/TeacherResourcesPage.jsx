@@ -12,7 +12,7 @@ import TopNav from '../components/TopNav';
 import {
   Upload, FileText, Video, Music, Trash2, Loader2,
   CheckCircle, AlertTriangle, X, Plus, BookOpen,
-  File,
+  File, Pencil,
 } from 'lucide-react';
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
