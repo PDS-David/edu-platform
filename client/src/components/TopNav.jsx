@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/apiClient';
 import branding from '../config/branding';
 import { Bell, ChevronDown, Settings, LogOut, LayoutDashboard } from 'lucide-react';
+import GlobalSearch from './GlobalSearch';
 
 export default function TopNav() {
   const { user, logout } = useAuth();
@@ -104,6 +105,13 @@ export default function TopNav() {
       </div>
 
       {/* RIGHT */}
+      {/* X17 — global search, students only */}
+      {role === 'student' && (
+        <div className="flex-1 flex justify-center px-4">
+          <GlobalSearch />
+        </div>
+      )}
+
       <div className="ml-auto flex items-center gap-1">
         {/* Notifications */}
         <div ref={notifRef} className="relative">
