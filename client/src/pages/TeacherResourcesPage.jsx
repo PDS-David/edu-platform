@@ -1,5 +1,5 @@
 // client/src/pages/TeacherResourcesPage.jsx
-// URL: /teacher/resources
+// URL: /teacher/resources  [build:cache-bust]
 // Tab 1 — Upload Resource → POST /api/resources/bulk-upload (multipart)
 // Tab 2 — My Resources   → GET/DELETE /api/resources
 // Tab 3 — Add Question   → POST /api/teacher/questions
