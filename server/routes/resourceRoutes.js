@@ -416,11 +416,14 @@ router.get('/', async (req, res) => {
               r.original_filename, r.mime_type, r.is_staged, r.is_active,
               r.uploaded_by, r.subject_id, r.topic_id, r.subtopic_id, r.push_type,
               r.content_kind, r.questions_extracted_at, r.created_at, r.updated_at,
-              s.name AS subject_name, t.name AS topic_name, st.name AS subtopic_name
+              s.name AS subject_name, t.name AS topic_name, st.name AS subtopic_name,
+              TRIM(COALESCE(u.first_name,'') || ' ' || COALESCE(u.last_name,'')) AS uploader_name,
+              u.role AS uploader_role
          FROM resources r
          LEFT JOIN subjects  s ON s.id = r.subject_id
          LEFT JOIN topics    t ON t.id = r.topic_id
          LEFT JOIN subtopics st ON st.id = r.subtopic_id
+         LEFT JOIN users     u  ON u.id  = r.uploaded_by
          ${where}
         ORDER BY r.created_at DESC LIMIT 1000`,
       { replacements, type: QueryTypes.SELECT }
@@ -779,7 +782,7 @@ router.put('/:id/assign-users', authorize('admin', 'teacher'), async (req, res) 
     let eligibleIds = candidateIds;
     if (meta.subject_id && candidateIds.length > 0) {
       const enrolledRows = await sequelize.query(
-        `SELECT student_id FROM student_subjects WHERE subject_id = :sid AND status = :approvedStatus AND student_id IN (:cids)`,
+        `SELECT student_id FROM student_subjects WHERE subject_id = :sid AND (status = :approvedStatus OR status IS NULL) AND student_id IN (:cids)`,
         { replacements: { sid: meta.subject_id, cids: candidateIds, approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.SELECT }
       );
       const enrolledSet = new Set(enrolledRows.map(r => r.student_id));

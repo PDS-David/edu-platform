@@ -293,7 +293,7 @@ export default function StudentFilesPage() {
                             <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-400 flex-wrap">
                               <span className="capitalize">{ftype || 'file'}</span>
                               {file.topic_name && <><span>·</span><span>{file.topic_name}</span></>}
-                              {file.assigned_by_name && <><span>·</span><span>From: {file.assigned_by_name}</span></>}
+                              {(file.uploader_name || file.assigned_by_name) && <><span>·</span><span>From: {file.uploader_name || file.assigned_by_name}</span></>}
                             </div>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
