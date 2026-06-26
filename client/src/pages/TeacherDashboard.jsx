@@ -181,8 +181,17 @@ function ClassesTab() {
   const [newName,    setNewName]    = useState('');
   const [newSelected,setNewSelected]= useState(new Set());
   const [creating,   setCreating]   = useState(false);
-  const [managing,   setManaging]   = useState(null); // class being managed
+  const [managing,   setManaging]   = useState(null);
   const [toast,      setToast]      = useState(null);
+
+  // Rename state
+  const [renamingId,  setRenamingId]  = useState(null);   // class id being renamed
+  const [renameVal,   setRenameVal]   = useState('');      // current input value
+  const [renaming,    setRenaming]    = useState(false);   // saving in-flight
+
+  // Delete state
+  const [confirmDel,  setConfirmDel]  = useState(null);   // class object to confirm-delete
+  const [deleting,    setDeleting]    = useState(false);   // delete in-flight
 
   const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
 
@@ -191,6 +200,39 @@ function ClassesTab() {
     api.get('/teacher/classes').then(r => setClasses(r.data || [])).catch(() => {}).finally(() => setLoading(false));
   }, []);
   useEffect(load, [load]);
+
+  const startRename = (cls) => { setRenamingId(cls.id); setRenameVal(cls.name); };
+  const cancelRename = () => { setRenamingId(null); setRenameVal(''); };
+
+  const saveRename = async (cls) => {
+    if (!renameVal.trim() || renameVal.trim() === cls.name) { cancelRename(); return; }
+    setRenaming(true);
+    try {
+      await api.patch(`/teacher/classes/${cls.id}`, { name: renameVal.trim() });
+      showToast('Class renamed.');
+      cancelRename();
+      load();
+    } catch (err) {
+      showToast(err?.message || 'Failed to rename class.', 'error');
+    } finally {
+      setRenaming(false);
+    }
+  };
+
+  const deleteClass = async () => {
+    if (!confirmDel) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/teacher/classes/${confirmDel.id}`);
+      showToast('Class deleted.');
+      setConfirmDel(null);
+      load();
+    } catch (err) {
+      showToast(err?.message || 'Failed to delete class.', 'error');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const createClass = async () => {
     if (!newName.trim()) return;
@@ -260,17 +302,48 @@ function ClassesTab() {
         <div className="space-y-2">
           {classes.map(cls => (
             <div key={cls.id} className="bg-white border border-gray-100 rounded-xl p-4 hover:border-violet-100 transition-colors shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-semibold text-gray-800">{cls.name}</p>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  {renamingId === cls.id ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        value={renameVal}
+                        onChange={e => setRenameVal(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') saveRename(cls); if (e.key === 'Escape') cancelRename(); }}
+                        autoFocus
+                        className="flex-1 text-sm font-semibold border border-violet-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-violet-300"
+                      />
+                      <button onClick={() => saveRename(cls)} disabled={renaming}
+                        className="text-violet-600 hover:text-violet-800 disabled:opacity-40">
+                        {renaming ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+                      </button>
+                      <button onClick={cancelRename} className="text-gray-400 hover:text-gray-600">
+                        <X size={13} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      <p className="font-semibold text-gray-800 truncate">{cls.name}</p>
+                      <button onClick={() => startRename(cls)} title="Rename class"
+                        className="text-gray-300 hover:text-violet-500 flex-shrink-0">
+                        <Pencil size={11} />
+                      </button>
+                    </div>
+                  )}
                   <p className="text-xs text-gray-400 mt-0.5 font-mono">
                     {cls.student_count ?? 0} student{cls.student_count !== 1 ? 's' : ''} · {fmtDate(cls.created_at)}
                   </p>
                 </div>
-                <button onClick={() => setManaging(cls)}
-                  className="flex items-center gap-1.5 text-xs text-violet-600 border border-violet-200 hover:bg-violet-50 px-3 py-1.5 rounded-lg font-semibold transition-colors">
-                  <Settings size={12} /> Manage students
-                </button>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button onClick={() => setManaging(cls)}
+                    className="flex items-center gap-1.5 text-xs text-violet-600 border border-violet-200 hover:bg-violet-50 px-3 py-1.5 rounded-lg font-semibold transition-colors">
+                    <Settings size={12} /> Manage
+                  </button>
+                  <button onClick={() => setConfirmDel(cls)} title="Delete class"
+                    className="text-red-300 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition-colors">
+                    <Trash2 size={13} />
+                  </button>
+                </div>
               </div>
             </div>
           ))}
@@ -285,6 +358,30 @@ function ClassesTab() {
           showToast={showToast}
         />
       )}
+
+      {confirmDel && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
+            <h3 className="font-bold text-gray-900 mb-1">Delete class?</h3>
+            <p className="text-sm text-gray-500 mb-1">
+              <span className="font-semibold text-gray-800">"{confirmDel.name}"</span> and all its student memberships will be permanently removed.
+            </p>
+            <p className="text-xs text-amber-600 mb-5">This cannot be undone.</p>
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => setConfirmDel(null)}
+                className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 border border-gray-200 rounded-xl">
+                Cancel
+              </button>
+              <button onClick={deleteClass} disabled={deleting}
+                className="px-4 py-2 text-sm font-semibold text-white bg-red-500 hover:bg-red-600 rounded-xl disabled:opacity-40 flex items-center gap-2">
+                {deleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
     </div>
   );
