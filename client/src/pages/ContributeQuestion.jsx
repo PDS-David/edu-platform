@@ -20,7 +20,7 @@ import { useState, useEffect } from 'react';
 import api from '../services/apiClient';
 import {
   Send, CheckCircle, PlusCircle, Trash2, Lightbulb,
-  Loader, BookOpen, ArrowLeft, FileText, Eye,
+  Loader, BookOpen, ArrowLeft, Eye,
 } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -39,6 +39,7 @@ export default function ContributeQuestion() {
 
   const [examBoards,    setExamBoards]    = useState([]);
   const [subjects,      setSubjects]      = useState([]);
+  const [allMySubjects, setAllMySubjects] = useState([]); // teacher: full list
   const [boardsLoading, setBoardsLoading] = useState(true);
   const [submitting,    setSubmitting]    = useState(false);
   const [submitted,     setSubmitted]     = useState(false);
@@ -70,23 +71,51 @@ export default function ContributeQuestion() {
 
   const isEssay = form.question_type === 'essay';
 
-  // Load exam boards
+  // Load exam boards / subjects depending on role
   useEffect(() => {
-    api.get('/exam-boards')
-      .then(r => setExamBoards(Array.isArray(r) ? r : (r.data || [])))
-      .catch(() => setExamBoards([]))
-      .finally(() => setBoardsLoading(false));
-  }, []);
+    if (isTeacher) {
+      // Q2 FIX: teachers only see subjects they are assigned to.
+      // Derive the board list from their assigned subjects.
+      api.get('/teacher/my-subjects')
+        .then(r => {
+          const subs = Array.isArray(r) ? r : (r.data || []);
+          setAllMySubjects(subs);
+          const boardMap = {};
+          subs.forEach(s => {
+            if (s.exam_board_code && !boardMap[s.exam_board_code]) {
+              boardMap[s.exam_board_code] = {
+                id:   s.exam_board_code,
+                code: s.exam_board_code,
+                name: s.exam_board_name || s.exam_board_code,
+              };
+            }
+          });
+          setExamBoards(Object.values(boardMap));
+        })
+        .catch(() => { setExamBoards([]); setAllMySubjects([]); })
+        .finally(() => setBoardsLoading(false));
+    } else {
+      api.get('/exam-boards')
+        .then(r => setExamBoards(Array.isArray(r) ? r : (r.data || [])))
+        .catch(() => setExamBoards([]))
+        .finally(() => setBoardsLoading(false));
+    }
+  }, [isTeacher]);
 
-  // Load subjects when board changes
+  // Filter subjects when board selection changes
   useEffect(() => {
     if (!form.exam_board_id) { setSubjects([]); return; }
-    const board = examBoards.find(b => b.id === parseInt(form.exam_board_id))?.code;
-    if (!board) return;
-    api.get(`/subjects?board=${board}`)
-      .then(r => setSubjects(Array.isArray(r) ? r : (r.data || [])))
-      .catch(() => setSubjects([]));
-  }, [form.exam_board_id, examBoards]);
+    if (isTeacher) {
+      // Q2 FIX: filter from teacher's already-loaded assigned subjects only
+      setSubjects(allMySubjects.filter(s => s.exam_board_code === form.exam_board_id));
+    } else {
+      const board = examBoards.find(b => String(b.id) === String(form.exam_board_id))?.code;
+      if (!board) return;
+      api.get(`/subjects?board=${board}`)
+        .then(r => setSubjects(Array.isArray(r) ? r : (r.data || [])))
+        .catch(() => setSubjects([]));
+    }
+  }, [form.exam_board_id, examBoards, allMySubjects, isTeacher]);
 
   const handleField   = (key, val) => { setForm(f => ({ ...f, [key]: val })); setErrors(e => ({ ...e, [key]: '' })); };
   const handleOptText = (i, val)   => setOptions(p => p.map((o, idx) => idx === i ? { ...o, text: val } : o));
