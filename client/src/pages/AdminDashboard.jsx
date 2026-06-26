@@ -636,11 +636,17 @@ const TeacherAssignmentPanel = () => {
 };
 
 const AIGeneratePanel = ({ setActivePanel }) => {
-  const [subjects, setSubjects] = useState([]);
-  const [subtopics, setSubtopics] = useState([]);
+  const [subjects,   setSubjects]   = useState([]);
+  const [topics,     setTopics]     = useState([]);
+  const [subtopics,  setSubtopics]  = useState([]);
   const [subjectsLoad, setSubjectsLoad] = useState(false);
+  const [topicsLoad,   setTopicsLoad]   = useState(false);
+  const [subtopicsLoad,setSubtopicsLoad]= useState(false);
   const [pendingCount, setPendingCount] = useState(null);
-  const [form, setForm] = useState({ exam_type_id: '', subject_id: '', topic: '', subtopic_id: '', exam_board: '', count: 10, difficulty: 'medium' });
+  const [form, setForm] = useState({
+    exam_type_id: '', subject_id: '', topic_id: '', topic: '',
+    subtopic_id: '', exam_board: '', count: 10, difficulty: 'medium',
+  });
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
@@ -652,8 +658,8 @@ const AIGeneratePanel = ({ setActivePanel }) => {
 
   const handleExamTypeChange = async (typeId) => {
     const chosen = examTypes.find(et => String(et.id) === String(typeId));
-    setForm(f => ({ ...f, exam_type_id: typeId, subject_id: '', subtopic_id: '', exam_board: chosen?.code || '' }));
-    setSubjects([]); setSubtopics([]);
+    setForm(f => ({ ...f, exam_type_id: typeId, subject_id: '', topic_id: '', topic: '', subtopic_id: '', exam_board: chosen?.code || '' }));
+    setSubjects([]); setTopics([]); setSubtopics([]);
     if (!typeId) return;
     setSubjectsLoad(true);
     try { const raw = await fetchSubjectsForType(typeId); setSubjects([...new Map(raw.map(s => [s.id, s])).values()]); }
@@ -662,28 +668,35 @@ const AIGeneratePanel = ({ setActivePanel }) => {
   };
 
   const handleSubjectChange = async (subjectId) => {
-    setForm(f => ({ ...f, subject_id: subjectId, subtopic_id: '' }));
-    setSubtopics([]);
+    setForm(f => ({ ...f, subject_id: subjectId, topic_id: '', topic: '', subtopic_id: '' }));
+    setTopics([]); setSubtopics([]);
     if (!subjectId) return;
+    setTopicsLoad(true);
     try {
-      // Load topics, then load all subtopics for each topic
-      const topicsRes = await api.get(`/teacher/topics?subject_id=${subjectId}`).catch(() => ({ data: [] }));
-      const topics = topicsRes?.data || [];
-      const allSubtopics = [];
-      await Promise.all(topics.map(async t => {
-        const stRes = await api.get(`/teacher/subtopics?topic_id=${t.id}`).catch(() => ({ data: [] }));
-        const sts = stRes?.data || [];
-        sts.forEach(st => allSubtopics.push({ ...st, topic_name: t.name }));
-      }));
-      setSubtopics(allSubtopics);
+      const res = await api.get(`/teacher/topics?subject_id=${subjectId}`).catch(() => ({ data: [] }));
+      setTopics(res?.data || []);
+    } catch { setTopics([]); }
+    finally { setTopicsLoad(false); }
+  };
+
+  const handleTopicChange = async (topicId) => {
+    const chosen = topics.find(t => String(t.id) === String(topicId));
+    setForm(f => ({ ...f, topic_id: topicId, topic: chosen?.name || '', subtopic_id: '' }));
+    setSubtopics([]);
+    if (!topicId) return;
+    setSubtopicsLoad(true);
+    try {
+      const res = await api.get(`/teacher/subtopics?topic_id=${topicId}`).catch(() => ({ data: [] }));
+      setSubtopics(res?.data || []);
     } catch { setSubtopics([]); }
+    finally { setSubtopicsLoad(false); }
   };
 
   const handleGenerate = async (e) => {
     e.preventDefault();
     if (!form.exam_type_id) { setError('Please select an exam type first.'); return; }
     if (!form.subject_id)   { setError('Please select a subject.'); return; }
-    if (!form.topic.trim()) { setError('Please enter a topic.'); return; }
+    if (!form.topic.trim()) { setError('Please select a topic.'); return; }
     setError(''); setResult(null); setPreviewQuestions([]); setGenerating(true);
     try {
       const res = await api.post('/admin/generate-questions', {
@@ -710,27 +723,83 @@ const AIGeneratePanel = ({ setActivePanel }) => {
         {pendingCount !== null && <a href="/admin/questions/review" className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-100 px-3 py-1.5 rounded-full hover:bg-amber-200"><Zap size={12} />{pendingCount} pending review</a>}
       </div>
       <form onSubmit={handleGenerate} className="space-y-4 max-w-lg">
-        <div><label className="block text-xs font-semibold text-gray-600 mb-1">Exam Type *</label><select value={form.exam_type_id} onChange={e => handleExamTypeChange(e.target.value)} className={inputCls} required><option value="">Select exam type first…</option>{examTypesLoad ? <option disabled>Loading…</option> : examTypes.filter(et => et.is_active !== false).map(et => <option key={et.id} value={et.id}>{safeEmoji(et.icon_emoji) ? safeEmoji(et.icon_emoji) + ' ' : ''}{et.name} ({et.code})</option>)}</select></div>
-        <div><label className="block text-xs font-semibold text-gray-600 mb-1">Subject *</label>{!form.exam_type_id ? <div className="border-2 border-dashed border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-400">Select an exam type above</div> : <select value={form.subject_id} onChange={e => handleSubjectChange(e.target.value)} className={inputCls} required><option value="">Select subject…</option>{subjectsLoad ? <option disabled>Loading subjects…</option> : subjects.length === 0 ? <option disabled>No subjects found</option> : subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>}</div>
-        <div><label className="block text-xs font-semibold text-gray-600 mb-1">Topic / Subtopic *</label><input type="text" value={form.topic} onChange={e => setForm(f => ({ ...f, topic: e.target.value }))} placeholder="e.g. Acid Base and Salts" className={inputCls} required /></div>
-        {subtopics.length > 0 && (
-          <div><label className="block text-xs font-semibold text-gray-600 mb-1">Link to Subtopic <span className="text-gray-400 font-normal">(recommended — ensures students see questions in quiz)</span></label><select value={form.subtopic_id} onChange={e => setForm(f => ({ ...f, subtopic_id: e.target.value }))} className={inputCls}><option value="">— None (questions won't appear in subtopic quiz) —</option>{subtopics.map(st => <option key={st.id} value={st.id}>{st.name}</option>)}</select></div>
-        )}
-        {form.subject_id && subtopics.length === 0 && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-700">
-            ⚠ This subject has no subtopics yet. Generated questions will not appear in student quizzes until you create at least one subtopic under a topic in the <button onClick={() => setActivePanel('catalog')} className="underline font-semibold">Catalog panel</button>.
+
+        {/* Exam Type */}
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Exam Type *</label>
+          <select value={form.exam_type_id} onChange={e => handleExamTypeChange(e.target.value)} className={inputCls} required>
+            <option value="">Select exam type first…</option>
+            {examTypesLoad ? <option disabled>Loading…</option> : examTypes.filter(et => et.is_active !== false).map(et => <option key={et.id} value={et.id}>{safeEmoji(et.icon_emoji) ? safeEmoji(et.icon_emoji) + ' ' : ''}{et.name} ({et.code})</option>)}
+          </select>
+        </div>
+
+        {/* Subject */}
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Subject *</label>
+          {!form.exam_type_id
+            ? <div className="border-2 border-dashed border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-400">Select an exam type above</div>
+            : <select value={form.subject_id} onChange={e => handleSubjectChange(e.target.value)} className={inputCls} required>
+                <option value="">Select subject…</option>
+                {subjectsLoad ? <option disabled>Loading subjects…</option> : subjects.length === 0 ? <option disabled>No subjects found</option> : subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+          }
+        </div>
+
+        {/* Topic — dropdown, cascades from Subject */}
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Topic *</label>
+          {!form.subject_id
+            ? <div className="border-2 border-dashed border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-400">Select a subject above</div>
+            : topicsLoad
+              ? <div className={inputCls + ' text-gray-400'}>Loading topics…</div>
+              : topics.length === 0
+                ? <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-700">
+                    ⚠ This subject has no topics yet. Create topics first in the <button type="button" onClick={() => setActivePanel('catalog')} className="underline font-semibold">Catalog panel</button>.
+                  </div>
+                : <select value={form.topic_id} onChange={e => handleTopicChange(e.target.value)} className={inputCls} required>
+                    <option value="">Select topic…</option>
+                    {topics.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+          }
+        </div>
+
+        {/* Subtopic — dropdown, cascades from Topic */}
+        {form.topic_id && (
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">
+              Subtopic <span className="text-red-500">*</span>
+              <span className="ml-1 text-gray-400 font-normal">(required — without this, students will not see questions in their quiz)</span>
+            </label>
+            {subtopicsLoad
+              ? <div className={inputCls + ' text-gray-400'}>Loading subtopics…</div>
+              : subtopics.length === 0
+                ? <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-700">
+                    ⚠ This topic has no subtopics yet. Create subtopics first in the <button type="button" onClick={() => setActivePanel('catalog')} className="underline font-semibold">Catalog panel</button>.
+                  </div>
+                : <select value={form.subtopic_id} onChange={e => setForm(f => ({ ...f, subtopic_id: e.target.value }))} className={inputCls} required>
+                    <option value="">Select subtopic…</option>
+                    {subtopics.map(st => <option key={st.id} value={st.id}>{st.name}</option>)}
+                  </select>
+            }
           </div>
         )}
+
         <div className="grid grid-cols-2 gap-3">
           <div><label className="block text-xs font-semibold text-gray-600 mb-1">Difficulty</label><select value={form.difficulty} onChange={e => setForm(f => ({ ...f, difficulty: e.target.value }))} className={inputCls}><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option></select></div>
           <div><label className="block text-xs font-semibold text-gray-600 mb-1">Count</label><select value={form.count} onChange={e => setForm(f => ({ ...f, count: Number(e.target.value) }))} className={inputCls}><option value={5}>5</option><option value={10}>10</option><option value={15}>15</option></select></div>
         </div>
+
         {error && <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm"><AlertTriangle size={14} /> {error}</div>}
         {result && <div className="flex items-center gap-2 text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 text-sm"><Check size={14} /> {result.message || 'Questions generated successfully!'}</div>}
-        <button type="submit" disabled={generating} className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white font-semibold px-6 py-2.5 rounded-xl text-sm">
+
+        <button type="submit" disabled={generating || !form.subtopic_id} className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white font-semibold px-6 py-2.5 rounded-xl text-sm">
           {generating ? <><Loader2 size={14} className="animate-spin" /> Generating…</> : <><Sparkles size={14} /> Generate Questions</>}
         </button>
+        {!form.subtopic_id && form.topic_id && subtopics.length > 0 && (
+          <p className="text-xs text-amber-600">Please select a subtopic to enable generation.</p>
+        )}
       </form>
+
       {previewQuestions.length > 0 && (
         <div className="mt-6 max-w-lg">
           <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3">Generated Preview ({previewQuestions.length})<span className="ml-2 text-[10px] font-bold bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full">Pending Review</span></p>
@@ -1503,7 +1572,7 @@ const AdminDashboard = () => {
                   return (
                     <a key={key} href={href}
                       className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all text-left text-[#6b6259] hover:text-[#1a1a1a] hover:bg-white/60">
-                      <span className="text-base leading-none">🇬🇧</span>
+                      {Icon && <Icon size={14} className="text-[#b5a99a]" />}
                       {label}
                     </a>
                   );
