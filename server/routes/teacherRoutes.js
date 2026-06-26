@@ -421,6 +421,46 @@ router.get('/class/:classId/members', protect, teacherOnly, requireTeacherClassO
   }
 });
 
+// ── PATCH /api/teacher/classes/:id ───────────────────────────────────────────
+// Rename a class. Only the owning teacher can rename it.
+router.patch('/classes/:id', protect, teacherOnly, async (req, res) => {
+  const { id } = req.params;
+  const { name } = req.body;
+  if (!name || !name.trim()) {
+    return res.status(400).json({ success: false, error: 'Class name is required' });
+  }
+  try {
+    const rows = await sequelize.query(
+      `UPDATE classes SET name = :name WHERE id = :id AND teacher_id = :teacherId RETURNING id, name`,
+      { replacements: { name: name.trim(), id, teacherId: req.user.id }, type: QueryTypes.SELECT }
+    );
+    if (!rows.length) return res.status(404).json({ success: false, error: 'Class not found' });
+    return res.json({ success: true, class: rows[0] });
+  } catch (err) {
+    console.error('[PATCH /teacher/classes/:id]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── DELETE /api/teacher/classes/:id ──────────────────────────────────────────
+// Delete a class. Memberships cascade automatically (ON DELETE CASCADE).
+// test_assignments rows referencing this class also cascade.
+// Only the owning teacher can delete their class.
+router.delete('/classes/:id', protect, teacherOnly, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const rows = await sequelize.query(
+      `DELETE FROM classes WHERE id = :id AND teacher_id = :teacherId RETURNING id`,
+      { replacements: { id, teacherId: req.user.id }, type: QueryTypes.SELECT }
+    );
+    if (!rows.length) return res.status(404).json({ success: false, error: 'Class not found' });
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('[DELETE /teacher/classes/:id]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ── GET /api/teacher/class/:classId/analytics ────────────────────────────────
 router.get('/class/:classId/analytics', protect, teacherOnly, requireTeacherClassOwnership, async (req, res) => {
   try {
