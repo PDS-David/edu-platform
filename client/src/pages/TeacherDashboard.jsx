@@ -688,8 +688,9 @@ export default function TeacherDashboard() {
     { id: 'classes',     label: 'Classes',   icon: Users    },
     { id: 'analytics',   label: 'Analytics', icon: BarChart2},
     { id: 'testbuilder', label: 'Tests',      icon: PenTool  },
-    { id: 'content',     label: 'Content',    icon: BookOpen, link: '/teacher/content'   },
-    { id: 'resources',   label: 'Resources',  icon: Upload,   link: '/teacher/resources' },
+    { id: 'content',     label: 'Content',    icon: BookOpen, link: '/teacher/content'      },
+    { id: 'resources',   label: 'Resources',  icon: Upload,   link: '/teacher/resources'    },
+    { id: 'addq',        label: 'Add Q',      icon: Plus,     link: '/teacher/questions/add' },
   ];
 
   // ── Sidebar items — all wired ─────────────────────────────────────────────
