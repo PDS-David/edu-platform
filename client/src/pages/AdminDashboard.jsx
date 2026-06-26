@@ -651,6 +651,8 @@ const AIGeneratePanel = ({ setActivePanel }) => {
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [previewQuestions, setPreviewQuestions] = useState([]);
+  const [newSubtopicName, setNewSubtopicName] = useState('');
+  const [creatingSubtopic, setCreatingSubtopic] = useState(false);
   const { examTypes, loadingTypes: examTypesLoad, fetchSubjectsForType } = useCatalog();
   const navigate = useNavigate();
 
@@ -682,7 +684,7 @@ const AIGeneratePanel = ({ setActivePanel }) => {
   const handleTopicChange = async (topicId) => {
     const chosen = topics.find(t => String(t.id) === String(topicId));
     setForm(f => ({ ...f, topic_id: topicId, topic: chosen?.name || '', subtopic_id: '' }));
-    setSubtopics([]);
+    setSubtopics([]); setNewSubtopicName('');
     if (!topicId) return;
     setSubtopicsLoad(true);
     try {
@@ -690,6 +692,30 @@ const AIGeneratePanel = ({ setActivePanel }) => {
       setSubtopics(res?.data || []);
     } catch { setSubtopics([]); }
     finally { setSubtopicsLoad(false); }
+  };
+
+  const handleCreateSubtopic = async () => {
+    if (!newSubtopicName.trim() || !form.topic_id) return;
+    setCreatingSubtopic(true);
+    try {
+      const r = await api.post('/teacher/subtopics', {
+        topic_id: form.topic_id,
+        name: newSubtopicName.trim(),
+      });
+      const created = r?.data || r;
+      if (created?.id) {
+        const newSt = { id: created.id, name: newSubtopicName.trim() };
+        setSubtopics([newSt]);
+        setForm(f => ({ ...f, subtopic_id: String(created.id) }));
+        setNewSubtopicName('');
+      } else {
+        setError('Subtopic created but response was unexpected. Refresh and try again.');
+      }
+    } catch (err) {
+      setError(err?.message || 'Failed to create subtopic.');
+    } finally {
+      setCreatingSubtopic(false);
+    }
   };
 
   const handleGenerate = async (e) => {
@@ -773,8 +799,29 @@ const AIGeneratePanel = ({ setActivePanel }) => {
             {subtopicsLoad
               ? <div className={inputCls + ' text-gray-400'}>Loading subtopics…</div>
               : subtopics.length === 0
-                ? <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-700">
-                    ⚠ This topic has no subtopics yet. Create subtopics first in the <button type="button" onClick={() => setActivePanel('catalog')} className="underline font-semibold">Catalog panel</button>.
+                ? <div className="space-y-2">
+                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                      No subtopics yet for this topic. Create one below — it will be saved and questions will link to it automatically.
+                    </p>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newSubtopicName}
+                        onChange={e => setNewSubtopicName(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleCreateSubtopic(); } }}
+                        placeholder="e.g. Acid"
+                        className={inputCls + ' flex-1'}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleCreateSubtopic}
+                        disabled={creatingSubtopic || !newSubtopicName.trim()}
+                        className="flex items-center gap-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-xs font-semibold px-3 py-2 rounded-lg whitespace-nowrap"
+                      >
+                        {creatingSubtopic ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                        {creatingSubtopic ? 'Creating…' : 'Create'}
+                      </button>
+                    </div>
                   </div>
                 : <select value={form.subtopic_id} onChange={e => setForm(f => ({ ...f, subtopic_id: e.target.value }))} className={inputCls} required>
                     <option value="">Select subtopic…</option>
