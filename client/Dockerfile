@@ -1,9 +1,10 @@
 # ── Stage 1: build React app ──────────────────────────────────────────────────
 FROM node:22-alpine AS builder
 
-# Increase Node heap so esbuild/Rollup can handle large bundles without OOM.
-# Default is ~1.5GB which is too small for this bundle on a 4GB shared VPS.
-ENV NODE_OPTIONS="--max-old-space-size=3072"
+# Increase Node heap for esbuild/Rollup on the shared 4GB VPS.
+# manualChunks in vite.config.js splits the bundle so peak memory is lower,
+# but we keep this ceiling high as a safety net.
+ENV NODE_OPTIONS="--max-old-space-size=2048"
 
 WORKDIR /app
 
