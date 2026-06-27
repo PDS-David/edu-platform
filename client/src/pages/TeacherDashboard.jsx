@@ -3,7 +3,7 @@ import { useNavigate, Link, Outlet, useLocation } from 'react-router-dom';
 import api from '../services/apiClient';
 import {
   Users, Plus, CheckCircle, Loader2, AlertTriangle,
-  BarChart2, X, PenTool, BookOpen, Upload, Send,
+  BarChart2, X, PenTool, BookOpen, Upload, Send, FileText,
   ChevronDown, AlertCircle, Search, UserPlus, Settings, Check, Trash2, Pencil,
 } from 'lucide-react';
 import TopNav from '../components/TopNav';
@@ -977,6 +977,8 @@ export default function TeacherDashboard() {
     { id: 'content',     label: 'Content',    icon: BookOpen, link: '/teacher/content'      },
     { id: 'resources',   label: 'Resources',  icon: Upload,   link: '/teacher/resources'    },
     { id: 'addq',        label: 'Add Q',      icon: Plus,     link: '/teacher/questions/add' },
+    { id: 'pastpapers',  label: 'Past Papers', icon: FileText, link: '/past-papers'           },
+    { id: 'settings',    label: 'Settings',    icon: Settings, link: '/teacher/settings'      },
   ];
 
   // ── Sidebar items — all wired ─────────────────────────────────────────────
@@ -987,6 +989,8 @@ export default function TeacherDashboard() {
     { id: 'content',     icon: BookOpen,  label: 'Content Manager', link: '/teacher/content'      },
     { id: 'resources',   icon: Upload,    label: 'Resources',       link: '/teacher/resources'    },
     { id: 'addq',        icon: Plus,      label: 'Add Question',    link: '/teacher/questions/add'},
+    { id: 'pastpapers',  icon: FileText,  label: 'Past Papers',     link: '/past-papers'          },
+    { id: 'settings',    icon: Settings,  label: 'Settings',        link: '/teacher/settings'     },
   ];
 
   const isTabActive = (item) => item.tab && activeTab === item.id;
