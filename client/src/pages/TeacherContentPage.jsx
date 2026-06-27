@@ -201,6 +201,30 @@ function SubtopicList({ topic, subjectId, showToast }) {
     }
   };
 
+  // C1: move a subtopic up or down by swapping order_index with its neighbour
+  const moveSubtopic = async (idx, direction) => {
+    const swapIdx = idx + direction;
+    if (swapIdx < 0 || swapIdx >= subtopics.length) return;
+    const a = subtopics[idx];
+    const b = subtopics[swapIdx];
+    // Optimistic UI update
+    const next = [...subtopics];
+    next[idx]     = { ...a, order_index: b.order_index };
+    next[swapIdx] = { ...b, order_index: a.order_index };
+    next.sort((x, y) => (x.order_index ?? 0) - (y.order_index ?? 0));
+    setSubtopics(next);
+    try {
+      await Promise.all([
+        api.put(`/teacher/subtopics/${a.id}`, { order_index: b.order_index }),
+        api.put(`/teacher/subtopics/${b.id}`, { order_index: a.order_index }),
+      ]);
+    } catch {
+      // Revert on failure
+      load();
+      showToast('Failed to reorder subtopics', 'error');
+    }
+  };
+
   if (loading) return (
     <div className="py-4 flex justify-center">
       <Loader2 size={16} className="animate-spin text-blue-400" />
@@ -231,6 +255,21 @@ function SubtopicList({ topic, subjectId, showToast }) {
               <>
                 <span className="text-sm text-gray-700 flex-1">{sub.name}</span>
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                  {/* C1: reorder buttons */}
+                  <button
+                    onClick={() => moveSubtopic(subtopics.indexOf(sub), -1)}
+                    disabled={subtopics.indexOf(sub) === 0}
+                    title="Move up"
+                    className="p-1 rounded text-gray-400 hover:text-violet-600 hover:bg-violet-50 transition-colors disabled:opacity-20 disabled:cursor-not-allowed">
+                    <ChevronUp size={12} />
+                  </button>
+                  <button
+                    onClick={() => moveSubtopic(subtopics.indexOf(sub), 1)}
+                    disabled={subtopics.indexOf(sub) === subtopics.length - 1}
+                    title="Move down"
+                    className="p-1 rounded text-gray-400 hover:text-violet-600 hover:bg-violet-50 transition-colors disabled:opacity-20 disabled:cursor-not-allowed">
+                    <ChevronDown size={12} />
+                  </button>
                   <button onClick={() => setEditingId(sub.id)}
                     className="p-1 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
                     <Pencil size={12} />
@@ -276,7 +315,7 @@ function SubtopicList({ topic, subjectId, showToast }) {
 }
 
 // ── Topic card ────────────────────────────────────────────────────────────────
-function TopicCard({ topic, subjectId, showToast, onEdit, onDelete }) {
+function TopicCard({ topic, idx, totalTopics, subjectId, showToast, onEdit, onDelete, onMove }) {
   const [expanded, setExpanded] = useState(false);
   const [editing,  setEditing]  = useState(false);
 
@@ -307,6 +346,21 @@ function TopicCard({ topic, subjectId, showToast, onEdit, onDelete }) {
 
         {!editing && (
           <div className="flex gap-1 shrink-0">
+            {/* C1: reorder buttons for topics */}
+            <button
+              onClick={() => onMove(idx, -1)}
+              disabled={idx === 0}
+              title="Move topic up"
+              className="p-1.5 rounded-lg text-gray-400 hover:text-violet-600 hover:bg-violet-50 transition-colors disabled:opacity-20 disabled:cursor-not-allowed">
+              <ChevronUp size={13} />
+            </button>
+            <button
+              onClick={() => onMove(idx, 1)}
+              disabled={idx === totalTopics - 1}
+              title="Move topic down"
+              className="p-1.5 rounded-lg text-gray-400 hover:text-violet-600 hover:bg-violet-50 transition-colors disabled:opacity-20 disabled:cursor-not-allowed">
+              <ChevronDown size={13} />
+            </button>
             <button onClick={() => setEditing(true)}
               className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
               <Pencil size={13} />
@@ -396,6 +450,32 @@ export default function TeacherContentPage() {
       showToast('Topic updated!');
     } catch (err) {
       showToast(err?.message || 'Failed to update topic', 'error');
+    }
+  };
+
+  // C1: move a topic up or down by swapping order_index with its neighbour
+  const handleMoveTopic = async (idx, direction) => {
+    const swapIdx = idx + direction;
+    if (swapIdx < 0 || swapIdx >= topics.length) return;
+    const a = topics[idx];
+    const b = topics[swapIdx];
+    const next = [...topics];
+    next[idx]     = { ...a, order_index: b.order_index };
+    next[swapIdx] = { ...b, order_index: a.order_index };
+    next.sort((x, y) => (x.order_index ?? 0) - (y.order_index ?? 0));
+    setTopics(next);
+    try {
+      await Promise.all([
+        api.put(`/teacher/topics/${a.id}`, { order_index: b.order_index }),
+        api.put(`/teacher/topics/${b.id}`, { order_index: a.order_index }),
+      ]);
+    } catch {
+      // Revert on failure
+      if (!activeSubj) return;
+      api.get('/teacher/topics', { params: { subject_id: activeSubj.id } })
+        .then(r => setTopics(Array.isArray(r) ? r : (r.data ?? [])))
+        .catch(() => {});
+      showToast('Failed to reorder topics', 'error');
     }
   };
 
@@ -514,14 +594,17 @@ export default function TeacherContentPage() {
                   </div>
                 )}
 
-                {topics.map(topic => (
+                {topics.map((topic, idx) => (
                   <TopicCard
                     key={topic.id}
                     topic={topic}
+                    idx={idx}
+                    totalTopics={topics.length}
                     subjectId={activeSubj.id}
                     showToast={showToast}
                     onEdit={handleEditTopic}
                     onDelete={t => setConfirmDel(t)}
+                    onMove={handleMoveTopic}
                   />
                 ))}
 
