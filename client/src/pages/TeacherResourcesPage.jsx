@@ -737,19 +737,19 @@ function ResourcesTab({ showToast, refreshKey }) {
             <div className="border-t border-gray-100 bg-indigo-50 px-4 py-4 space-y-3">
               <p className="text-xs font-semibold text-gray-700">Push "{r.title}" to students or classes</p>
 
-              {/* Push type */}
-              <div className="flex gap-2 flex-wrap">
-                {PUSH_TYPES.map(pt => (
-                  <button key={pt.value} type="button"
-                    onClick={() => setPushForm(f => ({ ...f, push_type: pt.value }))}
-                    className={`px-2.5 py-1 text-xs font-medium rounded-lg border transition-colors ${
-                      pushForm.push_type === pt.value
-                        ? 'bg-indigo-600 border-indigo-600 text-white'
-                        : 'bg-white border-gray-200 text-gray-600 hover:border-indigo-300'
-                    }`}>
-                    {pt.label}
-                  </button>
-                ))}
+              {/* Push type — display only, set at upload time and cannot be changed here */}
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-semibold text-gray-500 uppercase">Type:</span>
+                <span className={`px-2.5 py-1 text-xs font-medium rounded-lg border ${
+                  pushForm.push_type === 'quiz'          ? 'bg-amber-50 border-amber-200 text-amber-700'
+                  : pushForm.push_type === 'practice_test' ? 'bg-blue-50 border-blue-200 text-blue-700'
+                  : 'bg-gray-50 border-gray-200 text-gray-600'
+                }`}>
+                  {pushForm.push_type === 'quiz' ? '⚡ Quiz'
+                    : pushForm.push_type === 'practice_test' ? '📝 Practice Test'
+                    : '📚 Learning Material'}
+                </span>
+                <span className="text-[10px] text-gray-400">(set at upload time)</span>
               </div>
 
               {/* All students */}
