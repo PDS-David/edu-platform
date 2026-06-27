@@ -125,7 +125,7 @@ export default function App() {
           <Route path="/teacher" element={<TeacherLayout />}>
             <Route index element={<Navigate to="/teacher/dashboard" replace />} />
             <Route path="dashboard" element={<TeacherDashboard />} />
-            <Route path="assignments" element={<Navigate to="/admin/dashboard" replace />} />
+            <Route path="assignments" element={<Navigate to="/teacher/dashboard?tab=testbuilder" replace />} />
             <Route path="content" element={<TeacherContentPage />} />
             <Route path="pending-questions" element={<TeacherPendingQuestions />} />
             <Route path="resources" element={<TeacherResourcesPage />} />

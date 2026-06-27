@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate, Link, Outlet, useLocation } from 'react-router-dom';
+import { useNavigate, Link, Outlet, useLocation, useSearchParams } from 'react-router-dom';
 import api from '../services/apiClient';
 import {
   Users, Plus, CheckCircle, Loader2, AlertTriangle,
@@ -956,9 +956,25 @@ export default function TeacherDashboard() {
   const { user }   = useAuth();
   const navigate   = useNavigate();
   const location   = useLocation();
+  const [searchParams] = useSearchParams();
 
   const [activeTab,        setActiveTab]        = useState('classes');
   const [assignedSubjects, setAssignedSubjects] = useState(null);
+
+  // N2 fix: read ?tab= from URL (e.g. /teacher/dashboard?tab=testbuilder) and
+  // activate the matching tab on mount. This allows /teacher/assignments to
+  // redirect here with the Tests tab pre-selected instead of dumping the teacher
+  // on the wrong tab with no indication of where they are.
+  // Only inline tabs are valid targets — link-based tabs (content, resources,
+  // addq, pastpapers, settings) navigate to separate pages so cannot be
+  // activated this way.
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    const INLINE_TABS = ['classes', 'analytics', 'testbuilder'];
+    if (tabParam && INLINE_TABS.includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, []); // run once on mount only
 
   useEffect(() => {
     api.get('/teacher/my-subjects')
