@@ -493,6 +493,7 @@ function ResourcesTab({ showToast, refreshKey }) {
   const [pushSaving,  setPushSaving]  = useState(false);
   const [renaming,    setRenaming]    = useState(null);   // resource id being renamed
   const [renameValue, setRenameValue] = useState('');
+  const [subjectFilter, setSubjectFilter] = useState(''); // R1: filter list by subject
 
   const startRename = (resource) => {
     setRenameValue(resource.title || '');
@@ -610,9 +611,52 @@ function ResourcesTab({ showToast, refreshKey }) {
     </div>
   );
 
+  // R1: derive unique subjects present in the loaded resources
+  const subjectOptions = [...new Map(
+    resources
+      .filter(r => r.subject_name)
+      .map(r => [r.subject_name, r.subject_name])
+  ).entries()].map(([v]) => v).sort();
+
+  const visibleResources = subjectFilter
+    ? resources.filter(r => r.subject_name === subjectFilter)
+    : resources;
+
   return (
     <div className="space-y-3 max-w-3xl">
-      {resources.map(r => (
+      {/* R1: Subject filter */}
+      {subjectOptions.length > 1 && (
+        <div className="flex items-center gap-3 pb-1">
+          <select
+            value={subjectFilter}
+            onChange={e => setSubjectFilter(e.target.value)}
+            className="text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-300 bg-white"
+          >
+            <option value="">All subjects ({resources.length})</option>
+            {subjectOptions.map(s => (
+              <option key={s} value={s}>
+                {s} ({resources.filter(r => r.subject_name === s).length})
+              </option>
+            ))}
+          </select>
+          {subjectFilter && (
+            <button
+              onClick={() => setSubjectFilter('')}
+              className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1"
+            >
+              <X size={12} /> Clear
+            </button>
+          )}
+        </div>
+      )}
+
+      {visibleResources.length === 0 && subjectFilter && (
+        <div className="text-center py-10 text-gray-400 text-sm">
+          No resources for <span className="font-semibold text-gray-600">{subjectFilter}</span>.
+        </div>
+      )}
+
+      {visibleResources.map(r => (
         <div key={r.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
           {/* Resource row */}
           <div className="p-4 flex items-center gap-4">
