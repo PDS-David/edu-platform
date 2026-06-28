@@ -697,14 +697,14 @@ export default function StudentDashboard() {
       )}
 
       {/* DEF-009: Slide-out navigation drawer (mobile) */}
-      <aside className={`fixed top-0 left-0 h-full w-64 z-50 bg-[#f0ede8] border-r border-[#e8e4dd] transform transition-transform duration-200 md:hidden ${drawerOpen ? "translate-x-0" : "-translate-x-full"}`}>
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[#e8e4dd]">
+      <aside className={`fixed top-0 left-0 h-full w-64 z-50 bg-[#f0ede8] border-r border-[#e8e4dd] transform transition-transform duration-200 md:hidden flex flex-col ${drawerOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[#e8e4dd] shrink-0">
           <span className="text-sm font-bold text-gray-700">Navigation</span>
           <button onClick={() => setDrawerOpen(false)} className="p-1.5 rounded-lg hover:bg-white/60 text-gray-500">
             <X size={16} />
           </button>
         </div>
-        <div className="px-3 py-4">
+        <div className="px-3 py-4 overflow-y-auto flex-1">
           <div className="px-3 py-2 mb-4">
             <p className="text-[10px] font-bold uppercase tracking-widest text-[#b5a99a]">Student</p>
             <p className="text-xs font-semibold text-gray-700 mt-0.5 truncate">{firstName}</p>
