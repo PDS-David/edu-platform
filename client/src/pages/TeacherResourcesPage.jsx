@@ -372,19 +372,95 @@ function isOfficeMime(file) {
     /\.(docx?|pptx?|xlsx?)(\?|$)/.test(url)
   );
 }
-function isPubliclyReachable(url) {
-  try {
-    if (!url?.startsWith('http')) return false;
-    const u = new URL(url);
-    if (u.hostname === 'localhost') return false;
-    if (/^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(u.hostname)) return false;
-    if (u.hostname.endsWith('.onrender.com')) return false;
-    if (u.pathname.startsWith('/uploads/') || u.pathname.startsWith('/api/')) return false;
-    return true;
-  } catch { return false; }
-}
+// isPubliclyReachable removed — OfficeViewer now fetches a fresh signed URL
+// from our own server (?viewer=1) instead of passing the raw file_url to
+// Microsoft's viewer. The TTL problem (60s expiry) is fixed server-side.
 
 // ── Inline viewer — mirrors StudentFilesPage InlineViewer exactly ──────────────
+// OfficeViewer — fetches a fresh 10-minute signed URL from our own server,
+// then passes it to the Microsoft Office Online viewer iframe.
+// Root cause of the broken preview: the raw file_url is an R2 presigned URL
+// with a 60-second TTL that expires before Microsoft's servers fetch it
+// asynchronously. Fix: call ?viewer=1 on mount to get a fresh 10-min URL.
+function OfficeViewer({ resource, onClose }) {
+  const [viewerSrc, setViewerSrc] = useState(null);
+  const [loading,   setLoading]   = useState(true);
+  const [fetchErr,  setFetchErr]  = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    setFetchErr(false);
+    setViewerSrc(null);
+    const token   = getToken() || '';
+    const apiBase = (import.meta.env.VITE_API_URL || '/api').replace(/\/+$/, '');
+    fetch(`${apiBase}/resources/${resource.id}/download?viewer=1`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(data => {
+        if (data && data.url) {
+          setViewerSrc(
+            `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(data.url)}`
+          );
+        } else {
+          setFetchErr(true);
+        }
+      })
+      .catch(() => setFetchErr(true))
+      .finally(() => setLoading(false));
+  // run once per resource
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resource.id]);
+
+  return (
+    <div className="border-t border-blue-100">
+      <div className="flex justify-between items-center px-4 py-2 bg-gray-50 border-b border-gray-100">
+        <span className="text-xs text-gray-500">Office document preview</span>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => openResourceAuth(resource.id, resource.file_url)}
+            className="text-xs text-blue-600 hover:underline font-medium"
+          >
+            Download
+          </button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xs">✕ close</button>
+        </div>
+      </div>
+
+      {loading && (
+        <div className="flex items-center justify-center gap-2 py-10 text-sm text-gray-400">
+          <Loader2 size={16} className="animate-spin" /> Loading preview…
+        </div>
+      )}
+
+      {!loading && fetchErr && (
+        <div className="p-4 bg-amber-50">
+          <p className="text-xs text-amber-700 mb-3">
+            Preview could not load. Download the file to open it in Microsoft Office or Google Docs.
+          </p>
+          <button
+            onClick={() => openResourceAuth(resource.id, resource.file_url)}
+            className="text-xs font-semibold px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-1.5"
+          >
+            <FileText size={12} /> Download
+          </button>
+        </div>
+      )}
+
+      {!loading && viewerSrc && (
+        <iframe
+          src={viewerSrc}
+          title={resource.title}
+          className="w-full"
+          style={{ height: 480 }}
+          frameBorder="0"
+          allowFullScreen
+        />
+      )}
+    </div>
+  );
+}
+
 function TeacherInlineViewer({ resource, onClose }) {
   const rawUrl = `/api/resources/${resource.id}/download`;
   const type   = (resource.resource_type || resource.type || '').toLowerCase();
@@ -433,33 +509,9 @@ function TeacherInlineViewer({ resource, onClose }) {
     </div>
   );
 
+  // Office documents — delegate to OfficeViewer which fetches a fresh signed URL
   if (isOfficeMime(resource)) {
-    const publicUrl = resource.file_url && isPubliclyReachable(resource.file_url) ? resource.file_url : null;
-    if (publicUrl) {
-      const viewerSrc = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(publicUrl)}`;
-      return (
-        <div className="border-t border-blue-100">
-          <div className="flex justify-between items-center px-4 py-2 bg-gray-50 border-b border-gray-100">
-            <span className="text-xs text-gray-500">Office document preview</span>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xs">✕ close</button>
-          </div>
-          <iframe src={viewerSrc} title={resource.title} className="w-full" style={{ height: 480 }} frameBorder="0" allowFullScreen />
-        </div>
-      );
-    }
-    return (
-      <div className="border-t border-blue-100 p-4 bg-amber-50">
-        <div className="flex justify-between items-center mb-2">
-          <span className="text-xs text-amber-700 font-medium">Office document</span>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xs">✕ close</button>
-        </div>
-        <p className="text-xs text-gray-500 mb-3">Online preview needs a public URL. Download to open in Office or Google Docs.</p>
-        <button onClick={() => openResourceAuth(resource.id, resource.file_url)}
-          className="text-xs font-semibold px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-1.5">
-          <FileText size={12} /> Download
-        </button>
-      </div>
-    );
+    return <OfficeViewer resource={resource} onClose={onClose} />;
   }
 
   return (

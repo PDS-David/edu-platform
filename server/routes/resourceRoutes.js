@@ -668,14 +668,17 @@ router.get('/:id/download', protect, async (req, res) => {
 
     // ── 4. Serve the file ──────────────────────────────────────────────────
     if (key && r2.isR2Enabled()) {
-      // R2: issue a 60-second signed URL
-      const signedUrl = await getSignedDownloadUrl(key, 60);
+      // R2: viewer mode gets a 10-minute signed URL so Microsoft/Google viewer
+      // has time to fetch the file asynchronously after the client receives the URL.
+      // Download mode keeps the tight 60-second TTL.
+      const ttlSeconds = req.query.viewer === '1' ? 600 : 60;
+      const signedUrl = await getSignedDownloadUrl(key, ttlSeconds);
       logger.info('[download] R2 signed URL issued', { resourceId: id, userId });
 
       // ?direct=1 → return the signed URL as JSON so the client can open it
       // in a new tab without a cross-origin fetch (which caused CORS errors
       // manifesting as "No internet connection" on the View/Download buttons).
-      if (req.query.direct === '1') {
+      if (req.query.direct === '1' || req.query.viewer === '1') {
         return res.json({ success: true, url: signedUrl });
       }
 
