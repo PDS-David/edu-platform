@@ -994,7 +994,7 @@ export default function TeacherDashboard() {
     { id: 'resources',   label: 'Resources',  icon: Upload,   link: '/teacher/resources'    },
     { id: 'addq',        label: 'Add Q',      icon: Plus,     link: '/teacher/questions/add' },
     { id: 'pastpapers',  label: 'Past Papers', icon: FileText, link: '/past-papers'           },
-    { id: 'settings',    label: 'Settings',    icon: Settings, link: '/teacher/settings'      },
+
   ];
 
   // ── Sidebar items — all wired ─────────────────────────────────────────────
@@ -1006,7 +1006,7 @@ export default function TeacherDashboard() {
     { id: 'resources',   icon: Upload,    label: 'Resources',       link: '/teacher/resources'    },
     { id: 'addq',        icon: Plus,      label: 'Add Question',    link: '/teacher/questions/add'},
     { id: 'pastpapers',  icon: FileText,  label: 'Past Papers',     link: '/past-papers'          },
-    { id: 'settings',    icon: Settings,  label: 'Settings',        link: '/teacher/settings'     },
+
   ];
 
   const isTabActive = (item) => item.tab && activeTab === item.id;
