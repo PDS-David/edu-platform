@@ -6,7 +6,7 @@ import {
   Users, School, BookOpen, Settings, Languages, LogOut,
   Plus, Pencil, Trash2, ChevronDown, ChevronRight,
   Loader2, X, Check, AlertTriangle, RefreshCw, GraduationCap,
-  UserCheck, ChevronUp, Sparkles, Zap, Upload, CheckCircle, Shield
+  UserCheck, ChevronUp, Sparkles, Zap, Upload, CheckCircle, Shield, Mail
 } from 'lucide-react';
 import branding from '../config/branding';
 import TopNav from '../components/TopNav';
@@ -1196,6 +1196,7 @@ const PlatformAnalyticsPanel = () => {
   const [notifTitle, setNotifTitle] = useState('');
   const [notifMessage, setNotifMessage] = useState('');
   const [notifSending, setNotifSending] = useState(false);
+  const [digestSending, setDigestSending] = useState(false);
 
   const showToast = (message, type = 'success') => { setToast({ message, type }); setTimeout(() => setToast(null), 3500); };
 
@@ -1205,6 +1206,21 @@ const PlatformAnalyticsPanel = () => {
     try { const res = await api.post('/admin/send-notification', { target: notifTarget, title: notifTitle.trim(), message: notifMessage.trim() }); const sent = res.sent ?? res.data?.sent ?? 0; const emailOk = res.email_enabled ?? res.data?.email_enabled ?? false; showToast(emailOk ? `Notification sent to ${sent} user(s).` : `Notification saved for ${sent} user(s). ⚠ Email delivery is not configured on this server.`); setNotifModal(false); setNotifTitle(''); setNotifMessage(''); setNotifTarget('all'); }
     catch (err) { showToast(err?.message || 'Failed to send notification', 'error'); }
     finally { setNotifSending(false); }
+  };
+
+  const sendDigestNow = async () => {
+    if (digestSending) return;
+    if (!window.confirm('Send this week\'s digest email to all eligible active students now?')) return;
+    setDigestSending(true);
+    try {
+      const res = await api.post('/admin/send-weekly-digest');
+      const message = res.message ?? res.data?.message ?? 'Weekly digest sent.';
+      showToast(message);
+    } catch (err) {
+      showToast(err?.message || 'Failed to send weekly digest', 'error');
+    } finally {
+      setDigestSending(false);
+    }
   };
 
   const fetchStats = async () => {
@@ -1270,6 +1286,7 @@ const PlatformAnalyticsPanel = () => {
         <p className="text-sm font-semibold text-gray-700 mb-3">Quick Actions</p>
         <div className="flex flex-wrap gap-3">
           <button onClick={() => setNotifModal(true)} className="flex items-center gap-2 text-sm bg-violet-600 hover:bg-violet-700 text-white font-semibold px-4 py-2 rounded-xl"><Zap size={14} /> Send Notification</button>
+          <button onClick={sendDigestNow} disabled={digestSending} className="flex items-center gap-2 text-sm border border-emerald-300 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50 font-semibold px-4 py-2 rounded-xl">{digestSending ? <Loader2 size={14} className="animate-spin" /> : <Mail size={14} />} {digestSending ? 'Sending…' : 'Send Weekly Digest Now'}</button>
           <button onClick={() => navigate('/admin/questions/review')} className="flex items-center gap-2 text-sm border border-amber-300 text-amber-700 hover:bg-amber-50 font-semibold px-4 py-2 rounded-xl"><AlertTriangle size={14} /> View Pending ({questions.total_pending ?? 0})</button>
         </div>
       </div>
