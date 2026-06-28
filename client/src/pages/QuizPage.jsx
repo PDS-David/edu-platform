@@ -247,10 +247,14 @@ export default function QuizPage() {
         total_time_ms: Date.now() - quizStartMs.current,
         answers:       answersRef.current,
       });
-      navigate('/student/quiz-results/inline', {
+      // S3 fix: use real attempt_id in the URL so refresh/share works via
+      // GET /api/quizzes/attempt/:id. Fall back to 'inline' only when the
+      // server couldn't resolve an attempt_id (race condition safeguard).
+      const attemptId = res?.data?.attempt_id ?? res?.attempt_id ?? 'inline';
+      navigate(`/student/quiz-results/${attemptId}`, {
         state: {
           subtopicId, subtopicName, subjectName, examBoardName,
-          inlineResult: res,
+          inlineResult: res,  // kept so first load is instant, no extra GET
         },
       });
     } catch {

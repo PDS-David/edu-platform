@@ -169,7 +169,9 @@ export default function MockExamPage() {
           answers:       answersArray,
         });
 
-      navigate('/student/quiz-results/inline', {
+      // S3 fix: use real attempt_id so refresh/share works via GET endpoint
+      const attemptId = res?.data?.attempt_id ?? res?.attempt_id ?? 'inline';
+      navigate(`/student/quiz-results/${attemptId}`, {
         state: { subjectId, subjectName, examBoardName, isMock: true, inlineResult: res },
       });
     } catch (err) {
