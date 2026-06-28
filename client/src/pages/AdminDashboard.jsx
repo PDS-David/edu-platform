@@ -6,7 +6,7 @@ import {
   Users, School, BookOpen, Settings, Languages, LogOut,
   Plus, Pencil, Trash2, ChevronDown, ChevronRight,
   Loader2, X, Check, AlertTriangle, RefreshCw, GraduationCap,
-  UserCheck, ChevronUp, Sparkles, Zap, Upload, CheckCircle, Shield, Mail
+  UserCheck, UserX, ChevronUp, Sparkles, Zap, Upload, CheckCircle, Shield, Mail
 } from 'lucide-react';
 import branding from '../config/branding';
 import TopNav from '../components/TopNav';
@@ -460,18 +460,43 @@ const TeacherAssignmentPanel = () => {
     finally { setCreatingTeacher(false); }
   };
 
+  const handleToggleActive = async (teacher) => {
+    const newState = !teacher.is_active;
+    const action   = newState ? 'reactivate' : 'deactivate';
+    if (!window.confirm(`${newState ? 'Reactivate' : 'Deactivate'} ${teacher.name || teacher.email}? ${newState ? 'They will be able to log in again.' : 'They will be unable to log in until reactivated.'}`)) return;
+    try {
+      await api.put(`/users/${teacher.id}/deactivate`, { is_active: newState });
+      showToast(`${teacher.name || teacher.email} ${newState ? 'reactivated' : 'deactivated'}`);
+      // Update local state immediately — no need to re-fetch everything
+      setTeachers(prev => prev.map(t => t.id === teacher.id ? { ...t, is_active: newState } : t));
+    } catch (err) { showToast(err?.message || `Failed to ${action} teacher`, 'error'); }
+  };
+
+  const handleDeleteTeacher = async (teacher) => {
+    if (!window.confirm(`Permanently delete ${teacher.name || teacher.email}?\n\nThis cannot be undone. All their subject assignments will also be removed.`)) return;
+    try {
+      await api.delete(`/users/${teacher.id}`);
+      showToast(`${teacher.name || teacher.email} deleted`);
+      fetchAll();
+    } catch (err) { showToast(err?.message || 'Failed to delete teacher', 'error'); }
+  };
+
   // Merge ALL teachers with their assignments — shows unassigned teachers too
   const assignedTeacherIds = new Set(assignments.map(a => a.teacher_id));
   const byTeacher = assignments.reduce((acc, a) => {
     const key = a.teacher_id || a.teacher_name;
-    if (!acc[key]) acc[key] = { id: a.teacher_id, name: a.teacher_name, email: a.email, rows: [] };
+    if (!acc[key]) {
+      // Find the matching teacher record to get is_active
+      const teacherRecord = teachers.find(t => t.id === a.teacher_id);
+      acc[key] = { id: a.teacher_id, name: a.teacher_name, email: a.email, rows: [], is_active: teacherRecord?.is_active ?? true };
+    }
     acc[key].rows.push(a);
     return acc;
   }, {});
   // Add teachers with no assignments
   teachers.forEach(t => {
     if (!assignedTeacherIds.has(t.id)) {
-      byTeacher[t.id] = { id: t.id, name: `${t.first_name || ''} ${t.last_name || ''}`.trim(), email: t.email, rows: [] };
+      byTeacher[t.id] = { id: t.id, name: `${t.first_name || ''} ${t.last_name || ''}`.trim(), email: t.email, rows: [], is_active: t.is_active ?? true };
     }
   });
 
@@ -502,18 +527,48 @@ const TeacherAssignmentPanel = () => {
               {/* Teacher header row */}
               <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center text-sm font-bold text-violet-700 shrink-0">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
+                    teacher.is_active === false ? 'bg-gray-100 text-gray-400' : 'bg-violet-100 text-violet-700'
+                  }`}>
                     {(teacher.name || teacher.email || '?')[0].toUpperCase()}
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-gray-900">{teacher.name || '—'}</p>
+                    <div className="flex items-center gap-2">
+                      <p className={`text-sm font-semibold ${teacher.is_active === false ? 'text-gray-400' : 'text-gray-900'}`}>{teacher.name || '—'}</p>
+                      {teacher.is_active === false && (
+                        <span className="text-[10px] font-bold bg-red-50 text-red-500 border border-red-100 px-1.5 py-0.5 rounded-full">Deactivated</span>
+                      )}
+                    </div>
                     <p className="text-xs text-gray-400">{teacher.email}</p>
                   </div>
                 </div>
-                {teacher.rows.length === 0
-                  ? <span className="text-xs text-amber-500 bg-amber-50 border border-amber-200 px-2 py-1 rounded-full">No subjects assigned</span>
-                  : <span className="text-xs text-gray-400">{teacher.rows.length} assignment{teacher.rows.length !== 1 ? 's' : ''}</span>
-                }
+                <div className="flex items-center gap-2">
+                  {teacher.rows.length === 0
+                    ? <span className="text-xs text-amber-500 bg-amber-50 border border-amber-200 px-2 py-1 rounded-full">No subjects assigned</span>
+                    : <span className="text-xs text-gray-400">{teacher.rows.length} assignment{teacher.rows.length !== 1 ? 's' : ''}</span>
+                  }
+                  {/* Deactivate / Reactivate */}
+                  <button
+                    onClick={() => handleToggleActive(teacher)}
+                    title={teacher.is_active === false ? 'Reactivate this teacher' : 'Deactivate this teacher'}
+                    className={`flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors ${
+                      teacher.is_active === false
+                        ? 'border-green-200 text-green-600 hover:bg-green-50'
+                        : 'border-amber-200 text-amber-600 hover:bg-amber-50'
+                    }`}>
+                    {teacher.is_active === false
+                      ? <><UserCheck size={12} /> Reactivate</>
+                      : <><UserX     size={12} /> Deactivate</>
+                    }
+                  </button>
+                  {/* Delete */}
+                  <button
+                    onClick={() => handleDeleteTeacher(teacher)}
+                    title="Permanently delete this teacher account"
+                    className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-colors">
+                    <Trash2 size={12} /> Delete
+                  </button>
+                </div>
               </div>
               {/* Subject chips */}
               <div className="px-4 py-3 flex flex-wrap gap-2">
