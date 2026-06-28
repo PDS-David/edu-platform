@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate, Link, Outlet, useLocation } from 'react-router-dom';
+import { useNavigate, Link, Outlet, useLocation, useSearchParams } from 'react-router-dom';
 import api from '../services/apiClient';
 import {
   Users, Plus, CheckCircle, Loader2, AlertTriangle,
-  BarChart2, X, PenTool, BookOpen, Upload, Send,
+  BarChart2, X, PenTool, BookOpen, Upload, Send, FileText,
   ChevronDown, AlertCircle, Search, UserPlus, Settings, Check, Trash2, Pencil,
 } from 'lucide-react';
 import TopNav from '../components/TopNav';
@@ -956,9 +956,25 @@ export default function TeacherDashboard() {
   const { user }   = useAuth();
   const navigate   = useNavigate();
   const location   = useLocation();
+  const [searchParams] = useSearchParams();
 
   const [activeTab,        setActiveTab]        = useState('classes');
   const [assignedSubjects, setAssignedSubjects] = useState(null);
+
+  // N2 fix: read ?tab= from URL (e.g. /teacher/dashboard?tab=testbuilder) and
+  // activate the matching tab on mount. This allows /teacher/assignments to
+  // redirect here with the Tests tab pre-selected instead of dumping the teacher
+  // on the wrong tab with no indication of where they are.
+  // Only inline tabs are valid targets — link-based tabs (content, resources,
+  // addq, pastpapers, settings) navigate to separate pages so cannot be
+  // activated this way.
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    const INLINE_TABS = ['classes', 'analytics', 'testbuilder'];
+    if (tabParam && INLINE_TABS.includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, []); // run once on mount only
 
   useEffect(() => {
     api.get('/teacher/my-subjects')
@@ -977,6 +993,8 @@ export default function TeacherDashboard() {
     { id: 'content',     label: 'Content',    icon: BookOpen, link: '/teacher/content'      },
     { id: 'resources',   label: 'Resources',  icon: Upload,   link: '/teacher/resources'    },
     { id: 'addq',        label: 'Add Q',      icon: Plus,     link: '/teacher/questions/add' },
+    { id: 'pastpapers',  label: 'Past Papers', icon: FileText, link: '/past-papers'           },
+    { id: 'settings',    label: 'Settings',    icon: Settings, link: '/teacher/settings'      },
   ];
 
   // ── Sidebar items — all wired ─────────────────────────────────────────────
@@ -987,6 +1005,8 @@ export default function TeacherDashboard() {
     { id: 'content',     icon: BookOpen,  label: 'Content Manager', link: '/teacher/content'      },
     { id: 'resources',   icon: Upload,    label: 'Resources',       link: '/teacher/resources'    },
     { id: 'addq',        icon: Plus,      label: 'Add Question',    link: '/teacher/questions/add'},
+    { id: 'pastpapers',  icon: FileText,  label: 'Past Papers',     link: '/past-papers'          },
+    { id: 'settings',    icon: Settings,  label: 'Settings',        link: '/teacher/settings'     },
   ];
 
   const isTabActive = (item) => item.tab && activeTab === item.id;
