@@ -1,5 +1,5 @@
 // server/jobs/scheduledJobs.js
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 // FIXES in this version:
 //   1. Weekly digest user query uses last_activity_date (not last_login).
 //   2. Streak nudge query casts created_at::date to avoid date/timestamp mismatch.
@@ -7,7 +7,7 @@
 //   4. node-cron graceful fallback if package missing.
 //   5. FIX-1: Added `start` alias on module.exports so server.js call
 //      `scheduledJobs.start()` works alongside `scheduledJobs.startJobs()`.
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 
 let cron;
 try {
@@ -21,9 +21,10 @@ const { QueryTypes } = require('sequelize');
 const sequelize      = require('../config/database');
 const { sendWeeklyDigest, sendStreakNudge } = require('../services/emailService');
 
-// â”€â”€ Weekly digest â€” every Monday 9am WAT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Weekly digest — every Monday 9am WAT ─────────────────────────────────────
 async function runWeeklyDigest() {
-  console.log('[jobs] Running weekly digestâ€¦');
+  console.log('[jobs] Running weekly digest…');
+  const result = { total: 0, sent: 0, failed: 0 };
   try {
     const users = await sequelize.query(
       `SELECT id, first_name, email
@@ -34,6 +35,7 @@ async function runWeeklyDigest() {
       { type: QueryTypes.SELECT }
     );
 
+    result.total = users.length;
     console.log(`[jobs] Sending digest to ${users.length} active students`);
 
     for (const user of users) {
@@ -77,24 +79,27 @@ async function runWeeklyDigest() {
         );
 
         await sendWeeklyDigest(user, {
-          best_subject:        bestRow?.subject_name || 'â€”',
-          weakest_topic:       weakRow?.topic        || 'â€”',
+          best_subject:        bestRow?.subject_name || '—',
+          weakest_topic:       weakRow?.topic        || '—',
           weakest_subtopic_id: weakRow?.subtopic_id  || null,
           streak:              userRow?.study_streak_days || 0,
           accuracy_pct:        accRow?.pct           || 0,
         });
+        result.sent++;
       } catch (e) {
+        result.failed++;
         console.warn(`[jobs] digest failed for ${user.email}:`, e.message);
       }
     }
   } catch (err) {
     console.error('[jobs] weeklyDigest error:', err.message);
   }
+  return result;
 }
 
-// â”€â”€ Streak nudge â€” every day at 6pm WAT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Streak nudge — every day at 6pm WAT ──────────────────────────────────────
 async function runStreakNudge() {
-  console.log('[jobs] Running streak nudgeâ€¦');
+  console.log('[jobs] Running streak nudge…');
   try {
     const users = await sequelize.query(
       `SELECT id, first_name, email,

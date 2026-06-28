@@ -411,15 +411,23 @@ router.put('/questions/:id/review', protect, adminOnly, adminActionLimiter, asyn
 
 // ─────────────────────────────────────────────
 // POST /api/admin/send-weekly-digest
-// Queues (or sends) a weekly activity digest email to all students.
-// Stub implementation — replace body with real job queue when ready.
+// Manually triggers the same weekly digest the Monday 9am WAT cron job runs
+// (server/jobs/scheduledJobs.js::runWeeklyDigest) — useful for an admin who
+// wants to send it now rather than wait for the schedule, or to verify it
+// actually works. Reuses the exact same function as the cron job so there
+// is only one implementation of "what a weekly digest is" to keep correct,
+// not two that can drift apart.
 // ─────────────────────────────────────────────
 router.post('/send-weekly-digest', protect, adminOnly, async (req, res) => {
   try {
-    // TODO: enqueue a Bull job → send per-student summary emails
-    // e.g. weeklyDigestQueue.add({ triggeredBy: req.user.id });
-    console.log(`[admin] Weekly digest queued by admin ${req.user.id} at ${new Date().toISOString()}`);
-    return res.json({ success: true, message: 'Weekly digest queued successfully' });
+    const { runWeeklyDigest } = require('../jobs/scheduledJobs');
+    console.log(`[admin] Weekly digest manually triggered by admin ${req.user.id} at ${new Date().toISOString()}`);
+    const result = await runWeeklyDigest();
+    return res.json({
+      success: true,
+      message: `Weekly digest sent to ${result.sent} of ${result.total} eligible student(s)${result.failed ? ` (${result.failed} failed)` : ''}.`,
+      ...result,
+    });
   } catch (err) {
     console.error('[POST /admin/send-weekly-digest]', err.message);
     return res.status(500).json({ success: false, error: err.message });
