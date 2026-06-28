@@ -13,7 +13,7 @@ import TopNav from '../components/TopNav';
 import {
   Upload, FileText, Video, Music, Trash2, Loader2,
   CheckCircle, AlertTriangle, X, Plus, BookOpen,
-  File, Pencil,
+  File, Pencil, Filter,
 } from 'lucide-react';
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
@@ -481,18 +481,21 @@ function TeacherInlineViewer({ resource, onClose }) {
 // TAB 2 — My Resources
 // ══════════════════════════════════════════════════════════════════════════════
 function ResourcesTab({ showToast, refreshKey }) {
-  const [resources,   setResources]   = useState([]);
-  const [loading,     setLoading]     = useState(true);
-  const [deleting,    setDeleting]    = useState(null);
-  const [viewing,     setViewing]     = useState(null); // resource id currently shown inline
-  const [pushing,     setPushing]     = useState(null); // resource id being pushed
-  const [students,    setStudents]    = useState([]);
-  const [classes,     setClasses]     = useState([]);
-  const [pushForm,    setPushForm]    = useState({ push_type: 'learning_material', student_ids: [], class_ids: [], assign_all: false });
-  const [pushSearch,  setPushSearch]  = useState('');
-  const [pushSaving,  setPushSaving]  = useState(false);
-  const [renaming,    setRenaming]    = useState(null);   // resource id being renamed
-  const [renameValue, setRenameValue] = useState('');
+  const [resources,      setResources]      = useState([]);
+  const [loading,        setLoading]        = useState(true);
+  const [deleting,       setDeleting]       = useState(null);
+  const [viewing,        setViewing]        = useState(null);
+  const [pushing,        setPushing]        = useState(null);
+  const [students,       setStudents]       = useState([]);
+  const [classes,        setClasses]        = useState([]);
+  const [pushForm,       setPushForm]       = useState({ push_type: 'learning_material', student_ids: [], class_ids: [], assign_all: false });
+  const [pushSearch,     setPushSearch]     = useState('');
+  const [pushSaving,     setPushSaving]     = useState(false);
+  const [renaming,       setRenaming]       = useState(null);
+  const [renameValue,    setRenameValue]    = useState('');
+  // R1 — subject filter
+  const [subjectFilter,  setSubjectFilter]  = useState('');
+  const [filterSubjects, setFilterSubjects] = useState([]);
 
   const startRename = (resource) => {
     setRenameValue(resource.title || '');
@@ -515,13 +518,25 @@ function ResourcesTab({ showToast, refreshKey }) {
 
   const load = useCallback(() => {
     setLoading(true);
-    api.get('/resources')
-      .then(r => setResources(extractList(r)))
-      .catch(() => setResources([]))
+    Promise.all([
+      api.get('/resources').catch(() => ({ data: [] })),
+      api.get('/teacher/my-subjects').catch(() => ({ data: [] })),
+    ])
+      .then(([r, s]) => {
+        setResources(extractList(r));
+        // Build unique subject list from the teacher's assigned subjects
+        const subs = extractList(s);
+        setFilterSubjects(subs);
+      })
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(load, [load, refreshKey]); // re-fetch when upload completes
+  useEffect(load, [load, refreshKey]);
+
+  // R1 — client-side subject filter (no extra API call)
+  const visibleResources = subjectFilter
+    ? resources.filter(r => String(r.subject_id) === subjectFilter)
+    : resources;
 
   // Lazy-load students & classes when push panel opens
   const openPush = (id) => {
@@ -612,7 +627,44 @@ function ResourcesTab({ showToast, refreshKey }) {
 
   return (
     <div className="space-y-3 max-w-3xl">
-      {resources.map(r => (
+
+      {/* R1 — Subject filter */}
+      {filterSubjects.length > 1 && (
+        <div className="flex items-center gap-2">
+          <Filter size={14} className="text-gray-400 shrink-0" />
+          <select
+            value={subjectFilter}
+            onChange={e => setSubjectFilter(e.target.value)}
+            className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white text-gray-700 focus:outline-none focus:border-blue-400"
+          >
+            <option value="">All subjects ({resources.length})</option>
+            {filterSubjects.map(s => {
+              const count = resources.filter(r => String(r.subject_id) === String(s.id)).length;
+              return (
+                <option key={s.id} value={String(s.id)}>
+                  {subjectLabel(s)} · {count}
+                </option>
+              );
+            })}
+          </select>
+          {subjectFilter && (
+            <button
+              onClick={() => setSubjectFilter('')}
+              className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1"
+            >
+              <X size={12} /> Clear
+            </button>
+          )}
+        </div>
+      )}
+
+      {visibleResources.length === 0 && subjectFilter && (
+        <div className="text-center py-10 text-gray-400">
+          <p className="text-sm">No resources for this subject yet.</p>
+        </div>
+      )}
+
+      {visibleResources.map(r => (
         <div key={r.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
           {/* Resource row */}
           <div className="p-4 flex items-center gap-4">

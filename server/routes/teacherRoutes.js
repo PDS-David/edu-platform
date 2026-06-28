@@ -644,37 +644,47 @@ router.put('/tests/:id/publish', protect, teacherOnly, async (req, res) => {
 });
 
 // ── POST /api/teacher/tests/:id/assign ───────────────────────────────────────
-// Assigns a test to all students in a class by creating test_assignments rows.
+// Assigns a test to a class OR individual students (D4: individual support added).
+// Body: { class_id: UUID } — assigns all members of a class
+//    OR { student_ids: UUID[] } — assigns specific individual students
 router.post('/tests/:id/assign', protect, teacherOnly, async (req, res) => {
-  const { class_id } = req.body;
-  if (!class_id) return res.status(400).json({ success: false, error: 'class_id is required' });
+  const { class_id, student_ids } = req.body;
+  if (!class_id && (!Array.isArray(student_ids) || student_ids.length === 0)) {
+    return res.status(400).json({ success: false, error: 'class_id or student_ids is required' });
+  }
   try {
-    // Verify teacher owns test
     const test = await safeQuery(
       `SELECT id FROM custom_tests WHERE id = :id AND teacher_id = :teacherId`,
       { id: req.params.id, teacherId: req.user.id }
     );
     if (!test.length) return res.status(404).json({ success: false, error: 'Test not found' });
 
-    // Get all students in the class
-    const members = await safeQuery(
-      `SELECT student_id FROM class_memberships WHERE class_id = :classId`,
-      { classId: class_id }
-    );
+    let targets = [];
+    if (class_id) {
+      const members = await safeQuery(
+        `SELECT student_id FROM class_memberships WHERE class_id = :classId`,
+        { classId: class_id }
+      );
+      targets = members.map(m => ({ studentId: m.student_id, classId: class_id }));
+    } else {
+      const cleanIds = student_ids.filter(id => typeof id === 'string' && id.length > 10);
+      targets = cleanIds.map(id => ({ studentId: id, classId: null }));
+    }
+
     let count = 0;
-    for (const m of members) {
+    for (const { studentId, classId } of targets) {
       await sequelize.query(
         `INSERT INTO test_assignments (test_id, student_id, class_id, assigned_at)
          VALUES (:testId, :studentId, :classId, NOW())
          ON CONFLICT (test_id, student_id) DO NOTHING`,
         {
-          replacements: { testId: req.params.id, studentId: m.student_id, classId: class_id },
+          replacements: { testId: req.params.id, studentId, classId: classId || null },
           type: QueryTypes.INSERT,
         }
       ).catch(() => {});
       count++;
     }
-    return res.json({ success: true, message: `Test assigned to ${count} student(s).`, count });
+    return res.json({ success: true, message: `Test assigned to ${count} student${count !== 1 ? 's' : ''}.`, count });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
