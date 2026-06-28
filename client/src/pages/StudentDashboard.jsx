@@ -665,7 +665,7 @@ export default function StudentDashboard() {
     { label: "AI Marking",  icon: ScanLine,     path: "/student/mark-image" },
     { label: "Exam Types",         icon: Download,   path: "/student/exam-types"         },
     { label: "English Masterclass", icon: Languages,  path: "/student/english-masterclass" },
-    { label: "Settings",            icon: Settings,   path: "/student/settings"            },
+
   ];
 
   const isActive = (item) => {
