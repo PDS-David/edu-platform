@@ -9,7 +9,7 @@ import api from '../services/apiClient';
 import {
   GraduationCap, ChevronDown, ChevronRight,
   Loader2, CheckCircle, Plus, ArrowLeft, BookOpen,
-  Lock,
+  Lock, UserCheck,
 } from 'lucide-react';
 
 // S1: subject limits per exam board code (matches server/routes/studentRoutes.js)
@@ -36,6 +36,11 @@ export default function StudentExamTypesPage() {
   // S1: track enrolled subject IDs per board code so we can compute usage
   // { boardCode → Set<subjectId> }
   const [enrolledByBoard, setEnrolledByBoard] = useState({});
+
+  // O1: boards the student has explicitly joined via student_exam_types,
+  // independent of whether they've picked any subjects yet.
+  const [joinedBoardIds, setJoinedBoardIds] = useState(new Set());
+  const [joiningBoard,   setJoiningBoard]   = useState(new Set());
 
   const showToast = (msg, ok = true) => {
     setToast({ msg, ok });
@@ -71,6 +76,29 @@ export default function StudentExamTypesPage() {
       })
       .catch(() => {});
   }, []);
+
+  // O1: load exam boards the student has explicitly joined (student_exam_types),
+  // independent of subject enrolment.
+  useEffect(() => {
+    api.get('/students/my-boards')
+      .then(r => setJoinedBoardIds(new Set((r.data || []).map(b => String(b.id)))))
+      .catch(() => {});
+  }, []);
+
+  const handleJoinBoard = async (type) => {
+    const id = String(type.id);
+    if (joinedBoardIds.has(id) || joiningBoard.has(id)) return;
+    setJoiningBoard(prev => new Set([...prev, id]));
+    try {
+      await api.post(`/students/exam-types/${type.id}/join`);
+      setJoinedBoardIds(prev => new Set([...prev, id]));
+      showToast(`Joined ${type.name}`);
+    } catch (err) {
+      showToast(err?.message || 'Failed to join exam type', false);
+    } finally {
+      setJoiningBoard(prev => { const s = new Set(prev); s.delete(id); return s; });
+    }
+  };
 
   const toggleType = async (typeId) => {
     const open = !expanded[typeId];
@@ -171,14 +199,23 @@ export default function StudentExamTypesPage() {
               const limit     = SUBJECT_LIMITS[boardCode] ?? null;
               const used      = (enrolledByBoard[boardCode] || new Set()).size;
               const atLimit   = limit !== null && used >= limit;
+              // O1: a student is already effectively a member of this board
+              // either via an explicit join (student_exam_types) or because
+              // they already have at least one enrolled subject from it (the
+              // subject-enrol flow upserts student_exam_types as a side effect).
+              const isJoined  = joinedBoardIds.has(String(type.id)) || used > 0;
+              const isJoining = joiningBoard.has(String(type.id));
 
               return (
                 <div key={type.id}
                   className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
-                  {/* Type header */}
-                  <button
+                  {/* Type header — div, not button, because the Join button below must nest inside it */}
+                  <div
                     onClick={() => toggleType(type.id)}
-                    className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-gray-50 transition-colors">
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') toggleType(type.id); }}
+                    className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-gray-50 transition-colors cursor-pointer">
                     <span className="text-xl shrink-0 w-7">{type.icon_emoji || '📋'}</span>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-gray-900 text-sm">{type.name}</p>
@@ -200,13 +237,34 @@ export default function StudentExamTypesPage() {
                       </span>
                     )}
 
+                    {/* O1: explicit "Join this exam board" action, separate from
+                        enrolling in a specific subject. Once a student has any
+                        subject in this board, they're already a member (the
+                        subject-enrol flow upserts student_exam_types as a side
+                        effect), so show "Joined" instead of repeating the action. */}
+                    {isJoined ? (
+                      <span className="flex items-center gap-1 text-xs font-semibold text-emerald-600 shrink-0">
+                        <UserCheck size={12} /> Joined
+                      </span>
+                    ) : (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleJoinBoard(type); }}
+                        disabled={isJoining}
+                        className="flex items-center gap-1 text-xs font-semibold text-violet-600 border border-violet-200 hover:bg-violet-50 px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50 shrink-0">
+                        {isJoining
+                          ? <Loader2 size={11} className="animate-spin" />
+                          : <Plus size={11} />}
+                        Join this exam board
+                      </button>
+                    )}
+
                     <span className="text-xs font-mono bg-violet-50 text-violet-600 px-2 py-0.5 rounded shrink-0">
                       {type.code}
                     </span>
                     {open
                       ? <ChevronDown size={15} className="text-gray-400 shrink-0" />
                       : <ChevronRight size={15} className="text-gray-400 shrink-0" />}
-                  </button>
+                  </div>
 
                   {/* Subjects */}
                   {open && (

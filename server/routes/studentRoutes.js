@@ -382,6 +382,46 @@ module.exports.ensureEnrollmentColumns = ensureEnrollmentColumns;
 // Separate from student_exam_types (which tracks exam board access).
 // =============================================================================
 
+// ── POST /api/students/exam-types/:examTypeId/join ───────────────────────────
+// O1: explicit "Join this exam board" action, separate from subject
+// enrolment. POST /subjects already upserts student_exam_types as a side
+// effect of picking a subject, but there was no way to formally join a
+// board (e.g. Cambridge) without first picking a specific subject under it.
+// Reuses the exact same student_exam_types upsert as POST /subjects so both
+// paths produce identical board-membership state.
+router.post('/exam-types/:examTypeId/join', protect, async (req, res) => {
+  const studentId  = req.user.id;
+  const examTypeId = parseInt(req.params.examTypeId);
+  if (!examTypeId) {
+    return res.status(400).json({ success: false, error: 'Invalid exam type id' });
+  }
+  try {
+    await ensureEnrollmentColumns();
+
+    const boardRows = await sequelize.query(
+      `SELECT id, name FROM exam_boards WHERE id = :examTypeId AND is_active = true`,
+      { replacements: { examTypeId }, type: QueryTypes.SELECT }
+    );
+    if (boardRows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Exam type not found' });
+    }
+
+    await sequelize.query(
+      // exam_board_id in student_exam_types is INTEGER (exam_boards.id is INTEGER).
+      // Do NOT cast to ::uuid — that crashes with "invalid input syntax for type uuid".
+      `INSERT INTO student_exam_types (student_id, exam_board_id, is_active, status)
+       VALUES (:studentId, :boardId, true, :approvedStatus)
+       ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active = true, status = :approvedStatus`,
+      { replacements: { studentId, boardId: examTypeId, approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.INSERT }
+    );
+
+    return res.status(200).json({ success: true, message: `Joined ${boardRows[0].name}` });
+  } catch (err) {
+    console.error('[POST /students/exam-types/:examTypeId/join]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ── GET /api/students/my-boards ───────────────────────────────────────────────
 // Returns the exam boards the student selected during registration/onboarding.
 // Used by StudentDashboard to show only relevant boards in the dropdown.
