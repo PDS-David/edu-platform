@@ -729,10 +729,37 @@ export default function SubtopicPage() {
   return (
     <div className={`min-h-screen ${isQuizTab ? 'bg-[#0a4a3f]' : 'bg-gray-50'}`}>
       <div className="max-w-3xl mx-auto px-4 pt-3 pb-0">
-        <button onClick={() => navigate(-1)}
-          className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 mb-2 transition-colors">
-          <ArrowLeft size={13} /> Back
-        </button>
+        {/* N3: breadcrumb — My Subjects › Subject Name › Subtopic Name
+             Uses subject_id and subject_name from the already-fetched subtopic object.
+             Falls back to navigate(-1) if subject data isn't loaded yet. */}
+        <nav className="flex items-center gap-1 text-xs text-gray-400 mb-2 flex-wrap">
+          <Link to="/student/subjects" className="hover:text-blue-600 transition-colors">
+            My Subjects
+          </Link>
+          {subjectName && (
+            <>
+              <span>›</span>
+              {subtopic?.subject_id ? (
+                <Link
+                  to={`/student/subject/${subtopic.subject_id}`}
+                  className="hover:text-blue-600 transition-colors"
+                >
+                  {subjectName}
+                </Link>
+              ) : (
+                <span className="text-gray-500">{subjectName}</span>
+              )}
+            </>
+          )}
+          {topicName && (
+            <>
+              <span>›</span>
+              <span className="text-gray-500">{topicName}</span>
+            </>
+          )}
+          <span>›</span>
+          <span className="text-gray-700 font-medium">{subtopicName}</span>
+        </nav>
       </div>
 
       <div className={`sticky top-14 z-40 border-b ${isQuizTab ? 'bg-[#0a4a3f] border-white/10' : 'bg-white border-gray-100'}`}>
