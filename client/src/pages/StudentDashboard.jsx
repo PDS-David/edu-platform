@@ -22,7 +22,7 @@ import {
   FileText, Video, Music, File, Download,
   Zap, ClipboardList, ClipboardCheck, History, BookMarked, BarChart2, BookOpen, TrendingUp,
   Flame, Target, GraduationCap, ScanLine, Menu, X,
-  AlertCircle, RefreshCw, Languages,
+  AlertCircle, RefreshCw, Languages, Settings,
 } from "lucide-react";
 
 // ── Push type constants ───────────────────────────────────────────────────────
@@ -665,6 +665,7 @@ export default function StudentDashboard() {
     { label: "AI Marking",  icon: ScanLine,     path: "/student/mark-image" },
     { label: "Exam Types",         icon: Download,   path: "/student/exam-types"         },
     { label: "English Masterclass", icon: Languages,  path: "/student/english-masterclass" },
+    { label: "Settings",            icon: Settings,   path: "/student/settings"            },
   ];
 
   const isActive = (item) => {
