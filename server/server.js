@@ -185,7 +185,7 @@ app.use(helmet({
                     'https://api.paystack.co'],
       fontSrc:     ["'self'", 'data:', 'https://fonts.gstatic.com'],
       objectSrc:   ["'none'"],
-      frameSrc:    ["'self'", 'https://docs.google.com'],
+      frameSrc:    ["'self'", 'https://docs.google.com', 'https://view.officeapps.live.com'],
       upgradeInsecureRequests: [],
     },
   },
