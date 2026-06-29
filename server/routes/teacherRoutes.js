@@ -20,6 +20,10 @@ const teacherOnly = (req, res, next) => {
   next();
 };
 
+// Alias — same permissions as teacherOnly but used on routes where
+// admin bypass of ownership checks is explicitly documented.
+const teacherOrAdmin = teacherOnly;
+
 // Safe table check — returns empty instead of crashing
 const safeQuery = async (sql, replacements, fallback = []) => {
   try { return await sequelize.query(sql, { replacements, type: QueryTypes.SELECT }); }
@@ -61,13 +65,15 @@ router.get('/my-subjects', protect, teacherOnly, async (req, res) => {
 
 // ── GET /api/teacher/topics?subject_id=<uuid> ─────────────────────────────────
 // FIX: was parseInt(subject_id) — subject_id is a UUID foreign key
-router.get('/topics', protect, teacherOnly, async (req, res) => {
+router.get('/topics', protect, teacherOrAdmin, async (req, res) => {
   const { subject_id } = req.query;
   if (!subject_id) return res.status(400).json({ success: false, error: 'subject_id is required' });
   try {
-    // Confirm this teacher is assigned to the requested subject
-    const owned = await teacherOwnsSubject(req.user.id, subject_id);
-    if (!owned) return res.status(403).json({ success: false, error: 'Not assigned to this subject' });
+    // Teachers: confirm assigned to this subject. Admins: skip ownership check.
+    if (req.user.role === 'teacher') {
+      const owned = await teacherOwnsSubject(req.user.id, subject_id);
+      if (!owned) return res.status(403).json({ success: false, error: 'Not assigned to this subject' });
+    }
 
     const rows = await sequelize.query(
       `SELECT t.id, t.name, t.description, t.order_index,
@@ -142,7 +148,7 @@ router.delete('/topics/:id', protect, teacherOnly, async (req, res) => {
 
 // ── GET /api/teacher/subtopics?topic_id=<uuid> ───────────────────────────────
 // FIX: was parseInt(topic_id) — topic_id is a UUID foreign key
-router.get('/subtopics', protect, teacherOnly, async (req, res) => {
+router.get('/subtopics', protect, teacherOrAdmin, async (req, res) => {
   const { topic_id } = req.query;
   if (!topic_id) return res.status(400).json({ success: false, error: 'topic_id is required' });
   try {
@@ -158,7 +164,7 @@ router.get('/subtopics', protect, teacherOnly, async (req, res) => {
 
 // ── POST /api/teacher/subtopics ───────────────────────────────────────────────
 // FIX: was parseInt(topic_id) and parseInt(subject_id) — both are UUID foreign keys
-router.post('/subtopics', protect, teacherOnly, async (req, res) => {
+router.post('/subtopics', protect, teacherOrAdmin, async (req, res) => {
   const { topic_id, subject_id, name, description, order_index = 0 } = req.body;
   if (!topic_id || !name?.trim()) return res.status(400).json({ success: false, error: 'topic_id and name are required' });
   try {
