@@ -26,8 +26,10 @@ const safeQuery = async (sql, replacements, fallback = []) => {
   catch (e) { console.warn('[teacherRoutes] query skipped:', e.message.slice(0, 80)); return fallback; }
 };
 
-// Check if teacher is assigned to a subject (graceful if table missing)
-async function teacherOwnsSubject(teacherId, subjectId) {
+// Check if teacher is assigned to a subject (graceful if table missing).
+// Admins bypass this check — they manage all subjects.
+async function teacherOwnsSubject(teacherId, subjectId, userRole) {
+  if (userRole === 'admin') return true;
   try {
     const r = await sequelize.query(
       `SELECT id FROM teacher_subjects WHERE teacher_id=:teacherId AND subject_id=:subjectId AND is_active=true`,
@@ -66,7 +68,7 @@ router.get('/topics', protect, teacherOnly, async (req, res) => {
   if (!subject_id) return res.status(400).json({ success: false, error: 'subject_id is required' });
   try {
     // Confirm this teacher is assigned to the requested subject
-    const owned = await teacherOwnsSubject(req.user.id, subject_id);
+    const owned = await teacherOwnsSubject(req.user.id, subject_id, req.user.role);
     if (!owned) return res.status(403).json({ success: false, error: 'Not assigned to this subject' });
 
     const rows = await sequelize.query(
