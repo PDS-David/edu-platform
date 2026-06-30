@@ -47,7 +47,12 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
   const [submitting,    setSubmitting]    = useState(false);
   const startTime = useRef(Date.now());
 
-  const isEssay = question.question_type === 'essay';
+  // BUG FIX: GET /questions/random (questionsRoutes.js) returns the field as
+  // `type`, not `question_type` — this comparison always evaluated false,
+  // so every essay question was silently rendered as an MCQ with no options
+  // (since essay questions have no `options` array). Accept either field
+  // name so this keeps working regardless of which key a given insert path uses.
+  const isEssay = (question.question_type ?? question.type) === 'essay';
 
   useEffect(() => {
     setSelected(null);
@@ -104,9 +109,26 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
     }
   };
 
+  // BUG FIX: a teacher's browser (especially mobile keyboards and some
+  // autocorrect extensions) can silently insert curly/smart quotes,
+  // non-breaking spaces, or other invisible Unicode variants into typed
+  // option text. The backend's plain trim().toLowerCase() comparison in
+  // questionsRoutes.js POST /:id/answer treats these as different strings
+  // from straight quotes/regular spaces, so a correct answer can be marked
+  // wrong for every student even though it visually looks identical. This
+  // normalizer is applied consistently on both sides of every comparison
+  // in this file so the UI highlight matches what the server actually graded.
+  const normalizeForCompare = (s) =>
+    String(s ?? '')
+      .replace(/[\u2018\u2019\u201B]/g, "'")   // curly single quotes → straight
+      .replace(/[\u201C\u201D\u201F]/g, '"')   // curly double quotes → straight
+      .replace(/[\u00A0\u2007\u202F]/g, ' ')   // non-breaking spaces → regular space
+      .replace(/\s+/g, ' ')                     // collapse repeated whitespace
+      .trim()
+      .toLowerCase();
+
   const getOptionStyle = (optText) => {
-    const isCorrect  = result && String(optText).trim().toLowerCase() ===
-                       String(result.correct_answer || '').trim().toLowerCase();
+    const isCorrect  = result && normalizeForCompare(optText) === normalizeForCompare(result.correct_answer);
     const isSelected = selected === optText;
     if (!result) {
       return isSelected
@@ -210,10 +232,10 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
                     {LABELS[i]}
                   </span>
                   <span className="text-sm text-gray-800">{optText}</span>
-                  {result && String(optText).trim().toLowerCase() === String(result.correct_answer || '').trim().toLowerCase() && (
+                  {result && normalizeForCompare(optText) === normalizeForCompare(result.correct_answer) && (
                     <CheckCircle className="w-4 h-4 text-green-500 ml-auto flex-shrink-0" />
                   )}
-                  {result && selected === optText && String(optText).trim().toLowerCase() !== String(result.correct_answer || '').trim().toLowerCase() && (
+                  {result && selected === optText && normalizeForCompare(optText) !== normalizeForCompare(result.correct_answer) && (
                     <XCircle className="w-4 h-4 text-red-400 ml-auto flex-shrink-0" />
                   )}
                 </button>
@@ -324,14 +346,33 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
 
           {/* ── MCQ result banner ── */}
           {result && !isEssay && (
-            <div className={`mx-5 mb-4 rounded-xl px-3 py-2.5 flex items-center gap-2 text-sm ${
+            <div className={`mx-5 mb-4 rounded-xl px-3 py-2.5 text-sm ${
               result.is_correct
                 ? 'bg-green-50 border border-green-200 text-green-700'
                 : 'bg-red-50 border border-red-200 text-red-700'
             }`}>
-              {result.is_correct
-                ? <><CheckCircle className="w-4 h-4" /><span className="font-semibold">Correct! Well done.</span></>
-                : <><XCircle className="w-4 h-4" /><span className="font-semibold">Incorrect. See the correct answer below.</span></>}
+              <div className="flex items-center gap-2">
+                {result.is_correct
+                  ? <><CheckCircle className="w-4 h-4" /><span className="font-semibold">Correct! Well done.</span></>
+                  : <><XCircle className="w-4 h-4" /><span className="font-semibold">Incorrect.</span></>}
+              </div>
+              {/* BUG FIX: previously said "See the correct answer below" and relied
+                  entirely on a green highlight elsewhere matching result.correct_answer
+                  against one of the rendered option texts. If that string comparison
+                  failed for any reason (extra whitespace, a teacher-edited option after
+                  marking it correct, smart-quote characters, etc.) no option would turn
+                  green and the student would see no correct answer at all — exactly the
+                  reported bug. The correct answer text is now always shown explicitly
+                  here, straight from the API response, independent of whether it happens
+                  to string-match one of the option labels. */}
+              {!result.is_correct && (
+                <p className="mt-1.5 text-xs text-red-600">
+                  <span className="font-semibold">Correct answer:</span>{' '}
+                  {result.correct_answer
+                    ? result.correct_answer
+                    : <span className="italic text-red-400">Not available for this question — please flag it for your teacher.</span>}
+                </p>
+              )}
             </div>
           )}
 

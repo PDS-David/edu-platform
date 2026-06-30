@@ -255,9 +255,22 @@ router.post('/:id/answer', protect, async (req, res) => {
     if (!isEssay) {
       // MCQ — compare against correct_answer
       const correctAnswer = question.correct_answer;
+      // BUG FIX: a teacher's input device/browser can silently insert curly
+      // quotes or non-breaking spaces into option text. A plain
+      // trim().toLowerCase() comparison treats "don't" (straight quote) and
+      // "don't" (curly quote) as different strings, so the genuinely correct
+      // option could never match and every student answer — including the
+      // correct one — gets marked wrong. Normalize both sides identically.
+      const normalize = (s) =>
+        String(s ?? '')
+          .replace(/[\u2018\u2019\u201B]/g, "'")
+          .replace(/[\u201C\u201D\u201F]/g, '"')
+          .replace(/[\u00A0\u2007\u202F]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .toLowerCase();
       if (selected_answer !== undefined && selected_answer !== null) {
-        isCorrect = String(selected_answer).trim().toLowerCase() ===
-                    String(correctAnswer || '').trim().toLowerCase();
+        isCorrect = normalize(selected_answer) === normalize(correctAnswer);
       }
       marksAwarded = isCorrect ? (question.marks || 1) : 0;
     } else {

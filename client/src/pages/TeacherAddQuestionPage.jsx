@@ -180,6 +180,7 @@ export default function TeacherAddQuestionPage() {
     setError("");
 
     if (!questionText.trim()) return setError("Question text is required.");
+    if (!subtopicId) return setError("Please select a subtopic for this question.");
     const filledOptions = options.filter(o => o.text.trim());
     if (filledOptions.length < 2) return setError("At least 2 options must have text.");
     if (!filledOptions.some(o => o.is_correct)) return setError("Mark one option as correct.");
