@@ -192,9 +192,23 @@ export default function QuestionReview() {
                 const text = typeof opt === 'string' ? opt : opt?.option_text;
                 return text && String(text).trim();
               });
+              // BUG FIX: hardened the legacy-string-option fallback comparison
+              // to match the normalizer used everywhere else this question's
+              // options get compared (PracticeMode.jsx, QuizPage.jsx,
+              // SubtopicPage.jsx, questionsRoutes.js) — curly quotes / non-
+              // breaking spaces could otherwise make a genuinely-correct
+              // legacy option fail to register as correct here too.
+              const normalizeForCompare = (s) =>
+                String(s ?? '')
+                  .replace(/[\u2018\u2019\u201B]/g, "'")
+                  .replace(/[\u201C\u201D\u201F]/g, '"')
+                  .replace(/[\u00A0\u2007\u202F]/g, ' ')
+                  .replace(/\s+/g, ' ')
+                  .trim()
+                  .toLowerCase();
               const hasCorrect = validOptions.some(opt =>
                 typeof opt === 'object' ? !!opt.is_correct
-                  : String(opt).trim().toLowerCase() === (q.correct_answer || '').trim().toLowerCase()
+                  : normalizeForCompare(opt) === normalizeForCompare(q.correct_answer)
               );
               const isBroken = validOptions.length < 2 || !hasCorrect;
 
@@ -259,7 +273,7 @@ export default function QuestionReview() {
                       const optText    = typeof opt === 'string' ? opt : (opt.option_text || '');
                       const isCorrect  = typeof opt === 'object'
                         ? !!opt.is_correct
-                        : optText.trim().toLowerCase() === (q.correct_answer || '').trim().toLowerCase();
+                        : normalizeForCompare(optText) === normalizeForCompare(q.correct_answer);
                       return (
                         <div
                           key={i}

@@ -67,10 +67,24 @@ function QuizQuestion({ question, questionNumber, submitRef, onAnswered }) {
 
   const diffBadge = { easy: 'bg-green-500', medium: 'bg-amber-500', hard: 'bg-red-500' };
 
+  // BUG FIX: this used a plain trim().toLowerCase() comparison, identical to
+  // the one already fixed in PracticeMode.jsx — curly quotes, non-breaking
+  // spaces, or repeated whitespace in teacher-authored option text would
+  // make a genuinely correct option never highlight as correct here, even
+  // when the backend's own grading (POST /:id/answer, options[].is_correct)
+  // graded it right. Applying the identical normalizer used there.
+  const normalizeForCompare = (s) =>
+    String(s ?? '')
+      .replace(/[\u2018\u2019\u201B]/g, "'")
+      .replace(/[\u201C\u201D\u201F]/g, '"')
+      .replace(/[\u00A0\u2007\u202F]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+
   // Comparison uses option_text (the correct_answer field is also text)
   const optStyle = (optText) => {
-    const isCorrect  = result && String(optText).trim().toLowerCase() ===
-                       String(result.correct_answer || '').trim().toLowerCase();
+    const isCorrect  = result && normalizeForCompare(optText) === normalizeForCompare(result.correct_answer);
     const isSelected = selected === optText;
     if (!result) return isSelected ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-blue-300 cursor-pointer';
     if (isCorrect)                return 'border-blue-400 bg-blue-50';
@@ -104,8 +118,7 @@ function QuizQuestion({ question, questionNumber, submitRef, onAnswered }) {
         <div className="px-5 pb-4 space-y-2">
           {question.options?.map((opt, i) => {
             const optText   = typeof opt === 'string' ? opt : (opt.option_text || '');
-            const isCorrect = result && String(optText).trim().toLowerCase() ===
-                              String(result.correct_answer || '').trim().toLowerCase();
+            const isCorrect = result && normalizeForCompare(optText) === normalizeForCompare(result.correct_answer);
             const isSel     = selected === optText;
             return (
               <button
@@ -127,14 +140,27 @@ function QuizQuestion({ question, questionNumber, submitRef, onAnswered }) {
 
         {result && (
           <>
-            <div className={`mx-5 mb-3 rounded-xl px-3 py-2.5 flex items-center gap-2 text-xs ${
+            <div className={`mx-5 mb-3 rounded-xl px-3 py-2.5 text-xs ${
               result.is_correct
                 ? 'bg-green-50 border border-green-200 text-green-700'
                 : 'bg-red-50 border border-red-200 text-red-700'
             }`}>
-              {result.is_correct
-                ? <><CheckCircle size={14} /><span className="font-semibold">Correct! Well done.</span></>
-                : <><XCircle    size={14} /><span className="font-semibold">Incorrect. See the correct answer below.</span></>}
+              <div className="flex items-center gap-2">
+                {result.is_correct
+                  ? <><CheckCircle size={14} /><span className="font-semibold">Correct! Well done.</span></>
+                  : <><XCircle    size={14} /><span className="font-semibold">Incorrect.</span></>}
+              </div>
+              {/* BUG FIX: same fix as PracticeMode.jsx — never assume the
+                  highlight above successfully matched an option; always
+                  state the correct answer explicitly from the API response. */}
+              {!result.is_correct && (
+                <p className="mt-1.5 text-red-600">
+                  <span className="font-semibold">Correct answer:</span>{' '}
+                  {result.correct_answer
+                    ? result.correct_answer
+                    : <span className="italic text-red-400">Not available for this question — please flag it for your teacher.</span>}
+                </p>
+              )}
             </div>
 
             <div className="mx-5 mb-4 bg-blue-50 border border-blue-100 rounded-xl p-3">
