@@ -431,9 +431,22 @@ function MCQQuestion({ question, questionNumber, totalQuestions, onAnswer, onPre
 
   const diffBadge = { easy: 'bg-green-500', medium: 'bg-amber-500', hard: 'bg-red-500' };
 
+  // BUG FIX: same fix as PracticeMode.jsx and QuizPage.jsx — plain
+  // trim().toLowerCase() doesn't handle curly quotes/non-breaking spaces,
+  // so a genuinely correct option could fail to highlight here even when
+  // backend grading (options[].is_correct) graded it correctly.
+  const normalizeForCompare = (s) =>
+    String(s ?? '')
+      .replace(/[\u2018\u2019\u201B]/g, "'")
+      .replace(/[\u201C\u201D\u201F]/g, '"')
+      .replace(/[\u00A0\u2007\u202F]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+
   const optStyle = (optText) => {
     if (!result) return selected === optText ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-blue-300 cursor-pointer';
-    const isCorrect  = String(optText).trim().toLowerCase() === String(result.correct_answer || '').trim().toLowerCase();
+    const isCorrect  = normalizeForCompare(optText) === normalizeForCompare(result.correct_answer);
     const isSelected = selected === optText;
     if (isCorrect)                return 'border-green-400 bg-green-50';
     if (isSelected && !isCorrect) return 'border-red-300 bg-red-50';
@@ -460,7 +473,7 @@ function MCQQuestion({ question, questionNumber, totalQuestions, onAnswer, onPre
         <div className="px-5 pb-4 space-y-2">
           {question.options?.map((opt, i) => {
             const optText   = opt.option_text || opt.text || String(opt);
-            const isCorrect = result && String(optText).trim().toLowerCase() === String(result.correct_answer || '').trim().toLowerCase();
+            const isCorrect = result && normalizeForCompare(optText) === normalizeForCompare(result.correct_answer);
             const isSelected = selected === optText;
             return (
               <button key={i} onClick={() => !result && setSelected(optText)} disabled={!!result}
@@ -494,12 +507,25 @@ function MCQQuestion({ question, questionNumber, totalQuestions, onAnswer, onPre
 
         {result && (
           <>
-            <div className={`mx-5 mb-3 rounded-xl px-3 py-2.5 flex items-center gap-2 text-xs ${
+            <div className={`mx-5 mb-3 rounded-xl px-3 py-2.5 text-xs ${
               result.is_correct ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'
             }`}>
-              {result.is_correct
-                ? <><CheckCircle size={14} /><span className="font-semibold">Correct! Well done.</span></>
-                : <><XCircle    size={14} /><span className="font-semibold">Incorrect. See the correct answer below.</span></>}
+              <div className="flex items-center gap-2">
+                {result.is_correct
+                  ? <><CheckCircle size={14} /><span className="font-semibold">Correct! Well done.</span></>
+                  : <><XCircle    size={14} /><span className="font-semibold">Incorrect.</span></>}
+              </div>
+              {/* BUG FIX: same fix as PracticeMode.jsx/QuizPage.jsx — always
+                  state the correct answer explicitly rather than relying
+                  solely on the highlight above to have matched an option. */}
+              {!result.is_correct && (
+                <p className="mt-1.5 text-red-600">
+                  <span className="font-semibold">Correct answer:</span>{' '}
+                  {result.correct_answer
+                    ? result.correct_answer
+                    : <span className="italic text-red-400">Not available for this question — please flag it for your teacher.</span>}
+                </p>
+              )}
             </div>
             <div className="mx-5 mb-4 bg-blue-50 border border-blue-100 rounded-xl p-3">
               <p className="text-xs font-semibold text-blue-700 mb-1.5 flex items-center gap-1.5"><Sparkles size={12} /> AI Explanation</p>
