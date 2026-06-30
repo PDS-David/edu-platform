@@ -956,6 +956,7 @@ function QuestionsTab({ showToast }) {
   const handleSubmit = async () => {
     const { question_text, subject_id, options, difficulty } = form;
     if (!question_text.trim())          { showToast('Question text is required.', 'error'); return; }
+    if (question_text.trim().length < 10) { showToast('Question is too short (minimum 10 characters).', 'error'); return; }
     if (!subject_id)                    { showToast('Please select a subject.', 'error'); return; }
     if (!form.subtopic_id)              { showToast('Please select a subtopic — questions without one never reach students.', 'error'); return; }
     if (options.some(o => !o.text.trim())) { showToast('All 4 options must be filled.', 'error'); return; }

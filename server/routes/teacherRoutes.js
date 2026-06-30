@@ -1038,6 +1038,12 @@ router.get('/questions', protect, teacherOnly, async (req, res) => {
 router.post('/questions', protect, teacherOnly, async (req, res) => {
   const { question_text, subtopic_id, difficulty = 'medium', explanation, options } = req.body;
   if (!question_text?.trim()) return res.status(400).json({ success: false, error: 'question_text is required' });
+  // Matches the minimum-length standard already enforced on POST /api/questions/submit
+  // (the ContributeQuestion route) — previously this route only checked for a
+  // non-empty string, so a single-character question_text (or anything under
+  // a genuinely usable length) passed straight through to an immediate
+  // status='approved' insert with no review step at all.
+  if (question_text.trim().length < 10) return res.status(400).json({ success: false, error: 'Question text must be at least 10 characters' });
   if (!subtopic_id) return res.status(400).json({ success: false, error: 'Please select a subtopic — questions without one never reach students.' });
   if (!Array.isArray(options) || options.length < 2) return res.status(400).json({ success: false, error: 'At least 2 options required' });
   const correctOption = options.find(o => o.is_correct);
