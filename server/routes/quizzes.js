@@ -158,9 +158,6 @@ router.post('/attempt', protect, async (req, res) => {
 
       // Accept selected_answer (option text) OR selected_option_id (also option text in JSONB schema)
       const submittedAnswer = answer.selected_answer ?? answer.selected_option_id ?? '';
-      // BUG FIX: same normalization as questionsRoutes.js POST /:id/answer —
-      // curly quotes / non-breaking spaces in teacher-authored option text
-      // would otherwise make a genuinely correct answer compare as wrong.
       const normalizeAnswer = (s) =>
         String(s ?? '')
           .replace(/[\u2018\u2019\u201B]/g, "'")
@@ -169,12 +166,33 @@ router.post('/attempt', protect, async (req, res) => {
           .replace(/\s+/g, ' ')
           .trim()
           .toLowerCase();
-      const isCorrect = normalizeAnswer(submittedAnswer) === normalizeAnswer(question.correct_answer);
+
+      // Resolve options array up front so grading can use it
+      let qOpts = question.options;
+      if (typeof qOpts === 'string') { try { qOpts = JSON.parse(qOpts); } catch { qOpts = []; } }
+      qOpts = Array.isArray(qOpts) ? qOpts.filter(o => o && typeof o === 'object' && o.option_text) : [];
+
+      // BUG FIX (grading-always-wrong): grade against options[].is_correct,
+      // the flag set deliberately at question creation/review time, instead
+      // of re-deriving correctness from a separately-stored correct_answer
+      // text field. correct_answer and option_text are stored independently
+      // and can drift (different wording/punctuation, especially for
+      // AI-generated questions) — when they do, every option compares false
+      // against correct_answer, including the one already flagged correct,
+      // so the student is marked wrong regardless of selection. Falls back
+      // to the original text comparison only when no usable options exist
+      // on this question.
+      let isCorrect;
+      const matchedOpt = qOpts.find(o => normalizeAnswer(o.option_text) === normalizeAnswer(submittedAnswer));
+      if (matchedOpt) {
+        isCorrect = !!matchedOpt.is_correct;
+      } else {
+        isCorrect = normalizeAnswer(submittedAnswer) === normalizeAnswer(question.correct_answer);
+      }
       const marks     = isCorrect ? markValue : 0;
       totalScore     += marks;
 
       // Resolve correct option for correct_options array (matches GET /attempt/:id shape)
-      const qOpts = Array.isArray(question.options) ? question.options : [];
       const correctOpt = qOpts.find(o => o.is_correct);
 
       results.push({
