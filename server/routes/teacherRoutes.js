@@ -202,15 +202,42 @@ router.get('/subtopics', protect, teacherOrAdmin, async (req, res) => {
 // ── POST /api/teacher/subtopics ───────────────────────────────────────────────
 // FIX: was parseInt(topic_id) and parseInt(subject_id) — both are UUID foreign keys
 router.post('/subtopics', protect, teacherOrAdmin, async (req, res) => {
-  const { topic_id, subject_id, name, description, order_index = 0 } = req.body;
+  const { topic_id, name, description, order_index = 0 } = req.body;
   if (!topic_id || !name?.trim()) return res.status(400).json({ success: false, error: 'topic_id and name are required' });
   try {
+    // BUG FIX (cross-subject contamination on quiz "Try Again"): subject_id
+    // was previously taken directly from req.body, completely independent
+    // of topic_id. If a caller ever sent a topic_id/subject_id pair that
+    // disagreed (stale form state, a copy-paste error, any client bug),
+    // the row baked that wrong subject_id in permanently. Every downstream
+    // consumer trusts subtopics.subject_id as authoritative — GET
+    // /subtopics/:id returns it as-is (QuizPage.jsx uses this to resolve
+    // subjectId when "Try Again" navigates without router state), and GET
+    // /questions/random's subject_id filter takes the caller's word for it.
+    // A single bad insert here meant every quiz/practice session for that
+    // one subtopic would silently pull questions from whatever subject the
+    // bad subject_id actually pointed to — a student practising Chemistry
+    // could land in a subtopic whose subject_id secretly says Physics.
+    // Fixed by deriving subject_id from the topic itself instead of
+    // trusting a client-supplied value — the same pattern already used
+    // correctly in topicsRoutes.js's POST /:topicId/subtopics. Ignores any
+    // subject_id the client sends; it cannot disagree with the topic if
+    // it's never read.
+    const topicRows = await sequelize.query(
+      `SELECT subject_id FROM topics WHERE id = :topicId AND is_active = true LIMIT 1`,
+      { replacements: { topicId: topic_id }, type: QueryTypes.SELECT }
+    );
+    if (!topicRows.length) {
+      return res.status(404).json({ success: false, error: 'Topic not found' });
+    }
+    const subjectId = topicRows[0].subject_id;
+
     const rows = await sequelize.query(
       `INSERT INTO subtopics (topic_id, subject_id, name, description, order_index, is_active, created_at, updated_at)
        VALUES (:topicId, :subjectId, :name, :description, :orderIndex, true, NOW(), NOW())
        RETURNING id, name, description, order_index`,
       {
-        replacements: { topicId: topic_id, subjectId: subject_id || null, name: name.trim(), description: description || null, orderIndex: parseInt(order_index) || 0 },
+        replacements: { topicId: topic_id, subjectId, name: name.trim(), description: description || null, orderIndex: parseInt(order_index) || 0 },
         type: QueryTypes.SELECT,
       }
     );

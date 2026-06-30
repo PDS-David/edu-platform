@@ -7,6 +7,34 @@
 // GET /api/exam-boards              — list active exam boards (same data as /catalog/types)
 // GET /api/exam-boards/:code        — single board by code
 // GET /api/exam-boards/:code/subjects — active subjects for a board
+//
+// SEC-1 — RESOLVED (confirmed + documented, not a code change):
+// This entire router intentionally has no `protect` middleware applied,
+// neither here nor in server.js's app.use('/api/exam-boards', examBoardRoutes)
+// mount. Verified this is correct, not an oversight:
+//
+//   1. RegisterPage.jsx calls GET /exam-boards (line ~287) during account
+//      registration, before any user has an account or access token. If
+//      this route required `protect`, registration would be unable to
+//      populate the curriculum/exam-board dropdown at all — a logged-out
+//      visitor cannot authenticate against an endpoint they need in order
+//      to register in the first place.
+//   2. All three endpoints here are GET-only, read-only, and scoped to
+//      `WHERE is_active = true` — they return exam board metadata
+//      (name/code/description/icon) and active subject lists. No student
+//      data, no PII, no write capability exists in this file.
+//   3. This matches the established, consistent pattern already used
+//      throughout catalogRoutes.js (the other half of the same catalog
+//      data, per the comment above): every read-only GET there
+//      (/types, /stats, /all-subjects, /types/:id/subjects) is also
+//      deliberately public, while every write (POST/PUT/DELETE) is gated
+//      with `protect, authorize('admin')`. examBoardRoutes.js, being
+//      GET-only end to end, correctly has no write surface to protect.
+//
+// If a write endpoint is ever added to this file, it MUST use
+// `protect, authorize('admin')` — see catalogRoutes.js's /types POST/PUT/
+// DELETE handlers for the exact pattern to follow. Do not add an
+// unauthenticated write here under any circumstance.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const express   = require('express');

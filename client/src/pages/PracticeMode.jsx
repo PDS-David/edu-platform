@@ -243,10 +243,10 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
                     {LABELS[i]}
                   </span>
                   <span className="text-sm text-gray-800">{optText}</span>
-                  {result && normalizeForCompare(optText) === normalizeForCompare(result.correct_answer) && (
+                  {result && normalizeForCompare(optText) === normalizeForCompare(result?.correct_option_text || result?.correct_answer) && (
                     <CheckCircle className="w-4 h-4 text-green-500 ml-auto flex-shrink-0" />
                   )}
-                  {result && selected === optText && normalizeForCompare(optText) !== normalizeForCompare(result.correct_answer) && (
+                  {result && selected === optText && normalizeForCompare(optText) !== normalizeForCompare(result?.correct_option_text || result?.correct_answer) && (
                     <XCircle className="w-4 h-4 text-red-400 ml-auto flex-shrink-0" />
                   )}
                 </button>
@@ -379,8 +379,8 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
               {!result.is_correct && (
                 <p className="mt-1.5 text-xs text-red-600">
                   <span className="font-semibold">Correct answer:</span>{' '}
-                  {result.correct_answer
-                    ? result.correct_answer
+                  {(result.correct_option_text || result.correct_answer)
+                    ? (result.correct_option_text || result.correct_answer)
                     : <span className="italic text-red-400">Not available for this question — please flag it for your teacher.</span>}
                 </p>
               )}
