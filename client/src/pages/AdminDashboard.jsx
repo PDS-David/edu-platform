@@ -769,6 +769,13 @@ const TeacherAssignmentPanel = () => {
   const [selectedSubjectIds, setSelectedSubjectIds] = useState([]);
   const [form, setForm] = useState({ teacher_id: '', exam_type_id: '' });
   const [teacherForm, setTeacherForm] = useState({ first_name: '', last_name: '', email: '', password: '' });
+  // Issue 2: edit-assignment modal state
+  const [editingAssignment, setEditingAssignment] = useState(null); // { id, teacher_id, subject_id, exam_board_code, ... }
+  const [editExamTypeId,    setEditExamTypeId]    = useState('');
+  const [editSubjectId,     setEditSubjectId]     = useState('');
+  const [editSubjects,      setEditSubjects]      = useState([]);
+  const [editLoadingSubjects, setEditLoadingSubjects] = useState(false);
+  const [editSaving,        setEditSaving]        = useState(false);
   const { examTypes, loadingTypes, fetchSubjectsForType, invalidateCache } = useCatalog();
 
   const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
@@ -823,6 +830,55 @@ const TeacherAssignmentPanel = () => {
     if (!window.confirm('Remove this assignment?')) return;
     try { await api.delete(`/admin/teacher-assignments/${id}`); showToast('Assignment removed'); fetchAll(); }
     catch { showToast('Failed to remove', 'error'); }
+  };
+
+  // Issue 2: edit-assignment flow — swap which subject an existing
+  // assignment row covers, without deleting and recreating it.
+  const openEditAssignment = async (a) => {
+    setEditingAssignment(a);
+    setEditExamTypeId('');
+    setEditSubjectId(String(a.subject_id));
+    setEditSubjects([]);
+    // Pre-select the exam type matching this assignment's current exam board,
+    // then load that exam type's subjects so the dropdown is pre-populated.
+    const matchingType = examTypes.find(et => et.code === a.exam_board_code);
+    if (matchingType) {
+      setEditExamTypeId(String(matchingType.id));
+      setEditLoadingSubjects(true);
+      try {
+        const subjects = await fetchSubjectsForType(matchingType.id);
+        setEditSubjects(subjects);
+      } catch { showToast('Failed to load subjects', 'error'); }
+      finally { setEditLoadingSubjects(false); }
+    }
+  };
+
+  const handleEditExamTypeChange = async (typeId) => {
+    setEditExamTypeId(typeId);
+    setEditSubjectId('');
+    setEditSubjects([]);
+    if (!typeId) return;
+    setEditLoadingSubjects(true);
+    try { const subjects = await fetchSubjectsForType(typeId); setEditSubjects(subjects); }
+    catch { showToast('Failed to load subjects', 'error'); }
+    finally { setEditLoadingSubjects(false); }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingAssignment || !editSubjectId) { showToast('Please select a subject', 'error'); return; }
+    if (String(editSubjectId) === String(editingAssignment.subject_id)) {
+      // No actual change — just close
+      setEditingAssignment(null);
+      return;
+    }
+    setEditSaving(true);
+    try {
+      await api.put(`/admin/teacher-assignments/${editingAssignment.id}`, { subject_id: editSubjectId });
+      showToast('Assignment updated');
+      setEditingAssignment(null);
+      fetchAll();
+    } catch (err) { showToast(err?.message || 'Failed to update assignment', 'error'); }
+    finally { setEditSaving(false); }
   };
 
   const handleCreateTeacher = async () => {
@@ -960,16 +1016,75 @@ const TeacherAssignmentPanel = () => {
                     {a.subject_name}
                     {a.exam_board_code && <span className="text-violet-400">· {a.exam_board_code}</span>}
                     {a.is_active && (
-                      <button onClick={() => handleRemove(a.id)}
-                        className="ml-0.5 text-violet-300 hover:text-red-500 transition-colors" title="Remove">
-                        ×
-                      </button>
+                      <>
+                        <button onClick={() => openEditAssignment(a)}
+                          className="ml-0.5 text-violet-300 hover:text-violet-600 transition-colors" title="Edit subject">
+                          <Pencil size={11} />
+                        </button>
+                        <button onClick={() => handleRemove(a.id)}
+                          className="text-violet-300 hover:text-red-500 transition-colors" title="Remove">
+                          ×
+                        </button>
+                      </>
                     )}
                   </span>
                 ))}
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Edit Assignment Modal — Issue 2 */}
+      {editingAssignment && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white border border-gray-200 rounded-xl shadow-2xl w-full max-w-sm p-6">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-bold text-gray-900">Edit Assignment</h3>
+              <button onClick={() => setEditingAssignment(null)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+            </div>
+            <p className="text-xs text-gray-500 mb-4">
+              Changing the subject for <span className="font-semibold text-gray-700">{editingAssignment.teacher_name}</span>.
+              Currently assigned to <span className="font-semibold text-violet-700">{editingAssignment.subject_name}</span>.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Exam Type</label>
+                <select value={editExamTypeId} onChange={e => handleEditExamTypeChange(e.target.value)} className={inputCls}>
+                  <option value="">Select exam type…</option>
+                  {loadingTypes
+                    ? <option disabled>Loading…</option>
+                    : examTypes.filter(et => et.is_active !== false).map(et =>
+                        <option key={et.id} value={et.id}>{et.name} ({et.code})</option>
+                      )
+                  }
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">New Subject *</label>
+                {!editExamTypeId ? (
+                  <div className="border-2 border-dashed border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-400">Select an exam type above</div>
+                ) : (
+                  <select value={editSubjectId} onChange={e => setEditSubjectId(e.target.value)} className={inputCls}>
+                    <option value="">Select subject…</option>
+                    {editLoadingSubjects
+                      ? <option disabled>Loading subjects…</option>
+                      : editSubjects.length === 0
+                        ? <option disabled>No subjects found</option>
+                        : editSubjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)
+                    }
+                  </select>
+                )}
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-6">
+              <button onClick={() => setEditingAssignment(null)} className="text-sm text-gray-500 hover:text-gray-700 px-4 py-2 rounded-xl border border-gray-200">Cancel</button>
+              <button onClick={handleSaveEdit} disabled={editSaving || !editSubjectId}
+                className="flex items-center gap-1.5 text-sm bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white px-4 py-2 rounded-xl font-semibold">
+                {editSaving && <Loader2 size={14} className="animate-spin" />} Save Change
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

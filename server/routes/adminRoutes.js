@@ -697,6 +697,43 @@ router.delete('/teacher-assignments/:id', protect, adminOnly, async (req, res) =
   }
 });
 
+// Issue 2: edit an existing assignment's subject (swap subject_id on the
+// same row instead of forcing delete + recreate). teacher_id is immutable
+// here — the row's owner doesn't change, only which subject they cover.
+router.put('/teacher-assignments/:id', protect, adminOnly, async (req, res) => {
+  const { id } = req.params;
+  const { subject_id } = req.body;
+  if (!subject_id) return error(res, 'subject_id required', 400);
+
+  try {
+    const existing = await sequelize.query(
+      `SELECT id, teacher_id FROM teacher_subjects WHERE id = :id`,
+      { replacements: { id }, type: QueryTypes.SELECT }
+    );
+    if (!existing.length) return error(res, 'Assignment not found', 404);
+
+    // Guard against creating a duplicate (teacher_id, subject_id) pair —
+    // the table already has a UNIQUE/ON CONFLICT constraint on that combo
+    // (see POST handler above), so check first to return a clear error
+    // instead of a raw constraint-violation message.
+    const dup = await sequelize.query(
+      `SELECT id FROM teacher_subjects
+        WHERE teacher_id = :teacherId AND subject_id = :subjectId AND id != :id`,
+      { replacements: { teacherId: existing[0].teacher_id, subjectId: subject_id, id }, type: QueryTypes.SELECT }
+    );
+    if (dup.length) return error(res, 'This teacher is already assigned to that subject', 409);
+
+    await sequelize.query(
+      `UPDATE teacher_subjects SET subject_id = :subjectId, is_active = true WHERE id = :id`,
+      { replacements: { subjectId: subject_id, id }, type: QueryTypes.UPDATE }
+    );
+    return success(res, { message: 'Assignment updated' });
+  } catch (err) {
+    console.error('[PUT /admin/teacher-assignments/:id]', err.message);
+    return error(res, 'Failed to update assignment');
+  }
+});
+
 // ─────────────────────────────────────────────
 // TEACHER-SUBJECTS ALIASES
 // TeacherAssignmentPage calls /admin/teacher-subjects — alias to same handlers
