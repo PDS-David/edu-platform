@@ -236,7 +236,7 @@ router.get('/my-tests', protect, async (req, res) => {
           s.name                                                         AS subject_name
        FROM test_assignments ta
        JOIN custom_tests ct ON ct.id = ta.test_id
-       LEFT JOIN users u ON u.id = ct.created_by
+       LEFT JOIN users u ON u.id = ct.teacher_id  -- fix: column is teacher_id not created_by
        LEFT JOIN subjects s ON s.id = ct.subject_id
        WHERE ta.student_id = :studentId
           OR ta.class_id IN (
@@ -260,6 +260,25 @@ router.get('/test/:testId', protect, async (req, res) => {
     return res.status(400).json({ success: false, error: 'Invalid test ID' });
   }
   try {
+    // Security fix: verify the requesting student is actually assigned this
+    // test (directly or via class) before returning any content.
+    const assigned = await sequelize.query(
+      `SELECT 1 FROM test_assignments ta
+       WHERE ta.test_id = :testId
+         AND (
+           ta.student_id = :studentId
+           OR ta.class_id IN (
+             SELECT class_id FROM class_memberships
+             WHERE student_id = :studentId
+           )
+         )
+       LIMIT 1`,
+      { replacements: { testId, studentId: req.user.id }, type: QueryTypes.SELECT }
+    );
+    if (!assigned.length) {
+      return res.status(403).json({ success: false, error: 'This test has not been assigned to you.' });
+    }
+
     const tests = await sequelize.query(
       `SELECT ct.id, ct.title, ct.duration_minutes, ct.total_marks,
               u.first_name || ' ' || u.last_name AS teacher_name
