@@ -24,7 +24,7 @@ function ResultScreen({ result, testTitle, onDone }) {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 max-w-sm w-full text-center">
-        <div className="text-4xl mb-3">{result.accuracy_pct >= 70 ? '' : ''}</div>
+        <div className="text-4xl mb-3">{result.accuracy_pct >= 70 ? '🎉' : '📘'}</div>
         <h2 className="text-lg font-bold text-gray-900 mb-1">{testTitle} — Complete</h2>
         <p className="text-3xl font-black text-blue-500 mt-4">{result.accuracy_pct}%</p>
         <p className="text-sm text-gray-500 mt-1">{result.correct} / {result.total} correct</p>
