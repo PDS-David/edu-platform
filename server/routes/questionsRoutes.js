@@ -112,6 +112,24 @@ router.get('/random', protect, async (req, res) => {
   // four-empty-pill symptom reported live (subtopic 5, "Acid"). Rather than
   // touch every insert path or the renderer, normalize the shape once here,
   // at the single point every quiz/practice question already passes through.
+  // BUG FIX: this function used to hardcode `is_correct: false` on every
+  // option converted from a plain string, e.g. ["A","B","C","D"] ->
+  // [{option_text:"A", is_correct:false}, ...]. resourceQuestionExtractor.js
+  // stores options in exactly this bare-string-array shape by design (see
+  // its own correct_answer column and separate answer_options table, both
+  // populated correctly) — it has NO is_correct data inline in options at
+  // all, by design, because correctness lives in correct_answer instead.
+  // The grading endpoint's options[].is_correct-first logic (added to fix
+  // INV-1, the "always marked incorrect" bug) would find a matchedOpt for
+  // ANY selection here and trust its is_correct flag — which this function
+  // had just unconditionally forced to false — so EVERY answer to EVERY
+  // question stored this way graded as wrong, regardless of selection.
+  // That fallback path exists specifically for questions like this one; it
+  // must not be silently defeated by treating "no correctness data" the
+  // same as "confirmed incorrect". Use null (unknown) instead of false, so
+  // the grading endpoint's hasReliableCorrectness check (added alongside
+  // this fix) skips straight to comparing against correct_answer for these
+  // questions, exactly as the original fallback was designed to do.
   function normalizeOptions(rawOptions) {
     let opts = rawOptions;
     if (typeof opts === 'string') {
@@ -119,7 +137,7 @@ router.get('/random', protect, async (req, res) => {
     }
     if (!Array.isArray(opts)) return rawOptions;
     return opts.map(o => {
-      if (typeof o === 'string') return { option_text: o, is_correct: false };
+      if (typeof o === 'string') return { option_text: o, is_correct: null };
       if (o && typeof o === 'object') {
         // Already an object — make sure option_text is populated even if the
         // row only ever had `.text` (some older inserts used that key alone).
@@ -286,13 +304,23 @@ router.post('/:id/answer', protect, async (req, res) => {
 
       if (selected_answer !== undefined && selected_answer !== null && usableOpts.length > 0) {
         const matchedOpt = usableOpts.find(o => normalize(o.option_text) === normalize(selected_answer));
-        if (matchedOpt) {
+        // BUG FIX: a matched option's is_correct can be null (meaning "this
+        // question's options array has no correctness data at all" — see
+        // normalizeOptions() above, used by resourceQuestionExtractor.js
+        // questions) rather than a real boolean. Treating null the same as
+        // false here means every selection on those questions grades wrong,
+        // since *some* option always "matches" the student's selection.
+        // Only trust matchedOpt.is_correct when it's an actual boolean;
+        // otherwise this question has no per-option correctness data and we
+        // must fall back to comparing against correct_answer directly,
+        // exactly as the original (pre-INV-1) behavior did for this case.
+        if (matchedOpt && typeof matchedOpt.is_correct === 'boolean') {
           // Found the exact option the student selected — trust its is_correct flag.
-          isCorrect = !!matchedOpt.is_correct;
+          isCorrect = matchedOpt.is_correct;
         } else {
-          // Selected text didn't match any known option (shouldn't normally
-          // happen since the client only sends option_text it rendered) —
-          // fall back to comparing against correct_answer directly.
+          // Either no match, or matched option has no reliable correctness
+          // data (is_correct is null/undefined) — fall back to comparing
+          // against correct_answer directly.
           isCorrect = normalize(selected_answer) === normalize(question.correct_answer);
         }
       } else if (selected_answer !== undefined && selected_answer !== null) {
