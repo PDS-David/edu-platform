@@ -72,13 +72,24 @@ NEW_API_IMAGE=$(docker inspect aischool_api:latest --format '{{.Id}}' 2>/dev/nul
 echo "  web image: ${NEW_WEB_IMAGE:0:20}..."
 echo "  api image: ${NEW_API_IMAGE:0:20}..."
 
-# 5. Force-recreate web and api containers (don't rely on image-ID comparison)
+# 5. Force-recreate all services (don't rely on image-ID comparison)
 echo ""
 echo "▶ 6/8  Bringing up all services..."
-docker compose up -d --force-recreate caddy redis
-# --force-recreate guarantees the container is replaced even if Docker thinks
-# the image ID hasn't changed (which can happen with layer caching quirks).
+# BUG FIX: caddy's depends_on lists api/web/api_staging/web_staging (see
+# docker-compose.yml). Without --no-deps, `docker compose up caddy redis`
+# also starts/recreates api and web as a side effect of satisfying caddy's
+# dependency graph — racing against the next command, which force-recreates
+# api and web again. The second recreate then references a container ID the
+# first one had already replaced, producing exactly the observed failure:
+# "Error response from daemon: No such container: <old-id>_aischool_api".
+# --no-deps on every `up` call here ensures each service is only ever
+# touched by its own explicit command, never as a side effect of another
+# service's dependency graph. api/web are brought up FIRST (before caddy)
+# so caddy's reverse-proxy upstreams are resolvable on the network the
+# moment caddy itself starts.
+docker compose up -d --no-deps --force-recreate redis
 docker compose up -d --no-deps --force-recreate api web
+docker compose up -d --no-deps --force-recreate caddy
 
 echo ""
 echo "  Waiting 25s for containers to become healthy..."
