@@ -421,6 +421,83 @@ router.get('/questions/pending', protect, adminOnly, async (req, res) => {
   }
 });
 
+
+// ── GET /api/admin/questions/orphaned ─────────────────────────────────────────
+// Lists approved/active questions with no subtopic_id — these were silently
+// excluded from every subject's practice pool by the cross-subject
+// contamination fix in questionsRoutes.js. Surfaced here so admin can
+// manually reassign a subtopic_id (the only safe way to recover them —
+// confirmed via direct DB query that no automated inference is possible:
+// 54% have no submitted_by at all, 36% belong to the generic Platform
+// Admin account, and every teacher who submitted the rest is assigned to
+// multiple subjects, so no single-subject inference can be made safely).
+router.get('/questions/orphaned', protect, adminOnly, async (req, res) => {
+  try {
+    const limit  = Math.min(parseInt(req.query.limit  || '20', 10), 100);
+    const offset = parseInt(req.query.offset || '0', 10);
+
+    const rows = await sequelize.query(
+      `SELECT
+         q.id, q.question_text, q.options, q.correct_answer,
+         q.difficulty, q.explanation, q.created_at,
+         u.first_name, u.last_name, u.email AS submitted_by_email
+       FROM questions q
+       LEFT JOIN users u ON q.submitted_by = u.id
+       WHERE q.subtopic_id IS NULL
+         AND q.is_active = true
+         AND COALESCE(q.status, 'pending') IN ('approved', 'active')
+       ORDER BY q.created_at DESC
+       LIMIT :limit OFFSET :offset`,
+      { replacements: { limit, offset }, type: QueryTypes.SELECT }
+    );
+
+    const [countRow] = await sequelize.query(
+      `SELECT COUNT(*)::INTEGER AS count
+       FROM questions
+       WHERE subtopic_id IS NULL
+         AND is_active = true
+         AND COALESCE(status, 'pending') IN ('approved', 'active')`,
+      { type: QueryTypes.SELECT }
+    );
+
+    return res.json({ success: true, data: rows, total: countRow?.count || 0 });
+  } catch (err) {
+    console.error('[GET /admin/questions/orphaned]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── PUT /api/admin/questions/:id/assign-subtopic ──────────────────────────────
+// Manually assigns a subtopic_id to an orphaned question, making it eligible
+// for that subtopic's subject practice/quiz pool going forward.
+router.put('/questions/:id/assign-subtopic', protect, adminOnly, adminActionLimiter, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { subtopic_id } = req.body;
+    if (!subtopic_id) {
+      return res.status(400).json({ success: false, error: 'subtopic_id is required' });
+    }
+
+    const subtopicCheck = await sequelize.query(
+      `SELECT id FROM subtopics WHERE id = :subtopic_id LIMIT 1`,
+      { replacements: { subtopic_id }, type: QueryTypes.SELECT }
+    );
+    if (!subtopicCheck.length) {
+      return res.status(404).json({ success: false, error: 'Subtopic not found' });
+    }
+
+    await sequelize.query(
+      `UPDATE questions SET subtopic_id = :subtopic_id, updated_at = NOW() WHERE id = :id`,
+      { replacements: { subtopic_id, id }, type: QueryTypes.UPDATE }
+    );
+
+    return res.json({ success: true, message: 'Question reassigned to subtopic' });
+  } catch (err) {
+    console.error('[PUT /admin/questions/:id/assign-subtopic]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // PUT /api/admin/questions/:id/review  — approve or reject a question
 router.put('/questions/:id/review', protect, adminOnly, adminActionLimiter, async (req, res) => {
   try {

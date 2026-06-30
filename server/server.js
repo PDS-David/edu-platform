@@ -268,6 +268,13 @@ if (notificationRoutes) app.use('/api/notifications', protect, notificationRoute
 if (pastPaperRoutes) app.use('/api/past-papers', pastPaperRoutes);
 if (videosRoutes) app.use('/api/videos', protect, videosRoutes);
 if (conceptRoutes) app.use('/api/concepts', protect, conceptRoutes);
+// catalogRoutes and examBoardRoutes are intentionally mounted WITHOUT
+// `protect` here — both are read-only-public-by-design (catalog browsing,
+// and exam-board lookup needed by the unauthenticated registration flow).
+// catalogRoutes gates its own write endpoints internally with
+// `protect, authorize('admin')` per-route; examBoardRoutes has no write
+// endpoints at all. See the file-level comment in examBoardRoutes.js
+// (SEC-1) for the full verification.
 if (catalogRoutes) app.use('/api/catalog', catalogRoutes);
 if (examBoardRoutes) app.use('/api/exam-boards', examBoardRoutes);
 if (aiChatRoute) app.use('/api/ai', protect, aiChatRoute);
