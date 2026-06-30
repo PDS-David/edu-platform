@@ -462,15 +462,35 @@ function OfficeViewer({ resource, onClose }) {
 }
 
 function TeacherInlineViewer({ resource, onClose }) {
-  const rawUrl = `/api/resources/${resource.id}/download`;
-  const type   = (resource.resource_type || resource.type || '').toLowerCase();
+  // Fetch a signed URL with auth token first — native <video>/<audio>/<img> tags
+  // cannot send Authorization headers, and the server redirects to Cloudflare R2
+  // which blocks cross-origin requests without a signed URL.
+  const type = (resource.resource_type || resource.type || '').toLowerCase();
+  const [signedUrl, setSignedUrl] = useState(null);
+  const [urlErr,    setUrlErr]    = useState(false);
+
+  useEffect(() => {
+    const token   = getToken() || '';
+    const rawBase = import.meta.env.VITE_API_URL || '';
+    const apiBase = rawBase.endsWith('/api') ? rawBase : rawBase ? `${rawBase}/api` : '/api';
+    fetch(`${apiBase}/resources/${resource.id}/download?direct=1`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(data => { if (data?.url) setSignedUrl(data.url); else setUrlErr(true); })
+      .catch(() => setUrlErr(true));
+  }, [resource.id]);
+
+  const rawUrl = signedUrl || '';
 
   if (type === 'video') return (
     <div className="border-t border-blue-100 bg-black">
       <div className="flex justify-end p-1 bg-gray-900">
         <button onClick={onClose} className="text-white/60 hover:text-white text-xs px-2 py-0.5">✕ close</button>
       </div>
-      <video src={rawUrl} controls className="w-full max-h-72" />
+      {urlErr  && <p className="text-xs text-red-400 p-3">Could not load video. Try downloading instead.</p>}
+      {!urlErr && rawUrl && <video src={rawUrl} controls className="w-full max-h-72" />}
+      {!urlErr && !rawUrl && <div className="flex items-center justify-center py-8"><Loader2 size={16} className="animate-spin text-white/40" /></div>}
     </div>
   );
 
@@ -480,7 +500,9 @@ function TeacherInlineViewer({ resource, onClose }) {
         <span className="text-xs text-gray-500 font-medium">Audio preview</span>
         <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xs">✕ close</button>
       </div>
-      <audio src={rawUrl} controls className="w-full" />
+      {urlErr  && <p className="text-xs text-red-400">Could not load audio. Try downloading instead.</p>}
+      {!urlErr && rawUrl && <audio src={rawUrl} controls className="w-full" />}
+      {!urlErr && !rawUrl && <div className="flex items-center gap-2 text-xs text-gray-400"><Loader2 size={12} className="animate-spin" /> Loading…</div>}
     </div>
   );
 
@@ -490,7 +512,9 @@ function TeacherInlineViewer({ resource, onClose }) {
         <span className="text-xs text-gray-500 font-medium">Image preview</span>
         <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xs">✕ close</button>
       </div>
-      <img src={rawUrl} alt={resource.title} className="max-h-64 mx-auto rounded-xl object-contain bg-white border border-gray-100" />
+      {urlErr  && <p className="text-xs text-red-400">Could not load image. Try downloading instead.</p>}
+      {!urlErr && rawUrl && <img src={rawUrl} alt={resource.title} className="max-h-64 mx-auto rounded-xl object-contain bg-white border border-gray-100" />}
+      {!urlErr && !rawUrl && <div className="flex items-center gap-2 text-xs text-gray-400"><Loader2 size={12} className="animate-spin" /> Loading…</div>}
     </div>
   );
 
