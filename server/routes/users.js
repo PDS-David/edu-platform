@@ -161,6 +161,82 @@ router.put('/:id/role', protect, authorize('admin'), adminActionLimiter, async (
 });
 
 // ─────────────────────────────────────────────
+// PUT /api/users/:id/profile
+// Issue 3: admin can fix a typo'd name or email — no destructive action,
+// purely a profile field correction. Validates email format and uniqueness
+// before writing, matching the same error convention used at registration
+// ("An account with that email already exists", 409).
+// ─────────────────────────────────────────────
+router.put('/:id/profile', protect, authorize('admin'), adminActionLimiter, async (req, res) => {
+  const targetId = req.params.id;
+  const first_name = typeof req.body.first_name === 'string' ? req.body.first_name.trim() : undefined;
+  const last_name  = typeof req.body.last_name  === 'string' ? req.body.last_name.trim()  : undefined;
+  const email      = typeof req.body.email      === 'string' ? req.body.email.trim().toLowerCase() : undefined;
+
+  if (first_name === undefined && last_name === undefined && email === undefined) {
+    return error(res, 'Nothing to update — provide first_name, last_name, and/or email', 400);
+  }
+  if (first_name !== undefined && !first_name) {
+    return error(res, 'First name cannot be empty', 400);
+  }
+  if (email !== undefined) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) return error(res, 'Invalid email format', 400);
+  }
+
+  try {
+    const [target] = await sequelize.query(
+      `SELECT id, email, first_name, last_name FROM users WHERE id = :id AND deleted_at IS NULL LIMIT 1`,
+      { replacements: { id: targetId }, type: QueryTypes.SELECT }
+    );
+    if (!target) return error(res, 'User not found', 404);
+
+    // Email uniqueness pre-check (same message/status as registration flow)
+    if (email !== undefined && email !== target.email) {
+      const [dup] = await sequelize.query(
+        `SELECT id FROM users WHERE email = :email AND id != :id LIMIT 1`,
+        { replacements: { email, id: targetId }, type: QueryTypes.SELECT }
+      );
+      if (dup) return error(res, 'An account with that email already exists', 409);
+    }
+
+    const setClauses = ['updated_at = NOW()'];
+    const replacements = { id: targetId };
+    if (first_name !== undefined) { setClauses.push('first_name = :first_name'); replacements.first_name = first_name; }
+    if (last_name  !== undefined) { setClauses.push('last_name = :last_name');   replacements.last_name  = last_name; }
+    if (email      !== undefined) { setClauses.push('email = :email');           replacements.email      = email; }
+
+    const rows = await sequelize.query(
+      `UPDATE users SET ${setClauses.join(', ')}
+       WHERE id = :id AND deleted_at IS NULL
+       RETURNING id, email, first_name, last_name`,
+      { replacements, type: QueryTypes.SELECT }
+    );
+    if (!rows.length) return error(res, 'User not found', 404);
+
+    await audit.log(req, audit.ACTIONS.USER_UPDATE, {
+      targetType: 'user', targetId, targetEmail: rows[0].email,
+      metadata: {
+        old: { first_name: target.first_name, last_name: target.last_name, email: target.email },
+        new: { first_name: rows[0].first_name, last_name: rows[0].last_name, email: rows[0].email },
+      },
+    });
+
+    return success(res, rows[0]);
+  } catch (err) {
+    // Defensive fallback: DB-level unique constraint violation (race condition
+    // between the pre-check above and the UPDATE) surfaces as a Postgres
+    // error with code 23505 — map it to the same clean message rather than
+    // letting a raw constraint error reach the client.
+    if (err.original?.code === '23505' || /unique/i.test(err.message)) {
+      return error(res, 'An account with that email already exists', 409);
+    }
+    console.error('[users.profile]', err.message);
+    return error(res, 'Failed to update profile');
+  }
+});
+
+// ─────────────────────────────────────────────
 // PUT /api/users/:id/deactivate
 // ─────────────────────────────────────────────
 router.put('/:id/deactivate', protect, authorize('admin'), adminActionLimiter, async (req, res) => {

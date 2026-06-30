@@ -1647,6 +1647,13 @@ const UserManagementPanel = () => {
   const [loading,    setLoading]    = useState(true);
   const [toast,      setToast]      = useState(null);
   const LIMIT = 20;
+  // Issue 3: edit user (name/email) modal state
+  const [editingUser, setEditingUser]   = useState(null); // { id, email, first_name, last_name }
+  const [editFirstName, setEditFirstName] = useState('');
+  const [editLastName,  setEditLastName]  = useState('');
+  const [editEmail,     setEditEmail]     = useState('');
+  const [editSaving,    setEditSaving]    = useState(false);
+  const [editError,     setEditError]     = useState('');
 
   const showToast = (message, type = 'success') => { setToast({ message, type }); setTimeout(() => setToast(null), 3500); };
 
@@ -1665,6 +1672,39 @@ const UserManagementPanel = () => {
   const deleteUser    = async (userId, email)          => {
     if (!window.confirm(`Delete "${email}"? Cannot be undone.`)) return;
     try { await api.delete(`/users/${userId}`, { headers: { 'X-Admin-Action': '1' } }); showToast(`User ${email} deleted`); fetchUsers(); } catch (err) { showToast(err?.message || 'Failed to delete', 'error'); }
+  };
+
+  // Issue 3: edit name/email — fix a typo without deactivate/role/delete.
+  const openEditUser = (u) => {
+    setEditingUser(u);
+    setEditFirstName(u.first_name || '');
+    setEditLastName(u.last_name || '');
+    setEditEmail(u.email || '');
+    setEditError('');
+  };
+
+  const handleSaveEditUser = async () => {
+    if (!editingUser) return;
+    setEditError('');
+    if (!editFirstName.trim()) { setEditError('First name cannot be empty'); return; }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(editEmail.trim())) { setEditError('Invalid email format'); return; }
+
+    setEditSaving(true);
+    try {
+      await api.put(`/users/${editingUser.id}/profile`, {
+        first_name: editFirstName.trim(),
+        last_name:  editLastName.trim(),
+        email:      editEmail.trim(),
+      });
+      showToast('Profile updated');
+      setEditingUser(null);
+      fetchUsers();
+    } catch (err) {
+      setEditError(err?.message || 'Failed to update profile');
+    } finally {
+      setEditSaving(false);
+    }
   };
 
   const roleBadge = (role) => ({ student: 'bg-blue-100 text-blue-700', teacher: 'bg-violet-100 text-violet-700', admin: 'bg-red-100 text-red-700' }[role] || 'bg-gray-100 text-gray-600');
@@ -1708,6 +1748,7 @@ const UserManagementPanel = () => {
                     <td className="px-4 py-3 hidden sm:table-cell text-gray-400 text-xs">{fmtDate(u.last_login)}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
+                        <button onClick={() => openEditUser(u)} title="Edit name/email" className="text-xs px-2.5 py-1 rounded-lg bg-gray-100 text-gray-500 hover:bg-violet-100 hover:text-violet-600"><Pencil size={12} /></button>
                         <select value={u.role} onChange={e => changeRole(u.id, e.target.value)} className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-violet-400"><option value="student">Student</option><option value="teacher">Teacher</option><option value="admin">Admin</option></select>
                         <button onClick={() => toggleActive(u.id, u.is_active)} className={`text-xs px-2.5 py-1 rounded-lg font-semibold ${u.is_active ? 'bg-red-50 text-red-500 hover:bg-red-100' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'}`}>{u.is_active ? 'Deactivate' : 'Activate'}</button>
                         <button onClick={() => deleteUser(u.id, u.email)} className="text-xs px-2.5 py-1 rounded-lg bg-gray-100 text-gray-500 hover:bg-red-100 hover:text-red-600"><Trash2 size={12} /></button>
@@ -1726,6 +1767,42 @@ const UserManagementPanel = () => {
           <div className="flex gap-2">
             <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="text-sm px-3 py-1.5 border border-gray-200 rounded-xl disabled:opacity-40 hover:bg-gray-50">← Previous</button>
             <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} className="text-sm px-3 py-1.5 border border-gray-200 rounded-xl disabled:opacity-40 hover:bg-gray-50">Next →</button>
+          </div>
+        </div>
+      )}
+
+      {/* Edit User Modal — Issue 3: fix typo'd name/email */}
+      {editingUser && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white border border-gray-200 rounded-xl shadow-2xl w-full max-w-sm p-6">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-bold text-gray-900">Edit User</h3>
+              <button onClick={() => setEditingUser(null)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+            </div>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">First Name *</label>
+                  <input value={editFirstName} onChange={e => setEditFirstName(e.target.value)} className={inputCls} />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Last Name</label>
+                  <input value={editLastName} onChange={e => setEditLastName(e.target.value)} className={inputCls} />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Email *</label>
+                <input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} className={inputCls} />
+              </div>
+              {editError && <p className="text-xs text-red-500">{editError}</p>}
+            </div>
+            <div className="flex justify-end gap-2 mt-6">
+              <button onClick={() => setEditingUser(null)} className="text-sm text-gray-500 hover:text-gray-700 px-4 py-2 rounded-xl border border-gray-200">Cancel</button>
+              <button onClick={handleSaveEditUser} disabled={editSaving}
+                className="flex items-center gap-1.5 text-sm bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white px-4 py-2 rounded-xl font-semibold">
+                {editSaving && <Loader2 size={14} className="animate-spin" />} Save Changes
+              </button>
+            </div>
           </div>
         </div>
       )}
