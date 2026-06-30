@@ -59,7 +59,7 @@ export default function StudentTestPage() {
   const handleSubmitRef = useRef(null);
 
   useEffect(() => {
-    api.get(`/student/test/${testId}`)
+    api.get(`/students/test/${testId}`)
       .then(r => {
         const t = r.data;
         setTest(t);
@@ -91,7 +91,7 @@ export default function StudentTestPage() {
         time_taken_ms: Math.round((Date.now() - startTime.current) / (test?.questions?.length || 1)),
       }));
       const res = await api.post(
-        `/student/test/${testId}/submit`,
+        `/students/test/${testId}/submit`,
         { answers: answersArray, total_time_ms: Date.now() - startTime.current }
       );
       setResult(res.data ?? res);
