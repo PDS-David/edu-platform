@@ -479,6 +479,7 @@ router.get('/class/:classId/analytics', protect, teacherOnly, requireTeacherClas
        FROM users u
        JOIN class_memberships cm ON cm.student_id=u.id AND cm.class_id=:classId
        LEFT JOIN practice_attempts pa ON pa.student_id=u.id
+       WHERE u.role = 'student'
        GROUP BY u.id ORDER BY accuracy_pct DESC NULLS LAST`,
       { classId: req.params.classId }
     );
@@ -508,12 +509,21 @@ router.get('/students', protect, teacherOnly, async (req, res) => {
        JOIN users   u ON u.id = cm.student_id
        JOIN classes c ON c.id = cm.class_id
        WHERE c.teacher_id = :teacherId
-         AND u.is_active  = true`,
+         AND u.is_active  = true
+         AND u.role       = 'student'`,
       { teacherId: req.user.id }
     );
 
     // T4: Path 2: students enrolled in subjects this teacher is assigned to
     // (teachers with direct subject assignments but no formal class still see their students)
+    // BUG FIX: this query had no role filter on `u` — any non-student account
+    // (admin, teacher, or any user) with a stray row in student_subjects
+    // (test data, a role change after enrolling, manual DB edits, etc.)
+    // would show up in a teacher's class list as if they were a student.
+    // Confirmed live: "Platform Admin" appeared as a student here. The
+    // student_subjects table itself has no role constraint — it's keyed
+    // purely by user id — so this must be enforced at every read site,
+    // not assumed from how the row was created.
     const subjectStudents = await safeQuery(
       `SELECT DISTINCT u.id, u.first_name, u.last_name, u.email,
               NULL AS class_id, NULL AS class_name, 'subject' AS source
@@ -522,7 +532,8 @@ router.get('/students', protect, teacherOnly, async (req, res) => {
        JOIN users u ON u.id = ss.student_id
        WHERE ts.teacher_id = :teacherId
          AND ss.is_active  = true
-         AND u.is_active   = true`,
+         AND u.is_active   = true
+         AND u.role        = 'student'`,
       { teacherId: req.user.id }
     );
 
@@ -875,7 +886,7 @@ router.delete('/tests/:id', protect, teacherOnly, async (req, res) => {
 router.post('/nudge/:userId', protect, teacherOnly, async (req, res) => {
   try {
     const users = await sequelize.query(
-      `SELECT id, first_name, email FROM users WHERE id=:id AND is_active = true`,
+      `SELECT id, first_name, email FROM users WHERE id=:id AND is_active = true AND role = 'student'`,
       { replacements: { id: req.params.userId }, type: QueryTypes.SELECT }
     );
     if (!users.length) return res.status(404).json({ success: false, error: 'User not found' });
