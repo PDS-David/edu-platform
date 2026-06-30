@@ -75,7 +75,7 @@ echo "  api image: ${NEW_API_IMAGE:0:20}..."
 # 5. Force-recreate web and api containers (don't rely on image-ID comparison)
 echo ""
 echo "▶ 6/8  Bringing up all services..."
-docker compose up -d caddy redis
+docker compose up -d --force-recreate caddy redis
 # --force-recreate guarantees the container is replaced even if Docker thinks
 # the image ID hasn't changed (which can happen with layer caching quirks).
 docker compose up -d --no-deps --force-recreate api web
