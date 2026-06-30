@@ -419,7 +419,13 @@ function MCQQuestion({ question, questionNumber, totalQuestions, onAnswer, onPre
         selected_answer:  selected,                        // option text
         time_taken_ms:    Date.now() - startTime.current,
       });
-      setResult(res);
+      // BUG FIX: same root cause as PracticeMode.jsx/QuizPage.jsx —
+      // apiClient only hoists a fixed allowlist of fields to the top level;
+      // is_correct/correct_answer/explanation/marks_awarded are NOT in that
+      // list and only exist at res.data. Reading them off `res` directly
+      // always returned undefined, so every answer showed as incorrect
+      // with no correct-answer text available, regardless of grading.
+      setResult(res.data);
       setExplainLoad(true);
       api.post('/ai/explain', { question_id: question.id })
         .then(r => { if (r.success) setAiExplain(r.data?.explanation ?? r.explanation); })

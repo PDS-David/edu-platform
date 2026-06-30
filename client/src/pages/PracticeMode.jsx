@@ -82,7 +82,18 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
         time_taken_ms:   Date.now() - startTime.current,
         mode:            'practice',
       });
-      setResult(res);
+      // BUG FIX (root cause of "always marked incorrect" / "correct answer
+      // not available"): apiClient's response interceptor only hoists a
+      // fixed allowlist of fields to the top level of its return value
+      // (total, count, meta, sent, inserted, etc.) — is_correct,
+      // correct_answer, explanation, marks_awarded, max_marks, and feedback
+      // are NOT in that list. The full grading payload only exists at
+      // res.data. `setResult(res)` was reading is_correct/correct_answer
+      // off `res` directly, which is always undefined there regardless of
+      // what the backend actually graded — so the UI showed "Incorrect"
+      // and "correct answer not available" on every single submission,
+      // including ones the backend graded correctly.
+      setResult(res.data);
     } catch {
       alert('Failed to submit answer. Please try again.');
     } finally {
@@ -101,7 +112,7 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
         time_taken_ms:  Date.now() - startTime.current,
         mode:           'practice',
       });
-      setResult(res);
+      setResult(res.data);
     } catch {
       alert('Failed to submit answer. Please try again.');
     } finally {
