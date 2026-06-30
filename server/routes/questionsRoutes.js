@@ -270,23 +270,20 @@ router.post('/:id/answer', protect, async (req, res) => {
     let marksAwarded = 0;
     let feedback     = null;
 
+    // Authoritative correct option text — resolved once, used for both
+    // grading and the response payload so the frontend never has to
+    // re-derive it from a fragile independent text comparison.
+    let correctOptionText = question.correct_answer;
+
     if (!isEssay) {
       // MCQ — grade against options[].is_correct (the authoritative flag set
       // at insert time), NOT a fresh text comparison against correct_answer.
       //
       // BUG FIX (grading-always-wrong): correct_answer and options[].option_text
-      // are stored independently. For AI-generated questions in particular,
-      // the model can produce correct_answer with different wording, spacing,
-      // or punctuation than the option it actually meant ("Hess's Law" vs
-      // "Hess's law of heat summation"), or a curly-quote mismatch the
-      // insert-time is_correct flagging (adminRoutes.js generate-questions)
-      // doesn't normalize for. When that happens, EVERY option compares false
-      // against correct_answer — including the one already flagged
-      // is_correct: true — so the student is marked wrong no matter what they
-      // pick. options[].is_correct is set once, deliberately, at question
-      // creation/review time and is the actual source of truth for what's
-      // correct; re-deriving it from a parallel text field on every answer
-      // submission is both redundant and the root cause of this bug.
+      // are stored independently. When they drift, EVERY option compares
+      // false against correct_answer — including the one already flagged
+      // is_correct: true — so the student is marked wrong no matter what
+      // they pick. options[].is_correct is the source of truth.
       const normalize = (s) =>
         String(s ?? '')
           .replace(/[\u2018\u2019\u201B]/g, "'")
@@ -302,25 +299,23 @@ router.post('/:id/answer', protect, async (req, res) => {
         ? opts.filter(o => o && typeof o === 'object' && o.option_text)
         : [];
 
+      // Resolve the authoritative correct option text for the RESPONSE
+      // payload (so the frontend can highlight it independent of grading) —
+      // prefer the flagged option, fall back to correct_answer column.
+      const flaggedCorrect = usableOpts.find(o => o.is_correct === true);
+      if (flaggedCorrect) correctOptionText = flaggedCorrect.option_text;
+
       if (selected_answer !== undefined && selected_answer !== null && usableOpts.length > 0) {
         const matchedOpt = usableOpts.find(o => normalize(o.option_text) === normalize(selected_answer));
-        // BUG FIX: a matched option's is_correct can be null (meaning "this
-        // question's options array has no correctness data at all" — see
-        // normalizeOptions() above, used by resourceQuestionExtractor.js
-        // questions) rather than a real boolean. Treating null the same as
-        // false here means every selection on those questions grades wrong,
-        // since *some* option always "matches" the student's selection.
-        // Only trust matchedOpt.is_correct when it's an actual boolean;
-        // otherwise this question has no per-option correctness data and we
-        // must fall back to comparing against correct_answer directly,
-        // exactly as the original (pre-INV-1) behavior did for this case.
+        // BUG FIX: a matched option's is_correct can be null (question has
+        // no per-option correctness data at all) rather than a real boolean.
+        // Treating null the same as false means every selection on those
+        // questions grades wrong, since *some* option always "matches" the
+        // student's selection. Only trust matchedOpt.is_correct when it's
+        // an actual boolean; otherwise fall back to correct_answer directly.
         if (matchedOpt && typeof matchedOpt.is_correct === 'boolean') {
-          // Found the exact option the student selected — trust its is_correct flag.
           isCorrect = matchedOpt.is_correct;
         } else {
-          // Either no match, or matched option has no reliable correctness
-          // data (is_correct is null/undefined) — fall back to comparing
-          // against correct_answer directly.
           isCorrect = normalize(selected_answer) === normalize(question.correct_answer);
         }
       } else if (selected_answer !== undefined && selected_answer !== null) {
@@ -370,12 +365,16 @@ router.post('/:id/answer', protect, async (req, res) => {
     awardXP(req.user.id, 'answer', { is_correct: isCorrect }).catch(() => {});
 
     return res.json({
-      success:        true,
-      is_correct:     isCorrect,
-      correct_answer: question.correct_answer,
-      explanation:    question.explanation || null,
-      marks_awarded:  marksAwarded,
-      max_marks:      question.marks || 1,
+      success:             true,
+      is_correct:          isCorrect,
+      correct_answer:      question.correct_answer,
+      // Authoritative text for frontend highlighting — resolved from
+      // options[].is_correct when available, falls back to correct_answer.
+      // Frontend should prefer this over correct_answer for matching.
+      correct_option_text: correctOptionText,
+      explanation:         question.explanation || null,
+      marks_awarded:       marksAwarded,
+      max_marks:           question.marks || 1,
       feedback,
     });
   } catch (err) {
