@@ -7,12 +7,13 @@ import {
   Plus, Pencil, Trash2, ChevronDown, ChevronRight,
   Loader2, X, Check, AlertTriangle, RefreshCw, GraduationCap,
   UserCheck, UserX, ChevronUp, Sparkles, Zap, Upload, CheckCircle, Shield, Mail,
-  Layers, Search,
+  Layers, Search, FileText,
 } from 'lucide-react';
 import branding from '../config/branding';
 import TopNav from '../components/TopNav';
 import { useCatalog } from '../hooks/useCatalog';
 import AdminBulkUploadPanel from '../components/AdminBulkUploadPanel';
+import UploadPastPaperForm from '../components/UploadPastPaperForm';
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Cell,
@@ -2072,9 +2073,11 @@ const ScrapePastPapersForm = ({ onImported, showToast }) => {
 const AdminPastPapersPanel = () => {
   const navigate = useNavigate();
   const [papers, setPapers] = useState([]);
+  const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const [filters, setFilters] = useState({ exam_board: '', year_from: '', year_to: '' });
+  const [showScraper, setShowScraper] = useState(false);
   const showToast = (message, type = 'success') => { setToast({ message, type }); setTimeout(() => setToast(null), 3500); };
 
   const fetchPapers = async () => {
@@ -2084,6 +2087,19 @@ const AdminPastPapersPanel = () => {
     finally { setLoading(false); }
   };
   useEffect(() => { fetchPapers(); }, []);
+  useEffect(() => {
+    api.get('/catalog/types').then(async r => {
+      const types = r.data || [];
+      const allSubjects = [];
+      for (const t of types) {
+        try {
+          const sr = await api.get(`/catalog/types/${t.id}/subjects`);
+          (sr.data || []).forEach(s => { if (!allSubjects.find(x => x.id === s.id)) allSubjects.push(s); });
+        } catch { /* skip */ }
+      }
+      setSubjects(allSubjects);
+    }).catch(() => {});
+  }, []);
 
   const handleDelete = async (id, title) => {
     if (!window.confirm(`Delete "${title}"?`)) return;
@@ -2103,12 +2119,30 @@ const AdminPastPapersPanel = () => {
           <button onClick={() => navigate('/past-papers')} className="flex items-center gap-2 text-sm border border-violet-200 text-violet-700 hover:bg-violet-50 font-semibold px-4 py-2 rounded-xl"><BookOpen size={14} /> Student View</button>
         </div>
       </div>
-      <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700 space-y-1">
-        <p><strong>How it works:</strong></p>
-        <p>• <strong>Import from URL</strong> — paste a webpage URL that contains links to PDF past papers. The system will scan the page and import all PDFs it finds automatically.</p>
-        <p>• <strong>Manage existing papers</strong> — view, search, and delete papers already in the system. Students see these on the Past Papers page.</p>
+
+      {/* Primary path: direct upload. Most sites block scraping, so this is
+          the reliable way to get real papers into the library. */}
+      <UploadPastPaperForm subjects={subjects} onUploaded={fetchPapers} showToast={showToast} />
+
+      {/* Secondary, minor-convenience path: URL scraping. Kept exactly as it
+          was — useful for the minority of sites that don't block it — but
+          tucked behind a toggle so it doesn't compete with the reliable
+          upload path above. */}
+      <div className="mb-5">
+        <button
+          onClick={() => setShowScraper(s => !s)}
+          className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1"
+        >
+          {showScraper ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+          {showScraper ? 'Hide' : 'Show'} advanced: import from a website URL (works only on sites that allow it)
+        </button>
+        {showScraper && (
+          <div className="mt-3">
+            <ScrapePastPapersForm onImported={fetchPapers} showToast={showToast} />
+          </div>
+        )}
       </div>
-      <ScrapePastPapersForm onImported={fetchPapers} showToast={showToast} />
+
       <div className="flex gap-3 mb-5 flex-wrap">
         <select value={filters.exam_board} onChange={e => setFilters(f => ({ ...f, exam_board: e.target.value }))} className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"><option value="">All Exam Types</option>{['JAMB','WAEC','NECO','GCE_OL','GCE_AL','IELTS','TOEFL','SAT','JUPEB'].map(c => <option key={c} value={c}>{c}</option>)}</select>
         <input type="number" min="1900" max="2099" placeholder="Year from" value={filters.year_from} onChange={e => setFilters(f => ({ ...f, year_from: e.target.value }))} className="w-28 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300" />

@@ -50,6 +50,7 @@ import SettingsPage from "./pages/SettingsPage";
 // Teacher
 import TeacherDashboard from "./pages/TeacherDashboard";
 import TeacherContentPage from "./pages/TeacherContentPage";
+import TeacherPastPapersPage from "./pages/TeacherPastPapersPage";
 import TeacherPendingQuestions from "./pages/TeacherPendingQuestions";
 import TeacherResourcesPage from "./pages/TeacherResourcesPage";
 import ContributeQuestion from "./pages/ContributeQuestion";
@@ -127,6 +128,7 @@ export default function App() {
             <Route path="dashboard" element={<TeacherDashboard />} />
             <Route path="assignments" element={<Navigate to="/teacher/dashboard?tab=testbuilder" replace />} />
             <Route path="content" element={<TeacherContentPage />} />
+            <Route path="past-papers" element={<TeacherPastPapersPage />} />
             <Route path="pending-questions" element={<TeacherPendingQuestions />} />
             <Route path="resources" element={<TeacherResourcesPage />} />
             <Route path="review" element={<QuestionReview />} />

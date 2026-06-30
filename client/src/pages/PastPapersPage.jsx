@@ -178,10 +178,13 @@ export default function PastPapersPage() {
                 ? 'Try a different filter combination, or clear all filters.'
                 : 'No past papers have been uploaded yet.'}
             </p>
-            {user?.role && ['admin','teacher'].includes(user.role) && (
-              <p className="text-xs text-blue-600">
-                Upload past papers from your dashboard under Past Papers management.
-              </p>
+            {user?.role && ['admin', 'teacher'].includes(user.role) && (
+              <Link
+                to={user.role === 'admin' ? '/admin/dashboard' : '/teacher/past-papers'}
+                className="text-xs text-blue-600 hover:underline font-semibold"
+              >
+                Upload a past paper →
+              </Link>
             )}
             {(board || subjectId) && (
               <button
