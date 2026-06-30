@@ -68,6 +68,31 @@ function InlineEdit({ value, onSave, onCancel, placeholder = 'Enter name…' }) 
 }
 
 // ── Confirm delete modal ──────────────────────────────────────────────────────
+// ── C2 fix: build a specific delete-impact message from real counts ──────────
+// Falls back to a sensible generic sentence if the impact fetch failed for
+// any reason (e.g. students_affected: null), rather than blocking deletion
+// or showing a misleading number.
+function buildTopicDeleteMessage(topic, impact) {
+  const count = impact?.subtopic_count ?? topic?.subtopic_count ?? 0;
+
+  if (count === 0) {
+    return `Delete topic "${topic.name}"? It has no subtopics, so nothing else will be affected.`;
+  }
+
+  const subtopicPart = `${count} subtopic${count === 1 ? '' : 's'}`;
+  const studentsAffected = impact?.students_affected;
+
+  if (studentsAffected === null || studentsAffected === undefined) {
+    return `Delete topic "${topic.name}"? This will remove ${subtopicPart} from students' view. Could not check how many students have progress on them.`;
+  }
+
+  if (studentsAffected === 0) {
+    return `Delete topic "${topic.name}"? This will remove ${subtopicPart}. No students currently have progress recorded on them.`;
+  }
+
+  return `Delete topic "${topic.name}"? This will remove ${subtopicPart} and permanently erase progress data for ${studentsAffected} student${studentsAffected === 1 ? '' : 's'} who studied them. This cannot be undone.`;
+}
+
 function ConfirmModal({ message, onConfirm, onCancel, loading }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
@@ -400,6 +425,8 @@ export default function TeacherContentPage() {
   const [loadingTop,   setLoadingTop]   = useState(false);
   const [showAddTopic, setShowAddTopic] = useState(false);
   const [confirmDel,   setConfirmDel]   = useState(null);
+  const [deleteImpact, setDeleteImpact] = useState(null);   // { subtopic_count, subtopic_names, students_affected }
+  const [loadingImpact,setLoadingImpact]= useState(false);
   const [deleting,     setDeleting]     = useState(false);
   const [toast,        setToast]        = useState(null);
 
@@ -491,6 +518,28 @@ export default function TeacherContentPage() {
     } finally {
       setDeleting(false);
       setConfirmDel(null);
+      setDeleteImpact(null);
+    }
+  };
+
+  // C2 fix: fetch the real cascade impact (subtopic count + students with
+  // recorded progress) BEFORE showing the confirmation, so the warning is
+  // specific to this exact topic instead of a static sentence that's the
+  // same regardless of what's actually about to be removed.
+  const openDeleteConfirm = async (topic) => {
+    setConfirmDel(topic);
+    setDeleteImpact(null);
+    setLoadingImpact(true);
+    try {
+      const r = await api.get(`/teacher/topics/${topic.id}/delete-impact`);
+      setDeleteImpact(r.data || r);
+    } catch {
+      // If the impact check fails, fall back to the topic's own subtopic_count
+      // (already present on the topic object from GET /teacher/topics) rather
+      // than blocking the delete flow entirely.
+      setDeleteImpact({ subtopic_count: topic.subtopic_count || 0, students_affected: null, subtopic_names: [] });
+    } finally {
+      setLoadingImpact(false);
     }
   };
 
@@ -603,7 +652,7 @@ export default function TeacherContentPage() {
                     subjectId={activeSubj.id}
                     showToast={showToast}
                     onEdit={handleEditTopic}
-                    onDelete={t => setConfirmDel(t)}
+                    onDelete={openDeleteConfirm}
                     onMove={handleMoveTopic}
                   />
                 ))}
@@ -632,10 +681,14 @@ export default function TeacherContentPage() {
 
       {confirmDel && (
         <ConfirmModal
-          message={`Delete topic "${confirmDel.name}"? All its subtopics will also be removed from students' view.`}
+          message={
+            loadingImpact
+              ? `Checking what depends on "${confirmDel.name}"…`
+              : buildTopicDeleteMessage(confirmDel, deleteImpact)
+          }
           onConfirm={handleDeleteTopic}
-          onCancel={() => setConfirmDel(null)}
-          loading={deleting}
+          onCancel={() => { setConfirmDel(null); setDeleteImpact(null); }}
+          loading={deleting || loadingImpact}
         />
       )}
 
