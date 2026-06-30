@@ -17,7 +17,12 @@ const API_BASE_URL = normalised.endsWith('/api') ? normalised : normalised + '/a
 export const TIMEOUT_DASHBOARD  = 10_000;  //  10 s — summary/metric cards
 export const TIMEOUT_ANALYTICS  = 15_000;  //  15 s — heavier aggregations
 export const TIMEOUT_DEFAULT    = 15_000;  //  15 s — standard API calls (DEF-005: was 90 s)
-export const TIMEOUT_AI         = 60_000;  //  60 s — AI vision/marking
+export const TIMEOUT_AI         = 60_000;  //  60 s — AI vision/marking (single image)
+export const TIMEOUT_AI_GENERATE = 110_000; // 110 s — AI question-batch generation (up to 15
+                                             //         questions through a model + fallback
+                                             //         chain). Kept just under Caddy's 120 s
+                                             //         read_timeout so the frontend doesn't
+                                             //         give up before the server would have.
 
 const apiClient = axios.create({
   baseURL:         API_BASE_URL,
