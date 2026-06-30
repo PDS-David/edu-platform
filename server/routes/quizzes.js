@@ -158,8 +158,18 @@ router.post('/attempt', protect, async (req, res) => {
 
       // Accept selected_answer (option text) OR selected_option_id (also option text in JSONB schema)
       const submittedAnswer = answer.selected_answer ?? answer.selected_option_id ?? '';
-      const isCorrect = String(submittedAnswer).trim().toLowerCase() ===
-                        String(question.correct_answer || '').trim().toLowerCase();
+      // BUG FIX: same normalization as questionsRoutes.js POST /:id/answer —
+      // curly quotes / non-breaking spaces in teacher-authored option text
+      // would otherwise make a genuinely correct answer compare as wrong.
+      const normalizeAnswer = (s) =>
+        String(s ?? '')
+          .replace(/[\u2018\u2019\u201B]/g, "'")
+          .replace(/[\u201C\u201D\u201F]/g, '"')
+          .replace(/[\u00A0\u2007\u202F]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .toLowerCase();
+      const isCorrect = normalizeAnswer(submittedAnswer) === normalizeAnswer(question.correct_answer);
       const marks     = isCorrect ? markValue : 0;
       totalScore     += marks;
 
