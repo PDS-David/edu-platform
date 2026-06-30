@@ -286,8 +286,16 @@ const RegisterPage = () => {
 
     api.get('/exam-boards')
       .then(res => {
-        // api.js interceptor returns response.data directly
-        // res = { success, count, data: [...boards] }
+        // GET /exam-boards returns { success, count, data: [...boards] }
+        // server-side, so res.data correctly resolves to the boards array
+        // via apiClient's unwrap. The `|| res` fallback below is defensive
+        // only — it is NOT true that "the interceptor returns response.data
+        // directly" as a general rule; see QuizPage.jsx header comment for
+        // the full contract. Only fields the interceptor explicitly hoists
+        // (data, success, message, total, count, meta, and a few admin-
+        // specific fields) are safe to read off the top level for ANY
+        // endpoint; everything else is at res.data, and only when the
+        // backend itself wrapped its response in data:{}.
         const boards = res.data || res || [];
         if (Array.isArray(boards) && boards.length > 0) {
           setCurricula(boards);

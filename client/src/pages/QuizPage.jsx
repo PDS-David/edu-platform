@@ -2,11 +2,18 @@
 // URL: /student/quiz/:subtopicId?paper=all|paper1|structured
 // Receives router state: { subtopicName, subjectName, examBoardName, subjectId }
 //
-// FIX v1.1: Replaced raw axios with api instance from services/api.js
-//   - Removed: import axios, const API, const authHeader
-//   - Added:   import api
-//   - Response shape updated: api interceptor returns response.data directly
-//   - Error handling for free_limit_reached (403) preserved correctly
+// RESPONSE SHAPE NOTE (this comment block previously claimed "api interceptor
+// returns response.data directly" — that claim is false and has caused two
+// separate regressions in this file's history, most recently in commit
+// 8820d4e which silently reverted a correct fix from 6dd9a6a as an unrelated
+// side effect of an unrelated commit. The actual contract:
+//   apiClient's interceptor returns { data, success, message, total, count,
+//   meta, sent, inserted, already_exists, unread_count, approval_status,
+//   httpStatus } — only THESE named fields are hoisted to the top level.
+//   Any other field the backend returns (is_correct, correct_answer,
+//   explanation, marks_awarded, attempt_id, etc.) only exists at res.data.
+// Always read res.data for anything not in that explicit list, never assume
+// a flat backend response means a flat client-side result.
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
@@ -270,9 +277,12 @@ export default function QuizPage() {
     }
     setSubmitting(true);
     try {
-      // api interceptor returns response.data directly
-      // res = { subtopic_id, total_score, max_score, accuracy_pct, passed, answers }
-      // There is no attempt_id — pass full result as inlineResult to QuizResultsPage
+      // POST /quizzes/attempt wraps its payload in data:{} server-side, so
+      // res.data is the actual result object: { subtopic_id, total_score,
+      // max_score, accuracy_pct, passed, answers, attempt_id, ... }.
+      // (Do not assume "interceptor returns response.data directly" — it
+      // does not; see file-header note above. The dual-path read below is
+      // intentional defensive coding, not a workaround for a flat response.)
       const res = await api.post('/quizzes/attempt', {
         subtopic_id:   subtopicId,
         subject_id:    subjectId,
