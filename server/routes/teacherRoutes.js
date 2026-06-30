@@ -365,29 +365,57 @@ router.post('/classes', protect, teacherOnly, async (req, res) => {
 });
 
 // ── GET /api/teacher/students-directory ───────────────────────────────────────
-// Returns ALL active students for the class-creation picker. Supports an
-// optional ?q= search across name + email so large rosters stay manageable.
+// Returns students for the class-creation picker, scoped to the requesting
+// teacher's own subject coverage. Supports an optional ?q= search across
+// name + email so large rosters stay manageable.
+//
+// SECURITY FIX (R2): this previously had no teacher scope at all --
+// `WHERE role = 'student' AND is_active = true` with no teacher_id filter --
+// returning up to 500 students from across the ENTIRE platform to any
+// teacher with a valid JWT, regardless of any connection to those students.
+// Confirmed directly against the live route before fixing, not assumed from
+// a prior description.
+//
+// Cannot scope this to "students already in one of my classes" (the pattern
+// used by GET /teacher/students below) -- this endpoint specifically backs
+// the class-CREATION search-to-add picker, where finding students who are
+// NOT YET in any of the teacher's classes is the entire point. That scope
+// would break the feature outright.
+//
+// Scoped instead to "students enrolled in any subject this teacher is
+// assigned to" via teacher_subjects -- a real, bounded boundary (every
+// other teacher's unrelated students are still excluded) that preserves the
+// legitimate "search my subject's students to add to a new class" workflow.
+// Matches the existing teacher_subjects + student_subjects join pattern
+// already established in GET /teacher/students (T4 fix) in this same file.
 router.get('/students-directory', protect, teacherOnly, async (req, res) => {
   const q = String(req.query.q || '').trim();
-  const replacements = {};
-  let where = `role = 'student' AND is_active = true`;
+  const replacements = { teacherId: req.user.id };
+  let searchClause = '';
   if (q) {
-    where += ` AND (
-      LOWER(first_name) LIKE :q OR
-      LOWER(last_name)  LIKE :q OR
-      LOWER(email)      LIKE :q OR
-      LOWER(first_name || ' ' || last_name) LIKE :q
+    searchClause = `AND (
+      LOWER(u.first_name) LIKE :q OR
+      LOWER(u.last_name)  LIKE :q OR
+      LOWER(u.email)      LIKE :q OR
+      LOWER(u.first_name || ' ' || u.last_name) LIKE :q
     )`;
     replacements.q = `%${q.toLowerCase()}%`;
   }
   try {
-    const rows = await sequelize.query(
-      `SELECT id, first_name, last_name, email
-         FROM users
-        WHERE ${where}
-        ORDER BY first_name, last_name
+    const rows = await safeQuery(
+      `SELECT DISTINCT u.id, u.first_name, u.last_name, u.email
+         FROM teacher_subjects ts
+         JOIN student_subjects ss ON ss.subject_id = ts.subject_id
+         JOIN users u ON u.id = ss.student_id
+        WHERE ts.teacher_id = :teacherId
+          AND ts.is_active  = true
+          AND ss.is_active  = true
+          AND u.is_active   = true
+          AND u.role        = 'student'
+          ${searchClause}
+        ORDER BY u.first_name, u.last_name
         LIMIT 500`,
-      { replacements, type: QueryTypes.SELECT }
+      replacements
     );
     return res.json({ success: true, data: rows });
   } catch (err) {
