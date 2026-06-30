@@ -957,6 +957,7 @@ function QuestionsTab({ showToast }) {
     const { question_text, subject_id, options, difficulty } = form;
     if (!question_text.trim())          { showToast('Question text is required.', 'error'); return; }
     if (!subject_id)                    { showToast('Please select a subject.', 'error'); return; }
+    if (!form.subtopic_id)              { showToast('Please select a subtopic — questions without one never reach students.', 'error'); return; }
     if (options.some(o => !o.text.trim())) { showToast('All 4 options must be filled.', 'error'); return; }
     if (!options.some(o => o.is_correct))  { showToast('Mark one option as correct.', 'error'); return; }
 
@@ -965,7 +966,7 @@ function QuestionsTab({ showToast }) {
       await api.post('/teacher/questions', {
         question_text: question_text.trim(),
         subject_id,
-        subtopic_id:   form.subtopic_id || null,
+        subtopic_id:   form.subtopic_id,
         difficulty,
         explanation:   form.explanation.trim() || null,
         options:       options.map(o => ({ option_text: o.text.trim(), is_correct: o.is_correct })),
@@ -1067,14 +1068,14 @@ function QuestionsTab({ showToast }) {
       {form.topic_id && (
         <div>
           <label className={lbl}>
-            Subtopic <span className="text-gray-400 font-normal">(optional — links question to specific content)</span>
+            Subtopic *
           </label>
           <select
             value={form.subtopic_id}
             onChange={e => setForm(f => ({ ...f, subtopic_id: e.target.value }))}
             className={inp}
           >
-            <option value="">No specific subtopic</option>
+            <option value="">— Select subtopic —</option>
             {subtopics.map(s => (
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}

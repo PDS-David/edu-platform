@@ -982,9 +982,26 @@ router.get('/questions', protect, teacherOnly, async (req, res) => {
 
 // ── POST /api/teacher/questions ───────────────────────────────────────────────
 // FIX: was parseInt(subtopic_id) — subtopic_id is a UUID foreign key
+//
+// BUG FIX: subtopic_id is now REQUIRED, not optional. The `questions` table
+// has no direct subject_id column — the only path from a question to a
+// subject/exam-board is question -> subtopic -> topic -> subject. A question
+// inserted with subtopic_id = null is a true orphan: GET /questions/random
+// (questionsRoutes.js) scopes by board/subject via that exact join chain, so
+// an orphaned question silently never reaches any student, with no error
+// anywhere — it just vanishes. TeacherAddQuestionPage.jsx already enforces
+// "select a subtopic" client-side; TeacherResourcesPage.jsx's QuestionsTab
+// did not (its subtopic field was explicitly labeled "optional"), and that
+// form also sends subject_id directly in the POST body, which this route
+// has never read at all — there is no subject-level fallback linkage,
+// subtopic_id is the only link that exists. Enforcing it here, in the one
+// route both forms call, fixes both UIs and any future caller at once,
+// instead of patching each form's client-side validation separately and
+// hoping nothing else ever skips it.
 router.post('/questions', protect, teacherOnly, async (req, res) => {
   const { question_text, subtopic_id, difficulty = 'medium', explanation, options } = req.body;
   if (!question_text?.trim()) return res.status(400).json({ success: false, error: 'question_text is required' });
+  if (!subtopic_id) return res.status(400).json({ success: false, error: 'Please select a subtopic — questions without one never reach students.' });
   if (!Array.isArray(options) || options.length < 2) return res.status(400).json({ success: false, error: 'At least 2 options required' });
   const correctOption = options.find(o => o.is_correct);
   if (!correctOption) return res.status(400).json({ success: false, error: 'One option must be marked correct' });
@@ -1002,7 +1019,7 @@ router.post('/questions', protect, teacherOnly, async (req, res) => {
       {
         replacements: {
           question_text:  question_text.trim(),
-          subtopic_id:    subtopic_id || null,
+          subtopic_id,
           submitted_by:   req.user.id,
           difficulty,
           explanation:    explanation?.trim() || null,
