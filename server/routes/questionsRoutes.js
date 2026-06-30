@@ -60,16 +60,18 @@ router.get('/random', protect, async (req, res) => {
     replacements.subtopic_id = subtopic_id;
   }
   if (subject_id) {
-    // With LEFT JOINs, t.subject_id is NULL for questions that have no subtopic_id.
-    // Use a subquery so subject-filtered quizzes still include those questions
-    // (they are linked via the subtopic chain when it exists, or orphaned otherwise).
-    // We match either the joined path OR a direct subject_id column on questions if it exists.
-    filters.push(`(
-      t.subject_id = :subject_id
-      OR (t.subject_id IS NULL AND q.subtopic_id IS NULL AND EXISTS (
-        SELECT 1 FROM subjects sub WHERE sub.id = :subject_id
-      ))
-    )`);
+    // BUG FIX (cross-subject contamination): the previous fallback branch
+    // included ANY orphaned question (no subtopic_id, so t.subject_id is
+    // NULL via the LEFT JOIN) as long as the requested subject_id existed
+    // ANYWHERE in the subjects table — it never actually checked that the
+    // orphaned question belonged to the requested subject. Since orphaned
+    // questions have no subject link at all, this matched them into EVERY
+    // subject's pool simultaneously. A student practising Physics would
+    // see GNS, Math, and Biology questions mixed in — exactly the reported
+    // symptom. Orphaned questions (no subtopic_id) cannot be reliably
+    // attributed to any subject, so they must be excluded from
+    // subject-filtered queries entirely rather than included everywhere.
+    filters.push('t.subject_id = :subject_id');
     replacements.subject_id = subject_id;
   }
   if (difficulty && ['easy','medium','hard'].includes(difficulty)) {
