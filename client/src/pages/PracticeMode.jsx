@@ -447,7 +447,7 @@ function EndScreen({ score, total, subjectName, onRetry, onBack }) {
             <ChevronLeft className="w-4 h-4" /> Dashboard
           </button>
           <button
-            onClick={onRetry}
+            onClick={() => onRetry()}
             className="flex-1 flex items-center justify-center gap-1.5 bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-3 rounded-xl text-sm transition-colors"
           >
             <RotateCcw className="w-4 h-4" /> Try Again

@@ -22,6 +22,69 @@ const audit = require('../services/auditLogger');
 const { requireConfirmHeader, requireAdminConfirm } = require('../middleware/confirmDestructive');
 
 // ─────────────────────────────────────────────
+// AI JSON SANITIZER
+// Gemini sometimes pretty-prints its JSON response with real newline/tab
+// bytes used both as structural whitespace (between tokens, fine for JSON)
+// AND inside string values (e.g. a multi-line explanation — invalid for
+// JSON, which requires \n escaped inside strings). A naive global
+// replace of every newline corrupts the structural whitespace too,
+// producing exactly the malformed text seen in production:
+//   "[\n{\n \"question_text\"..."
+// — the literal two-character sequence \n sitting where a real newline
+// used to be between tokens, which JSON.parse cannot tolerate either.
+//
+// This sanitizer walks the string character-by-character, tracking
+// whether we are currently inside a double-quoted JSON string (respecting
+// escape sequences), and only escapes control characters when inside a
+// string. Structural whitespace outside strings is left completely alone.
+// ─────────────────────────────────────────────
+function sanitizeAiJson(raw) {
+  let result = '';
+  let inString = false;
+  let escaped = false;
+
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+
+    if (inString) {
+      if (escaped) {
+        result += ch;
+        escaped = false;
+        continue;
+      }
+      if (ch === '\\') {
+        result += ch;
+        escaped = true;
+        continue;
+      }
+      if (ch === '"') {
+        result += ch;
+        inString = false;
+        continue;
+      }
+      // Inside a string: escape raw control characters instead of
+      // dropping or passing them through unescaped.
+      if (ch === '\n') { result += '\\n'; continue; }
+      if (ch === '\r') { continue; } // drop bare \r — \n (if present) already escaped above
+      if (ch === '\t') { result += '\\t'; continue; }
+      if (ch.charCodeAt(0) <= 0x1F) { continue; } // drop other control chars
+      result += ch;
+      continue;
+    }
+
+    // Outside a string — structural JSON whitespace is left untouched.
+    if (ch === '"') {
+      inString = true;
+      result += ch;
+      continue;
+    }
+    result += ch;
+  }
+
+  return result;
+}
+
+// ─────────────────────────────────────────────
 // ADMIN GUARD
 // ─────────────────────────────────────────────
 const adminOnly = (req, res, next) => {
@@ -538,13 +601,11 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
     // JSON spec requires these to be escaped as \n/\t inside strings;
     // JSON.parse throws "Bad control character in string literal" and the
     // ENTIRE batch generation fails, even though only one field in one
-    // question is malformed. Sanitize control characters (0x00-0x1F except
-    // the ones JSON already allows unescaped) before parsing, converting
-    // raw newlines/tabs to their escaped equivalents so the content survives
-    // intact instead of being silently dropped.
-    const sanitized = cleaned.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
-      .replace(/\r\n|\r|\n/g, '\\n')
-      .replace(/\t/g, '\\t');
+    // question is malformed. sanitizeAiJson() only escapes control
+    // characters that fall INSIDE a quoted JSON string — structural
+    // whitespace between tokens (which a naive global regex previously
+    // corrupted) is left untouched.
+    const sanitized = sanitizeAiJson(cleaned);
 
     let questions;
     try {
@@ -869,7 +930,17 @@ Rules:
 
     const raw     = await generate(prompt, 'generate-questions');
     const cleaned = raw.replace(/```json|```/g, '').trim();
-    const parsed  = JSON.parse(cleaned);
+    const sanitized = sanitizeAiJson(cleaned);
+
+    let parsed;
+    try {
+      parsed = JSON.parse(sanitized);
+    } catch (parseErr) {
+      return res.status(502).json({
+        success: false,
+        error: `AI returned malformed data and could not be parsed: ${parseErr.message}. Try generating again.`,
+      });
+    }
     const topicsArr = parsed.topics || [];
 
     if (!topicsArr.length) {
