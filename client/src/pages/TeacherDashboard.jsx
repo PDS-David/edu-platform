@@ -993,7 +993,7 @@ export default function TeacherDashboard() {
     { id: 'content',     label: 'Content',    icon: BookOpen, link: '/teacher/content'      },
     { id: 'resources',   label: 'Resources',  icon: Upload,   link: '/teacher/resources'    },
     { id: 'addq',        label: 'Add Q',      icon: Plus,     link: '/teacher/questions/add' },
-    { id: 'pastpapers',  label: 'Past Papers', icon: FileText, link: '/past-papers'           },
+    { id: 'pastpapers',  label: 'Past Papers', icon: FileText, link: '/teacher/past-papers'    },
 
   ];
 
@@ -1005,7 +1005,7 @@ export default function TeacherDashboard() {
     { id: 'content',     icon: BookOpen,  label: 'Content Manager', link: '/teacher/content'      },
     { id: 'resources',   icon: Upload,    label: 'Resources',       link: '/teacher/resources'    },
     { id: 'addq',        icon: Plus,      label: 'Add Question',    link: '/teacher/questions/add'},
-    { id: 'pastpapers',  icon: FileText,  label: 'Past Papers',     link: '/past-papers'          },
+    { id: 'pastpapers',  icon: FileText,  label: 'Past Papers',     link: '/teacher/past-papers'  },
 
   ];
 

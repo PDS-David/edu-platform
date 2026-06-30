@@ -89,7 +89,7 @@ router.get('/', async (req, res) => {
 
     const rows = await sequelize.query(
       `SELECT pp.id, pp.title, pp.exam_board, pp.year, pp.paper_type,
-              pp.file_url, pp.file_size_bytes, pp.created_at,
+              pp.file_url, pp.file_size_bytes, pp.created_at, pp.created_by,
               s.name AS subject_name
          FROM past_papers pp
          LEFT JOIN subjects s ON s.id = pp.subject_id
@@ -212,17 +212,31 @@ router.get('/:id/download', protect, async (req, res) => {
 });
 
 // ── DELETE /api/past-papers/:id ───────────────────────────────────────────────
-router.delete('/:id', protect, (req, res, next) => {
-  if (req.user?.role !== 'admin') return res.status(403).json({ success: false, error: 'Admin only' });
-  next();
-}, async (req, res) => {
+// Admin   → can delete any past paper.
+// Teacher → can only delete a paper they themselves uploaded (created_by match).
+router.delete('/:id', protect, teacherOrAdmin, async (req, res) => {
   try {
-    const rows = await sequelize.query(
-      `DELETE FROM past_papers WHERE id = :id RETURNING file_url`,
+    const existing = await sequelize.query(
+      `SELECT id, file_url, created_by FROM past_papers WHERE id = :id`,
+      { replacements: { id: req.params.id }, type: QueryTypes.SELECT }
+    );
+
+    if (!existing.length) {
+      return res.status(404).json({ success: false, error: 'Past paper not found' });
+    }
+
+    const paper = existing[0];
+
+    if (req.user.role !== 'admin' && paper.created_by !== req.user.id) {
+      return res.status(403).json({ success: false, error: 'You can only delete past papers you uploaded yourself' });
+    }
+
+    await sequelize.query(
+      `DELETE FROM past_papers WHERE id = :id`,
       { replacements: { id: req.params.id }, type: QueryTypes.DELETE }
     );
 
-    const fileUrl = rows?.[0]?.[0]?.file_url;
+    const fileUrl = paper.file_url;
     if (fileUrl) {
       if (/^https?:\/\//i.test(fileUrl)) {
         r2.deleteByUrl(fileUrl).catch(() => {});
