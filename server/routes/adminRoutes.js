@@ -531,11 +531,47 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
 
     const raw     = await generate(prompt, 'generate-questions');
     const cleaned = raw.replace(/```json|```/g, '').trim();
-    const questions = JSON.parse(cleaned);
+
+    // BUG FIX: Gemini occasionally emits raw, unescaped control characters
+    // (literal newlines/tabs/carriage returns) inside JSON string values —
+    // e.g. when writing a multi-line explanation or a stacked equation. The
+    // JSON spec requires these to be escaped as \n/\t inside strings;
+    // JSON.parse throws "Bad control character in string literal" and the
+    // ENTIRE batch generation fails, even though only one field in one
+    // question is malformed. Sanitize control characters (0x00-0x1F except
+    // the ones JSON already allows unescaped) before parsing, converting
+    // raw newlines/tabs to their escaped equivalents so the content survives
+    // intact instead of being silently dropped.
+    const sanitized = cleaned.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
+      .replace(/\r\n|\r|\n/g, '\\n')
+      .replace(/\t/g, '\\t');
+
+    let questions;
+    try {
+      questions = JSON.parse(sanitized);
+    } catch (parseErr) {
+      // Sanitization couldn't fix it — give the admin a clearer error than
+      // a raw JSON.parse stack trace with a byte offset.
+      return error(res, `AI returned malformed data and could not be parsed: ${parseErr.message}. Try generating again or reduce the question count.`, 502);
+    }
 
     let inserted = 0;
     let skipped  = 0;
     const skippedReasons = [];
+
+    // Same Unicode-aware normalization used by the grading endpoints
+    // (questionsRoutes.js POST /:id/answer, quizzes.js POST /attempt) so
+    // that is_correct is flagged using the identical comparison that will
+    // later be used to grade against it — eliminates the class of bug where
+    // insert-time matching and grading-time matching disagree.
+    const normalizeForMatch = (s) =>
+      String(s ?? '')
+        .replace(/[\u2018\u2019\u201B]/g, "'")
+        .replace(/[\u201C\u201D\u201F]/g, '"')
+        .replace(/[\u00A0\u2007\u202F]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
 
     for (const q of questions) {
       if (!q.question_text) { skipped++; continue; }
@@ -545,7 +581,7 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
         if (typeof opt === 'string') {
           return {
             option_text: opt,
-            is_correct:  opt.trim().toLowerCase() === (q.correct_answer || '').trim().toLowerCase(),
+            is_correct:  normalizeForMatch(opt) === normalizeForMatch(q.correct_answer || ''),
           };
         }
         return { option_text: opt.option_text || opt.text || String(opt), is_correct: !!opt.is_correct };
@@ -554,7 +590,7 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
       const anyCorrect = normOptions.some(o => o.is_correct);
       if (!anyCorrect && q.correct_answer) {
         normOptions.forEach(o => {
-          o.is_correct = o.option_text.trim().toLowerCase() === q.correct_answer.trim().toLowerCase();
+          o.is_correct = normalizeForMatch(o.option_text) === normalizeForMatch(q.correct_answer);
         });
       }
 

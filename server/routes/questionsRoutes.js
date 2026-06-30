@@ -253,14 +253,22 @@ router.post('/:id/answer', protect, async (req, res) => {
     let feedback     = null;
 
     if (!isEssay) {
-      // MCQ — compare against correct_answer
-      const correctAnswer = question.correct_answer;
-      // BUG FIX: a teacher's input device/browser can silently insert curly
-      // quotes or non-breaking spaces into option text. A plain
-      // trim().toLowerCase() comparison treats "don't" (straight quote) and
-      // "don't" (curly quote) as different strings, so the genuinely correct
-      // option could never match and every student answer — including the
-      // correct one — gets marked wrong. Normalize both sides identically.
+      // MCQ — grade against options[].is_correct (the authoritative flag set
+      // at insert time), NOT a fresh text comparison against correct_answer.
+      //
+      // BUG FIX (grading-always-wrong): correct_answer and options[].option_text
+      // are stored independently. For AI-generated questions in particular,
+      // the model can produce correct_answer with different wording, spacing,
+      // or punctuation than the option it actually meant ("Hess's Law" vs
+      // "Hess's law of heat summation"), or a curly-quote mismatch the
+      // insert-time is_correct flagging (adminRoutes.js generate-questions)
+      // doesn't normalize for. When that happens, EVERY option compares false
+      // against correct_answer — including the one already flagged
+      // is_correct: true — so the student is marked wrong no matter what they
+      // pick. options[].is_correct is set once, deliberately, at question
+      // creation/review time and is the actual source of truth for what's
+      // correct; re-deriving it from a parallel text field on every answer
+      // submission is both redundant and the root cause of this bug.
       const normalize = (s) =>
         String(s ?? '')
           .replace(/[\u2018\u2019\u201B]/g, "'")
@@ -269,8 +277,28 @@ router.post('/:id/answer', protect, async (req, res) => {
           .replace(/\s+/g, ' ')
           .trim()
           .toLowerCase();
-      if (selected_answer !== undefined && selected_answer !== null) {
-        isCorrect = normalize(selected_answer) === normalize(correctAnswer);
+
+      let opts = question.options;
+      if (typeof opts === 'string') { try { opts = JSON.parse(opts); } catch { opts = null; } }
+      const usableOpts = Array.isArray(opts)
+        ? opts.filter(o => o && typeof o === 'object' && o.option_text)
+        : [];
+
+      if (selected_answer !== undefined && selected_answer !== null && usableOpts.length > 0) {
+        const matchedOpt = usableOpts.find(o => normalize(o.option_text) === normalize(selected_answer));
+        if (matchedOpt) {
+          // Found the exact option the student selected — trust its is_correct flag.
+          isCorrect = !!matchedOpt.is_correct;
+        } else {
+          // Selected text didn't match any known option (shouldn't normally
+          // happen since the client only sends option_text it rendered) —
+          // fall back to comparing against correct_answer directly.
+          isCorrect = normalize(selected_answer) === normalize(question.correct_answer);
+        }
+      } else if (selected_answer !== undefined && selected_answer !== null) {
+        // No usable options array on this question — fall back to the
+        // original text-comparison behaviour.
+        isCorrect = normalize(selected_answer) === normalize(question.correct_answer);
       }
       marksAwarded = isCorrect ? (question.marks || 1) : 0;
     } else {
