@@ -36,13 +36,20 @@ function QuizQuestion({ question, questionNumber, submitRef, onAnswered }) {
     setSubmitting(true);
     try {
       const timeTaken = Date.now() - startTime.current;
-      // api interceptor returns response.data directly
-      // so `res` = { success, is_correct, correct_options, explanation, ... }
+      // BUG FIX: this comment previously claimed "api interceptor returns
+      // response.data directly" — that's incorrect. apiClient's interceptor
+      // returns a wrapper object that only hoists a fixed allowlist of
+      // fields to the top level (total, count, meta, sent, inserted, etc).
+      // is_correct/correct_answer/explanation/marks_awarded are NOT in that
+      // list — they only exist at res.data. Reading them off `res` directly
+      // (as this code previously did via setResult(res)) always returned
+      // undefined, regardless of what the backend actually graded — every
+      // answer showed as incorrect with no correct-answer text available.
       const res = await api.post(`/questions/${question.id}/answer`, {
         selected_answer: selected,   // option text — matches correct_answer in DB
         time_taken_ms:   timeTaken,
       });
-      setResult(res);
+      setResult(res.data);
 
       // Fire AI explanation in background — non-blocking
       setExplainLoad(true);
