@@ -134,6 +134,43 @@ router.put('/topics/:id', protect, teacherOnly, async (req, res) => {
   } catch (err) { return res.status(500).json({ success: false, error: err.message }); }
 });
 
+// ── GET /api/teacher/topics/:id/delete-impact ────────────────────────────────
+// C2 fix: read-only impact check so the UI can show a specific, accurate
+// warning before a topic delete proceeds — "this topic has 4 subtopics and
+// 12 students have recorded progress on them" instead of a generic static
+// sentence that says the same thing regardless of what's actually at stake.
+// Purely additive — no writes, no schema change.
+router.get('/topics/:id/delete-impact', protect, teacherOnly, async (req, res) => {
+  try {
+    const topicId = parseInt(req.params.id);
+    const subtopics = await sequelize.query(
+      `SELECT id, name FROM subtopics WHERE topic_id = :id AND is_active = true`,
+      { replacements: { id: topicId }, type: QueryTypes.SELECT }
+    );
+
+    let studentsAffected = 0;
+    if (subtopics.length > 0) {
+      const subtopicIds = subtopics.map(s => s.id);
+      const countRow = await sequelize.query(
+        `SELECT COUNT(DISTINCT student_id)::INTEGER AS count
+           FROM subtopic_progress
+          WHERE subtopic_id = ANY(:ids)`,
+        { replacements: { ids: subtopicIds }, type: QueryTypes.SELECT }
+      ).catch(() => [{ count: 0 }]); // table/column drift shouldn't block the warning UI
+      studentsAffected = countRow[0]?.count || 0;
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        subtopic_count:    subtopics.length,
+        subtopic_names:    subtopics.map(s => s.name),
+        students_affected: studentsAffected,
+      },
+    });
+  } catch (err) { return res.status(500).json({ success: false, error: err.message }); }
+});
+
 // ── DELETE /api/teacher/topics/:id ───────────────────────────────────────────
 // topics.id is INTEGER — parseInt(req.params.id) is correct here
 router.delete('/topics/:id', protect, teacherOnly, async (req, res) => {
