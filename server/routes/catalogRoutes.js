@@ -417,6 +417,15 @@ router.post('/teachers/:teacherId/assign', protect, authorize('admin'), async (r
   const { teacherId } = req.params;
   const { subject_ids } = req.body;
   if (!subject_ids?.length) return res.status(400).json({ success: false, error: 'subject_ids required' });
+  // PERF-2 FIX: subject_ids comes directly from req.body with no length cap.
+  // The loop below runs 2 sequential awaited DB queries per element — an
+  // unbounded array here means an unbounded number of sequential round-trips
+  // on one request. A realistic teacher-subject assignment is at most a
+  // handful of subjects; 100 is generous headroom while still preventing a
+  // request from submitting thousands of ids and tying up a connection.
+  if (subject_ids.length > 100) {
+    return res.status(400).json({ success: false, error: 'Too many subject_ids in one request (max 100)' });
+  }
 
   try {
     const teacher = await sequelize.query(
