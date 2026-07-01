@@ -564,12 +564,18 @@ function ProgressTab() {
 
 // ═════════════════════════════════════════════════════════════════════════════
 // MAIN PAGE COMPONENT
+// Props:
+//   embedded   {boolean} — when true, renders without the standalone
+//                         min-h-screen wrapper and sticky header.
+//                         Used by /em/practice and /em/progress where
+//                         EMLayout already provides the nav shell.
+//   defaultTab {string}  — 'practice' | 'progress'  (default: 'practice')
 // ═════════════════════════════════════════════════════════════════════════════
-export default function EnglishMasterclass() {
+export default function EnglishMasterclass({ embedded = false, defaultTab = 'practice' }) {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const [activeTab, setActiveTab]       = useState('practice');
+  const [activeTab, setActiveTab]       = useState(defaultTab);
   // practice flow states
   const [view, setView]                 = useState('levels'); // levels | session | summary
   const [categories, setCategories]     = useState([]);
@@ -655,6 +661,121 @@ export default function EnglishMasterclass() {
     { id: 'progress', label: 'My Progress', icon: TrendingUp },
   ];
 
+  // Shared tab bar component
+  const TabBar = () => (
+    <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+      {tabs.map(t => (
+        <button key={t.id} onClick={() => { setActiveTab(t.id); if (t.id === 'practice') backToLevels(); }}
+          className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
+            activeTab === t.id
+              ? 'bg-white text-indigo-700 shadow-sm'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}>
+          <t.icon size={13} />
+          <span className="hidden sm:inline">{t.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+
+  // ── Shared content block (used in both embedded and standalone) ───────────
+  const Content = () => (
+    <>
+      {activeTab === 'progress' && <ProgressTab />}
+
+      {activeTab === 'practice' && (
+        <>
+          {loadingInit && (
+            <div className="flex items-center justify-center py-24">
+              <Loader2 size={24} className="animate-spin text-indigo-500 mr-3" />
+              <span className="text-gray-500 text-sm">Loading English Masterclass…</span>
+            </div>
+          )}
+          {!loadingInit && initError && (
+            <div className="flex flex-col items-center py-24 gap-3">
+              <AlertCircle size={24} className="text-red-400" />
+              <p className="text-red-600 text-sm">{initError}</p>
+              <button onClick={() => window.location.reload()}
+                className="flex items-center gap-1 text-xs text-indigo-600 font-semibold hover:underline">
+                <RefreshCw size={12} /> Retry
+              </button>
+            </div>
+          )}
+          {!loadingInit && !initError && view === 'levels' && (
+            <div>
+              {levelProgress && !Object.values(levelProgress.category_progress || {}).length && (
+                <div className="mb-8 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-6 text-white">
+                  <h2 className="text-xl font-bold mb-1">Welcome to English Masterclass 🇬🇧</h2>
+                  <p className="text-sm text-indigo-100 leading-relaxed">
+                    Master British English vocabulary step by step. Start with <span className="font-semibold">Beginner</span> categories below.
+                    Score 60% or higher to unlock the next level!
+                  </p>
+                </div>
+              )}
+              {levelProgress && Object.values(levelProgress.category_progress || {}).length > 0 && (
+                <div className="mb-8 grid grid-cols-3 gap-3">
+                  {['Beginner', 'Intermediate', 'Advanced'].map(d => {
+                    const unlocked = levelProgress.unlocked?.[d];
+                    const s = DIFF_STYLE[d];
+                    return (
+                      <div key={d} className={`rounded-xl p-3 text-center border-2 ${unlocked ? `border-transparent bg-gradient-to-br ${s.glow} text-white shadow-sm` : 'border-dashed border-gray-200 bg-gray-50'}`}>
+                        <div className="text-lg mb-0.5">{d === 'Beginner' ? '🌱' : d === 'Intermediate' ? '🔥' : '⚡'}</div>
+                        <div className={`text-xs font-bold ${unlocked ? 'text-white' : 'text-gray-400'}`}>{d}</div>
+                        <div className={`text-[10px] mt-0.5 ${unlocked ? 'text-white/80' : 'text-gray-400'}`}>{unlocked ? 'Unlocked' : 'Locked'}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {['Beginner', 'Intermediate', 'Advanced'].map(diff => (
+                <LevelSection
+                  key={diff}
+                  level={diff}
+                  categories={byDiff[diff]}
+                  unlocked={levelProgress?.unlocked?.[diff] ?? (diff === 'Beginner')}
+                  categoryProgress={levelProgress?.category_progress}
+                  onStart={startPractice}
+                  loadingId={loadingCatId}
+                />
+              ))}
+            </div>
+          )}
+          {!loadingInit && !initError && view === 'session' && selectedCat && words.length > 0 && (
+            <PracticeSession
+              cat={selectedCat}
+              words={words}
+              onComplete={handleSessionComplete}
+              onBack={backToLevels}
+            />
+          )}
+          {!loadingInit && !initError && view === 'summary' && (
+            <SessionSummary
+              cat={selectedCat}
+              attempts={sessionAttempts}
+              onPracticeAgain={() => startPractice(selectedCat)}
+              onBackToLevels={backToLevels}
+            />
+          )}
+        </>
+      )}
+    </>
+  );
+
+  // ── Embedded mode — fits inside EMLayout (no standalone chrome) ───────────
+  if (embedded) {
+    return (
+      <div className="px-4 sm:px-6 py-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex justify-end mb-6">
+            <TabBar />
+          </div>
+          <Content />
+        </div>
+      </div>
+    );
+  }
+
+  // ── Standalone mode (existing student portal route) ───────────────────────
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
 
@@ -681,117 +802,14 @@ export default function EnglishMasterclass() {
           </div>
 
           {/* Right: tab switcher */}
-          <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
-            {tabs.map(t => (
-              <button key={t.id} onClick={() => { setActiveTab(t.id); if (t.id === 'practice') backToLevels(); }}
-                className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
-                  activeTab === t.id
-                    ? 'bg-white text-indigo-700 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}>
-                <t.icon size={13} />
-                <span className="hidden sm:inline">{t.label}</span>
-              </button>
-            ))}
-          </div>
+          <TabBar />
         </div>
       </div>
 
       {/* ── Content ────────────────────────────────────────────────────────── */}
       <div className="flex-1 px-4 sm:px-6 py-6">
         <div className="max-w-4xl mx-auto">
-
-          {activeTab === 'progress' && <ProgressTab />}
-
-          {activeTab === 'practice' && (
-            <>
-              {/* Loading state */}
-              {loadingInit && (
-                <div className="flex items-center justify-center py-24">
-                  <Loader2 size={24} className="animate-spin text-indigo-500 mr-3" />
-                  <span className="text-gray-500 text-sm">Loading English Masterclass…</span>
-                </div>
-              )}
-
-              {/* Error state */}
-              {!loadingInit && initError && (
-                <div className="flex flex-col items-center py-24 gap-3">
-                  <AlertCircle size={24} className="text-red-400" />
-                  <p className="text-red-600 text-sm">{initError}</p>
-                  <button onClick={() => window.location.reload()}
-                    className="flex items-center gap-1 text-xs text-indigo-600 font-semibold hover:underline">
-                    <RefreshCw size={12} /> Retry
-                  </button>
-                </div>
-              )}
-
-              {/* Levels grid view */}
-              {!loadingInit && !initError && view === 'levels' && (
-                <div>
-                  {/* Welcome banner for first-timers */}
-                  {levelProgress && !Object.values(levelProgress.category_progress || {}).length && (
-                    <div className="mb-8 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-6 text-white">
-                      <h2 className="text-xl font-bold mb-1">Welcome to English Masterclass 🇬🇧</h2>
-                      <p className="text-sm text-indigo-100 leading-relaxed">
-                        Master British English vocabulary step by step. Start with <span className="font-semibold">Beginner</span> categories below.
-                        Score 60% or higher to unlock the next level!
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Level progress strip (only show after at least one session) */}
-                  {levelProgress && Object.values(levelProgress.category_progress || {}).length > 0 && (
-                    <div className="mb-8 grid grid-cols-3 gap-3">
-                      {['Beginner', 'Intermediate', 'Advanced'].map(d => {
-                        const unlocked = levelProgress.unlocked?.[d];
-                        const s = DIFF_STYLE[d];
-                        return (
-                          <div key={d} className={`rounded-xl p-3 text-center border-2 ${unlocked ? `border-transparent bg-gradient-to-br ${s.glow} text-white shadow-sm` : 'border-dashed border-gray-200 bg-gray-50'}`}>
-                            <div className="text-lg mb-0.5">{d === 'Beginner' ? '🌱' : d === 'Intermediate' ? '🔥' : '⚡'}</div>
-                            <div className={`text-xs font-bold ${unlocked ? 'text-white' : 'text-gray-400'}`}>{d}</div>
-                            <div className={`text-[10px] mt-0.5 ${unlocked ? 'text-white/80' : 'text-gray-400'}`}>{unlocked ? 'Unlocked' : 'Locked'}</div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Difficulty sections */}
-                  {['Beginner', 'Intermediate', 'Advanced'].map(diff => (
-                    <LevelSection
-                      key={diff}
-                      level={diff}
-                      categories={byDiff[diff]}
-                      unlocked={levelProgress?.unlocked?.[diff] ?? (diff === 'Beginner')}
-                      categoryProgress={levelProgress?.category_progress}
-                      onStart={startPractice}
-                      loadingId={loadingCatId}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {/* Practice session */}
-              {!loadingInit && !initError && view === 'session' && selectedCat && words.length > 0 && (
-                <PracticeSession
-                  cat={selectedCat}
-                  words={words}
-                  onComplete={handleSessionComplete}
-                  onBack={backToLevels}
-                />
-              )}
-
-              {/* Session summary */}
-              {!loadingInit && !initError && view === 'summary' && (
-                <SessionSummary
-                  cat={selectedCat}
-                  attempts={sessionAttempts}
-                  onPracticeAgain={() => startPractice(selectedCat)}
-                  onBackToLevels={backToLevels}
-                />
-              )}
-            </>
-          )}
+          <Content />
         </div>
       </div>
     </div>

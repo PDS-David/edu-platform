@@ -3,9 +3,11 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 // Layout shells
 import TeacherLayout from "./layouts/TeacherLayout";
 import AdminLayout from "./layouts/AdminLayout";
+import EMLayout from "./layouts/EMLayout";
 
-// Auth guard
+// Auth guards
 import PrivateRoute from "./components/PrivateRoute";
+import EMPrivateRoute from "./components/EMPrivateRoute";
 
 // Public / auth pages
 import LandingPage from "./pages/LandingPage";
@@ -20,6 +22,10 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import PaymentVerify from "./pages/PaymentVerify";
 import NotFound from "./pages/NotFound";
+
+// English Masterclass standalone portal
+import EMLoginPage from "./pages/em/EMLoginPage";
+import EMDashboard from "./pages/em/EMDashboard";
 
 // Semi-public
 import PastPapersPage from "./pages/PastPapersPage";
@@ -75,8 +81,21 @@ export default function App() {
         <Route path="/terms" element={<TermsOfService />} />
         <Route path="/past-papers" element={<PastPapersPage />} />
         <Route path="/subjects" element={<SubjectCatalog />} />
-        {/* Public preview of English Masterclass — redirects authenticated students to the real module */}
-        <Route path="/english-masterclass" element={<Navigate to="/login?next=/student/english-masterclass" replace />} />
+        {/* English Masterclass public entry — goes to the dedicated EM login */}
+        <Route path="/english-masterclass" element={<Navigate to="/em/login" replace />} />
+
+        {/* ENGLISH MASTERCLASS — public login */}
+        <Route path="/em/login" element={<EMLoginPage />} />
+
+        {/* ENGLISH MASTERCLASS — protected portal (own layout, no AISchoolOnAir chrome) */}
+        <Route element={<EMPrivateRoute />}>
+          <Route element={<EMLayout />}>
+            <Route path="/em/dashboard" element={<EMDashboard />} />
+            <Route path="/em/practice"  element={<EnglishMasterclass embedded />} />
+            <Route path="/em/progress"  element={<EnglishMasterclass embedded defaultTab="progress" />} />
+            <Route path="/em"           element={<Navigate to="/em/dashboard" replace />} />
+          </Route>
+        </Route>
 
         {/* AUTH */}
         <Route path="/login" element={<LoginPage />} />
