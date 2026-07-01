@@ -286,6 +286,68 @@ router.get('/progress', async (req, res) => {
   }
 });
 
+// GET /api/english-masterclass/level-progress
+// Returns which difficulty tiers are unlocked for the current student.
+// Rules:
+//   Beginner    — always unlocked
+//   Intermediate — unlocked after student completes at least 1 Beginner session
+//                  with accuracy >= 60%
+//   Advanced    — unlocked after student completes at least 1 Intermediate session
+//                  with accuracy >= 60%
+// Also returns per-category best accuracy so the UI can show a mini progress bar.
+router.get('/level-progress', async (req, res) => {
+  const userId = req.user.id;
+  try {
+    // Fetch all sessions for this user (with the category's difficulty)
+    const sessions = await q(`
+      SELECT ps.category_id, ps.accuracy, c.difficulty
+        FROM em_practice_sessions ps
+        JOIN em_categories c ON c.id = ps.category_id
+       WHERE ps.user_id = $1
+    `, [userId]);
+
+    const hasPassedDifficulty = (diff) =>
+      sessions.some(s => s.difficulty === diff && s.accuracy >= 60);
+
+    const beginnerUnlocked      = true;
+    const intermediateUnlocked  = hasPassedDifficulty('Beginner');
+    const advancedUnlocked      = hasPassedDifficulty('Intermediate');
+
+    // Per-category best accuracy
+    const catBest = await q(`
+      SELECT ps.category_id,
+             MAX(ps.accuracy)::numeric(5,1) AS best_accuracy,
+             COUNT(*)::int AS session_count
+        FROM em_practice_sessions ps
+       WHERE ps.user_id = $1
+       GROUP BY ps.category_id
+    `, [userId]);
+
+    const categoryProgress = {};
+    catBest.forEach(r => {
+      categoryProgress[r.category_id] = {
+        best_accuracy: parseFloat(r.best_accuracy),
+        session_count: r.session_count,
+      };
+    });
+
+    res.json({
+      success: true,
+      data: {
+        unlocked: {
+          Beginner:     beginnerUnlocked,
+          Intermediate: intermediateUnlocked,
+          Advanced:     advancedUnlocked,
+        },
+        category_progress: categoryProgress,
+      },
+    });
+  } catch (err) {
+    console.error('[EM] GET /level-progress', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ═════════════════════════════════════════════════════════════════════════════
 // ADMIN ROUTES
 // ═════════════════════════════════════════════════════════════════════════════
