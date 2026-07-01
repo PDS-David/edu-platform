@@ -26,6 +26,8 @@ import NotFound from "./pages/NotFound";
 // English Masterclass standalone portal
 import EMLoginPage from "./pages/em/EMLoginPage";
 import EMDashboard from "./pages/em/EMDashboard";
+import EMPractice  from "./pages/em/EMPractice";
+import EMProgress  from "./pages/em/EMProgress";
 
 // Semi-public
 import PastPapersPage from "./pages/PastPapersPage";
@@ -91,8 +93,8 @@ export default function App() {
         <Route element={<EMPrivateRoute />}>
           <Route element={<EMLayout />}>
             <Route path="/em/dashboard" element={<EMDashboard />} />
-            <Route path="/em/practice"  element={<EnglishMasterclass embedded />} />
-            <Route path="/em/progress"  element={<EnglishMasterclass embedded defaultTab="progress" />} />
+            <Route path="/em/practice"  element={<EMPractice />} />
+            <Route path="/em/progress"  element={<EMProgress />} />
             <Route path="/em"           element={<Navigate to="/em/dashboard" replace />} />
           </Route>
         </Route>
