@@ -169,10 +169,14 @@ export default function EMLoginPage() {
 
                 {/* Email */}
                 <div className="relative">
-                  <label className="absolute -top-2 left-3 px-1 bg-white text-xs text-gray-500 font-medium z-10">
+                  <label
+                    htmlFor="em-email"
+                    className="absolute -top-2 left-3 px-1 bg-white text-xs text-gray-500 font-medium z-10"
+                  >
                     Email Address *
                   </label>
                   <input
+                    id="em-email"
                     type="email"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
@@ -188,10 +192,14 @@ export default function EMLoginPage() {
 
                 {/* Password */}
                 <div className="relative">
-                  <label className="absolute -top-2 left-3 px-1 bg-white text-xs text-gray-500 font-medium z-10">
+                  <label
+                    htmlFor="em-password"
+                    className="absolute -top-2 left-3 px-1 bg-white text-xs text-gray-500 font-medium z-10"
+                  >
                     Password *
                   </label>
                   <input
+                    id="em-password"
                     type={showPass ? 'text' : 'password'}
                     value={password}
                     onChange={e => setPassword(e.target.value)}
@@ -205,6 +213,7 @@ export default function EMLoginPage() {
                   <button
                     type="button"
                     onClick={() => setShowPass(s => !s)}
+                    aria-label={showPass ? 'Hide password' : 'Show password'}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                     tabIndex={-1}
                   >
@@ -227,13 +236,10 @@ export default function EMLoginPage() {
                 <button
                   type="submit"
                   disabled={loading || !isReady}
-                  className="w-full py-3 rounded-lg text-sm font-bold text-white transition-all mt-1 shadow-md"
+                  className="w-full py-3 rounded-lg text-sm font-bold text-white transition-all mt-1"
                   style={{
-                    background:  isReady && !loading
-                      ? `linear-gradient(135deg, ${NAVY} 0%, #1e3a6e 100%)`
-                      : '#d1d5db',
-                    cursor: isReady && !loading ? 'pointer' : 'not-allowed',
-                    borderBottom: isReady && !loading ? `3px solid ${GOLD}` : 'none',
+                    background: isReady && !loading ? '#1D2F6F' : '#d1d5db',
+                    cursor:     isReady && !loading ? 'pointer'  : 'not-allowed',
                   }}
                 >
                   {loading ? (
