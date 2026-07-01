@@ -75,6 +75,8 @@ export default function App() {
         <Route path="/terms" element={<TermsOfService />} />
         <Route path="/past-papers" element={<PastPapersPage />} />
         <Route path="/subjects" element={<SubjectCatalog />} />
+        {/* Public preview of English Masterclass — redirects authenticated students to the real module */}
+        <Route path="/english-masterclass" element={<Navigate to="/login?next=/student/english-masterclass" replace />} />
 
         {/* AUTH */}
         <Route path="/login" element={<LoginPage />} />
@@ -90,7 +92,7 @@ export default function App() {
           <Route path="/onboarding" element={<OnboardingPage />} />
         </Route>
 
-        {/* STUDENT */}
+        {/* STUDENT — shell routes (sidebar + TopNav) */}
         <Route element={<PrivateRoute allowedRoles={["student"]} />}>
           <Route path="/student" element={<StudentDashboard />}>
             {/* DEF-003: DashboardContent is the index child so /student and /student/dashboard
@@ -117,8 +119,10 @@ export default function App() {
             <Route path="files"      element={<Navigate to="/student/resources" replace />} />
             <Route path="resources"  element={<StudentFilesPage />} />
             <Route path="exam-types" element={<StudentExamTypesPage />} />
-            <Route path="english-masterclass" element={<EnglishMasterclass />} />
           </Route>
+
+          {/* English Masterclass — standalone route, own full-screen shell */}
+          <Route path="/student/english-masterclass" element={<EnglishMasterclass />} />
         </Route>
 
         {/* TEACHER */}
