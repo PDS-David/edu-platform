@@ -2,7 +2,7 @@
 // Admin panel for managing English Masterclass content:
 // categories, words, and AI word-list generation.
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, useId } from 'react';
 import api from '../services/apiClient';
 import {
   Plus, Trash2, Pencil, Save, X, Loader2, Sparkles,
@@ -29,22 +29,24 @@ function Toast({ msg, type }) {
 }
 
 // ── Inline editable field ────────────────────────────────────────────────────
-function Field({ label, value, onChange, type = 'text', placeholder }) {
+function Field({ id, label, value, onChange, type = 'text', placeholder, autoFocus }) {
+  const generatedId = useId();
+  const fieldId = id || generatedId;
   return (
     <div>
-      <label className="block text-xs font-semibold text-gray-600 mb-1">{label}</label>
+      <label htmlFor={fieldId} className="block text-xs font-semibold text-gray-600 mb-1">{label}</label>
       {type === 'textarea' ? (
-        <textarea value={value} onChange={e => onChange(e.target.value)}
-          placeholder={placeholder} rows={2}
+        <textarea id={fieldId} value={value} onChange={e => onChange(e.target.value)}
+          placeholder={placeholder} rows={2} autoFocus={autoFocus}
           className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none" />
       ) : type === 'select' ? (
-        <select value={value} onChange={e => onChange(e.target.value)}
+        <select id={fieldId} value={value} onChange={e => onChange(e.target.value)} autoFocus={autoFocus}
           className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
           {DIFFICULTIES.map(d => <option key={d}>{d}</option>)}
         </select>
       ) : (
-        <input type={type} value={value} onChange={e => onChange(e.target.value)}
-          placeholder={placeholder}
+        <input id={fieldId} type={type} value={value} onChange={e => onChange(e.target.value)}
+          placeholder={placeholder} autoFocus={autoFocus}
           className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
       )}
     </div>
@@ -63,6 +65,58 @@ function WordModal({ word, categoryId, onClose, onSaved, toast }) {
   });
   const [saving, setSaving]       = useState(false);
   const [explaining, setExplaining] = useState(false);
+
+  const titleId = useId();
+  const dialogRef = useRef(null);
+  const closeButtonRef = useRef(null);
+  const previouslyFocusedRef = useRef(null);
+
+  // Focus trap + Escape-to-close + focus restoration
+  useEffect(() => {
+    previouslyFocusedRef.current = document.activeElement;
+
+    // Focus the first focusable element inside the dialog on open
+    const focusables = () =>
+      dialogRef.current
+        ? Array.from(
+            dialogRef.current.querySelectorAll(
+              'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+            )
+          ).filter(el => !el.disabled && el.offsetParent !== null)
+        : [];
+
+    const firstFocusable = focusables()[0];
+    (firstFocusable || closeButtonRef.current)?.focus();
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onClose();
+        return;
+      }
+      if (e.key === 'Tab') {
+        const elements = focusables();
+        if (elements.length === 0) return;
+        const first = elements[0];
+        const last = elements[elements.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      // Return focus to whatever triggered the modal
+      previouslyFocusedRef.current?.focus?.();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const set = (k) => (v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -107,27 +161,33 @@ function WordModal({ word, categoryId, onClose, onSaved, toast }) {
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden"
+      >
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gradient-to-r from-indigo-600 to-purple-600">
-          <h3 className="text-white font-bold">{isEdit ? 'Edit Word' : 'Add New Word'}</h3>
-          <button onClick={onClose} className="text-white/70 hover:text-white"><X size={18} /></button>
+          <h3 id={titleId} className="text-white font-bold">{isEdit ? 'Edit Word' : 'Add New Word'}</h3>
+          <button ref={closeButtonRef} onClick={onClose} aria-label="Close dialog" className="text-white/70 hover:text-white"><X size={18} /></button>
         </div>
         <div className="p-5 space-y-3">
           <div className="flex gap-2">
             <div className="flex-1">
-              <Field label="Word *" value={form.word} onChange={set('word')} placeholder="e.g. queue" />
+              <Field id="word-field-word" label="Word *" value={form.word} onChange={set('word')} placeholder="e.g. queue" />
             </div>
             <button onClick={aiExplain} disabled={explaining || !form.word.trim()}
-              title="Let AI fill in the details"
+              aria-label="Let AI fill in the details" title="Let AI fill in the details"
               className="self-end flex items-center gap-1 text-xs bg-indigo-50 text-indigo-600 font-semibold px-3 py-2 rounded-lg hover:bg-indigo-100 disabled:opacity-40 transition-colors">
               {explaining ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
               AI Fill
             </button>
           </div>
-          <Field label="Phonetic (British IPA)" value={form.phonetic} onChange={set('phonetic')} placeholder="e.g. /kjuː/" />
-          <Field label="Definition" value={form.definition} onChange={set('definition')} type="textarea" placeholder="British English definition" />
-          <Field label="Example Sentence" value={form.example_sentence} onChange={set('example_sentence')} type="textarea" placeholder="A natural British English example" />
-          <Field label="Difficulty" value={form.difficulty} onChange={set('difficulty')} type="select" />
+          <Field id="word-field-phonetic" label="Phonetic (British IPA)" value={form.phonetic} onChange={set('phonetic')} placeholder="e.g. /kjuː/" />
+          <Field id="word-field-definition" label="Definition" value={form.definition} onChange={set('definition')} type="textarea" placeholder="British English definition" />
+          <Field id="word-field-example" label="Example Sentence" value={form.example_sentence} onChange={set('example_sentence')} type="textarea" placeholder="A natural British English example" />
+          <Field id="word-field-difficulty" label="Difficulty" value={form.difficulty} onChange={set('difficulty')} type="select" />
         </div>
         <div className="px-5 pb-5 flex gap-3">
           <button onClick={handleSave} disabled={saving}
