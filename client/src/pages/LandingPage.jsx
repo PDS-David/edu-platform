@@ -95,8 +95,11 @@ export default function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [loginMenuOpen, setLoginMenuOpen] = useState(false);       // desktop "Login" dropdown
   const [mobileLoginOpen, setMobileLoginOpen] = useState(false);   // mobile "Login" submenu
+  const [startFreeMenuOpen, setStartFreeMenuOpen] = useState(false);       // desktop "Start Free" dropdown
+  const [mobileStartFreeOpen, setMobileStartFreeOpen] = useState(false);   // mobile "Start Free" submenu
   const [stats, setStats] = useState(STATS_FALLBACK);
   const loginMenuRef = useRef(null);
+  const startFreeMenuRef = useRef(null);
 
   // Click-to-open / click-outside-to-close for the desktop Login dropdown.
   // Previously used onMouseEnter/onMouseLeave, which broke because the
@@ -117,6 +120,19 @@ export default function LandingPage() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [loginMenuOpen]);
+
+  // Same click-to-open / click-outside-to-close pattern for the nav
+  // "Start Free" dropdown (see below for why this became a dropdown).
+  useEffect(() => {
+    if (!startFreeMenuOpen) return;
+    const handleClickOutside = (e) => {
+      if (startFreeMenuRef.current && !startFreeMenuRef.current.contains(e.target)) {
+        setStartFreeMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [startFreeMenuOpen]);
 
   // X5 fix: replace the two genuinely-numeric placeholder entries with real
   // counts once available. Intentionally fails silently — a landing page's
@@ -181,9 +197,37 @@ export default function LandingPage() {
                 )}
               </div>
 
-              <Link to="/register" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-xl transition-colors text-sm">
-                Start Free
-              </Link>
+              {/* Start Free — was a plain Link to /register, which silently sent
+                  every visitor (including ones interested in English
+                  Masterclass) into AISchoolOnAir's signup. Now a dropdown,
+                  mirroring the Login picker above, so EM-interested visitors
+                  land on /em/login (their real entry point — see EMPrivateRoute)
+                  instead of the wrong product's signup form. */}
+              <div className="relative" ref={startFreeMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setStartFreeMenuOpen(o => !o)}
+                  aria-expanded={startFreeMenuOpen}
+                  className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-xl transition-colors text-sm"
+                >
+                  Start Free
+                  <ChevronDown size={14} className={`transition-transform ${startFreeMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {startFreeMenuOpen && (
+                  <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-50">
+                    <Link to="/register" onClick={() => setStartFreeMenuOpen(false)}
+                      className="block px-4 py-2.5 hover:bg-gray-50 transition-colors">
+                      <p className="font-semibold text-gray-900 text-sm">AISchoolonair</p>
+                      <p className="text-xs text-gray-400">Exam practice &amp; AI tutoring</p>
+                    </Link>
+                    <Link to="/english-masterclass" onClick={() => setStartFreeMenuOpen(false)}
+                      className="block px-4 py-2.5 hover:bg-gray-50 transition-colors">
+                      <p className="font-semibold text-gray-900 text-sm">English Masterclass</p>
+                      <p className="text-xs text-gray-400">British English training</p>
+                    </Link>
+                  </div>
+                )}
+              </div>
             </nav>
             {/* Mobile hamburger */}
             <button onClick={() => { setMenuOpen(o => !o); setMobileLoginOpen(false); }} className="md:hidden p-2 text-gray-500 hover:text-gray-700">
@@ -230,10 +274,30 @@ export default function LandingPage() {
             )}
           </div>
 
-          <Link to="/register" onClick={() => setMenuOpen(false)}
-            className="block w-full text-center bg-blue-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm">
-            Start Free
-          </Link>
+          {/* Start Free — expandable submenu, mirrors the Login submenu above */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setMobileStartFreeOpen(o => !o)}
+              aria-expanded={mobileStartFreeOpen}
+              className="flex items-center justify-between w-full text-center bg-blue-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm"
+            >
+              <span className="mx-auto">Start Free</span>
+              <ChevronDown size={16} className={`transition-transform shrink-0 ${mobileStartFreeOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {mobileStartFreeOpen && (
+              <div className="pl-3 mt-2 space-y-2 border-l-2 border-gray-100">
+                <Link to="/register" onClick={() => setMenuOpen(false)} className="block py-1">
+                  <p className="text-sm font-medium text-gray-700">AISchoolonair</p>
+                  <p className="text-xs text-gray-400">Exam practice &amp; AI tutoring</p>
+                </Link>
+                <Link to="/english-masterclass" onClick={() => setMenuOpen(false)} className="block py-1">
+                  <p className="text-sm font-medium text-gray-700">English Masterclass</p>
+                  <p className="text-xs text-gray-400">British English training</p>
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
