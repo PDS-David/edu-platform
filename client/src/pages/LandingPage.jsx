@@ -7,7 +7,7 @@ import { Link } from 'react-router-dom';
 import api from '../services/apiClient';
 import {
   Lightbulb, BookOpen, TrendingUp, BarChart3, PenTool,
-  FileText, Check, X, Menu, ChevronRight,
+  FileText, Check, X, Menu, ChevronRight, ChevronDown,
   Mail, Phone, MapPin, Twitter, Facebook, Linkedin, Instagram,
   Volume2, Layers, Flame, Crown,
 } from 'lucide-react';
@@ -93,6 +93,8 @@ const CellIcon = ({ val }) => {
 // ══════════════════════════════════════════════════════════════════════════════
 export default function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [loginMenuOpen, setLoginMenuOpen] = useState(false);       // desktop "Login" dropdown
+  const [mobileLoginOpen, setMobileLoginOpen] = useState(false);   // mobile "Login" submenu
   const [stats, setStats] = useState(STATS_FALLBACK);
 
   // X5 fix: replace the two genuinely-numeric placeholder entries with real
@@ -129,14 +131,45 @@ export default function LandingPage() {
             <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-gray-600">
               <a href="#features"     className="hover:text-blue-600 transition-colors">Features</a>
               <a href="#subjects"     className="hover:text-blue-600 transition-colors">Subjects</a>
-              <Link to="/english-masterclass" className="hover:text-blue-600 transition-colors">English Masterclass</Link>
-              <Link to="/login"       className="hover:text-blue-600 transition-colors">Login</Link>
+
+              {/* Login — dropdown so it's never confused with a single product's
+                  login, and doesn't imply English Masterclass is a page section */}
+              <div
+                className="relative"
+                onMouseEnter={() => setLoginMenuOpen(true)}
+                onMouseLeave={() => setLoginMenuOpen(false)}
+              >
+                <button
+                  type="button"
+                  onClick={() => setLoginMenuOpen(o => !o)}
+                  aria-expanded={loginMenuOpen}
+                  className="flex items-center gap-1 hover:text-blue-600 transition-colors"
+                >
+                  Login
+                  <ChevronDown size={14} className={`transition-transform ${loginMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {loginMenuOpen && (
+                  <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-50">
+                    <Link to="/login" onClick={() => setLoginMenuOpen(false)}
+                      className="block px-4 py-2.5 hover:bg-gray-50 transition-colors">
+                      <p className="font-semibold text-gray-900 text-sm">AISchoolonair</p>
+                      <p className="text-xs text-gray-400">Exam practice &amp; AI tutoring</p>
+                    </Link>
+                    <Link to="/em/login" onClick={() => setLoginMenuOpen(false)}
+                      className="block px-4 py-2.5 hover:bg-gray-50 transition-colors">
+                      <p className="font-semibold text-gray-900 text-sm">English Masterclass</p>
+                      <p className="text-xs text-gray-400">British English training</p>
+                    </Link>
+                  </div>
+                )}
+              </div>
+
               <Link to="/register" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-xl transition-colors text-sm">
                 Start Free
               </Link>
             </nav>
             {/* Mobile hamburger */}
-            <button onClick={() => setMenuOpen(o => !o)} className="md:hidden p-2 text-gray-500 hover:text-gray-700">
+            <button onClick={() => { setMenuOpen(o => !o); setMobileLoginOpen(false); }} className="md:hidden p-2 text-gray-500 hover:text-gray-700">
               {menuOpen ? <X size={22} /> : <Menu size={22} />}
             </button>
           </>
@@ -154,8 +187,32 @@ export default function LandingPage() {
               {s}
             </a>
           ))}
-          <Link to="/english-masterclass" onClick={() => setMenuOpen(false)} className="block text-sm font-medium text-gray-700 py-1">English Masterclass</Link>
-          <Link to="/login"    onClick={() => setMenuOpen(false)} className="block text-sm font-medium text-gray-700 py-1">Login</Link>
+
+          {/* Login — expandable submenu, mirrors the desktop dropdown */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setMobileLoginOpen(o => !o)}
+              aria-expanded={mobileLoginOpen}
+              className="flex items-center justify-between w-full text-sm font-medium text-gray-700 py-1"
+            >
+              Login
+              <ChevronDown size={16} className={`transition-transform ${mobileLoginOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {mobileLoginOpen && (
+              <div className="pl-3 mt-1 space-y-2 border-l-2 border-gray-100">
+                <Link to="/login" onClick={() => setMenuOpen(false)} className="block py-1">
+                  <p className="text-sm font-medium text-gray-700">AISchoolonair</p>
+                  <p className="text-xs text-gray-400">Exam practice &amp; AI tutoring</p>
+                </Link>
+                <Link to="/em/login" onClick={() => setMenuOpen(false)} className="block py-1">
+                  <p className="text-sm font-medium text-gray-700">English Masterclass</p>
+                  <p className="text-xs text-gray-400">British English training</p>
+                </Link>
+              </div>
+            )}
+          </div>
+
           <Link to="/register" onClick={() => setMenuOpen(false)}
             className="block w-full text-center bg-blue-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm">
             Start Free
