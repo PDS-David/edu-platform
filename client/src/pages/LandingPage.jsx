@@ -2,7 +2,7 @@
 // Full marketing landing page — no auth required.
 // 8 sections: Hero, Stats, Challenges, Features, Subjects, Pricing Preview, Comparison, Footer
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/apiClient';
 import {
@@ -96,6 +96,27 @@ export default function LandingPage() {
   const [loginMenuOpen, setLoginMenuOpen] = useState(false);       // desktop "Login" dropdown
   const [mobileLoginOpen, setMobileLoginOpen] = useState(false);   // mobile "Login" submenu
   const [stats, setStats] = useState(STATS_FALLBACK);
+  const loginMenuRef = useRef(null);
+
+  // Click-to-open / click-outside-to-close for the desktop Login dropdown.
+  // Previously used onMouseEnter/onMouseLeave, which broke because the
+  // dropdown panel sits `mt-2` below the button: that gap falls outside the
+  // wrapper's actual rendered box (the panel is absolutely positioned, so it
+  // doesn't extend the wrapper's flow height), so the pointer briefly left
+  // the hoverable area while crossing the gap and mouseleave fired before
+  // the user could reach the menu items. Click-based toggling avoids the
+  // gap issue entirely and also works on touch devices, where hover never
+  // fired in the first place.
+  useEffect(() => {
+    if (!loginMenuOpen) return;
+    const handleClickOutside = (e) => {
+      if (loginMenuRef.current && !loginMenuRef.current.contains(e.target)) {
+        setLoginMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [loginMenuOpen]);
 
   // X5 fix: replace the two genuinely-numeric placeholder entries with real
   // counts once available. Intentionally fails silently — a landing page's
@@ -134,11 +155,7 @@ export default function LandingPage() {
 
               {/* Login — dropdown so it's never confused with a single product's
                   login, and doesn't imply English Masterclass is a page section */}
-              <div
-                className="relative"
-                onMouseEnter={() => setLoginMenuOpen(true)}
-                onMouseLeave={() => setLoginMenuOpen(false)}
-              >
+              <div className="relative" ref={loginMenuRef}>
                 <button
                   type="button"
                   onClick={() => setLoginMenuOpen(o => !o)}
@@ -699,7 +716,7 @@ export default function LandingPage() {
         </div>
 
         <div className="border-t border-white/10 pt-6 text-center text-xs text-gray-500">
-          © {new Date().getFullYear()} {branding.platformName}. All rights reserved. · Powered by AISchoolonair
+          © {new Date().getFullYear()} {branding.platformName}. All rights reserved. · Powered by {branding.poweredByShort}
         </div>
       </footer>
 
