@@ -35,8 +35,14 @@ export default function EMLoginPage() {
     setError('');
     setLoading(true);
     try {
-      await login(email, password, false);
-      navigate('/em/dashboard', { replace: true });
+      const user = await login(email, password, false);
+      // AISchoolOnAir login succeeding is not enough — English Masterclass
+      // requires its own one-time registration step on top of that account.
+      if (user?.role === 'student' && !user?.em_registered_at) {
+        navigate('/em/register', { replace: true });
+      } else {
+        navigate('/em/dashboard', { replace: true });
+      }
     } catch (err) {
       const raw = err?.message ?? '';
       setError(typeof raw === 'string' ? raw : (raw?.message || 'Invalid email or password'));
@@ -358,9 +364,10 @@ export default function EMLoginPage() {
                   className="font-semibold hover:underline"
                   style={{ color: SOVEREIGN[700] }}
                 >
-                  Register on AISchoolOnAir
+                  Create an AISchoolOnAir account
                 </Link>{' '}
-                first, then return here.
+                first, then return here to sign in and complete a quick,
+                separate English Masterclass registration.
               </p>
 
             </div>
@@ -374,7 +381,7 @@ export default function EMLoginPage() {
         style={{ color: `${SOVEREIGN[300]}66` }}
       >
         English Masterclass is powered by{' '}
-        <span style={{ color: `${SOVEREIGN[300]}99` }}>AISchoolOnAir</span>
+        <span style={{ color: `${SOVEREIGN[300]}99` }}>Educational Advancement Centre</span>
       </p>
     </div>
   );

@@ -259,7 +259,7 @@ exports.login = async (req, res, next) => {
          is_active, is_verified, subscription_status,
          subscription_expires_at, onboarding_complete,
          xp_points, study_streak_days, last_login,
-         avatar_url, daily_goal,
+         avatar_url, daily_goal, em_registered_at,
          failed_login_count, locked_until
        FROM users
        WHERE email = :email
@@ -480,7 +480,7 @@ exports.getMe = async (req, res, next) => {
               phone, subscription_status, subscription_expires_at,
               is_verified, onboarding_complete, xp_points,
               study_streak_days, daily_goal, last_login,
-              created_at, updated_at
+              em_registered_at, created_at, updated_at
        FROM users WHERE id = :id LIMIT 1`,
       { replacements: { id: req.user.id }, type: QueryTypes.SELECT }
     );

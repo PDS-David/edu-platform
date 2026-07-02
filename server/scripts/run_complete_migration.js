@@ -1417,6 +1417,26 @@ async function run() {
      ON CONFLICT (category_id, word) DO NOTHING`
   );
 
+  // ── users: separate English Masterclass registration ───────────────────────
+  // Shared `users` table stays, but EM access now requires an explicit one-time
+  // registration step distinct from AISchoolOnAir signup — a NULL value here
+  // means the user has an AISchoolOnAir account but has never registered for EM.
+  await exec('users: add em_registered_at',
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS em_registered_at TIMESTAMPTZ`);
+
+  // Grandfather existing users who already have EM activity — they registered
+  // under the old shared-access model, so treat that activity as their
+  // registration rather than locking them out retroactively.
+  await exec('users: grandfather existing EM users',
+    `UPDATE users
+        SET em_registered_at = NOW()
+      WHERE em_registered_at IS NULL
+        AND id IN (
+          SELECT user_id FROM em_practice_sessions
+          UNION
+          SELECT user_id FROM em_word_progress
+        )`);
+
   console.log('\n✅ Migration complete.\n');
   await pool.end();
 }

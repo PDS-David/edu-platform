@@ -27,6 +27,51 @@ async function q1(sql, params = []) {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
+// EM REGISTRATION — separate one-time opt-in, distinct from AISchoolOnAir signup
+// ═════════════════════════════════════════════════════════════════════════════
+// A valid AISchoolOnAir login is NOT enough to use English Masterclass. The
+// user must explicitly hit this endpoint once. It reuses the same `users`
+// row/credentials rather than a second account, but still enforces the
+// "one registration does not cover both apps" requirement via the
+// em_registered_at gate below.
+//
+// This route is intentionally declared BEFORE requireEmRegistration so a
+// student who isn't registered yet can still call it.
+router.post('/register', async (req, res) => {
+  const userId = req.user.id;
+  try {
+    const row = await q1(
+      `UPDATE users
+          SET em_registered_at = COALESCE(em_registered_at, NOW())
+        WHERE id = $1
+        RETURNING em_registered_at`,
+      [userId]
+    );
+    if (!row) return res.status(404).json({ success: false, error: 'User not found' });
+    res.json({ success: true, em_registered_at: row.em_registered_at });
+  } catch (err) {
+    console.error('[EM] POST /register', err.message);
+    res.status(500).json({ success: false, error: 'Could not complete English Masterclass registration.' });
+  }
+});
+
+// Gate: students must have completed EM registration before touching any
+// other EM route. Admin/teacher roles pass through untouched — this only
+// applies to the student-facing surface.
+function requireEmRegistration(req, res, next) {
+  if (req.user.role !== 'student') return next();
+  if (!req.user.em_registered_at) {
+    return res.status(403).json({
+      success: false,
+      error: 'You need to register for English Masterclass before you can access it.',
+      code: 'EM_REGISTRATION_REQUIRED',
+    });
+  }
+  next();
+}
+router.use(requireEmRegistration);
+
+// ═════════════════════════════════════════════════════════════════════════════
 // PUBLIC (student-facing) ROUTES
 // ═════════════════════════════════════════════════════════════════════════════
 

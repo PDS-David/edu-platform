@@ -33,7 +33,7 @@ const protect = async (req, res, next) => {
     const users = await db.query(
       `SELECT id, email, first_name, last_name, role,
               is_active, subscription_status, subscription_expires_at,
-              daily_goal
+              daily_goal, em_registered_at
        FROM users
        WHERE id = :id AND is_active = true
        LIMIT 1`,
