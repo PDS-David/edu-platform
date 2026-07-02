@@ -17,7 +17,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, BookOpen, TrendingUp, LogOut,
-  ExternalLink, Menu, X,
+  Menu, X,
 } from 'lucide-react';
 import { SOVEREIGN, CRIMSON } from '../pages/em/constants';
 
@@ -130,20 +130,6 @@ export default function EMLayout() {
 
           {/* ── Right controls ───────────────────────────────────────────────── */}
           <div className="flex items-center gap-2 shrink-0">
-
-            {/* Back to main platform */}
-            <NavLink
-              to="/student/dashboard"
-              className="hidden lg:flex items-center gap-1 text-xs font-medium transition-colors rounded px-2 py-1
-                         focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
-              style={{ color: SOVEREIGN[300] }}
-              onMouseEnter={e => (e.currentTarget.style.color = '#ffffff')}
-              onMouseLeave={e => (e.currentTarget.style.color = SOVEREIGN[300])}
-              aria-label="Return to AISchoolOnAir"
-            >
-              <ExternalLink size={12} aria-hidden="true" />
-              <span>AISchoolOnAir</span>
-            </NavLink>
 
             {/* Avatar — Sovereign-500 flat (not gold; gold is for rewards only) */}
             <div
