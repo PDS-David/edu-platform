@@ -8,8 +8,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/apiClient';
 import {
-  Volume2, ChevronRight, RotateCcw, Trophy, Target,
-  Flame, BookOpen, Clock, CheckCircle2, XCircle,
+  Volume2, ChevronRight, RotateCcw, Trophy,
+  Flame, BookOpen, CheckCircle2, XCircle,
   Loader2, AlertCircle, RefreshCw, Play, SkipForward,
   Info, Star, TrendingUp, Sparkles,
   ChevronLeft, ArrowLeft, Award,
@@ -19,6 +19,9 @@ import {
 import DiffBadge, { DIFF_STYLE } from './em/DiffBadge';
 import LevelGate                  from './em/LevelGate';
 import LevelSection               from './em/LevelSection';
+// ProgressTab is the ProgressContent component from EMProgress — single source
+// of truth used by both the /em/progress standalone page and this embedded tab.
+import { ProgressContent as ProgressTab } from './em/EMProgress';
 
 // ── Audio hook — tries Gemini first, falls back to browser TTS ────────────────
 function useAudio() {
@@ -366,96 +369,7 @@ function SessionSummary({ cat, attempts, onPracticeAgain, onBackToLevels }) {
 // ═════════════════════════════════════════════════════════════════════════════
 // PROGRESS TAB
 // ═════════════════════════════════════════════════════════════════════════════
-function ProgressTab() {
-  const [data, setData]       = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState(null);
-
-  useEffect(() => {
-    api.get('/english-masterclass/progress')
-      .then(r => setData(r.data))
-      .catch(e => setError(e.message))
-      .finally(() => setLoading(false));
-  }, []);
-
-  if (loading) return (
-    <div className="flex items-center justify-center py-20">
-      <Loader2 size={22} className="animate-spin text-indigo-500 mr-2" />
-      <span className="text-gray-400 text-sm">Loading progress…</span>
-    </div>
-  );
-  if (error) return <div className="text-center py-20 text-red-500 text-sm">{error}</div>;
-
-  const { stats, recent_sessions = [], mastered_count = 0 } = data || {};
-
-  return (
-    <div className="max-w-2xl">
-      <h2 className="text-xl font-bold text-gray-900 mb-5">My Progress</h2>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-        {[
-          { icon: BookOpen,   label: 'Words Learned',  value: stats?.words_learned || 0,                          color: 'blue'   },
-          { icon: Star,       label: 'Mastered',        value: mastered_count,                                     color: 'amber'  },
-          { icon: Flame,      label: 'Day Streak',      value: `${stats?.practice_streak || 0}d`,                  color: 'orange' },
-          { icon: Target,     label: 'Accuracy',        value: `${Math.round(stats?.overall_accuracy || 0)}%`,    color: 'green'  },
-        ].map(s => (
-          <div key={s.label} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm text-center">
-            <s.icon size={18} className={`text-${s.color}-500 mx-auto mb-1`} />
-            <div className={`text-2xl font-bold text-${s.color}-600 font-mono`}>{s.value}</div>
-            <div className="text-[11px] text-gray-500 mt-0.5">{s.label}</div>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 mb-6">
-        <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm flex items-center gap-3">
-          <Clock size={18} className="text-purple-500 shrink-0" />
-          <div>
-            <p className="text-xs text-gray-500">Total Practice Time</p>
-            <p className="font-bold text-gray-900">{Math.round((stats?.total_practice_secs || 0) / 60)} minutes</p>
-          </div>
-        </div>
-        <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm flex items-center gap-3">
-          <TrendingUp size={18} className="text-indigo-500 shrink-0" />
-          <div>
-            <p className="text-xs text-gray-500">Total Sessions</p>
-            <p className="font-bold text-gray-900">{stats?.total_sessions || 0}</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-5">
-        <h3 className="text-sm font-bold text-gray-700 mb-4 uppercase tracking-wider">Recent Sessions</h3>
-        {recent_sessions.length === 0 ? (
-          <div className="text-center py-8 text-gray-400">
-            <BookOpen size={24} className="mx-auto mb-2 opacity-40" />
-            <p className="text-sm">No practice sessions yet.</p>
-            <p className="text-xs mt-1">Head to the Practice tab to get started!</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {recent_sessions.map((s, i) => (
-              <div key={i} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
-                <div className="flex items-center gap-3">
-                  <span className="text-xl">{s.icon_emoji || '📚'}</span>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-800">{s.category_name}</p>
-                    <p className="text-xs text-gray-400">{new Date(s.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className={`text-sm font-bold ${s.accuracy >= 80 ? 'text-green-600' : s.accuracy >= 60 ? 'text-amber-600' : 'text-red-500'}`}>
-                    {Math.round(s.accuracy)}%
-                  </p>
-                  <p className="text-xs text-gray-400">{s.correct_words}/{s.total_words} words</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+// ProgressTab is imported from ./em/EMProgress above.
 
 // ═════════════════════════════════════════════════════════════════════════════
 // MAIN PAGE COMPONENT
