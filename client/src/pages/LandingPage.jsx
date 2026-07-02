@@ -121,7 +121,6 @@ export default function LandingPage() {
             <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-gray-600">
               <a href="#features"     className="hover:text-blue-600 transition-colors">Features</a>
               <a href="#subjects"     className="hover:text-blue-600 transition-colors">Subjects</a>
-              <Link to="/english-masterclass" className="hover:text-blue-600 transition-colors">English Masterclass</Link>
               <Link to="/login"       className="hover:text-blue-600 transition-colors">Login</Link>
               <Link to="/register" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-xl transition-colors text-sm">
                 Start Free
@@ -146,7 +145,6 @@ export default function LandingPage() {
               {s}
             </a>
           ))}
-          <Link to="/english-masterclass" onClick={() => setMenuOpen(false)} className="block text-sm font-medium text-gray-700 py-1">English Masterclass</Link>
           <Link to="/login"    onClick={() => setMenuOpen(false)} className="block text-sm font-medium text-gray-700 py-1">Login</Link>
           <Link to="/register" onClick={() => setMenuOpen(false)}
             className="block w-full text-center bg-blue-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm">
@@ -502,7 +500,7 @@ export default function LandingPage() {
           <div>
             <p className="text-white text-xs font-bold uppercase tracking-wider mb-3">Platform</p>
             <ul className="space-y-2">
-              {[['English Masterclass', '/english-masterclass'], ['Subjects', '/subjects'], ['Register', '/register'], ['Login', '/login']].map(([l, h]) => (
+              {[['Subjects', '/subjects'], ['Register', '/register'], ['Login', '/login']].map(([l, h]) => (
                 <li key={l}><Link to={h} className="text-xs hover:text-white transition-colors">{l}</Link></li>
               ))}
             </ul>

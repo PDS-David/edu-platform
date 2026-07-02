@@ -22,7 +22,7 @@ import {
   FileText, Video, Music, File, Download,
   Zap, ClipboardList, ClipboardCheck, History, BookMarked, BarChart2, BookOpen, TrendingUp,
   Flame, Target, GraduationCap, ScanLine, Menu, X,
-  AlertCircle, RefreshCw, Languages, Settings,
+  AlertCircle, RefreshCw, Settings,
 } from "lucide-react";
 
 // ── Push type constants ───────────────────────────────────────────────────────
@@ -328,9 +328,6 @@ export function DashboardContent() {
 
   const [showMockPicker,   setShowMockPicker]   = useState(false);
 
-  // GAP 1: English Masterclass progress card
-  const [emStats,          setEmStats]          = useState(null);
-
   // DEF-006: loadAll uses per-request timeouts and surfaces errors instead of
   //          swallowing them.  Each section independently tracks its error state.
   const loadAll = useCallback(async () => {
@@ -363,11 +360,6 @@ export function DashboardContent() {
         .then(r => { setRecentScores(r.data || []); })
         .catch(e => { setErrorScores(e.message || "Failed to load activity"); setRecentScores([]); })
         .finally(() => setLoadingScores(false)),
-
-      // GAP 1: English Masterclass teaser stats
-      api.get("/english-masterclass/progress", { timeout: TIMEOUT_ANALYTICS })
-        .then(r => setEmStats(r.data?.stats || null))
-        .catch(() => setEmStats(null)),
     ]);
   }, []);
 
@@ -517,48 +509,6 @@ export function DashboardContent() {
         )}
       </section>
 
-      {/* ── ENGLISH MASTERCLASS TEASER ── */}
-      <section>
-        <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-2">
-          <Languages size={13} className="text-gray-400" /> English Masterclass
-        </h2>
-        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 rounded-xl p-4 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center shrink-0 shadow-sm">
-              <span className="text-lg">🇬🇧</span>
-            </div>
-            <div>
-              {emStats && (emStats.total_sessions > 0) ? (
-                <div className="flex gap-4">
-                  <div className="text-center">
-                    <p className="text-lg font-bold text-indigo-700 font-mono">{emStats.words_learned || 0}</p>
-                    <p className="text-[10px] text-indigo-500 font-medium">Words</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-lg font-bold text-purple-700 font-mono">{emStats.practice_streak || 0}d</p>
-                    <p className="text-[10px] text-purple-500 font-medium">Streak</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-lg font-bold text-indigo-700 font-mono">{Math.round(emStats.overall_accuracy || 0)}%</p>
-                    <p className="text-[10px] text-indigo-500 font-medium">Accuracy</p>
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <p className="text-sm font-semibold text-indigo-900">British English Training</p>
-                  <p className="text-xs text-indigo-600">Start practising vocabulary today</p>
-                </div>
-              )}
-            </div>
-          </div>
-          <button
-            onClick={() => navigate("/student/english-masterclass")}
-            className="shrink-0 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg transition-colors whitespace-nowrap">
-            {emStats?.total_sessions > 0 ? "Continue →" : "Start →"}
-          </button>
-        </div>
-      </section>
-
       {/* ── ASSIGNED RESOURCES ── */}
       <section>
         <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-2">
@@ -664,7 +614,6 @@ export default function StudentDashboard() {
     { label: "Analytics",    icon: TrendingUp,     path: "/student/analytics"    },
     { label: "AI Marking",  icon: ScanLine,     path: "/student/mark-image" },
     { label: "Exam Types",         icon: Download,   path: "/student/exam-types"         },
-    { label: "English Masterclass", icon: Languages,  path: "/student/english-masterclass" },
 
   ];
 
