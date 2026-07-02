@@ -2,6 +2,11 @@
 export const branding = {
   platformName: 'AISchoolonair',
   tagline: 'Transform Your Learning Experience',
+  // Single source of truth for the "Powered by" attribution shown across
+  // the app. Use poweredByShort ("EAC") wherever space is tight (badges,
+  // small footer lines); use poweredByFull for room to spell it out.
+  poweredByFull:  'Educational Advancement Centre',
+  poweredByShort: 'EAC',
   description: 'The ultimate learning management system for modern education',
 
   colors: {
