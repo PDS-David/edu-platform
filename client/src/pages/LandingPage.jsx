@@ -40,29 +40,29 @@ const CHALLENGES = [
   { emoji: '', title: 'No Exam Feedback',         desc: 'Students submit answers with zero explanation of what went wrong or how to improve.' },
   { emoji: '', title: 'Limited Practice Questions', desc: 'Reliable, curriculum-aligned question banks are scarce and scattered across the web.' },
   { emoji: '', title: 'No Performance Tracking',   desc: 'Neither students nor teachers have clear visibility into strengths, weaknesses, or trends.' },
-  { emoji: '', title: 'Private Tuition Costs',      desc: 'Quality private tutoring can cost ₦50,000+ per month — out of reach for most families.' },
+  { emoji: '', title: 'Private Tuition Costs',      desc: 'Quality private tutoring can cost the equivalent of hundreds of dollars per month — out of reach for most families.' },
 ];
 
 const FEATURES = [
   { icon: Lightbulb, colour: 'bg-amber-50 text-amber-500',   title: 'AI Hints',             desc: 'Get intelligent, step-by-step clues when stuck — without giving away the full answer.' },
   { icon: BookOpen,  colour: 'bg-blue-50 text-blue-500',      title: 'Instant Explanations', desc: 'Every question comes with a detailed marking scheme and AI-generated explanation after submission.' },
-  { icon: TrendingUp,colour: 'bg-green-50 text-green-500',    title: 'Predicted Grade',      desc: 'Our model analyses your quiz history and predicts your likely exam grade in real time.' },
+  { icon: TrendingUp,colour: 'bg-green-50 text-green-500',    title: 'Predicted Performance',      desc: 'Our model analyses your quiz history and predicts your likely exam grade in real time.' },
   { icon: BarChart3, colour: 'bg-indigo-50 text-indigo-500',  title: 'Cohort Analytics',     desc: 'Teachers see class-wide performance heatmaps, at-risk students, and AI intervention recommendations.' },
   { icon: PenTool,   colour: 'bg-purple-50 text-purple-500',  title: 'Quiz Builder',         desc: 'Build custom topic or mock exams from 200,000+ past-paper questions and assign to your class.' },
   { icon: FileText,  colour: 'bg-rose-50 text-rose-500',      title: 'Revision Notes',       desc: 'Curated, examiner-aligned notes for every subtopic — readable in the app or downloadable as PDF.' },
 ];
 
 const SUBJECTS = [
-  { emoji: '', name: 'Mathematics',         tag: 'WAEC · NECO · JAMB · IGCSE' },
-  { emoji: '', name: 'Physics',             tag: 'WAEC · NECO · JAMB · IGCSE' },
-  { emoji: '', name: 'Chemistry',           tag: 'WAEC · NECO · JAMB · IGCSE' },
-  { emoji: '', name: 'Biology',             tag: 'WAEC · NECO · JAMB · IGCSE' },
-  { emoji: '', name: 'English Language',    tag: 'WAEC · NECO · JAMB · IGCSE' },
-  { emoji: '', name: 'Economics',           tag: 'WAEC · NECO · JAMB · IGCSE' },
-  { emoji: '', name: 'Computer Science',    tag: 'WAEC · NECO · JAMB · IGCSE' },
-  { emoji: '', name: 'Business Studies',    tag: 'WAEC · NECO · JAMB · IGCSE' },
-  { emoji: '', name: 'Further Mathematics', tag: 'WAEC · NECO · A-Level'      },
-  { emoji: '', name: 'Geography',           tag: 'WAEC · NECO · JAMB · IGCSE' },
+  { emoji: '', name: 'Mathematics',         tag: 'IGCSE · GCSE · IB · SAT' },
+  { emoji: '', name: 'Physics',             tag: 'IGCSE · GCSE · IB · SAT' },
+  { emoji: '', name: 'Chemistry',           tag: 'IGCSE · GCSE · IB · SAT' },
+  { emoji: '', name: 'Biology',             tag: 'IGCSE · GCSE · IB · SAT' },
+  { emoji: '', name: 'English Language',    tag: 'IGCSE · GCSE · IB · SAT' },
+  { emoji: '', name: 'Economics',           tag: 'IGCSE · GCSE · IB · SAT' },
+  { emoji: '', name: 'Computer Science',    tag: 'IGCSE · GCSE · IB · SAT' },
+  { emoji: '', name: 'Business Studies',    tag: 'IGCSE · GCSE · IB · SAT' },
+  { emoji: '', name: 'Further Mathematics', tag: 'A-Level · IGCSE · IB'      },
+  { emoji: '', name: 'Geography',           tag: 'IGCSE · GCSE · IB · SAT' },
 ];
 
 const COMPARISON = [
@@ -164,13 +164,13 @@ export default function LandingPage() {
           {/* Left */}
           <div className="text-white space-y-6">
             <span className="inline-block bg-white/15 text-white text-xs font-bold px-3 py-1.5 rounded-full tracking-wide uppercase">
-               Nigeria's #1 Exam Prep Platform
+               AI-Powered Smart Learning
             </span>
             <h1 className="text-3xl sm:text-4xl xl:text-5xl font-extrabold leading-tight">
-              Ace Your JAMB, WAEC &amp; NECO with AI-Powered Practice
+              Master Your Exams with AI-Powered Learning
             </h1>
             <p className="text-blue-200 text-base sm:text-lg leading-relaxed max-w-lg">
-              50,000+ curriculum-aligned questions, instant AI feedback, predicted grades, and progress tracking — all built for Nigerian students.
+              50,000+ curriculum-aligned questions, instant AI feedback, predicted performance insights, and progress tracking — designed to help students succeed worldwide.
             </p>
             <div className="flex flex-col sm:flex-row gap-3">
               <Link to="/register"
@@ -225,7 +225,7 @@ export default function LandingPage() {
 
               {/* Predicted grade pill */}
               <div className="flex items-center justify-between bg-indigo-50 rounded-xl px-4 py-2.5">
-                <span className="text-xs font-medium text-indigo-700">Predicted Grade</span>
+                <span className="text-xs font-medium text-indigo-700">Predicted Performance</span>
                 <span className="text-base font-extrabold text-indigo-600">B+</span>
               </div>
 
@@ -312,7 +312,7 @@ export default function LandingPage() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
-              { step: '01', title: 'Register free',      desc: 'Create an account, pick your exam board and subjects. Get 5 practice questions every day at no cost.',      icon: '' },
+              { step: '01', title: 'Register free',      desc: 'Create an account, choose your curriculum and subjects. Get 5 practice questions every day at no cost.',      icon: '' },
               { step: '02', title: 'Practice daily',     desc: 'Answer curriculum-aligned MCQs. Get instant AI explanations and marking-scheme feedback on every answer.',    icon: '' },
               { step: '03', title: 'Track & improve',    desc: 'See your weak topics, score trends, and predicted grade. Upgrade for unlimited practice and mock exams.',     icon: '' },
             ].map(({ step, title, desc, icon }) => (
@@ -346,7 +346,7 @@ export default function LandingPage() {
         <div className="max-w-5xl mx-auto">
           <p className="text-blue-600 text-xs font-bold uppercase tracking-widest text-center mb-2">Subjects</p>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 text-center mb-10">
-            8 Subjects. Every Nigerian Exam.
+            Subjects Across Multiple Curricula
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {SUBJECTS.map(({ emoji, name, tag }) => (
@@ -401,9 +401,9 @@ export default function LandingPage() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {[
-              { name: 'Adaeze O.', school: 'Federal Government College, Enugu', quote: 'I was scoring 40% in Chemistry. After 3 weeks on AISchoolonair my mock score jumped to 74%. The AI explanations make it click in a way textbooks never did.' },
-              { name: 'Emeka T.', school: 'King\'s College, Lagos', quote: 'The daily streak feature keeps me consistent. I\'ve done 5 questions every day for 6 weeks. JAMB is in 2 months and I feel ready for the first time.' },
-              { name: 'Fatima A.', school: 'GGSS Minna, Niger State', quote: 'Past papers used to be impossible to find. AISchoolonair has everything in one place with instant marking. My teacher even uses it to set class assignments.' },
+              { name: 'Adaeze O.', school: 'International Secondary School', quote: 'I was scoring 40% in Chemistry. After 3 weeks on AISchoolonair my mock score jumped to 74%. The AI explanations make concepts click in a way textbooks never did.' },
+              { name: 'Emeka T.', school: 'Cambridge International School', quote: 'The daily streak feature keeps me consistent. I\'ve completed 5 questions every day for 6 weeks. My exams are in 2 months and I feel ready for the first time.' },
+              { name: 'Fatima A.', school: 'Global Academy', quote: 'Finding quality past papers used to be difficult. AISchoolonair has everything in one place with instant marking. My teacher even uses it to set class assignments.' },
             ].map(({ name, school, quote }) => (
               <div key={name} className="bg-white rounded-2xl border border-gray-100 p-5 space-y-3 shadow-sm">
                 <div className="flex">
