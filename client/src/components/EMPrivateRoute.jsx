@@ -24,5 +24,14 @@ export default function EMPrivateRoute() {
     return <Navigate to="/em/login" state={{ from: location }} replace />;
   }
 
+  // AISchoolOnAir login alone doesn't grant EM access — students must also
+  // complete the separate one-time EM registration step. Non-students
+  // (teachers/admins) skip this, matching the backend gate.
+  const needsEmRegistration =
+    user.role === 'student' && !user.em_registered_at && location.pathname !== '/em/register';
+  if (needsEmRegistration) {
+    return <Navigate to="/em/register" replace />;
+  }
+
   return <Outlet />;
 }

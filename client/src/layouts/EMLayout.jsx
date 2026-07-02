@@ -269,7 +269,7 @@ export default function EMLayout() {
         className="py-4 text-center text-[11px]"
         style={{ background: SOVEREIGN[950], color: `${SOVEREIGN[300]}88` }}
       >
-        English Masterclass &nbsp;·&nbsp; AISchoolOnAir &nbsp;·&nbsp;
+        English Masterclass &nbsp;·&nbsp; Educational Advancement Centre &nbsp;·&nbsp;
         Pronoia Digital Services &nbsp;·&nbsp; +234 810 755 1000
       </footer>
     </div>
