@@ -144,7 +144,7 @@ export default function UploadPastPaperForm({ subjects = [], onUploaded, showToa
           {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
         <input
-          type="number" min="1900" max="2099" placeholder="Year (optional)"
+          type="number" min="1990" max={new Date().getFullYear()} placeholder={`Year (e.g. ${new Date().getFullYear()})`}
           value={year} onChange={e => setYear(e.target.value)} className={inputCls}
         />
         <select value={paperType} onChange={e => setPaperType(e.target.value)} className={inputCls}>

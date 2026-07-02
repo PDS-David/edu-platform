@@ -825,12 +825,24 @@ router.post('/tests/:id/questions', protect, teacherOnly, async (req, res) => {
     if (!test.length) return res.status(404).json({ success: false, error: 'Test not found' });
 
     // Only allow attaching questions the teacher actually owns/submitted
-    // (or any question, for admins)
-    const validQuestions = await safeQuery(
-      `SELECT id, marks FROM questions
-        WHERE id = ANY(:ids) AND is_active = true AND (submitted_by = :teacherId OR :isAdmin)`,
-      { ids: question_ids, teacherId: req.user.id, isAdmin: req.user.role === 'admin' }
-    );
+    // (or any question, for admins).
+    // NOTE: Sequelize named replacements do NOT expand JS arrays into SQL
+    // arrays for ANY() — must use positional params + UNNEST instead.
+    const isAdmin = req.user.role === 'admin';
+    let validQuestions;
+    if (isAdmin) {
+      const rows = await sequelize.query(
+        `SELECT id FROM questions WHERE id = ANY(ARRAY[${question_ids.map((_, i) => `$${i + 1}`).join(',')}]::uuid[]) AND is_active = true`,
+        { bind: question_ids, type: QueryTypes.SELECT }
+      );
+      validQuestions = rows;
+    } else {
+      const rows = await sequelize.query(
+        `SELECT id FROM questions WHERE id = ANY(ARRAY[${question_ids.map((_, i) => `$${i + 1}`).join(',')}]::uuid[]) AND is_active = true AND submitted_by = $${question_ids.length + 1}`,
+        { bind: [...question_ids, req.user.id], type: QueryTypes.SELECT }
+      );
+      validQuestions = rows;
+    }
     if (!validQuestions.length) {
       return res.status(404).json({ success: false, error: 'No matching questions found for this teacher' });
     }
@@ -855,7 +867,7 @@ router.post('/tests/:id/questions', protect, teacherOnly, async (req, res) => {
               testId,
               questionId: q.id,
               order: nextOrder,
-              marks: q.marks || 1,
+              marks: 1,
             },
             type: QueryTypes.INSERT,
           }

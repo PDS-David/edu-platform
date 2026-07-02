@@ -69,8 +69,23 @@ export default function TeacherPastPapersPage() {
 
   useEffect(() => {
     api.get('/teacher/my-subjects')
-      .then(r => setSubjects(r.data || []))
-      .catch(() => setSubjects([]));
+      .then(r => {
+        const assigned = r.data || [];
+        if (assigned.length > 0) {
+          setSubjects(assigned);
+        } else {
+          // Teacher has no formal subject assignments — fall back to the full
+          // catalog so they can still tag past papers with a subject.
+          return api.get('/catalog/all-subjects')
+            .then(r2 => setSubjects(r2.data || []))
+            .catch(() => setSubjects([]));
+        }
+      })
+      .catch(() =>
+        api.get('/catalog/all-subjects')
+          .then(r2 => setSubjects(r2.data || []))
+          .catch(() => setSubjects([]))
+      );
   }, []);
 
   const handleDelete = async (id, title) => {
