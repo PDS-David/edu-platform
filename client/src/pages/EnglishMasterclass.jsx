@@ -11,26 +11,14 @@ import {
   Volume2, ChevronRight, RotateCcw, Trophy, Target,
   Flame, BookOpen, Clock, CheckCircle2, XCircle,
   Loader2, AlertCircle, RefreshCw, Play, SkipForward,
-  Info, Star, TrendingUp, Sparkles, Lock,
+  Info, Star, TrendingUp, Sparkles,
   ChevronLeft, ArrowLeft, Award,
 } from 'lucide-react';
 
-// ── Difficulty colours ────────────────────────────────────────────────────────
-const DIFF_STYLE = {
-  Beginner:     { badge: 'bg-emerald-100 text-emerald-700', ring: 'ring-emerald-300', glow: 'from-emerald-500 to-teal-500',    label: '🌱 Beginner'     },
-  Intermediate: { badge: 'bg-blue-100 text-blue-700',       ring: 'ring-blue-300',    glow: 'from-blue-500 to-indigo-500',     label: '🔥 Intermediate' },
-  Advanced:     { badge: 'bg-purple-100 text-purple-700',   ring: 'ring-purple-300',  glow: 'from-purple-500 to-fuchsia-500',  label: '⚡ Advanced'     },
-};
-
-// ── Difficulty badge ──────────────────────────────────────────────────────────
-function DiffBadge({ level }) {
-  const s = DIFF_STYLE[level] || DIFF_STYLE.Beginner;
-  return (
-    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${s.badge}`}>
-      {level}
-    </span>
-  );
-}
+// ── Shared EM sub-components (extracted so EMDashboard can also use them) ────
+import DiffBadge, { DIFF_STYLE } from './em/DiffBadge';
+import LevelGate                  from './em/LevelGate';
+import LevelSection               from './em/LevelSection';
 
 // ── Audio hook — tries Gemini first, falls back to browser TTS ────────────────
 function useAudio() {
@@ -87,100 +75,7 @@ function useAudio() {
   return { playing, play };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// LEVEL GATE CARD — shown for locked tiers
-// ─────────────────────────────────────────────────────────────────────────────
-function LevelGate({ level, requiredLevel }) {
-  const s = DIFF_STYLE[level] || DIFF_STYLE.Beginner;
-  return (
-    <div className="rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 p-6 flex flex-col items-center gap-3 opacity-70 select-none">
-      <div className={`w-14 h-14 rounded-full bg-gradient-to-br ${s.glow} flex items-center justify-center opacity-30`}>
-        <Lock size={24} className="text-white" />
-      </div>
-      <p className="font-bold text-gray-500 text-base">{s.label}</p>
-      <p className="text-xs text-gray-400 text-center leading-relaxed">
-        Complete at least one <span className="font-semibold">{requiredLevel}</span> session with 60% or higher accuracy to unlock this level.
-      </p>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// LEVEL SECTION — header + category cards for one difficulty
-// ─────────────────────────────────────────────────────────────────────────────
-function LevelSection({ level, categories, unlocked, categoryProgress, onStart, loadingId }) {
-  const s = DIFF_STYLE[level] || DIFF_STYLE.Beginner;
-
-  if (!unlocked) {
-    const reqMap = { Intermediate: 'Beginner', Advanced: 'Intermediate' };
-    return (
-      <div className="mb-8">
-        <div className="flex items-center gap-2 mb-4">
-          <span className={`text-xs font-bold px-3 py-1 rounded-full ${s.badge}`}>{s.label}</span>
-        </div>
-        <LevelGate level={level} requiredLevel={reqMap[level]} />
-      </div>
-    );
-  }
-
-  return (
-    <div className="mb-8">
-      <div className="flex items-center gap-2 mb-4">
-        <span className={`text-xs font-bold px-3 py-1 rounded-full ${s.badge}`}>{s.label}</span>
-        <CheckCircle2 size={14} className="text-emerald-500" />
-        <span className="text-xs text-gray-400">Unlocked</span>
-      </div>
-
-      {categories.length === 0 ? (
-        <p className="text-sm text-gray-400 italic">No categories available yet.</p>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {categories.map(cat => {
-            const prog   = categoryProgress?.[cat.id];
-            const best   = prog?.best_accuracy ?? null;
-            const isLoading = loadingId === cat.id;
-            return (
-              <button key={cat.id} onClick={() => onStart(cat)}
-                disabled={isLoading}
-                className="group text-left bg-white border border-gray-100 rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-indigo-300">
-                <div className="flex items-start justify-between mb-3">
-                  <span className="text-3xl">{cat.icon_emoji || '📚'}</span>
-                  {isLoading
-                    ? <Loader2 size={16} className="animate-spin text-indigo-400" />
-                    : best !== null
-                      ? <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${best >= 80 ? 'bg-emerald-100 text-emerald-700' : best >= 60 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600'}`}>
-                          Best {Math.round(best)}%
-                        </span>
-                      : <DiffBadge level={cat.difficulty} />
-                  }
-                </div>
-                <h3 className="font-bold text-gray-900 text-sm mb-1">{cat.name}</h3>
-                <p className="text-xs text-gray-500 mb-3 leading-relaxed line-clamp-2">{cat.description}</p>
-
-                {/* Mini progress bar */}
-                {best !== null && (
-                  <div className="mb-3">
-                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div className={`h-full rounded-full transition-all duration-500 bg-gradient-to-r ${s.glow}`}
-                        style={{ width: `${Math.min(best, 100)}%` }} />
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-400">{cat.word_count} words</span>
-                  <span className="text-xs font-semibold text-indigo-600 group-hover:translate-x-1 transition-transform flex items-center gap-1">
-                    {best !== null ? 'Practice again' : 'Start'} <ChevronRight size={12} />
-                  </span>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
+// LevelGate, LevelSection, DiffBadge are now imported above from ./em/
 
 // ═════════════════════════════════════════════════════════════════════════════
 // PRACTICE SESSION VIEW
@@ -571,7 +466,7 @@ function ProgressTab() {
 //                         EMLayout already provides the nav shell.
 //   defaultTab {string}  — 'practice' | 'progress'  (default: 'practice')
 // ═════════════════════════════════════════════════════════════════════════════
-export default function EnglishMasterclass({ embedded = false, defaultTab = 'practice' }) {
+export default function EnglishMasterclass({ embedded = false, defaultTab = 'practice', initialCategory = null }) {
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -596,9 +491,14 @@ export default function EnglishMasterclass({ embedded = false, defaultTab = 'pra
       .then(([catRes, lpRes]) => {
         setCategories(catRes.data || []);
         setLevelProgress(lpRes.data || null);
+        // If EMDashboard navigated here with a pre-selected category, start immediately
+        if (initialCategory) {
+          startPractice(initialCategory);
+        }
       })
       .catch(e => setInitError(e.message || 'Failed to load English Masterclass'))
       .finally(() => setLoadingInit(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Refresh level progress after a session completes (may unlock new level)

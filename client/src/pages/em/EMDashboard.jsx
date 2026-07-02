@@ -1,354 +1,529 @@
 // client/src/pages/em/EMDashboard.jsx
-// English Masterclass — dedicated dashboard page (/em/dashboard).
-// Shows: welcome hero, live stats, level unlock status, quick-start cards,
-// and recent session log. Completely independent of the student dashboard.
+// Route: /em/dashboard  (inside EMLayout + EMPrivateRoute)
+//
+// Task 4 implementation:
+//   ✅ Time-of-day personalised greeting
+//   ✅ Level progress strip (3 tiles, locked/unlocked from /level-progress API)
+//   ✅ Full category grid grouped by difficulty via shared LevelSection
+//   ✅ Clicking a category navigates to /em/practice with { category } state
+//   ✅ Streak badge (Gold-400 flame) shown when streak ≥ 1
+//   ✅ First-time welcome banner (no sessions yet)
+//
+// Shared components: DiffBadge, LevelGate, LevelSection (from ./em/)
+// API calls: unchanged — same endpoints already used by EnglishMasterclass.jsx
+// Business logic: none changed
 
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/apiClient';
 import {
-  BookOpen, Flame, Target, Star, TrendingUp, Clock,
-  Play, ChevronRight, Loader2, AlertCircle, Lock,
-  CheckCircle2, Award, RefreshCw,
+  Flame, BookOpen, Target, Star, TrendingUp, Clock,
+  Loader2, AlertCircle, RefreshCw, CheckCircle2, Lock,
+  Award, Sparkles,
 } from 'lucide-react';
+import { SOVEREIGN, CRIMSON, EM_GOLD, SHADOW } from './constants';
+import LevelSection from './LevelSection';
 
-// ── Brand tokens ─────────────────────────────────────────────────────────────
-const NAVY  = '#0d1b3e';
-const GOLD  = '#c8a84b';
-const GOLD2 = '#e6c96d';
+// ── Time-of-day greeting helper ───────────────────────────────────────────────
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
 
-// ── Level styling ─────────────────────────────────────────────────────────────
-const LEVEL = {
-  Beginner:     { emoji: '🌱', from: 'from-emerald-500', to: 'to-teal-500',    badge: 'bg-emerald-100 text-emerald-700' },
-  Intermediate: { emoji: '🔥', from: 'from-blue-500',    to: 'to-indigo-500',  badge: 'bg-blue-100 text-blue-700'       },
-  Advanced:     { emoji: '⚡', from: 'from-purple-500',  to: 'to-fuchsia-500', badge: 'bg-purple-100 text-purple-700'   },
+// ── Stat pill — compact metric in a row ──────────────────────────────────────
+// Static class map — avoids dynamic Tailwind interpolation that gets purged.
+const STAT_PILL = {
+  blue:   { wrap: 'bg-blue-50 border-blue-100',    icon: 'text-blue-500'    },
+  green:  { wrap: 'bg-emerald-50 border-emerald-100', icon: 'text-emerald-500' },
+  amber:  { wrap: 'bg-amber-50 border-amber-100',  icon: 'text-amber-500'   },
+  purple: { wrap: 'bg-purple-50 border-purple-100', icon: 'text-purple-500' },
 };
 
-// ── Stat card ─────────────────────────────────────────────────────────────────
-function StatCard({ icon: Icon, label, value, colour }) {
+function StatPill({ icon: Icon, label, value, colour }) {
+  const cls = STAT_PILL[colour] || STAT_PILL.blue;
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-4">
-      <div className={`w-11 h-11 rounded-xl flex items-center justify-center bg-${colour}-50 shrink-0`}>
-        <Icon size={20} className={`text-${colour}-500`} />
-      </div>
+    <div
+      className={`flex items-center gap-3 px-4 py-3 rounded-2xl border ${cls.wrap}`}
+      style={{ boxShadow: SHADOW.tier1 }}
+    >
+      <Icon size={18} className={`${cls.icon} shrink-0`} aria-hidden="true" />
       <div>
-        <p className="text-2xl font-bold text-gray-900 leading-none">{value}</p>
-        <p className="text-xs text-gray-500 mt-0.5">{label}</p>
+        <p className="text-lg font-bold text-gray-900 leading-none">{value}</p>
+        <p className="text-[11px] text-gray-500 mt-0.5">{label}</p>
       </div>
     </div>
   );
 }
 
-// ── Level badge ───────────────────────────────────────────────────────────────
-function LevelBadge({ name, unlocked }) {
-  const s = LEVEL[name];
+// ── Level tile in the progress strip ─────────────────────────────────────────
+const LEVEL_EMOJI = { Beginner: '🌱', Intermediate: '🔥', Advanced: '⚡' };
+
+function LevelTile({ name, unlocked }) {
   return (
     <div
-      className={`flex flex-col items-center gap-1.5 p-4 rounded-2xl border-2 transition-all ${
+      className="flex flex-col items-center gap-1.5 p-3 sm:p-4 rounded-2xl border-2 transition-all select-none"
+      style={
         unlocked
-          ? 'border-transparent shadow-sm'
-          : 'border-dashed border-gray-200 bg-gray-50 opacity-60'
-      }`}
-      style={unlocked ? { background: `linear-gradient(135deg, ${NAVY} 0%, #1e3a6e 100%)` } : {}}
-    >
-      <span className="text-2xl">{s.emoji}</span>
-      <p className={`text-xs font-bold ${unlocked ? 'text-white' : 'text-gray-400'}`}>{name}</p>
-      {unlocked
-        ? <span className="text-[10px] font-semibold text-yellow-300 flex items-center gap-1"><CheckCircle2 size={10} /> Unlocked</span>
-        : <Lock size={12} className="text-gray-400" />
+          ? {
+              background:  SOVEREIGN[500],
+              borderColor: 'transparent',
+              boxShadow:   SHADOW.tier1,
+            }
+          : {
+              background:  '#f9fafb',
+              borderColor: '#e5e7eb',
+              borderStyle: 'dashed',
+              opacity:      0.65,
+            }
       }
+      aria-label={`${name} level — ${unlocked ? 'unlocked' : 'locked'}`}
+    >
+      <span className="text-xl sm:text-2xl" aria-hidden="true">
+        {LEVEL_EMOJI[name]}
+      </span>
+      <p
+        className={`text-[11px] sm:text-xs font-bold text-center leading-tight
+          ${unlocked ? 'text-white' : 'text-gray-400'}`}
+      >
+        {name}
+      </p>
+      {unlocked ? (
+        <span className="text-[9px] sm:text-[10px] font-semibold text-white/80 flex items-center gap-0.5">
+          <CheckCircle2 size={9} aria-hidden="true" /> Unlocked
+        </span>
+      ) : (
+        <Lock size={11} className="text-gray-400" aria-hidden="true" />
+      )}
     </div>
+  );
+}
+
+// ── Welcome banner — shown only for first-time users (no sessions yet) ────────
+function WelcomeBanner({ onStart }) {
+  return (
+    <div
+      className="rounded-3xl p-6 sm:p-8 relative overflow-hidden"
+      style={{ background: SOVEREIGN[800], boxShadow: SHADOW.tier2 }}
+      role="region"
+      aria-label="Welcome to English Masterclass"
+    >
+      {/* Decorative sovereign glow */}
+      <div
+        className="absolute top-0 right-0 w-56 h-56 rounded-full pointer-events-none"
+        style={{
+          background: `radial-gradient(circle, ${SOVEREIGN[600]}33, transparent)`,
+          transform:  'translate(30%,-30%)',
+        }}
+        aria-hidden="true"
+      />
+      {/* Union Jack watermark */}
+      <div
+        className="absolute bottom-4 right-6 opacity-[0.07] pointer-events-none"
+        aria-hidden="true"
+      >
+        <svg viewBox="0 0 80 54" width="72" height="48" xmlns="http://www.w3.org/2000/svg">
+          <rect width="80" height="54" rx="4" fill="#012169"/>
+          <line x1="0" y1="0" x2="80" y2="54" stroke="white" strokeWidth="10"/>
+          <line x1="80" y1="0" x2="0" y2="54" stroke="white" strokeWidth="10"/>
+          <line x1="0" y1="0" x2="80" y2="54" stroke="#C8102E" strokeWidth="6"/>
+          <line x1="80" y1="0" x2="0" y2="54" stroke="#C8102E" strokeWidth="6"/>
+          <rect x="30" y="0" width="20" height="54" fill="white"/>
+          <rect x="0" y="17" width="80" height="20" fill="white"/>
+          <rect x="33" y="0" width="14" height="54" fill="#C8102E"/>
+          <rect x="0" y="20" width="80" height="14" fill="#C8102E"/>
+        </svg>
+      </div>
+
+      <div className="relative z-10">
+        <div className="flex items-center gap-2 mb-3">
+          <div
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-sm"
+            style={{ background: CRIMSON[500] }}
+            aria-hidden="true"
+          >
+            👑
+          </div>
+          <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: SOVEREIGN[300] }}>
+            Welcome to English Masterclass
+          </p>
+        </div>
+
+        <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3 leading-tight">
+          Your British English<br />journey starts here
+        </h2>
+
+        <p className="text-sm leading-relaxed mb-6 max-w-md" style={{ color: SOVEREIGN[200] }}>
+          Work through <span className="font-semibold text-white">Beginner</span>,{' '}
+          <span className="font-semibold text-white">Intermediate</span>, and{' '}
+          <span className="font-semibold text-white">Advanced</span> vocabulary categories.
+          Score 60% or higher in any session to unlock the next level.
+        </p>
+
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={onStart}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold
+                       text-white transition-all hover:scale-105
+                       focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            style={{ background: SOVEREIGN[500], boxShadow: '0 2px 8px rgba(41,82,200,0.4)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = SOVEREIGN[400])}
+            onMouseLeave={e => (e.currentTarget.style.background = SOVEREIGN[500])}
+          >
+            <Sparkles size={14} aria-hidden="true" /> Begin Beginner Level
+          </button>
+        </div>
+
+        {/* Feature pills */}
+        <div className="flex flex-wrap gap-2 mt-5">
+          {[
+            '🎙️ British pronunciation audio',
+            '🤖 AI word explanations',
+            '📈 Progressive level unlock',
+            '🔥 Daily streak tracking',
+          ].map(f => (
+            <span
+              key={f}
+              className="text-[11px] px-2.5 py-1 rounded-full font-medium"
+              style={{ background: `${SOVEREIGN[700]}66`, color: SOVEREIGN[200] }}
+            >
+              {f}
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Streak badge — shown in the greeting row when streak ≥ 1 ─────────────────
+function StreakBadge({ count }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold"
+      style={{
+        background: `${EM_GOLD[400]}22`,
+        color:       EM_GOLD[500],
+        border:      `1px solid ${EM_GOLD[400]}44`,
+      }}
+      aria-label={`${count}-day streak`}
+    >
+      <Flame size={13} style={{ color: EM_GOLD[400] }} aria-hidden="true" />
+      {count} day streak
+    </span>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MAIN PAGE
+// ─────────────────────────────────────────────────────────────────────────────
 export default function EMDashboard() {
   const { user } = useAuth();
+  const navigate  = useNavigate();
+
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState(null);
 
+  // ── Fetch categories + level-progress + stats in parallel ────────────────
   const fetchData = () => {
     setLoading(true);
     setError(null);
     Promise.all([
-      api.get('/english-masterclass/progress'),
-      api.get('/english-masterclass/level-progress'),
       api.get('/english-masterclass/categories'),
+      api.get('/english-masterclass/level-progress'),
+      api.get('/english-masterclass/progress'),
     ])
-      .then(([progressRes, levelRes, catRes]) => {
+      .then(([catRes, levelRes, progressRes]) => {
         setData({
-          progress:      progressRes.data  || {},
-          levelProgress: levelRes.data     || {},
-          categories:    catRes.data       || [],
+          categories:    catRes.data     || [],
+          levelProgress: levelRes.data   || {},
+          progress:      progressRes.data || {},
         });
       })
-      .catch(e => setError(e.message || 'Could not load dashboard data.'))
+      .catch(e => setError(e.message || 'Could not load dashboard.'))
       .finally(() => setLoading(false));
   };
 
   useEffect(() => { fetchData(); }, []);
 
-  const firstName = user?.first_name || user?.name?.split(' ')[0] || 'Student';
+  // ── Derived values ────────────────────────────────────────────────────────
+  const firstName = user?.first_name || user?.name?.split(' ')[0] || 'there';
+  const greeting  = useMemo(() => getGreeting(), []);
 
+  // ── Loading ───────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-32">
-        <Loader2 size={26} className="animate-spin mr-3" style={{ color: GOLD }} />
+      <div className="flex items-center justify-center py-32 gap-3" role="status">
+        <Loader2
+          size={24}
+          className="animate-spin"
+          style={{ color: SOVEREIGN[500] }}
+          aria-hidden="true"
+        />
         <span className="text-gray-500 text-sm">Loading your dashboard…</span>
       </div>
     );
   }
 
+  // ── Error ─────────────────────────────────────────────────────────────────
   if (error) {
     return (
-      <div className="flex flex-col items-center py-32 gap-3">
-        <AlertCircle size={24} className="text-red-400" />
-        <p className="text-red-600 text-sm">{error}</p>
+      <div className="flex flex-col items-center justify-center py-32 gap-3" role="alert">
+        <AlertCircle size={24} className="text-red-400" aria-hidden="true" />
+        <p className="text-red-600 text-sm text-center">{error}</p>
         <button
           onClick={fetchData}
-          className="flex items-center gap-1 text-xs font-semibold hover:underline"
-          style={{ color: NAVY }}
+          className="flex items-center gap-1.5 text-xs font-semibold hover:underline
+                     focus:outline-none focus-visible:ring-2 rounded px-2 py-1"
+          style={{ color: SOVEREIGN[700], '--tw-ring-color': SOVEREIGN[500] }}
         >
-          <RefreshCw size={12} /> Retry
+          <RefreshCw size={12} aria-hidden="true" /> Try again
         </button>
       </div>
     );
   }
 
-  const { progress, levelProgress, categories } = data;
-  const stats           = progress?.stats || {};
-  const recentSessions  = progress?.recent_sessions || [];
-  const masteredCount   = progress?.mastered_count  || 0;
-  const unlocked        = levelProgress?.unlocked   || { Beginner: true, Intermediate: false, Advanced: false };
-  const catProgress     = levelProgress?.category_progress || {};
-  const hasAnySession   = Object.keys(catProgress).length > 0;
+  const { categories, levelProgress, progress } = data;
+  const unlocked       = levelProgress?.unlocked          || { Beginner: true, Intermediate: false, Advanced: false };
+  const catProgress    = levelProgress?.category_progress || {};
+  const stats          = progress?.stats                  || {};
+  const recentSessions = progress?.recent_sessions        || [];
+  const masteredCount  = progress?.mastered_count         || 0;
+  const streak         = stats.practice_streak            || 0;
+  const isFirstTimer   = recentSessions.length === 0;
 
-  // Pick 3 featured (unlocked) categories for quick-start
-  const featuredCats = categories
-    .filter(c => unlocked[c.difficulty])
-    .slice(0, 3);
+  // Group categories by difficulty — same logic as EnglishMasterclass.jsx
+  const byDiff = { Beginner: [], Intermediate: [], Advanced: [] };
+  categories.forEach(c => {
+    if (byDiff[c.difficulty]) byDiff[c.difficulty].push(c);
+  });
+
+  // Navigate to /em/practice with the selected category in location state
+  // EMPractice reads location.state.category and pre-selects it
+  const handleStartCategory = (cat) => {
+    navigate('/em/practice', { state: { category: cat } });
+  };
+
+  // Scroll to the category grid (for Welcome banner CTA)
+  const handleBeginFromBanner = () => {
+    document.getElementById('em-category-grid')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-8">
 
-      {/* ── Welcome hero ──────────────────────────────────────────────────── */}
-      <div
-        className="rounded-3xl p-8 relative overflow-hidden shadow-lg"
-        style={{ background: `linear-gradient(140deg, ${NAVY} 0%, #1e3a6e 60%, #162040 100%)` }}
-      >
-        {/* Decorative gold circle */}
-        <div
-          className="absolute top-0 right-0 w-64 h-64 rounded-full opacity-10 pointer-events-none"
-          style={{ background: `radial-gradient(circle, ${GOLD}, transparent)`, transform: 'translate(30%,-30%)' }}
-        />
-        {/* Union Jack mini */}
-        <div className="absolute bottom-6 right-8 opacity-10 pointer-events-none">
-          <svg viewBox="0 0 80 54" width="80" height="54" xmlns="http://www.w3.org/2000/svg">
-            <rect width="80" height="54" rx="4" fill="#012169"/>
-            <line x1="0" y1="0" x2="80" y2="54" stroke="white" strokeWidth="10"/>
-            <line x1="80" y1="0" x2="0" y2="54" stroke="white" strokeWidth="10"/>
-            <line x1="0" y1="0" x2="80" y2="54" stroke="#C8102E" strokeWidth="6"/>
-            <line x1="80" y1="0" x2="0" y2="54" stroke="#C8102E" strokeWidth="6"/>
-            <rect x="30" y="0" width="20" height="54" fill="white"/>
-            <rect x="0" y="17" width="80" height="20" fill="white"/>
-            <rect x="33" y="0" width="14" height="54" fill="#C8102E"/>
-            <rect x="0" y="20" width="80" height="14" fill="#C8102E"/>
-          </svg>
-        </div>
-
-        <div className="relative z-10">
-          <p className="text-sm font-semibold mb-1" style={{ color: GOLD }}>
+      {/* ── Greeting row ─────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-0.5">
             🇬🇧 English Masterclass
           </p>
-          <h1 className="text-3xl font-bold text-white mb-2">
-            Welcome back, {firstName}!
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 leading-tight">
+            {greeting}, {firstName}!
           </h1>
-          <p className="text-sm max-w-lg leading-relaxed mb-6" style={{ color: '#9db4d9' }}>
-            {hasAnySession
-              ? `You've completed ${stats.total_sessions || 0} sessions and learned ${stats.words_learned || 0} British English words. Keep your streak going!`
-              : 'Start your British English vocabulary journey. Work through Beginner, Intermediate, and Advanced levels — each unlocking when you score 60% or higher.'}
-          </p>
-          <Link
-            to="/em/practice"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold shadow-md transition-all hover:scale-105"
-            style={{ background: `linear-gradient(135deg, ${GOLD} 0%, ${GOLD2} 100%)`, color: NAVY }}
-          >
-            <Play size={15} /> Start Practising
-          </Link>
+          {!isFirstTimer && (
+            <p className="text-sm text-gray-500 mt-1">
+              {stats.total_sessions
+                ? `${stats.total_sessions} session${stats.total_sessions !== 1 ? 's' : ''} · ${stats.words_learned || 0} words learned`
+                : 'Ready to practise today?'}
+            </p>
+          )}
         </div>
+
+        {/* Streak badge — Gold-400, only when streak ≥ 1 */}
+        {streak >= 1 && <StreakBadge count={streak} />}
       </div>
 
-      {/* ── Stats row ─────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={BookOpen}   label="Words Learned"    value={stats.words_learned || 0}                         colour="blue"   />
-        <StatCard icon={Star}       label="Mastered"         value={masteredCount}                                     colour="amber"  />
-        <StatCard icon={Flame}      label="Day Streak"       value={`${stats.practice_streak || 0}d`}                 colour="orange" />
-        <StatCard icon={Target}     label="Overall Accuracy" value={`${Math.round(stats.overall_accuracy || 0)}%`}    colour="green"  />
-      </div>
-
-      {/* ── Level unlock status ───────────────────────────────────────────── */}
-      <div>
-        <h2 className="text-base font-bold text-gray-800 mb-3">Your Levels</h2>
-        <div className="grid grid-cols-3 gap-4">
-          {['Beginner', 'Intermediate', 'Advanced'].map(name => (
-            <LevelBadge key={name} name={name} unlocked={!!unlocked[name]} />
-          ))}
-        </div>
-        {!unlocked.Intermediate && (
-          <p className="text-xs text-gray-400 mt-2 text-center">
-            Score ≥ 60% in any Beginner session to unlock Intermediate.
-          </p>
-        )}
-      </div>
-
-      {/* ── Quick-start categories ────────────────────────────────────────── */}
-      {featuredCats.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-base font-bold text-gray-800">Quick Start</h2>
-            <Link
-              to="/em/practice"
-              className="text-xs font-semibold flex items-center gap-1 hover:underline"
-              style={{ color: NAVY }}
-            >
-              All categories <ChevronRight size={13} />
-            </Link>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {featuredCats.map(cat => {
-              const prog = catProgress[cat.id];
-              const best = prog?.best_accuracy ?? null;
-              const s    = LEVEL[cat.difficulty];
-              return (
-                <Link
-                  key={cat.id}
-                  to="/em/practice"
-                  state={{ openCatId: cat.id }}
-                  className="group bg-white border border-gray-100 rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <span className="text-3xl">{cat.icon_emoji || '📚'}</span>
-                    {best !== null
-                      ? <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${best >= 80 ? 'bg-emerald-100 text-emerald-700' : best >= 60 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600'}`}>
-                          Best {Math.round(best)}%
-                        </span>
-                      : <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${s.badge}`}>{cat.difficulty}</span>
-                    }
-                  </div>
-                  <h3 className="font-bold text-gray-900 text-sm mb-1">{cat.name}</h3>
-                  <p className="text-xs text-gray-500 mb-3 line-clamp-2">{cat.description}</p>
-                  {best !== null && (
-                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mb-3">
-                      <div
-                        className={`h-full rounded-full bg-gradient-to-r ${s.from} ${s.to}`}
-                        style={{ width: `${Math.min(best, 100)}%` }}
-                      />
-                    </div>
-                  )}
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-400">{cat.word_count} words</span>
-                    <span className="text-xs font-semibold text-indigo-600 group-hover:translate-x-1 transition-transform flex items-center gap-1">
-                      {best !== null ? 'Practice again' : 'Start'} <ChevronRight size={12} />
-                    </span>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
+      {/* ── First-time welcome banner ─────────────────────────────────────── */}
+      {isFirstTimer && (
+        <WelcomeBanner onStart={handleBeginFromBanner} />
       )}
 
-      {/* ── Stats supplement ──────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm flex items-center gap-3">
-          <Clock size={18} className="text-purple-500 shrink-0" />
-          <div>
-            <p className="text-xs text-gray-500">Total Practice Time</p>
-            <p className="font-bold text-gray-900">{Math.round((stats.total_practice_secs || 0) / 60)} minutes</p>
+      {/* ── Returning-user hero stats ─────────────────────────────────────── */}
+      {!isFirstTimer && (
+        <section aria-label="Your statistics">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <StatPill
+              icon={BookOpen}
+              label="Words Learned"
+              value={stats.words_learned || 0}
+              colour="blue"
+            />
+            <StatPill
+              icon={Star}
+              label="Mastered"
+              value={masteredCount}
+              colour="amber"
+            />
+            <StatPill
+              icon={Target}
+              label="Accuracy"
+              value={`${Math.round(stats.overall_accuracy || 0)}%`}
+              colour="green"
+            />
+            <StatPill
+              icon={TrendingUp}
+              label="Sessions"
+              value={stats.total_sessions || 0}
+              colour="purple"
+            />
           </div>
-        </div>
-        <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm flex items-center gap-3">
-          <TrendingUp size={18} className="text-indigo-500 shrink-0" />
-          <div>
-            <p className="text-xs text-gray-500">Total Sessions</p>
-            <p className="font-bold text-gray-900">{stats.total_sessions || 0}</p>
-          </div>
-        </div>
-      </div>
+        </section>
+      )}
 
-      {/* ── Recent sessions ───────────────────────────────────────────────── */}
-      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider">Recent Sessions</h3>
-          <Link
-            to="/em/progress"
-            className="text-xs font-semibold flex items-center gap-1 hover:underline"
-            style={{ color: NAVY }}
+      {/* ── Level progress strip ─────────────────────────────────────────── */}
+      <section aria-labelledby="em-levels-heading">
+        <div className="flex items-center justify-between mb-3">
+          <h2
+            id="em-levels-heading"
+            className="text-sm font-bold text-gray-700 uppercase tracking-wider"
           >
-            Full history <ChevronRight size={13} />
-          </Link>
+            Your Levels
+          </h2>
+          {!unlocked.Intermediate && (
+            <span className="text-xs text-gray-400 hidden sm:block">
+              Score ≥60% in Beginner to unlock Intermediate
+            </span>
+          )}
         </div>
-        {recentSessions.length === 0 ? (
-          <div className="text-center py-10 text-gray-400">
-            <BookOpen size={28} className="mx-auto mb-2 opacity-40" />
-            <p className="text-sm">No sessions yet.</p>
-            <p className="text-xs mt-1">
-              Head to{' '}
-              <Link to="/em/practice" className="font-semibold underline" style={{ color: NAVY }}>Practice</Link>
-              {' '}to get started!
-            </p>
+
+        {/* 3-tile strip */}
+        <div className="grid grid-cols-3 gap-3">
+          {['Beginner', 'Intermediate', 'Advanced'].map(name => (
+            <LevelTile key={name} name={name} unlocked={!!unlocked[name]} />
+          ))}
+        </div>
+        {/* Mobile hint */}
+        {!unlocked.Intermediate && (
+          <p className="text-xs text-gray-400 mt-2 text-center sm:hidden">
+            Score ≥60% in Beginner to unlock Intermediate
+          </p>
+        )}
+      </section>
+
+      {/* ── Full category grid, grouped by difficulty ─────────────────────── */}
+      {/* Uses the shared LevelSection component (also used by EnglishMasterclass)  */}
+      {/* Clicking a category card navigates to /em/practice with category state   */}
+      <section
+        id="em-category-grid"
+        aria-labelledby="em-categories-heading"
+        className="scroll-mt-20"
+      >
+        <h2
+          id="em-categories-heading"
+          className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-5"
+        >
+          Practice Categories
+        </h2>
+
+        {['Beginner', 'Intermediate', 'Advanced'].map(diff => (
+          <LevelSection
+            key={diff}
+            level={diff}
+            categories={byDiff[diff]}
+            unlocked={unlocked[diff] ?? (diff === 'Beginner')}
+            categoryProgress={catProgress}
+            onStart={handleStartCategory}
+            loadingId={null}
+          />
+        ))}
+      </section>
+
+      {/* ── Recent sessions (returning users) ───────────────────────────── */}
+      {!isFirstTimer && recentSessions.length > 0 && (
+        <section
+          className="bg-white border border-gray-100 rounded-2xl p-5"
+          style={{ boxShadow: SHADOW.tier1 }}
+          aria-labelledby="em-recent-heading"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h3
+              id="em-recent-heading"
+              className="text-sm font-bold text-gray-700 uppercase tracking-wider"
+            >
+              Recent Sessions
+            </h3>
+            <button
+              onClick={() => navigate('/em/progress')}
+              className="text-xs font-semibold hover:underline
+                         focus:outline-none focus-visible:ring-2 rounded"
+              style={{ color: SOVEREIGN[700], '--tw-ring-color': SOVEREIGN[500] }}
+            >
+              View all →
+            </button>
           </div>
-        ) : (
-          <div className="space-y-3">
-            {recentSessions.slice(0, 5).map((s, i) => (
-              <div key={i} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
+          <ul className="space-y-3" aria-label="Recent practice sessions">
+            {recentSessions.slice(0, 4).map((s, i) => (
+              <li
+                key={i}
+                className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0"
+              >
                 <div className="flex items-center gap-3">
-                  <span className="text-xl">{s.icon_emoji || '📚'}</span>
+                  <span className="text-xl" aria-hidden="true">{s.icon_emoji || '📚'}</span>
                   <div>
                     <p className="text-sm font-semibold text-gray-800">{s.category_name}</p>
                     <p className="text-xs text-gray-400">
-                      {new Date(s.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      {new Date(s.created_at).toLocaleDateString('en-GB', {
+                        day: 'numeric', month: 'short',
+                      })}
                     </p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className={`text-sm font-bold ${s.accuracy >= 80 ? 'text-green-600' : s.accuracy >= 60 ? 'text-amber-600' : 'text-red-500'}`}>
+                  <p className={`text-sm font-bold ${
+                    s.accuracy >= 80
+                      ? 'text-emerald-600'
+                      : s.accuracy >= 60
+                        ? 'text-amber-600'
+                        : 'text-red-500'
+                  }`}>
                     {Math.round(s.accuracy)}%
                   </p>
-                  <p className="text-xs text-gray-400">{s.correct_words}/{s.total_words} words</p>
+                  <p className="text-xs text-gray-400">
+                    {s.correct_words}/{s.total_words} words
+                  </p>
                 </div>
-              </div>
+              </li>
             ))}
-          </div>
-        )}
-      </div>
+          </ul>
+        </section>
+      )}
 
-      {/* ── Motivational footer strip ─────────────────────────────────────── */}
-      {hasAnySession && (
+      {/* ── Motivational strip (returning users with streak) ────────────── */}
+      {!isFirstTimer && streak >= 3 && (
         <div
           className="rounded-2xl p-5 flex items-center gap-4"
-          style={{ background: `linear-gradient(135deg, ${NAVY} 0%, #1e3a6e 100%)` }}
+          style={{ background: SOVEREIGN[800] }}
+          role="complementary"
+          aria-label="Streak motivation"
         >
-          <Award size={28} style={{ color: GOLD }} className="shrink-0" />
-          <div>
+          <Award
+            size={26}
+            style={{ color: EM_GOLD[400] }}
+            className="shrink-0"
+            aria-hidden="true"
+          />
+          <div className="flex-1 min-w-0">
             <p className="font-bold text-white text-sm">
-              {stats.practice_streak >= 3
-                ? `🔥 ${stats.practice_streak}-day streak! Keep it up!`
-                : 'Build a daily habit — practise a little every day.'}
+              🔥 {streak}-day streak — incredible!
             </p>
-            <p className="text-xs mt-0.5" style={{ color: '#9db4d9' }}>
-              Consistent practice is the fastest route to British English fluency.
+            <p className="text-xs mt-0.5 truncate" style={{ color: SOVEREIGN[200] }}>
+              Keep showing up every day to stay ahead.
             </p>
           </div>
-          <Link
-            to="/em/practice"
-            className="ml-auto shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all hover:scale-105"
-            style={{ background: `linear-gradient(135deg, ${GOLD} 0%, ${GOLD2} 100%)`, color: NAVY }}
+          <button
+            onClick={() => navigate('/em/practice')}
+            className="shrink-0 px-4 py-2 rounded-xl text-xs font-bold text-white transition-all
+                       hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            style={{ background: SOVEREIGN[500] }}
+            onMouseEnter={e => (e.currentTarget.style.background = SOVEREIGN[400])}
+            onMouseLeave={e => (e.currentTarget.style.background = SOVEREIGN[500])}
           >
             Practise Now
-          </Link>
+          </button>
         </div>
       )}
 

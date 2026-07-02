@@ -7,6 +7,40 @@ export default {
   theme: {
     extend: {
       colors: {
+        // ── English Masterclass design system ─────────────────────────────────
+        // Sovereign: deep authoritative navy — nav, headers, primary buttons
+        sovereign: {
+          50:  '#F0F4FD',
+          100: '#DDE5FA',
+          200: '#B8C8F4',
+          300: '#7A98E8',
+          400: '#4D71D9',
+          500: '#2952C8',
+          600: '#2040A0',
+          700: '#1D2F6F',
+          800: '#162045',
+          900: '#0F1629',
+          950: '#0A0F1E',
+        },
+        // Crimson: British red — logo mark, identity accent, errors
+        crimson: {
+          50:  '#FFF0F2',
+          100: '#FFD6DB',
+          200: '#F8C2C9',
+          400: '#E04356',
+          500: '#CF142B',
+          600: '#B30E21',
+          700: '#8B0A1A',
+        },
+        // em-gold: achievements, streaks, mastery — never general UI chrome
+        'em-gold': {
+          50:  '#FFFBF0',
+          200: '#FDDEA0',
+          400: '#F0A000',
+          500: '#C47D00',
+          600: '#9A6000',
+        },
+        // ─────────────────────────────────────────────────────────────────────
         primary: {
           50:  '#edf3ff',
           100: '#d6e5ff',
