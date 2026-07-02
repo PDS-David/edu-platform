@@ -9,9 +9,11 @@ import {
   Lightbulb, BookOpen, TrendingUp, BarChart3, PenTool,
   FileText, Check, X, Menu, ChevronRight,
   Mail, Phone, MapPin, Twitter, Facebook, Linkedin, Instagram,
+  Volume2, Layers, Flame, Crown,
 } from 'lucide-react';
 import branding from '../config/branding';
 import PublicNav from '../components/PublicNav';
+import { SOVEREIGN, CRIMSON } from './em/constants';
 
 // ── Data ───────────────────────────────────────────────────────────────────────
 
@@ -72,6 +74,12 @@ const COMPARISON = [
   { feature: 'Progress tracking',             eac: true,  free: false,     tutor: 'partial'  },
   { feature: 'Teacher cohort analytics',      eac: true,  free: false,     tutor: false      },
   { feature: 'Available 24/7',                eac: true,  free: true,      tutor: false      },
+];
+
+const EM_HIGHLIGHTS = [
+  { icon: Volume2, title: 'Real British Pronunciation', desc: 'Hear every word spoken aloud in Received Pronunciation, then practise saying it back.' },
+  { icon: Layers,  title: '6 Vocabulary Categories',     desc: 'From Everyday British to Idioms, Formal English, Slang, Pronunciation traps, and Spelling patterns.' },
+  { icon: Flame,   title: 'Streaks & Progress Tracking', desc: 'Level up from Beginner to Advanced as your accuracy and practice streak grow.' },
 ];
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -363,6 +371,99 @@ export default function LandingPage() {
             <Link to="/register" className="inline-flex items-center gap-1.5 text-blue-600 font-semibold text-sm hover:underline">
               Start practising now <ChevronRight size={15} />
             </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          5b. ENGLISH MASTERCLASS PROMO
+      ══════════════════════════════════════════════════════════════════════ */}
+      <section
+        className="py-16 px-4"
+        style={{ background: `linear-gradient(135deg, ${SOVEREIGN[900]} 0%, ${SOVEREIGN[800]} 100%)` }}
+      >
+        <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
+
+          {/* Left — pitch */}
+          <div className="text-white space-y-5">
+            <span
+              className="inline-flex items-center gap-1.5 text-white text-xs font-bold px-3 py-1.5 rounded-full tracking-wide uppercase"
+              style={{ background: CRIMSON[500] }}
+            >
+              <Crown size={12} /> New · British English Training
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-extrabold leading-tight">
+              Master British English with English Masterclass
+            </h2>
+            <p className="text-sm sm:text-base leading-relaxed max-w-lg" style={{ color: SOVEREIGN[200] }}>
+              A standalone vocabulary and pronunciation trainer built for Nigerian learners —
+              real British audio, AI-generated explanations, and progress tracking, separate
+              from your exam practice.
+            </p>
+
+            <div className="grid sm:grid-cols-1 gap-3 pt-1">
+              {EM_HIGHLIGHTS.map(({ icon: Icon, title, desc }) => (
+                <div key={title} className="flex items-start gap-3">
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                    style={{ background: `${SOVEREIGN[500]}33` }}
+                  >
+                    <Icon size={16} style={{ color: SOVEREIGN[300] }} />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-sm text-white">{title}</p>
+                    <p className="text-xs" style={{ color: SOVEREIGN[200] }}>{desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <Link to="/english-masterclass"
+              className="inline-flex items-center gap-2 font-bold px-6 py-3 rounded-xl transition-colors shadow-lg text-sm"
+              style={{ background: CRIMSON[500], color: '#ffffff' }}
+            >
+              Explore English Masterclass <ChevronRight size={16} />
+            </Link>
+            <p className="text-xs" style={{ color: SOVEREIGN[300] }}>
+              Requires its own quick registration, separate from your AISchoolonair account.
+            </p>
+          </div>
+
+          {/* Right — mock word-practice card */}
+          <div className="flex justify-center lg:justify-end">
+            <div className="bg-white rounded-2xl shadow-2xl w-72 p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-gray-400">Everyday British</span>
+                <span
+                  className="text-[11px] font-bold px-2 py-1 rounded-full text-white"
+                  style={{ background: CRIMSON[500] }}
+                >
+                  🇬🇧 RP Audio
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between rounded-xl px-4 py-3" style={{ background: SOVEREIGN[50] }}>
+                <div>
+                  <p className="font-bold text-gray-900 text-lg">fortnight</p>
+                  <p className="text-xs text-gray-400">/ˈfɔːtnaɪt/</p>
+                </div>
+                <div
+                  className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
+                  style={{ background: SOVEREIGN[700] }}
+                >
+                  <Volume2 size={16} className="text-white" />
+                </div>
+              </div>
+
+              <p className="text-xs text-gray-500 leading-relaxed">
+                A period of two weeks — <span className="italic">"I shall return in a fortnight."</span>
+              </p>
+
+              <div className="flex items-center justify-between rounded-xl px-4 py-2.5" style={{ background: `${CRIMSON[500]}12` }}>
+                <span className="text-xs font-medium" style={{ color: CRIMSON[600] }}>Practice Streak</span>
+                <span className="text-base font-extrabold" style={{ color: CRIMSON[600] }}>🔥 7 days</span>
+              </div>
+            </div>
           </div>
         </div>
       </section>
