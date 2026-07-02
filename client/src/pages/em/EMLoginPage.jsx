@@ -85,7 +85,7 @@ export default function EMLoginPage() {
           onMouseEnter={e => (e.currentTarget.style.color = '#ffffff')}
           onMouseLeave={e => (e.currentTarget.style.color = SOVEREIGN[200])}
         >
-          ← Back to AISchoolOnAir
+          ← Back to Home Page
         </Link>
       </header>
 
