@@ -170,7 +170,7 @@ export default function EMLogin() {
             </p>
 
             <div className="mt-8 pt-6 border-t border-gray-100 text-center">
-              <p className="text-[10px] text-gray-300">Powered by AISchoolOnAir · Pronoia Digital Services</p>
+              <p className="text-[10px] text-gray-300">Powered by EAC</p>
             </div>
           </div>
         </div>
