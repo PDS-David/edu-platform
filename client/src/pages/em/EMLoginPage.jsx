@@ -18,6 +18,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { SOVEREIGN, CRIMSON } from './constants';
+import branding from '../../config/branding';
 
 export default function EMLoginPage() {
   const [email,    setEmail]    = useState('');
@@ -381,7 +382,7 @@ export default function EMLoginPage() {
         style={{ color: `${SOVEREIGN[300]}66` }}
       >
         English Masterclass is powered by{' '}
-        <span style={{ color: `${SOVEREIGN[300]}99` }}>Educational Advancement Centre</span>
+        <span style={{ color: `${SOVEREIGN[300]}99` }}>{branding.poweredByFull}</span>
       </p>
     </div>
   );
