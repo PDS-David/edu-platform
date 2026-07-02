@@ -20,10 +20,11 @@ import api from '../../services/apiClient';
 import {
   Flame, BookOpen, Target, Star, TrendingUp, Clock,
   Loader2, AlertCircle, RefreshCw, CheckCircle2, Lock,
-  Award, Sparkles,
+  Award, Sparkles, PlayCircle,
 } from 'lucide-react';
 import { SOVEREIGN, CRIMSON, EM_GOLD, SHADOW } from './constants';
 import LevelSection from './LevelSection';
+import { dedupeCategories } from './categoryUtils';
 
 // ── Time-of-day greeting helper ───────────────────────────────────────────────
 function getGreeting() {
@@ -198,6 +199,99 @@ function WelcomeBanner({ onStart }) {
   );
 }
 
+// ── Continue learning — hero card for the last-practiced category ────────────
+function ContinueLearningCard({ cat, onContinue }) {
+  const best = cat._best;
+  return (
+    <section
+      className="bg-white border border-gray-100 rounded-2xl p-5 sm:p-6"
+      style={{ boxShadow: SHADOW.tier1 }}
+      aria-labelledby="em-continue-heading"
+    >
+      <h2
+        id="em-continue-heading"
+        className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4"
+      >
+        Continue learning
+      </h2>
+      <div className="flex items-center gap-4">
+        <div
+          className="w-14 h-14 rounded-xl flex items-center justify-center text-2xl shrink-0"
+          style={{ background: SOVEREIGN[50] }}
+          aria-hidden="true"
+        >
+          {cat.icon_emoji || '📚'}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="font-bold text-gray-900 text-sm truncate">{cat.name}</p>
+          <p className="text-xs text-gray-400 mb-2">{cat.word_count} words</p>
+          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden max-w-xs">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-blue-500 transition-all duration-500"
+              style={{ width: `${Math.min(best ?? 0, 100)}%` }}
+              role="progressbar"
+              aria-valuenow={Math.round(best ?? 0)}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={`${cat.name} progress`}
+            />
+          </div>
+        </div>
+        <button
+          onClick={() => onContinue(cat)}
+          className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold
+                     text-white transition-all hover:scale-105
+                     focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
+          style={{ background: SOVEREIGN[500] }}
+          onMouseEnter={e => (e.currentTarget.style.background = SOVEREIGN[400])}
+          onMouseLeave={e => (e.currentTarget.style.background = SOVEREIGN[500])}
+        >
+          <PlayCircle size={15} aria-hidden="true" />
+          <span className="hidden sm:inline">Continue</span>
+        </button>
+      </div>
+    </section>
+  );
+}
+
+const DIFF_BADGE = {
+  Beginner:     'bg-emerald-100 text-emerald-700',
+  Intermediate: 'bg-blue-100 text-blue-700',
+  Advanced:     'bg-purple-100 text-purple-700',
+};
+
+// ── Recommended for you — horizontal strip of untried/weak categories ────────
+function RecommendedStrip({ cats, onStart }) {
+  if (!cats.length) return null;
+  return (
+    <section aria-labelledby="em-recommended-heading">
+      <h2
+        id="em-recommended-heading"
+        className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3"
+      >
+        Recommended for you
+      </h2>
+      <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1">
+        {cats.map(cat => (
+          <button
+            key={cat.id}
+            onClick={() => onStart(cat)}
+            className="shrink-0 w-40 text-left bg-white border border-gray-100 rounded-xl p-4
+                       shadow-sm hover:shadow-md hover:border-indigo-200 transition-all
+                       focus:outline-none focus:ring-2 focus:ring-indigo-300"
+          >
+            <span className="text-2xl block mb-2" aria-hidden="true">{cat.icon_emoji || '📚'}</span>
+            <p className="font-bold text-gray-900 text-xs mb-0.5 truncate">{cat.name}</p>
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${DIFF_BADGE[cat.difficulty] || DIFF_BADGE.Beginner}`}>
+              {cat.difficulty}
+            </span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 // ── Streak badge — shown in the greeting row when streak ≥ 1 ─────────────────
 function StreakBadge({ count }) {
   return (
@@ -301,6 +395,31 @@ export default function EMDashboard() {
     if (byDiff[c.difficulty]) byDiff[c.difficulty].push(c);
   });
 
+  // Deduped flat list — defensive merge for the em_categories duplicate-row
+  // bug (see categoryUtils.js). Used to derive "Continue learning" and
+  // "Recommended for you" without re-showing the same category repeatedly.
+  const mergedCategories = dedupeCategories(categories, catProgress);
+
+  // "Continue learning" — the category from the most recent session.
+  // Sessions store category_name denormalised (survives category deletes),
+  // so match on name rather than the possibly-stale category_id.
+  const lastSession = recentSessions[0];
+  const continueCategory = lastSession
+    ? mergedCategories.find(c => c.name === lastSession.category_name) || null
+    : null;
+
+  // "Recommended for you" — up to 3 unlocked categories the student hasn't
+  // continued with, prioritising untried categories, then lowest accuracy.
+  const recommended = mergedCategories
+    .filter(c => (unlocked[c.difficulty] ?? c.difficulty === 'Beginner'))
+    .filter(c => !continueCategory || c.id !== continueCategory.id)
+    .sort((a, b) => {
+      const aBest = a._best ?? -1;
+      const bBest = b._best ?? -1;
+      return aBest - bBest; // untried (-1) and weakest first
+    })
+    .slice(0, 3);
+
   // Navigate to /em/practice with the selected category in location state
   // EMPractice reads location.state.category and pre-selects it
   const handleStartCategory = (cat) => {
@@ -374,6 +493,16 @@ export default function EMDashboard() {
         </section>
       )}
 
+      {/* ── Continue learning ────────────────────────────────────────────── */}
+      {!isFirstTimer && continueCategory && (
+        <ContinueLearningCard cat={continueCategory} onContinue={handleStartCategory} />
+      )}
+
+      {/* ── Recommended for you ──────────────────────────────────────────── */}
+      {!isFirstTimer && (
+        <RecommendedStrip cats={recommended} onStart={handleStartCategory} />
+      )}
+
       {/* ── Level progress strip ─────────────────────────────────────────── */}
       <section aria-labelledby="em-levels-heading">
         <div className="flex items-center justify-between mb-3">
@@ -416,7 +545,7 @@ export default function EMDashboard() {
           id="em-categories-heading"
           className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-5"
         >
-          Practice Categories
+          Practice by Category
         </h2>
 
         {['Beginner', 'Intermediate', 'Advanced'].map(diff => (

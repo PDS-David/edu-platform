@@ -1285,6 +1285,25 @@ async function run() {
       updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`
   );
+  // BUGFIX (2026-07-03): em_categories had no unique constraint, so the
+  // 'ON CONFLICT DO NOTHING' on the seed insert below had nothing to key
+  // off of — every re-run of this migration (i.e. every deploy, since
+  // deploy.sh runs this script unconditionally) inserted 6 more duplicate
+  // categories. This is what produced the wall of ~40 identical "Everyday
+  // British" cards on the student dashboard. Adding the constraint here
+  // stops NEW duplicates; existing duplicates must be merged separately
+  // (see server/scripts/dedupe_em_categories.js) before this ALTER can
+  // succeed — until then it will safely no-op via the exec() catch below.
+  await exec('em_categories: add unique constraint (name, difficulty)',
+    `DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'em_categories_name_difficulty_unique'
+      ) THEN
+        ALTER TABLE em_categories ADD CONSTRAINT em_categories_name_difficulty_unique
+          UNIQUE (name, difficulty);
+      END IF;
+    END $$`
+  );
   await exec('em_words: create table',
     `CREATE TABLE IF NOT EXISTS em_words (
       id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1368,7 +1387,7 @@ async function run() {
        ('British Slang',     'Informal slang terms used across Britain',            'Advanced',     '😄',  4),
        ('Pronunciation',     'Words commonly mispronounced by non-native speakers', 'Advanced',     '🎙️', 5),
        ('Spelling Patterns', 'Common British spelling patterns vs American',        'Beginner',     '✏️', 6)
-     ON CONFLICT DO NOTHING`
+     ON CONFLICT (name, difficulty) DO NOTHING`
   );
   await exec('em_words: seed default words',
     `INSERT INTO em_words (category_id, word, phonetic, definition, example_sentence)
