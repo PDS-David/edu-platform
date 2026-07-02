@@ -52,7 +52,7 @@ export default function EMLogin() {
           </div>
         </div>
         <Link to="/" className="text-blue-300 hover:text-white text-xs font-medium transition-colors">
-          ← Back to AISchoolOnAir
+          ← Back to Home Page
         </Link>
       </header>
 
