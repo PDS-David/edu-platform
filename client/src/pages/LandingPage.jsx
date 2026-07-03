@@ -220,7 +220,7 @@ export default function LandingPage() {
                       <p className="font-semibold text-gray-900 text-sm">AISchoolonair</p>
                       <p className="text-xs text-gray-400">Exam practice &amp; AI tutoring</p>
                     </Link>
-                    <Link to="/english-masterclass" onClick={() => setStartFreeMenuOpen(false)}
+                    <Link to="/em/signup" onClick={() => setStartFreeMenuOpen(false)}
                       className="block px-4 py-2.5 hover:bg-gray-50 transition-colors">
                       <p className="font-semibold text-gray-900 text-sm">English Masterclass</p>
                       <p className="text-xs text-gray-400">British English training</p>
@@ -291,7 +291,7 @@ export default function LandingPage() {
                   <p className="text-sm font-medium text-gray-700">AISchoolonair</p>
                   <p className="text-xs text-gray-400">Exam practice &amp; AI tutoring</p>
                 </Link>
-                <Link to="/english-masterclass" onClick={() => setMenuOpen(false)} className="block py-1">
+                <Link to="/em/signup" onClick={() => setMenuOpen(false)} className="block py-1">
                   <p className="text-sm font-medium text-gray-700">English Masterclass</p>
                   <p className="text-xs text-gray-400">British English training</p>
                 </Link>
@@ -313,7 +313,7 @@ export default function LandingPage() {
                AI-Powered Smart Learning
             </span>
             <h1 className="text-3xl sm:text-4xl xl:text-5xl font-extrabold leading-tight">
-              Master Your Exams with AI-Powered Learning
+              Master your studies with AI powered learning
             </h1>
             <p className="text-blue-200 text-base sm:text-lg leading-relaxed max-w-lg">
               50,000+ curriculum-aligned questions, instant AI feedback, predicted performance insights, and progress tracking — designed to help students succeed worldwide.
@@ -534,9 +534,9 @@ export default function LandingPage() {
               Master British English with English Masterclass
             </h2>
             <p className="text-sm sm:text-base leading-relaxed max-w-lg" style={{ color: SOVEREIGN[200] }}>
-              A standalone vocabulary and pronunciation trainer built for Nigerian learners —
-              real British audio, AI-generated explanations, and progress tracking, separate
-              from your exam practice.
+              A standalone vocabulary and pronunciation trainer built for non-native English
+              learners — real British audio, AI-generated explanations, and progress tracking,
+              separate from your exam practice.
             </p>
 
             <div className="grid sm:grid-cols-1 gap-3 pt-1">
@@ -556,14 +556,14 @@ export default function LandingPage() {
               ))}
             </div>
 
-            <Link to="/english-masterclass"
+            <Link to="/em/signup"
               className="inline-flex items-center gap-2 font-bold px-6 py-3 rounded-xl transition-colors shadow-lg text-sm"
               style={{ background: CRIMSON[500], color: '#ffffff' }}
             >
               Explore English Masterclass <ChevronRight size={16} />
             </Link>
             <p className="text-xs" style={{ color: SOVEREIGN[300] }}>
-              Requires its own quick registration, separate from your AISchoolonair account.
+              Its own account, its own registration — no AISchoolonair account needed.
             </p>
           </div>
 

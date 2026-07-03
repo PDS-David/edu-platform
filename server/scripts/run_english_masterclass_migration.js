@@ -108,8 +108,13 @@ async function run() {
       correct_words INT NOT NULL DEFAULT 0,
       accuracy      NUMERIC(5,2) NOT NULL DEFAULT 0,
       duration_secs INT NOT NULL DEFAULT 0,
+      pronunciation_score NUMERIC(5,2),
       created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
+  `);
+
+  await exec('em_practice_sessions: add pronunciation_score column', `
+    ALTER TABLE em_practice_sessions ADD COLUMN IF NOT EXISTS pronunciation_score NUMERIC(5,2)
   `);
 
   // ── AGGREGATE USER STATS ──────────────────────────────────────────────────

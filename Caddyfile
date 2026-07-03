@@ -21,7 +21,7 @@
         X-Content-Type-Options     "nosniff"
         X-Frame-Options            "SAMEORIGIN"
         Referrer-Policy            "strict-origin-when-cross-origin"
-        Permissions-Policy         "camera=(), microphone=(), geolocation=(), payment=()"
+        Permissions-Policy         "camera=(), microphone=(self), geolocation=(), payment=()"
         Content-Security-Policy    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' wss://www.aischoolonair.ng wss://staging.aischoolonair.ng https://api.paystack.co; frame-src 'self' https://docs.google.com https://view.officeapps.live.com https://onedrive.live.com; object-src 'none'; upgrade-insecure-requests"
         -Server
         -Alt-Svc

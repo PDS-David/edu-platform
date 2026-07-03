@@ -8,7 +8,7 @@ export default function PricingPage() {
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex flex-col items-center justify-center p-8 text-center">
       <h1 className="text-3xl font-bold text-gray-900 mb-3">Pricing</h1>
       <p className="text-gray-500 mb-2 max-w-md text-sm">
-        Affordable plans for every Nigerian student — JAMB, WAEC, NECO, JUPEB and more.
+        Affordable plans for every student — JAMB, WAEC, NECO, JUPEB and more.
       </p>
       <p className="text-gray-400 mb-8 max-w-md text-sm">
         Contact us directly for current subscription rates and school bulk pricing.

@@ -1356,8 +1356,15 @@ async function run() {
       correct_words INT NOT NULL DEFAULT 0,
       accuracy      NUMERIC(5,2) NOT NULL DEFAULT 0,
       duration_secs INT NOT NULL DEFAULT 0,
+      pronunciation_score NUMERIC(5,2),
       created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`
+  );
+  // Mic-based pronunciation practice (added for the speaking-scoring feature).
+  // ADD COLUMN IF NOT EXISTS so this applies to the already-live production
+  // table, not just fresh installs picked up by the CREATE TABLE above.
+  await exec('em_practice_sessions: add pronunciation_score column',
+    `ALTER TABLE em_practice_sessions ADD COLUMN IF NOT EXISTS pronunciation_score NUMERIC(5,2)`
   );
   await exec('em_user_stats: create table',
     `CREATE TABLE IF NOT EXISTS em_user_stats (

@@ -8,6 +8,7 @@ const router     = express.Router();
 const { Pool }   = require('pg');
 const { generate } = require('../services/ai');
 const { authorize } = require('../middleware/auth');
+const { pronunciationLimiter } = require('../middleware/rateLimiter');
 
 const db = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -168,6 +169,81 @@ Say only the word, nothing else: "${word}"`
   }
 });
 
+// POST /api/english-masterclass/pronunciation-score
+// Mic-based speaking practice. The client records a short clip of the
+// student saying `word` and sends it here as base64 audio. Gemini transcribes
+// and scores it.
+//
+// Accent fairness: the prompt explicitly instructs the model NOT to grade
+// against a single "native" accent standard (British/American/etc). Nigerian
+// English, Indian English, and other World Englishes are all valid targets —
+// scoring is about whether the word was produced clearly and recognisably,
+// not about matching one accent. This is the "internationally acceptable"
+// framing requested — a Nigerian student should not be marked down for
+// sounding Nigerian.
+router.post('/pronunciation-score', pronunciationLimiter, async (req, res) => {
+  const { word, audio, mime_type } = req.body;
+  if (!word)  return res.status(400).json({ success: false, error: 'word is required' });
+  if (!audio) return res.status(400).json({ success: false, error: 'audio is required' });
+
+  // Guard against oversized payloads — a few seconds of speech is at most
+  // a few hundred KB; reject anything absurd rather than pass it to Gemini.
+  if (audio.length > 4_000_000) {
+    return res.status(413).json({ success: false, error: 'That recording is too long. Please keep it to one word.' });
+  }
+
+  try {
+    const { GoogleGenAI } = require('@google/genai');
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+    const prompt = `You are a supportive English pronunciation coach for learners around the world (Nigeria, India, and elsewhere all use valid, legitimate English accents).
+
+The student was asked to say the word: "${word}"
+
+Listen to the attached audio and evaluate it. Judge ONLY whether the word is clearly and recognisably produced — correct syllables, correct sounds, correct stress. Do NOT penalise the student for having a Nigerian, Indian, or any other non-British/non-American accent. Only mark it down if the word itself is genuinely unclear, mispronounced (wrong sounds/syllables), or a different word entirely.
+
+Respond in this exact JSON format, no markdown, no extra text:
+{
+  "heard": "what you heard the student say, as plain text",
+  "score": <integer 0-100>,
+  "matched": <true if it is recognisably the target word, false otherwise>,
+  "feedback": "one short, encouraging sentence (max 20 words), specific if possible"
+}`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: [{
+        parts: [
+          { text: prompt },
+          { inlineData: { mimeType: mime_type || 'audio/webm', data: audio } },
+        ],
+      }],
+    });
+
+    const textPart = response?.candidates?.[0]?.content?.parts?.find(p => p.text)?.text || '';
+    const cleaned  = textPart.replace(/```json|```/g, '').trim();
+
+    let data;
+    try { data = JSON.parse(cleaned); } catch { data = null; }
+
+    if (!data || typeof data.score !== 'number') {
+      return res.json({ success: false, error: 'Could not evaluate that recording. Please try again.' });
+    }
+
+    const score = Math.max(0, Math.min(100, Math.round(data.score)));
+    return res.json({
+      success: true,
+      score,
+      heard: data.heard || '',
+      matched: !!data.matched,
+      feedback: data.feedback || '',
+    });
+  } catch (err) {
+    console.error('[EM] POST /pronunciation-score', err.message);
+    res.status(500).json({ success: false, error: 'Pronunciation check is temporarily unavailable. Please try again shortly.' });
+  }
+});
+
 // POST /api/english-masterclass/word-explain
 // AI generates definition, example sentence, and usage tip for a word.
 // Accepts optional word_id — if supplied and the word's DB fields are empty,
@@ -233,12 +309,23 @@ router.post('/sessions', async (req, res) => {
 
   const accuracy = Math.round((correct_words / total_words) * 100 * 100) / 100;
 
+  // Average pronunciation_score across answers that actually attempted the
+  // mic exercise. Speaking practice is optional per word, so this stays null
+  // (not 0) when nobody used the mic — a student who never touches the mic
+  // shouldn't have their average dragged down.
+  const pronScores = Array.isArray(answers)
+    ? answers.map(a => a.pronunciation_score).filter(s => typeof s === 'number')
+    : [];
+  const avgPronunciation = pronScores.length
+    ? Math.round((pronScores.reduce((s, v) => s + v, 0) / pronScores.length) * 100) / 100
+    : null;
+
   try {
     // 1. Save session
     await db.query(`
-      INSERT INTO em_practice_sessions (user_id, category_id, category_name, total_words, correct_words, accuracy, duration_secs)
-      VALUES ($1,$2,$3,$4,$5,$6,$7)
-    `, [userId, category_id || null, category_name, total_words, correct_words, accuracy, duration_secs || 0]);
+      INSERT INTO em_practice_sessions (user_id, category_id, category_name, total_words, correct_words, accuracy, duration_secs, pronunciation_score)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+    `, [userId, category_id || null, category_name, total_words, correct_words, accuracy, duration_secs || 0, avgPronunciation]);
 
     // 2. Update per-word progress
     if (Array.isArray(answers)) {
