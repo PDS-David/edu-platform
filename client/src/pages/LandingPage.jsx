@@ -313,7 +313,7 @@ export default function LandingPage() {
                AI-Powered Smart Learning
             </span>
             <h1 className="text-3xl sm:text-4xl xl:text-5xl font-extrabold leading-tight">
-              Master Your Exams with AI-Powered Learning
+              Master your studies with AI powered learning
             </h1>
             <p className="text-blue-200 text-base sm:text-lg leading-relaxed max-w-lg">
               50,000+ curriculum-aligned questions, instant AI feedback, predicted performance insights, and progress tracking — designed to help students succeed worldwide.
@@ -534,9 +534,9 @@ export default function LandingPage() {
               Master British English with English Masterclass
             </h2>
             <p className="text-sm sm:text-base leading-relaxed max-w-lg" style={{ color: SOVEREIGN[200] }}>
-              A standalone vocabulary and pronunciation trainer built for Nigerian learners —
-              real British audio, AI-generated explanations, and progress tracking, separate
-              from your exam practice.
+              A standalone vocabulary and pronunciation trainer built for non-native English
+              learners — real British audio, AI-generated explanations, and progress tracking,
+              separate from your exam practice.
             </p>
 
             <div className="grid sm:grid-cols-1 gap-3 pt-1">
