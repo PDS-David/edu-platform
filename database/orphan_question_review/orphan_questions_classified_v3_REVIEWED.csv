@@ -1,0 +1,982 @@
+id,review_tier,question_text,difficulty,predicted_subject,predicted_subtopic_id,predicted_subtopic_name,final_subtopic_id,note,flag
+173,1-CONFIRM,"According to the double-entry system, every debit entry must have a corresponding:",easy,Accounting,92.0,Double-Entry Principle,92.0,,
+294,1-CONFIRM,"According to the double-entry principle, for every debit entry, there must be a corresponding:",easy,Accounting,92.0,Double-Entry Principle,92.0,,
+101,1-CONFIRM,"In agricultural plants, which organelle is the primary site for converting light energy into chemical energy during photosynthesis, a process crucial for biomass production?",medium,Biology,11.0,Photosynthesis,11.0,,
+106,1-CONFIRM,"Beyond anchoring the plant, the most vital function of a plant's root system for its growth and survival in an agricultural ecosystem is:",medium,Biology,18.0,Ecosystem,18.0,,
+159,1-CONFIRM,"In a typical food chain, which organism represents the primary consumer?",easy,Biology,16.0,Food Chain,16.0,,
+160,1-CONFIRM,"Organisms that are prokaryotic, unicellular, and lack a true nucleus belong to the kingdom:",medium,Biology,78.0,nucleus,78.0,,
+277,1-CONFIRM,All of the following are necessary raw materials for photosynthesis EXCEPT:,easy,Biology,11.0,Photosynthesis,11.0,,
+280,1-CONFIRM,"In a typical food chain, which of the following organisms represents a primary consumer?",easy,Biology,16.0,Food Chain,16.0,,
+282,1-CONFIRM,Which of the following is an advantage of asexual reproduction?,medium,Biology,9.0,asexual reproduction,9.0,,
+286,1-CONFIRM,The study of fossils provides direct evidence for evolution primarily through:,medium,Biology,21.0,Evidence Of Evolution,21.0,,
+388,1-CONFIRM,The variety of life in the world or in a particular habitat or ecosystem is referred to as:,medium,Biology,18.0,Ecosystem,18.0,,
+391,1-CONFIRM,Energy flows through an ecosystem typically in what direction?,medium,Biology,18.0,Ecosystem,18.0,,
+392,1-CONFIRM,Which process is primarily responsible for generating genetic variation within a sexually reproducing population?,medium,Biology,83.0,Genetic variation,83.0,,
+503,1-CONFIRM,"In a typical food chain, which of the following organisms are classified as primary consumers?",easy,Biology,16.0,Food Chain,16.0,,
+515,1-CONFIRM,"The study of homologous structures, such as the forelimbs of mammals (e.g., human arm, bat wing, whale flipper), provides strong evidence for which evolutionary concept?",hard,Biology,21.0,Evidence Of Evolution,21.0,,
+662,1-CONFIRM,Photosynthesis occurs mainly in the:,easy,Biology,11.0,Photosynthesis,11.0,,
+909,1-CONFIRM,What is the main function of the nucleus in eukaryotic cells?,medium,Biology,78.0,nucleus,78.0,,
+928,1-CONFIRM,"An increase in size and complexity, often involving cell division and differentiation, is referred to as:",medium,Biology,76.0,cell division,76.0,,
+932,1-CONFIRM,Organisms whose cells lack a true nucleus and other membrane-bound organelles are classified as:,medium,Biology,78.0,nucleus,78.0,,
+5,1-CONFIRM,Which of the following organic compounds is generally considered the most acidic?,medium,Chemistry,5.0,Acid,5.0,,
+10,1-CONFIRM,Which of the following compounds can exhibit cis-trans (geometric) isomerism?,medium,Chemistry,115.0,Isomerism in Organic Compounds,115.0,,
+261,1-CONFIRM,Which of the following elements has its valence electrons in the 'p' subshell and belongs to Group 16 of the periodic table?,easy,Chemistry,111.0,Valence Shell Electron Pair Repulsion (VSEPR) Theory,111.0,,
+266,1-CONFIRM,Which of the following organic compounds is a member of the alkyne homologous series?,easy,Chemistry,115.0,Isomerism in Organic Compounds,115.0,,
+544,1-CONFIRM,What are the primary products of a neutralization reaction between an acid and a base?,medium,Chemistry,24.0,neutralization Reaction,24.0,,
+610,1-CONFIRM,"In the reversible reaction H₂O + NH₃ ⇌ NH₄⁺ + OH⁻, which of the following is a conjugate acid-base pair?",medium,Chemistry,5.0,Acid,5.0,,
+939,1-CONFIRM,What is the defining characteristic that distinguishes most organic compounds from inorganic compounds?,medium,Chemistry,115.0,Isomerism in Organic Compounds,115.0,,
+940,1-CONFIRM,Which type of bonding is predominantly found in organic compounds?,medium,Chemistry,115.0,Isomerism in Organic Compounds,115.0,,
+941,1-CONFIRM,"Compared to typical inorganic salts, organic compounds generally exhibit:",medium,Chemistry,115.0,Isomerism in Organic Compounds,115.0,,
+942,1-CONFIRM,Which statement best describes the general solubility of organic compounds in water?,medium,Chemistry,115.0,Isomerism in Organic Compounds,115.0,,
+945,1-CONFIRM,The phenomenon where two or more compounds have the same molecular formula but different structural formulas is known as isomerism. This phenomenon is vastly more prevalent in:,medium,Chemistry,115.0,Isomerism in Organic Compounds,115.0,,
+946,1-CONFIRM,Which statement is generally true regarding the electrical conductivity of typical pure organic compounds in their liquid state compared to molten inorganic salts?,medium,Chemistry,115.0,Isomerism in Organic Compounds,115.0,,
+948,1-CONFIRM,"Historically, organic compounds were considered to be derived from living organisms, while inorganic compounds were derived from non-living matter. While this distinction is now blurred by synthesis, which statement correctly reflects a common natural source for many organic compounds?",medium,Chemistry,115.0,Isomerism in Organic Compounds,115.0,,
+949,1-CONFIRM,Which of the following compounds is classified as an inorganic compound?,medium,Chemistry,115.0,Isomerism in Organic Compounds,115.0,,
+951,1-CONFIRM,"While organic compounds can exhibit acidic or basic properties (e.g., carboxylic acids, amines), acid-base neutralization reactions are a fundamental and highly characteristic type of reaction primarily studied in:",medium,Chemistry,24.0,neutralization Reaction,24.0,,
+990,1-CONFIRM,"Which s-block element exhibits a diagonal relationship with aluminum, showing similar properties like covalent character in its compounds?",medium,Chemistry,30.0,Periodic Properties Of Element,30.0,,
+666,1-CONFIRM,A citizen's right to vote is known as:,medium,Civic Education,36.0,Right And Duities Of A Citizen,36.0,,
+672,1-CONFIRM,Which of the following is not a method of acquiring Nigerian citizenship?,easy,Civic Education,68.0,Modes of Acquiring Citizenship,68.0,,
+141,1-CONFIRM,Which of the following is NOT an aid to trade?,easy,Commerce,55.0,Aid To Trade,55.0,,
+146,1-CONFIRM,Which of the following principles of insurance states that the insured should not make profit from a loss?,medium,Commerce,59.0,principles of insurance,59.0,,
+154,1-CONFIRM,One significant disadvantage of a sole proprietorship is:,easy,Commerce,63.0,Sole Proprietorship And Partnership,63.0,,
+774,1-CONFIRM,What is a key characteristic that distinguishes a general partnership from a sole proprietorship?,medium,Commerce,63.0,Sole Proprietorship And Partnership,63.0,,
+848,1-CONFIRM,"When discussing data quality, which characteristic ensures that the data is free from errors and correctly represents the real-world facts it intends to describe?",medium,Data Processing,134.0,Data Quality and Security,134.0,,
+742,1-CONFIRM,"When a foreign company invests in building a new factory in a domestic country, how is this transaction recorded in the domestic country's Balance of Payments?",hard,Economics,122.0,Balance Of Trade And Payment,122.0,,
+760,1-CONFIRM,"If the price elasticity of demand for a product is -0.5, demand for that product is considered:",medium,Economics,127.0,Price Determination And Elasticity,127.0,,
+1010,1-CONFIRM,Choose the sentence with correct subject-verb agreement.,medium,English Language,131.0,Concord (Subject-Verb Agreement),131.0,,
+650,1-CONFIRM,Which of the following is most likely to increase population growth?,easy,Geography,318.0,Natural increase and population trends,318.0,,
+651,1-CONFIRM,2. The Demographic Transition Model stage with high birth rates and low death rates is:,easy,Geography,317.0,"Birth rates, death rates, fertility rates",317.0,,
+461,1-CONFIRM,Which of the following is a primary role of the Executive arm of government?,medium,Government,227.0,The Executive,227.0,,
+787,1-CONFIRM,The rise of nationalist movements in colonized territories was primarily fueled by:,medium,History,281.0,Rise of Nationalist Movements,281.0,,
+749,1-CONFIRM,"According to the International Product Life Cycle (IPLC) theory, at which stage is a product most likely to be produced and exported by the innovating developed country, while imports by other developed countries are minimal?",hard,Marketing,189.0,Product Life Cycle,189.0,,
+208,1-CONFIRM,The first term of an arithmetic progression (AP) is 3 and the common difference is 2. Find the 10th term.,easy,Mathematics,201.0,Arithmetic Progression (AP),201.0,,
+209,1-CONFIRM,The first term of a geometric progression (GP) is 2 and the common ratio is 3. Find the 4th term.,easy,Mathematics,203.0,Geometric Progression (GP),203.0,,
+809,1-CONFIRM,The scores on a math test are normally distributed with a mean of 70 and a standard deviation of 10. What percentage of students scored between 60 and 80?,medium,Mathematics,212.0,Measures of Dispersion (Range and Standard Deviation),212.0,,
+811,1-CONFIRM,A sample of 100 students has a mean test score of 75 with a known population standard deviation of 10. What is the 95% confidence interval for the true population mean? (Use z-score for 95% CI is approximately 1.96),medium,Mathematics,212.0,Measures of Dispersion (Range and Standard Deviation),212.0,,
+118,1-CONFIRM,What is the kinetic energy of a 2 kg object moving at a speed of 4 m/s?,easy,Physics,217.0,Kinetic and Potential Energy,217.0,,
+125,1-CONFIRM,"In the photoelectric effect, the maximum kinetic energy of emitted electrons depends on:",hard,Physics,217.0,Kinetic and Potential Energy,217.0,,
+186,1-CONFIRM,Which of the following is the SI unit for electric current?,easy,Physics,219.0,"Electric Current, Voltage and Resistance",219.0,,
+328,1-CONFIRM,A particle moves at a constant speed of 10 m/s in a circular path. Is its velocity constant?,medium,Physics,213.0,"Distance, Displacement, Speed and Velocity",213.0,,
+340,1-CONFIRM,"In uniform circular motion, which of the following remains constant?",medium,Physics,301.0,Circular Motion and Gravitation,301.0,,
+349,1-CONFIRM,"For a particle moving in a straight line, which statement is always true regarding distance and the magnitude of displacement?",medium,Physics,213.0,"Distance, Displacement, Speed and Velocity",213.0,,
+351,1-CONFIRM,"When an object's acceleration is not constant, what type of motion does it exhibit?",medium,Physics,214.0,Acceleration and Equations of Motion,214.0,,
+420,1-CONFIRM,What is the energy stored in a 10 µF capacitor charged to a potential difference of 50 V?,medium,Physics,217.0,Kinetic and Potential Energy,217.0,,
+427,1-CONFIRM,Which of the following properties of a sound wave determines its pitch?,easy,Physics,305.0,Wave Properties and Sound,305.0,,
+436,1-CONFIRM,"What is the equivalent capacitance of two capacitors, 3 µF and 6 µF, connected in parallel?",easy,Physics,303.0,Capacitors,303.0,,
+635,1-CONFIRM,A body of mass 'm' moving with velocity 'v' possesses kinetic energy given by the formula:,easy,Physics,217.0,Kinetic and Potential Energy,217.0,,
+636,1-CONFIRM,What is the gravitational potential energy of an object of mass 'm' raised to a height 'h' above the ground?,easy,Physics,217.0,Kinetic and Potential Energy,217.0,,
+641,1-CONFIRM,A car of mass 1200 kg is moving at a speed of 10 m/s. What is its kinetic energy?,medium,Physics,217.0,Kinetic and Potential Energy,217.0,,
+642,1-CONFIRM,A 2 kg object is lifted to a height of 5 meters. What is its gravitational potential energy? (Take g = 10 m/s²),medium,Physics,217.0,Kinetic and Potential Energy,217.0,,
+687,1-CONFIRM,Velocity is speed in a given,medium,Physics,213.0,"Distance, Displacement, Speed and Velocity",213.0,,
+961,1-CONFIRM,A sound wave has a frequency of 500 Hz and travels at a speed of 340 m/s in air. What is its wavelength?,medium,Physics,305.0,Wave Properties and Sound,305.0,,
+963,1-CONFIRM,Which of the following statements about sound waves is correct?,medium,Physics,305.0,Wave Properties and Sound,305.0,,
+862,1-CONFIRM,You're chatting with a close friend about your weekend plans. Which sentence fits this informal register best?,medium,Use of English,237.0,Formal and Informal Expressions,237.0,,
+690,1-CONFIRM,Èwo ni èdè àwọn ọmọ Yorùbá?,medium,Yoruba,242.0,Àwọn Ẹ̀ka Èdè Yorùbá (Parts of Speech,242.0,,
+1053,1-CONFIRM,Èwo ni èdè ìbánisọ̀rọ̀ àwọn ọmọ Yorùbá?,easy,Yoruba,242.0,Àwọn Ẹ̀ka Èdè Yorùbá (Parts of Speech,242.0,,
+93,1-CONFIRM,What is the primary function of the epididymis in the male mammalian reproductive system?,medium,Biology,8.0,reproductive system,8.0,,
+100,1-CONFIRM,Which component of the male reproductive system is responsible for producing sperm (spermatogenesis)?,medium,Biology,8.0,reproductive system,8.0,,
+161,1-CONFIRM,The primary site for photosynthesis in a plant cell is the:,easy,Biology,11.0,Photosynthesis,11.0,,
+285,1-CONFIRM,The basic functional unit of the nervous system is the:,easy,Biology,85.0,Functions of the nervous system,85.0,,
+368,1-CONFIRM,Living organisms require a continuous input of energy to power their life processes. Where do most ecosystems ultimately derive their energy?,medium,Biology,18.0,Ecosystem,18.0,,
+370,1-CONFIRM,Asexual reproduction differs from sexual reproduction in that asexual reproduction:,medium,Biology,9.0,asexual reproduction,9.0,,
+386,1-CONFIRM,"Organisms that produce their own food, usually through photosynthesis, are called:",medium,Biology,11.0,Photosynthesis,11.0,,
+8,1-CONFIRM,What is the major organic product formed when a primary alcohol is oxidized with a strong oxidizing agent such as potassium permanganate (KMnO4) or chromic acid (CrO3/H2SO4)?,medium,Chemistry,5.0,Acid,5.0,,
+103,1-CONFIRM,"The process by which water is absorbed by roots, transported through the plant, and then evaporates from stomata on the leaves into the atmosphere is known as:",medium,Biology,,,15.0,transpiration - Transport in plant,transpiration - Transport in plant
+163,1-CONFIRM,Eutrophication in aquatic environments is primarily caused by an excess of:,medium,Biology,,,17.0,eutrophication - Enviromental conservation,eutrophication - Enviromental conservation
+263,1-CONFIRM,"How many moles of hydrogen gas are produced when 0.6 moles of hydrochloric acid react completely with excess magnesium, according to the equation: Mg(s) + 2HCl(aq) → MgCl₂(aq) + H₂(g)?",medium,Chemistry,5.0,Acid,5.0,,
+342,1-CONFIRM,What does the slope of a position-time (x-t) graph represent?,medium,Physics,,,213.0,slope of x-t graph - Distance Displacement Speed and Velocity,slope of x-t graph - Distance Displacement Speed and Velocity
+354,1-CONFIRM,A curved line on a position-time graph (x-t graph) indicates:,medium,Physics,,,213.0,curved x-t graph - Distance Displacement Speed and Velocity,curved x-t graph - Distance Displacement Speed and Velocity
+513,1-CONFIRM,"Which part of a plant is primarily responsible for anchorage, absorption of water, and mineral salts from the soil?",easy,Biology,,,15.0,root function - Transport in plant,root function - Transport in plant
+516,1-CONFIRM,A buffer solution is prepared by mixing 0.20 M CH3COOH (Ka = 1.8 x 10^-5) and 0.20 M CH3COONa. Which of the following modifications would *increase* the buffer's capacity to neutralize added strong acid most effectively without significantly altering its initial pH?,hard,Chemistry,5.0,Acid,5.0,,
+519,1-CONFIRM,"During the titration of 0.1 M H2SO3 (sulfurous acid, a diprotic acid with Ka1 = 1.7 × 10^-2 and Ka2 = 6.4 × 10^-8) with 0.1 M NaOH, what is the predominant sulfur-containing species present at the first equivalence point?",hard,Chemistry,5.0,Acid,5.0,,
+520,1-CONFIRM,A student is performing a titration of a 0.1 M solution of a weak acid (Ka = 1.0 × 10^-5) with a 0.1 M strong base. Which indicator would be most appropriate for detecting the equivalence point?,hard,Chemistry,5.0,Acid,5.0,,
+521,1-CONFIRM,"Arrange the following oxyacids in order of increasing acid strength: HIO3, HBrO3, HClO3.",hard,Chemistry,5.0,Acid,5.0,,
+522,1-CONFIRM,"50.0 mL of 0.20 M acetic acid (CH3COOH, Ka = 1.8 × 10^-5) is mixed with 25.0 mL of 0.20 M NaOH. What is the pH of the resulting solution?",hard,Chemistry,5.0,Acid,5.0,,
+524,1-CONFIRM,"Given the following Ka values:
+Hydrocyanic acid (HCN): Ka = 6.2 × 10^-10
+Hypochlorous acid (HOCl): Ka = 3.0 × 10^-8
+Nitrous acid (HNO2): Ka = 4.5 × 10^-4
+Which of their conjugate bases is the *strongest*?",hard,Chemistry,5.0,Acid,5.0,,
+525,1-CONFIRM,"Which of the following compounds exhibits amphoteric behavior, meaning it can act as both a Brønsted-Lowry acid and a Brønsted-Lowry base?",hard,Chemistry,5.0,Acid,5.0,,
+546,1-CONFIRM,Which of the following statements best describes a strong acid?,medium,Chemistry,5.0,Acid,5.0,,
+547,1-CONFIRM,Phenolphthalein indicator changes color from colorless to pink in which type of solution?,medium,Chemistry,,,5.0,phenolphthalein indicator - Acid Base and salts bucket,phenolphthalein indicator - Acid Base and salts bucket
+548,1-CONFIRM,Which of the following is a characteristic property of a base?,medium,Chemistry,,,5.0,property of a base - Acid Base and salts bucket,property of a base - Acid Base and salts bucket
+549,1-CONFIRM,What is the salt formed when sulfuric acid (H2SO4) reacts with potassium hydroxide (KOH)?,medium,Chemistry,5.0,Acid,5.0,,
+550,1-CONFIRM,Which of the following oxides is considered amphoteric?,medium,Chemistry,,,5.0,amphoteric oxide - Acid Base and salts bucket,amphoteric oxide - Acid Base and salts bucket
+551,1-CONFIRM,Vinegar contains which common weak acid?,medium,Chemistry,5.0,Acid,5.0,,
+552,1-CONFIRM,"Sodium bicarbonate (NaHCO3), commonly known as baking soda, is used as an antacid because it is:",medium,Chemistry,5.0,Acid,5.0,,
+604,1-CONFIRM,Which of the following is a common characteristic of all acids?,easy,Chemistry,5.0,Acid,5.0,,
+605,1-CONFIRM,"According to the Brønsted-Lowry theory, an acid is a substance that:",medium,Chemistry,5.0,Acid,5.0,,
+606,1-CONFIRM,"When an acid reacts with a base, the products are typically:",easy,Chemistry,5.0,Acid,5.0,,
+608,1-CONFIRM,Which method is most suitable for preparing an insoluble salt like barium sulfate?,medium,Chemistry,,,5.0,preparing insoluble salt - Acid Base and salts bucket,preparing insoluble salt - Acid Base and salts bucket
+611,1-CONFIRM,Which of the following salts would hydrolyze in water to give an acidic solution?,medium,Chemistry,5.0,Acid,5.0,,
+612,1-CONFIRM,Methyl orange indicator changes color from red (acidic) to yellow (basic) in the pH range of 3.1-4.4. It would appear yellow in a solution with a pH of:,easy,Chemistry,5.0,Acid,5.0,,
+614,1-CONFIRM,"According to Lewis theory, an acid is a substance that:",hard,Chemistry,5.0,Acid,5.0,,
+615,1-CONFIRM,Which of the following oxides is amphoteric?,medium,Chemistry,,,5.0,amphoteric oxide dup - Acid Base and salts bucket,amphoteric oxide dup - Acid Base and salts bucket
+616,1-CONFIRM,A substance that loses its water of crystallization when exposed to the atmosphere is said to be:,hard,Chemistry,,,5.0,water of crystallization - Acid Base and salts bucket,water of crystallization - Acid Base and salts bucket
+618,1-CONFIRM,Which of the following metals will NOT react with dilute hydrochloric acid to produce hydrogen gas?,medium,Chemistry,5.0,Acid,5.0,,
+664,1-CONFIRM,A substance with pH 7 is:,medium,Chemistry,,,5.0,pH 7 substance - Acid Base and salts bucket,pH 7 substance - Acid Base and salts bucket
+695,1-CONFIRM,Which of the following is an example of an alphanumeric data type?,easy,Data Processing,,,132.0,alphanumeric data type - Basic Definitions of Data and Information,alphanumeric data type - Basic Definitions of Data and Information
+705,1-CONFIRM,Which of the following is an example of a figure of speech that uses exaggeration for emphasis?,easy,Literature in English,,,256.0,hyperbole figure of speech - Poetic Devices (need id lookup),hyperbole figure of speech - Poetic Devices (need id lookup)
+858,1-CONFIRM,"When giving a speech at a formal event, which introductory phrase would be most suitable?",medium,Use of English,,,237.0,formal speech phrase - Formal and Informal Expressions (need id lookup),formal speech phrase - Formal and Informal Expressions (need id lookup)
+944,1-CONFIRM,"A common characteristic reaction for many organic compounds, especially hydrocarbons, is:",medium,Chemistry,31.0,Hydro Carbon,31.0,,
+995,1-CONFIRM,The depletion of the ozone layer in the stratosphere is primarily caused by:,medium,Biology,,,17.0,ozone depletion - Enviromental conservation,ozone depletion - Enviromental conservation
+1026,1-CONFIRM,The volume $V$ of a sphere is given by $V = \frac{4}{3}\pi r^3$. What is the rate of change of volume with respect to its radius $r$?,medium,Mathematics,,,205.0,rate of change of volume - Differentiation,rate of change of volume - Differentiation
+227,1-CONFIRM,"A figure of speech in which contradictory terms are placed next to each other for effect (e.g., 'jumbo shrimp', 'bitter sweet') is a(n):",hard,Literature in English,,,256.0,oxymoron figure of speech - Poetic Devices (need id lookup),oxymoron figure of speech - Poetic Devices (need id lookup)
+853,1-CONFIRM,"Which standard is commonly used to represent characters (like letters, numbers, and symbols) as numerical codes in computers?",medium,Data Processing,,,132.0,ASCII character encoding - Basic Definitions of Data and Information,ASCII character encoding - Basic Definitions of Data and Information
+260,1-CONFIRM,Taxes levied on imported goods to make them more expensive than locally produced goods are known as,medium,Economics,,,123.0,import tariffs - Trade Restrictions And Exchange Rate,import tariffs - Trade Restrictions And Exchange Rate
+745,1-CONFIRM,"A country imposes a tariff of $50 on every imported television, regardless of its value. This type of tariff is known as a(n):",hard,Economics,,,123.0,specific tariff - Trade Restrictions And Exchange Rate,specific tariff - Trade Restrictions And Exchange Rate
+797,1-CONFIRM,"Changes in consumer spending patterns due to an economic recession, affecting purchasing power and consumer confidence, would primarily fall under which macroenvironmental factor?",medium,Marketing,,,186.0,macroenvironmental factor - Marketing Concepts and Consumer Needs,macroenvironmental factor - Marketing Concepts and Consumer Needs
+836,1-CONFIRM,"According to Christian teachings, why is it important to forgive those who wrong us?",medium,CRS,,,56.0,forgiveness - Jesus' Teaching on Love and Forgiveness,forgiveness - Jesus' Teaching on Love and Forgiveness
+1050,1-CONFIRM,2. Which part of speech describes an action or state of being?,medium,English Language,,,139.0,part of speech verb - Verbs and Adjectives,part of speech verb - Verbs and Adjectives
+182,1-CONFIRM,"Expenditure incurred to acquire or improve a fixed asset, which increases its earning capacity or extends its useful life, is known as:",easy,Accounting,,,90.0,capital expenditure - Classification of Financial Transactions,capital expenditure - Classification of Financial Transactions
+460,1-CONFIRM,The primary function of the legislature in a democratic state is to...,easy,Government,226.0,The Legislature,226.0,,
+786,1-CONFIRM,A significant and lasting political legacy of colonialism in many parts of Africa is:,medium,History,285.0,Economic Activities in Pre-Colonial Africa,285.0,,
+230,1-CONFIRM,A group of lines forming the basic recurring metrical unit in a poem; a verse is also called a:,easy,Literature in English,,,256.0,stanza/verse - Poetic Devices,stanza/verse - Poetic Devices
+442,1-CONFIRM,Which of the following best describes personification?,medium,Literature in English,,,256.0,personification - Poetic Devices,personification - Poetic Devices
+443,1-CONFIRM,"A long speech made by a character in a play while alone on stage, revealing their thoughts and feelings, is called a...",medium,Literature in English,,,255.0,soliloquy - Dramatic Devices,soliloquy - Dramatic Devices
+455,1-CONFIRM,The pattern of rhymes at the end of lines in a poem is referred to as the...,easy,English Language,161.0,Rhymes,161.0,,
+890,1-CONFIRM,Which of the following best describes a lyric poem?,medium,Literature in English,,,256.0,lyric poem definition - Poetic Devices,lyric poem definition - Poetic Devices
+893,1-CONFIRM,What is the primary function of imagery in a poem?,medium,Literature in English,,,256.0,imagery function - Poetic Devices,imagery function - Poetic Devices
+1052,1-CONFIRM,"1. Which literary device is used when a poet compares two unlike things using the words ""like"" or ""as""?",medium,Literature in English,,,256.0,simile - Poetic Devices,simile - Poetic Devices
+1054,1-CONFIRM,"2. In poetry, what is the theme of a poem?",medium,Literature in English,,,257.0,theme of a poem - Themes & Messages,theme of a poem - Themes & Messages
+12,1-CONFIRM,Rationalize the denominator of $\frac{1}{\sqrt{2}+\sqrt{3}+\sqrt{5}}$.,hard,Mathematics,,,209.0,rationalize denominator (surds) - Simplification of Expressions Involving Indices,rationalize denominator (surds) - Simplification of Expressions Involving Indices
+13,1-CONFIRM,"If $x = \sqrt{3+\sqrt{5}}$ and $y = \sqrt{3-\sqrt{5}}$, find the value of $x+y$.",hard,Mathematics,,,209.0,surds - Simplification of Expressions Involving Indices,surds - Simplification of Expressions Involving Indices
+16,1-CONFIRM,Rationalize the denominator of $\frac{1}{\sqrt[3]{2}+1}$.,hard,Mathematics,,,209.0,rationalize denominator - Simplification of Expressions Involving Indices,rationalize denominator - Simplification of Expressions Involving Indices
+22,1-CONFIRM,"If $x = \frac{1}{2+\sqrt{3}}$, find the value of $x+\frac{1}{x}$.",hard,Mathematics,,,209.0,surds - Simplification of Expressions Involving Indices,surds - Simplification of Expressions Involving Indices
+26,1-CONFIRM,"If $x = \frac{\sqrt{5}+\sqrt{3}}{\sqrt{5}-\sqrt{3}}$, find the value of $x^2$.",hard,Mathematics,,,209.0,surds - Simplification of Expressions Involving Indices,surds - Simplification of Expressions Involving Indices
+29,1-CONFIRM,"If $a=\sqrt{3}+\sqrt{2}$ and $b=\sqrt{3}-\sqrt{2}$, find the value of $(a+b)^2+(a-b)^2$.",hard,Mathematics,,,209.0,surds - Simplification of Expressions Involving Indices,surds - Simplification of Expressions Involving Indices
+30,1-CONFIRM,"If $x = 7+4\sqrt{3}$, find the value of $\sqrt{x}+\frac{1}{\sqrt{x}}$.",hard,Mathematics,,,209.0,surds - Simplification of Expressions Involving Indices,surds - Simplification of Expressions Involving Indices
+31,1-CONFIRM,Rationalize the denominator of the expression: \( \frac{1}{\sqrt{2} + \sqrt{3} - \sqrt{5}} \),hard,Mathematics,,,209.0,rationalize denominator - Simplification of Expressions Involving Indices,rationalize denominator - Simplification of Expressions Involving Indices
+35,1-CONFIRM,"If \( x = 2 + \sqrt{3} \), find the value of \( x^3 - 6x^2 + 9x - 2 \).",hard,Mathematics,,,209.0,surds - Simplification of Expressions Involving Indices,surds - Simplification of Expressions Involving Indices
+37,1-CONFIRM,Rationalize the denominator of \( \frac{1}{\sqrt[3]{4} - \sqrt[3]{2} + 1} \).,hard,Mathematics,,,209.0,rationalize denominator - Simplification of Expressions Involving Indices,rationalize denominator - Simplification of Expressions Involving Indices
+40,1-CONFIRM,"If \( x = \sqrt[3]{5} + \frac{1}{\sqrt[3]{5}} \), find the value of \( 5x^3 - 15x \).",hard,Mathematics,,,209.0,surds - Simplification of Expressions Involving Indices,surds - Simplification of Expressions Involving Indices
+204,1-CONFIRM,Rationalize the denominator of 1 / (√3 - √2).,medium,Mathematics,,,209.0,rationalize denominator - Simplification of Expressions Involving Indices,rationalize denominator - Simplification of Expressions Involving Indices
+207,1-CONFIRM,Solve the inequality: 3x - 5 < 7.,easy,Mathematics,,,197.0,linear inequality - Linear Equations and Inequalities,linear inequality - Linear Equations and Inequalities
+309,1-CONFIRM,Rationalize the denominator of $\frac{6}{\sqrt{3}}$.,medium,Mathematics,,,209.0,rationalize denominator - Simplification of Expressions Involving Indices,rationalize denominator - Simplification of Expressions Involving Indices
+311,1-CONFIRM,Rationalize the denominator of $\frac{1}{2 + \sqrt{3}}$.,medium,Mathematics,,,209.0,rationalize denominator - Simplification of Expressions Involving Indices,rationalize denominator - Simplification of Expressions Involving Indices
+361,1-CONFIRM,Solve the inequality: 2x + 5 < 11,medium,Mathematics,,,197.0,linear inequality - Linear Equations and Inequalities,linear inequality - Linear Equations and Inequalities
+362,1-CONFIRM,"If f(x) = 3x² - 2x + 1, what is the value of f(-2)?",medium,Mathematics,,,199.0,evaluate f(x) quadratic - Quadratic Equations,evaluate f(x) quadratic - Quadratic Equations
+619,1-CONFIRM,Find dy/dx if y = 3x^4 - 2x^2 + 5x - 1.,easy,Mathematics,,,205.0,find dy/dx - Differentiation,find dy/dx - Differentiation
+623,1-CONFIRM,"If y = (x+1) / (x-1), find dy/dx.",medium,Mathematics,,,205.0,find dy/dx quotient rule - Differentiation,find dy/dx quotient rule - Differentiation
+626,1-CONFIRM,Evaluate ∫ (3x^2 - 4x + 2) dx.,easy,Mathematics,,,7.0,evaluate integral - integration,evaluate integral - integration
+628,1-CONFIRM,Evaluate ∫ (2x + 1) dx from x = 0 to x = 2.,medium,Mathematics,,,7.0,definite integral - integration,definite integral - integration
+631,1-CONFIRM,Find dy/dx if y = ln(5x).,easy,Mathematics,,,205.0,find dy/dx ln - Differentiation,find dy/dx ln - Differentiation
+632,1-CONFIRM,Evaluate ∫ (2x+3)^4 dx.,medium,Mathematics,,,7.0,evaluate integral - integration,evaluate integral - integration
+633,1-CONFIRM,The function f(x) = x^3 - 6x^2 + 9x + 1 has a local maximum at which value of x?,hard,Mathematics,,,205.0,local maximum calculus - Differentiation,local maximum calculus - Differentiation
+707,1-CONFIRM,"If x = t² + 1 and y = t³ + 2, find dy/dx.",easy,Mathematics,,,205.0,parametric dy/dx - Differentiation,parametric dy/dx - Differentiation
+754,1-CONFIRM,Which of the following is a likely consequence of a binding price ceiling in a market?,medium,Economics,,,127.0,price ceiling - Price Determination And Elasticity,price ceiling - Price Determination And Elasticity
+808,1-CONFIRM,"If y = x * e^(2x), what is dy/dx?",medium,Mathematics,,,205.0,find dy/dx product rule - Differentiation,find dy/dx product rule - Differentiation
+810,1-CONFIRM,Evaluate the definite integral ∫₀¹ x * (x² + 1)³ dx.,medium,Mathematics,,,7.0,definite integral - integration,definite integral - integration
+812,1-CONFIRM,"If x² + y² = 25, find dy/dx at the point (3, 4).",medium,Mathematics,,,205.0,implicit differentiation - Differentiation,implicit differentiation - Differentiation
+894,1-CONFIRM,Solve for x: 3(x - 2) = 15,medium,Mathematics,,,197.0,solve for x linear - Linear Equations and Inequalities,solve for x linear - Linear Equations and Inequalities
+898,1-CONFIRM,Solve the inequality: 2x - 5 < 7,medium,Mathematics,,,197.0,linear inequality - Linear Equations and Inequalities,linear inequality - Linear Equations and Inequalities
+899,1-CONFIRM,"If f(x) = 3x^2 - 2x + 1, what is f(2)?",medium,Mathematics,,,199.0,evaluate f(2) quadratic - Quadratic Equations,evaluate f(2) quadratic - Quadratic Equations
+902,1-CONFIRM,Solve for x: |x - 3| = 5,medium,Mathematics,,,197.0,solve absolute value equation - Linear Equations and Inequalities,solve absolute value equation - Linear Equations and Inequalities
+1014,1-CONFIRM,Find the derivative of $f(x) = 3x^4 - 2x + 5$.,medium,Mathematics,,,205.0,find derivative - Differentiation,find derivative - Differentiation
+1022,1-CONFIRM,"If $f(x) = x^4 - 3x^2 + x$, find $f''(x)$.",medium,Mathematics,,,205.0,second derivative - Differentiation,second derivative - Differentiation
+1027,1-CONFIRM,Find the derivative of $f(x) = \sqrt{x^2+1}$.,medium,Mathematics,,,205.0,find derivative - Differentiation,find derivative - Differentiation
+1030,1-CONFIRM,Solve for x: 3(x - 2) + 5 = 2x + 7,medium,Mathematics,,,197.0,solve for x linear - Linear Equations and Inequalities,solve for x linear - Linear Equations and Inequalities
+1035,1-CONFIRM,Solve the inequality: 2(x + 3) - 5 < 3x + 1,medium,Mathematics,,,197.0,linear inequality - Linear Equations and Inequalities,linear inequality - Linear Equations and Inequalities
+1036,1-CONFIRM,"If f(x) = 3x^2 - 2x + 1, find f(-2).",medium,Mathematics,,,199.0,evaluate f(-2) quadratic - Quadratic Equations,evaluate f(-2) quadratic - Quadratic Equations
+1042,1-CONFIRM,Solve for x: |2x - 1| = 5,medium,Mathematics,,,197.0,solve absolute value equation - Linear Equations and Inequalities,solve absolute value equation - Linear Equations and Inequalities
+1043,1-CONFIRM,Solve for x: sqrt(x + 2) = 3,medium,Mathematics,,,197.0,solve for x with square root - Linear Equations and Inequalities,solve for x with square root - Linear Equations and Inequalities
+193,1-CONFIRM,Which of the following statements is true about electric field lines?,easy,Physics,,,302.0,electric field lines - Electrostatics,electric field lines - Electrostatics
+194,1-CONFIRM,"Three resistors with resistances of 3 Ω, 6 Ω, and 9 Ω are connected in series to a 12 V battery. What is the total current flowing through the circuit?",medium,Physics,219.0,"Electric Current, Voltage and Resistance",219.0,,
+341,1-CONFIRM,The direction of centripetal acceleration in uniform circular motion is always:,medium,Physics,301.0,Circular Motion and Gravitation,301.0,,
+965,1-CONFIRM,What condition must be met for two waves to produce constructive interference at a specific point?,medium,Physics,,,305.0,constructive interference - Wave Properties and Sound,constructive interference - Wave Properties and Sound
+859,1-CONFIRM,You are explaining a complex scientific concept to a group of children aged 7-9. Which approach is best for the register?,medium,Use of English,,,237.0,explaining to children register - Formal and Informal Expressions,explaining to children register - Formal and Informal Expressions
+15,1-CONFIRM,"Which of the following numbers is the largest: $\sqrt{2}$, $\sqrt[3]{3}$, $\sqrt[4]{4}$, $\sqrt[6]{6}$?",hard,Mathematics,,,209.0,compare surds - Simplification of Expressions Involving Indices,compare surds - Simplification of Expressions Involving Indices
+20,1-CONFIRM,Which number is greater: $\sqrt{5}+\sqrt{6}$ or $3+\sqrt{2}$?,hard,Mathematics,,,209.0,compare surds - Simplification of Expressions Involving Indices,compare surds - Simplification of Expressions Involving Indices
+24,1-CONFIRM,"If $x = \sqrt{3}+1$, what is the value of $x^2-2x+1$?",hard,Mathematics,,,209.0,surds - Simplification of Expressions Involving Indices,surds - Simplification of Expressions Involving Indices
+34,1-CONFIRM,Which of the following numbers is larger: \( \sqrt{10} - \sqrt{5} \) or \( \sqrt{7} - \sqrt{3} \)?,hard,Mathematics,,,209.0,compare surds - Simplification of Expressions Involving Indices,compare surds - Simplification of Expressions Involving Indices
+38,1-CONFIRM,Find the smallest integer \( n \) such that \( \sqrt{n^2 + 20n + 99} \) is an integer.,hard,Mathematics,,,209.0,surds - Simplification of Expressions Involving Indices,surds - Simplification of Expressions Involving Indices
+91,1-CONFIRM,Which hormone is primarily responsible for maintaining the uterine lining and preventing uterine contractions during the early stages of mammalian pregnancy?,medium,Biology,,,10.0,pregnancy hormone - Sexual Reproduction,pregnancy hormone - Sexual Reproduction
+94,1-CONFIRM,The placenta in mammals serves multiple vital functions during pregnancy. Which of the following is NOT a primary role of the placenta?,medium,Biology,,,10.0,placenta function - Sexual Reproduction,placenta function - Sexual Reproduction
+95,1-CONFIRM,Which hormone surge directly triggers ovulation in the ovarian cycle of mammals?,medium,Biology,,,10.0,ovulation hormone - Sexual Reproduction,ovulation hormone - Sexual Reproduction
+96,1-CONFIRM,"In female mammals, what is the role of the corpus luteum after ovulation?",medium,Biology,,,10.0,corpus luteum - Sexual Reproduction,corpus luteum - Sexual Reproduction
+98,1-CONFIRM,"What is the process called when the blastocyst embeds itself into the endometrium (uterine wall), marking the beginning of pregnancy?",medium,Biology,,,10.0,implantation - Sexual Reproduction,implantation - Sexual Reproduction
+99,1-CONFIRM,"During mammalian parturition (childbirth), which hormone is responsible for stimulating strong uterine contractions?",medium,Biology,,,10.0,parturition hormone - Sexual Reproduction,parturition hormone - Sexual Reproduction
+109,1-CONFIRM,"Grafting, a common practice in fruit tree cultivation and horticulture, primarily involves:",medium,Agricultural Science,,,99.0,grafting - Methods of Crop Propagation,grafting - Methods of Crop Propagation
+132,1-CONFIRM,In which of the following words is the stress placed on the **first syllable**?,medium,English Language,,,162.0,stress on syllable - Emphatic Stress,stress on syllable - Emphatic Stress
+147,1-CONFIRM,A document issued by a seller to a buyer when goods are returned or an overcharge is corrected is called a:,medium,Accounting,,,91.0,credit note document - Source Documents,credit note document - Source Documents
+153,1-CONFIRM,The document that serves as an offer to sell specific goods at a stated price and terms is a:,medium,Accounting,,,91.0,pro forma invoice - Source Documents,pro forma invoice - Source Documents
+174,1-CONFIRM,Which book of original entry records goods purchased on credit?,easy,Accounting,,,91.0,purchases day book - Source Documents,purchases day book - Source Documents
+175,1-CONFIRM,An invoice issued by a seller to a buyer indicates:,medium,Accounting,,,91.0,invoice document - Source Documents,invoice document - Source Documents
+187,1-CONFIRM,A car accelerates uniformly from rest at 2 m/s² for 5 seconds. What is the distance covered by the car during this time?,medium,Physics,,,214.0,uniform acceleration distance - Acceleration and Equations of Motion,uniform acceleration distance - Acceleration and Equations of Motion
+191,1-CONFIRM,"An echo is heard 3 seconds after a sound is produced. If the speed of sound in air is 330 m/s, what is the distance of the reflecting surface from the source?",medium,Physics,213.0,"Distance, Displacement, Speed and Velocity",213.0,,
+203,1-CONFIRM,"If log_x 8 = 3, what is the value of x?",easy,Mathematics,,,292.0,solve logarithm equation - Logarithms,solve logarithm equation - Logarithms
+210,1-CONFIRM,"If sin θ = 3/5 and θ is an acute angle, find tan θ.",medium,Mathematics,,,298.0,trig ratio sin/tan - Trigonometry,trig ratio sin/tan - Trigonometry
+211,1-CONFIRM,The area of a circle is 154 cm². Find its radius (take π = 22/7).,medium,Mathematics,,,296.0,area of circle find radius - Mensuration,area of circle find radius - Mensuration
+212,1-CONFIRM,A cylinder has a radius of 3 cm and a height of 7 cm. Calculate its volume (take π = 22/7).,medium,Mathematics,,,296.0,volume of cylinder - Mensuration,volume of cylinder - Mensuration
+215,1-CONFIRM,"Find the distance between the points (1, 2) and (4, 6).",medium,Mathematics,,,288.0,distance between points - Coordinate Geometry,distance between points - Coordinate Geometry
+220,1-CONFIRM,Which figure of speech makes a direct comparison between two unlike things without using 'like' or 'as'?,easy,Literature in English,,,256.0,metaphor - Poetic Devices,metaphor - Poetic Devices
+221,1-CONFIRM,"A long speech delivered by a character alone on stage, revealing their innermost thoughts and feelings, is known as a:",medium,Literature in English,,,255.0,soliloquy - Dramatic Devices,soliloquy - Dramatic Devices
+223,1-CONFIRM,The central idea or underlying message that a writer explores in a literary work is its:,easy,Literature in English,,,257.0,central theme - Themes & Messages,central theme - Themes & Messages
+226,1-CONFIRM,Hints or clues given by an author about future events or outcomes in a story are known as:,medium,Literature in English,,,256.0,foreshadowing - Poetic Devices,foreshadowing - Poetic Devices
+237,1-CONFIRM,Which of the following words has the stress on the first syllable?,medium,English Language,,,162.0,stress on syllable - Emphatic Stress,stress on syllable - Emphatic Stress
+249,1-CONFIRM,The buying and selling of goods within the borders of a country is referred to as,easy,Commerce,,,52.0,home trade - Home Trade And Foreign Trade,home trade - Home Trade And Foreign Trade
+287,1-CONFIRM,The process by which plants lose water vapor from their leaves is called:,easy,Biology,,,15.0,transpiration - Transport in plant,transpiration - Transport in plant
+298,1-CONFIRM,"If Sales Revenue is N80,000 and Cost of Goods Sold is N50,000, what is the Gross Profit?",easy,Accounting,,,97.0,gross profit calculation - Trading Profit and Loss Account,gross profit calculation - Trading Profit and Loss Account
+308,1-CONFIRM,Evaluate $\sqrt{3} \times \sqrt{15}$.,medium,Mathematics,,,209.0,evaluate surds - Simplification of Expressions Involving Indices,evaluate surds - Simplification of Expressions Involving Indices
+312,1-CONFIRM,"If $x = 3 + \sqrt{2}$ and $y = 3 - \sqrt{2}$, find $xy$.",medium,Mathematics,,,209.0,surds product - Simplification of Expressions Involving Indices,surds product - Simplification of Expressions Involving Indices
+315,1-CONFIRM,Evaluate $(\sqrt{12} - \sqrt{3})^2$.,medium,Mathematics,,,209.0,evaluate surds - Simplification of Expressions Involving Indices,evaluate surds - Simplification of Expressions Involving Indices
+474,1-CONFIRM,The amalgamation of the Northern and Southern Protectorates of Nigeria took place in what year?,medium,History,280.0,Amalgamation of Nigeria (1914),280.0,,
+654,1-CONFIRM,The amalgamation of Northern and Southern Nigeria was carried out in the year,medium,History,280.0,Amalgamation of Nigeria (1914),280.0,,
+986,1-CONFIRM,Which of the following electronic configurations represents a stable transition metal ion with a d^0 configuration?,medium,Chemistry,25.0,Electronic configuration,25.0,,
+176,1-CONFIRM,The primary purpose of preparing a Trial Balance is to:,medium,Accounting,96.0,Errors Revealed and Not Revealed by a Trial Balance,96.0,,
+184,1-CONFIRM,Which of the following errors would NOT be disclosed by a Trial Balance?,medium,Accounting,96.0,Errors Revealed and Not Revealed by a Trial Balance,96.0,,
+296,1-CONFIRM,The primary purpose of preparing a trial balance is to:,medium,Accounting,96.0,Errors Revealed and Not Revealed by a Trial Balance,96.0,,
+399,1-CONFIRM,Which of the following errors would NOT be revealed by a trial balance?,medium,Accounting,96.0,Errors Revealed and Not Revealed by a Trial Balance,96.0,,
+395,1-CONFIRM,The theory of evolution suggests that all life on Earth shares a common ancestor. Evidence for this includes:,medium,Biology,21.0,Evidence Of Evolution,21.0,,
+165,1-CONFIRM,Which of the following nitrogenous bases is found in RNA but not in DNA?,easy,Biology,80.0,DNA,80.0,,
+517,1-CONFIRM,"In the reaction Cu^2+(aq) + 4NH3(aq) <=> [Cu(NH3)4]^2+(aq), which species acts as a Lewis acid?",hard,Chemistry,5.0,Acid,5.0,,
+543,1-CONFIRM,Which of the following is NOT a general property of acids?,medium,Chemistry,5.0,Acid,5.0,,
+396,1-CONFIRM,The accounting principle that states every debit entry must have a corresponding credit entry is known as the __________ principle.,easy,Accounting,92.0,Double-Entry Principle,92.0,,
+462,1-CONFIRM,The independence of the judiciary is best guaranteed by...,medium,Government,228.0,The Judiciary,228.0,,
+668,1-CONFIRM,"Democracy is government of the people, by the people and for the",medium,Government,223.0,Democracy and Forms of Government,223.0,,
+743,1-CONFIRM,Which form of economic integration requires members to not only eliminate tariffs and non-tariff barriers among themselves but also adopt a common external trade policy towards non-member countries?,hard,Mathematics,7.0,integration,7.0,,
+302,2-SKIM_AND_CONFIRM,The financial statement that provides a snapshot of an entity's financial position at a specific point in time is the:,easy,Accounting,90.0,Classification of Financial Transactions,90.0,,
+656,2-SKIM_AND_CONFIRM,A source document in accounting is used to,medium,Accounting,91.0,Source Documents,91.0,,
+777,2-SKIM_AND_CONFIRM,"When interest on partners' capital is provided for in the partnership agreement, how is it typically treated in the financial statements?",medium,Accounting,90.0,Classification of Financial Transactions,90.0,,
+102,2-SKIM_AND_CONFIRM,"Which of the following essential plant macronutrients is a key component of chlorophyll, promotes vigorous vegetative growth, and is commonly supplied to crops through fertilizers like urea and ammonium nitrate?",medium,Agricultural Science,100.0,Crop Pests and Diseases,100.0,,
+110,2-SKIM_AND_CONFIRM,"Following successful pollination and fertilization in most flowering plants, which specific part of the flower typically develops into the fruit?",medium,Biology,22.0,fertilization and development,22.0,,
+158,2-SKIM_AND_CONFIRM,"If a pure tall pea plant (genotype TT) is crossed with a pure dwarf pea plant (genotype tt), what will be the genotype of the F1 generation?",easy,Biology,15.0,Transport in plant,15.0,,
+279,2-SKIM_AND_CONFIRM,"If a homozygous tall pea plant (TT) is crossed with a homozygous dwarf pea plant (tt), what will be the genotype of the F1 generation?",medium,Biology,15.0,Transport in plant,15.0,,
+371,2-SKIM_AND_CONFIRM,The genetic material that carries information about an organism and is passed from parent to offspring is primarily:,medium,Biology,83.0,Genetic variation,83.0,,
+502,2-SKIM_AND_CONFIRM,"If a homozygous tall pea plant (TT) is crossed with a homozygous dwarf pea plant (tt), what will be the genotype of the F1 generation?",medium,Biology,15.0,Transport in plant,15.0,,
+505,2-SKIM_AND_CONFIRM,What are the main products of the light-dependent reactions of photosynthesis?,medium,Chemistry,24.0,neutralization Reaction,24.0,,
+930,2-SKIM_AND_CONFIRM,The passing of genetic information from parents to offspring is a key aspect of which characteristic of life?,medium,Biology,83.0,Genetic variation,83.0,,
+933,2-SKIM_AND_CONFIRM,Organisms that can produce their own food using light or chemical energy are known as:,medium,Biology,16.0,Food Chain,16.0,,
+659,2-SKIM_AND_CONFIRM,An entrepreneur is a person who,medium,Business admin,266.0,Characteristics of an Entrepreneur,266.0,,
+839,2-SKIM_AND_CONFIRM,What is a core characteristic of Christian discipleship?,medium,CRS,50.0,Discipleship and Cost,50.0,,
+2,2-SKIM_AND_CONFIRM,Which of the following functional groups contains a carbonyl group bonded to an oxygen atom and an alkyl or aryl group?,medium,Chemistry,31.0,Hydro Carbon,31.0,,
+6,2-SKIM_AND_CONFIRM,Which set of conditions generally favors an SN2 reaction over an SN1 reaction?,medium,Chemistry,24.0,neutralization Reaction,24.0,,
+7,2-SKIM_AND_CONFIRM,"According to Hückel's rule, for a compound to be considered aromatic, it must be cyclic, planar, fully conjugated, and possess a specific number of pi electrons. What is this number?",medium,Chemistry,111.0,Valence Shell Electron Pair Repulsion (VSEPR) Theory,111.0,,
+9,2-SKIM_AND_CONFIRM,Polyethylene is a polymer formed from the polymerization of ethene monomers. What type of polymerization reaction is this?,medium,Chemistry,24.0,neutralization Reaction,24.0,,
+264,2-SKIM_AND_CONFIRM,Which of the following substances will produce a blue precipitate when added to an aqueous solution of copper(II) sulfate?,medium,Chemistry,88.0,Solution Stoichiometry and Titration,88.0,,
+269,2-SKIM_AND_CONFIRM,For the reversible reaction: N₂(g) + 3H₂(g) ⇌ 2NH₃(g) ΔH = -92 kJ/mol. Which change will shift the equilibrium position to the right (favour ammonia production)?,medium,Chemistry,24.0,neutralization Reaction,24.0,,
+272,2-SKIM_AND_CONFIRM,A solution has a pH of 3. What is the concentration of hydroxide ions ([OH⁻]) in the solution?,medium,Chemistry,31.0,Hydro Carbon,31.0,,
+385,2-SKIM_AND_CONFIRM,"Most biological enzymes, which act as catalysts for biochemical reactions, belong to which class of macromolecules?",medium,Chemistry,24.0,neutralization Reaction,24.0,,
+545,2-SKIM_AND_CONFIRM,A solution has a pH of 9. This solution is considered:,medium,Chemistry,88.0,Solution Stoichiometry and Titration,88.0,,
+607,2-SKIM_AND_CONFIRM,A solution with a pH value of 2 is considered to be:,easy,Chemistry,88.0,Solution Stoichiometry and Titration,88.0,,
+665,2-SKIM_AND_CONFIRM,The particle with a negative charge isproton,medium,Chemistry,26.0,Subatomic Particle,26.0,,
+477,2-SKIM_AND_CONFIRM,The system of government in which eligible citizens vote directly on policy issues or laws is known as...,medium,Civic Education,36.0,Right And Duities Of A Citizen,36.0,,
+725,2-SKIM_AND_CONFIRM,"A significant decline in citizens' belief that their individual actions can influence the political system, even if they understand how the system works, is primarily indicative of a fall in which dimension of political efficacy?",hard,Civic Education,36.0,Right And Duities Of A Citizen,36.0,,
+728,2-SKIM_AND_CONFIRM,Which structural feature of a democratic system is most frequently cited as a potential contributor to political apathy among citizens?,hard,Civic Education,36.0,Right And Duities Of A Citizen,36.0,,
+733,2-SKIM_AND_CONFIRM,Some critical theories argue that political apathy is not merely a failure of citizens but can be a deliberate outcome fostered by political elites. This perspective suggests apathy is cultivated to:,hard,Civic Education,36.0,Right And Duities Of A Citizen,36.0,,
+405,2-SKIM_AND_CONFIRM,Which of the following items would NOT typically appear in a Partnership Appropriation Account?,medium,Commerce,63.0,Sole Proprietorship And Partnership,63.0,,
+779,2-SKIM_AND_CONFIRM,"Partners Alex and Ben have capital balances of $60,000 and $40,000, respectively. They agree to admit Cathy for a 20% interest in the partnership. Cathy contributes $30,000 in cash. Assuming the bonus method is used, what is the total capital of the partnership immediately after Cathy's admission?",medium,Commerce,63.0,Sole Proprietorship And Partnership,63.0,,
+780,2-SKIM_AND_CONFIRM,"When a partner withdraws from a partnership, and the remaining partners pay the withdrawing partner from their personal assets (not partnership assets), what is the effect on the partnership's total capital?",medium,Commerce,63.0,Sole Proprietorship And Partnership,63.0,,
+781,2-SKIM_AND_CONFIRM,"In the liquidation of a partnership, what is the correct order of cash distribution to the various claims?",medium,Commerce,63.0,Sole Proprietorship And Partnership,63.0,,
+782,2-SKIM_AND_CONFIRM,A partnership agreement provides for annual salaries to partners A and B. These salaries are considered:,medium,Commerce,63.0,Sole Proprietorship And Partnership,63.0,,
+783,2-SKIM_AND_CONFIRM,"A and B are partners with capital balances of $70,000 and $50,000, respectively. They agree to admit C, who contributes $40,000 for a 25% interest in the partnership. If the total agreed capital of the partnership after C's admission is $180,000, what amount of goodwill is recognized?",medium,Commerce,63.0,Sole Proprietorship And Partnership,63.0,,
+854,2-SKIM_AND_CONFIRM,You need to write an email to your university professor requesting an extension on an assignment. Which opening salutation is most appropriate?,medium,Data Processing,140.0,Internet Services and Email,140.0,,
+857,2-SKIM_AND_CONFIRM,You are writing a complaint email to a company about a faulty product. Which tone is most appropriate?,medium,Data Processing,140.0,Internet Services and Email,140.0,,
+47,2-SKIM_AND_CONFIRM,The Law of Diminishing Marginal Utility helps explain why the demand curve for a normal good is:,medium,Economics,126.0,Demand And Supply,126.0,,
+142,2-SKIM_AND_CONFIRM,The primary objective of a commercial bank is to:,medium,Economics,119.0,Commercial And Central Banking,119.0,,
+185,2-SKIM_AND_CONFIRM,Which of the following groups are external users of accounting information?,easy,Accounting,97.0,"Trading, Profit and Loss Account",97.0,,
+459,2-SKIM_AND_CONFIRM,Constitutionalism refers to the idea that government power should be...,medium,Government,223.0,Democracy and Forms of Government,223.0,,
+469,2-SKIM_AND_CONFIRM,A major challenge to federalism in Nigeria has been...,hard,Government,232.0,Military Rule and Nigerian Federalism,232.0,,
+472,2-SKIM_AND_CONFIRM,"In a federal system of government, power is constitutionally shared between the central government and...",medium,Government,223.0,Democracy and Forms of Government,223.0,,
+466,2-SKIM_AND_CONFIRM,The pre-colonial Igbo political system was largely characterized by...,medium,History,284.0,Causes of Colonial Rule,284.0,,
+225,2-SKIM_AND_CONFIRM,"Which dramatic genre typically features a protagonist who experiences a downfall due to a fatal flaw or adverse fate, often ending in death?",medium,Literature in English,255.0,Dramatic Devices,255.0,,
+450,2-SKIM_AND_CONFIRM,"A story told from the perspective of “I,” where the narrator is a character within the story, uses which point of view?",easy,Literature in English,246.0,Character Analysis,246.0,,
+355,2-SKIM_AND_CONFIRM,Which pair of quantities consists of one scalar and one vector?,medium,Mathematics,287.0,Vector Algebra,287.0,,
+706,2-SKIM_AND_CONFIRM,"The sum of the first n terms of a geometric series is 127 and the sum of their reciprocals is (127)/(64). If the first term is 1, find n and the common ratio r:",easy,Mathematics,203.0,Geometric Progression (GP),203.0,,
+111,2-SKIM_AND_CONFIRM,A car accelerates uniformly from rest at 2 m/s² for 5 seconds. What is its final velocity?,easy,Physics,213.0,"Distance, Displacement, Speed and Velocity",213.0,,
+113,2-SKIM_AND_CONFIRM,The property of sound that relates to its frequency is its:,easy,Physics,305.0,Wave Properties and Sound,305.0,,
+200,2-SKIM_AND_CONFIRM,The acceleration due to gravity (g) on the surface of a planet depends on the planet's mass (M) and radius (R) by the formula:,medium,Physics,214.0,Acceleration and Equations of Motion,214.0,,
+326,2-SKIM_AND_CONFIRM,A car travels 5 km east and then 3 km west. What is the magnitude of its displacement?,medium,Physics,213.0,"Distance, Displacement, Speed and Velocity",213.0,,
+330,2-SKIM_AND_CONFIRM,Acceleration is defined as the rate of change of...,medium,Physics,214.0,Acceleration and Equations of Motion,214.0,,
+331,2-SKIM_AND_CONFIRM,What are the standard SI units for acceleration?,medium,Physics,214.0,Acceleration and Equations of Motion,214.0,,
+334,2-SKIM_AND_CONFIRM,A car accelerates uniformly from rest at 2 m/s² for 5 seconds. What is its final velocity?,medium,Physics,213.0,"Distance, Displacement, Speed and Velocity",213.0,,
+338,2-SKIM_AND_CONFIRM,"In projectile motion, neglecting air resistance, the horizontal component of velocity:",medium,Physics,219.0,"Electric Current, Voltage and Resistance",219.0,,
+345,2-SKIM_AND_CONFIRM,"If a car is moving east and its acceleration is directed west, what is happening to the car?",medium,Physics,214.0,Acceleration and Equations of Motion,214.0,,
+346,2-SKIM_AND_CONFIRM,Which concept explains why a body in motion tends to stay in motion unless acted upon by an external force?,medium,Physics,215.0,Newton's Laws of Motion,215.0,,
+347,2-SKIM_AND_CONFIRM,A ball is thrown vertically upwards with an initial velocity of 20 m/s. How long does it take to reach its highest point? (Assume g = 10 m/s²),medium,Physics,213.0,"Distance, Displacement, Speed and Velocity",213.0,,
+353,2-SKIM_AND_CONFIRM,The instantaneous velocity of an object refers to its velocity at:,medium,Physics,213.0,"Distance, Displacement, Speed and Velocity",213.0,,
+412,2-SKIM_AND_CONFIRM,"Three resistors, 2 Ω, 3 Ω, and 6 Ω, are connected in parallel. What is their equivalent resistance?",easy,Physics,219.0,"Electric Current, Voltage and Resistance",219.0,,
+417,2-SKIM_AND_CONFIRM,"A 2 kg mass moving at 5 m/s collides with a stationary 3 kg mass. If they stick together after the collision, what is their common velocity?",medium,Physics,213.0,"Distance, Displacement, Speed and Velocity",213.0,,
+422,2-SKIM_AND_CONFIRM,"A ball is thrown vertically upwards. Neglecting air resistance, at its maximum height, its:",easy,Physics,219.0,"Electric Current, Voltage and Resistance",219.0,,
+423,2-SKIM_AND_CONFIRM,An object is placed 20 cm from a converging lens with a focal length of 10 cm. What type of image is formed and its distance from the lens?,hard,Physics,213.0,"Distance, Displacement, Speed and Velocity",213.0,,
+430,2-SKIM_AND_CONFIRM,An object is placed 15 cm in front of a plane mirror. What is the distance between the object and its image?,easy,Physics,213.0,"Distance, Displacement, Speed and Velocity",213.0,,
+434,2-SKIM_AND_CONFIRM,"Three resistors of 2 Ω, 3 Ω, and 5 Ω are connected in series. What is their equivalent resistance?",easy,Physics,219.0,"Electric Current, Voltage and Resistance",219.0,,
+638,2-SKIM_AND_CONFIRM,"A ball is dropped from a certain height. Neglecting air resistance, which of the following quantities is conserved during its fall?",medium,Physics,219.0,"Electric Current, Voltage and Resistance",219.0,,
+814,2-SKIM_AND_CONFIRM,Kí ni 'Ayan Ogbufo' gangan túmọ̀ sí nínú èdè Yorùbá?,medium,Yoruba,259.0,Ìgbéyàwó àti Ètò Ẹbí Yorùbá,259.0,,
+305,2-SKIM_AND_CONFIRM,Which of the following is a source document for recording cash payments?,easy,Accounting,91.0,Source Documents,91.0,,
+92,2-SKIM_AND_CONFIRM,Where does fertilization typically occur in the mammalian female reproductive tract?,medium,Biology,22.0,fertilization and development,22.0,,
+156,2-SKIM_AND_CONFIRM,Which of the following organelles is primarily responsible for cellular respiration and the production of ATP?,easy,Biology,76.0,cell division,76.0,,
+168,2-SKIM_AND_CONFIRM,"The theory of natural selection, a cornerstone of modern evolutionary biology, was primarily proposed by:",easy,Biology,21.0,Evidence Of Evolution,21.0,,
+276,2-SKIM_AND_CONFIRM,Which of the following organelles is primarily responsible for protein synthesis in a cell?,easy,Biology,76.0,cell division,76.0,,
+278,2-SKIM_AND_CONFIRM,"In the five-kingdom classification system, organisms that are unicellular and prokaryotic belong to the kingdom:",medium,Biology,8.0,reproductive system,8.0,,
+288,2-SKIM_AND_CONFIRM,Which cell organelle is often referred to as the 'powerhouse' of the cell?,easy,Biology,76.0,cell division,76.0,,
+369,2-SKIM_AND_CONFIRM,"The sum of all chemical reactions that occur in an organism, including both catabolic (breaking down) and anabolic (building up) processes, is called:",medium,Chemistry,24.0,neutralization Reaction,24.0,,
+374,2-SKIM_AND_CONFIRM,A key distinction between prokaryotic and eukaryotic cells is the presence of:,medium,Biology,76.0,cell division,76.0,,
+501,2-SKIM_AND_CONFIRM,Which of the following organelles is primarily responsible for cellular respiration and ATP production?,easy,Biology,76.0,cell division,76.0,,
+506,2-SKIM_AND_CONFIRM,"Which kingdom consists of organisms that are eukaryotic, multicellular, heterotrophic, and lack cell walls?",easy,Biology,76.0,cell division,76.0,,
+507,2-SKIM_AND_CONFIRM,The fusion of male and female gametes in flowering plants (angiosperms) typically occurs in the:,medium,Biology,15.0,Transport in plant,15.0,,
+904,2-SKIM_AND_CONFIRM,"Which organelle is responsible for generating most of the cell's supply of adenosine triphosphate (ATP), used as a source of chemical energy?",medium,Biology,76.0,cell division,76.0,,
+906,2-SKIM_AND_CONFIRM,"Which of the following is a characteristic feature of prokaryotic cells, distinguishing them from eukaryotic cells?",medium,Biology,76.0,cell division,76.0,,
+931,2-SKIM_AND_CONFIRM,Which of the following represents the correct hierarchical order from simplest to most complex in a multicellular organism?,medium,Biology,76.0,cell division,76.0,,
+936,2-SKIM_AND_CONFIRM,"The process by which species change over generations in response to their environment, leading to better survival and reproduction, is called:",medium,Biology,9.0,asexual reproduction,9.0,,
+937,2-SKIM_AND_CONFIRM,"What cellular component is present in ALL living cells, regardless of whether they are prokaryotic or eukaryotic?",medium,Biology,76.0,cell division,76.0,,
+943,2-SKIM_AND_CONFIRM,"Inorganic reactions often proceed very rapidly at room temperature, while organic reactions are generally characterized by:",medium,Chemistry,24.0,neutralization Reaction,24.0,,
+495,2-SKIM_AND_CONFIRM,"In Christian theology, the event of Jesus' bodily rising from the dead is known as the:",easy,CRS,48.0,The Baptism of Jesus,48.0,,
+3,2-SKIM_AND_CONFIRM,How many structural isomers are possible for the molecular formula C4H10?,medium,Chemistry,87.0,Empirical and Molecular Formulae,87.0,,
+4,2-SKIM_AND_CONFIRM,The reaction of an alkene with bromine (Br2) to form a dibromoalkane is an example of what type of organic reaction?,medium,Chemistry,24.0,neutralization Reaction,24.0,,
+224,2-SKIM_AND_CONFIRM,"An exaggerated statement or claim not meant to be taken literally, used for emphasis or effect, is a(n):",medium,Mathematics,211.0,"Measures of Central Tendency (Mean, Median, Mode)",211.0,,
+262,2-SKIM_AND_CONFIRM,What type of chemical bond is predominantly formed between two non-metallic atoms with similar electronegativities?,easy,Chemistry,111.0,Valence Shell Electron Pair Repulsion (VSEPR) Theory,111.0,,
+274,2-SKIM_AND_CONFIRM,An element X has an atomic number of 17 and a mass number of 35. How many neutrons are in one atom of X?,easy,Chemistry,74.0,Periodic Law and Atomic Properties,74.0,,
+376,2-SKIM_AND_CONFIRM,The process by which cells break down glucose and other organic molecules to release energy in the form of ATP is called:,medium,Chemistry,115.0,Isomerism in Organic Compounds,115.0,,
+384,2-SKIM_AND_CONFIRM,Which class of organic molecules is primarily responsible for storing genetic information?,medium,Chemistry,115.0,Isomerism in Organic Compounds,115.0,,
+425,2-SKIM_AND_CONFIRM,"When an electron in an atom moves from a higher energy level to a lower energy level, it:",easy,Chemistry,111.0,Valence Shell Electron Pair Repulsion (VSEPR) Theory,111.0,,
+667,2-SKIM_AND_CONFIRM,"For a chemical reaction that is second-order with respect to a reactant A, how many times does the reaction rate increase when the concentration of [A] is increased by a factor of 2?",easy,Chemistry,24.0,neutralization Reaction,24.0,,
+907,2-SKIM_AND_CONFIRM,The cell membrane is primarily composed of which type of molecule?,medium,Biology,76.0,cell division,76.0,,
+950,2-SKIM_AND_CONFIRM,The presence of specific atoms or groups of atoms within an organic molecule that are responsible for its characteristic chemical reactions is described by the concept of:,medium,Chemistry,24.0,neutralization Reaction,24.0,,
+953,2-SKIM_AND_CONFIRM,"Large molecules formed by the repetitive bonding of smaller molecular units (monomers) are known as polymers. The vast majority of commercially important synthetic polymers (e.g., polyethylene, nylon) are classified as:",medium,Chemistry,110.0,"Intermolecular Forces (Hydrogen bonding, van der Waals)",110.0,,
+998,2-SKIM_AND_CONFIRM,"The phenomenon where the electronic properties of semiconductor materials change significantly as their size is reduced to the nanoscale, leading to discrete energy levels, is known as:",medium,Chemistry,25.0,Electronic configuration,25.0,,
+476,2-SKIM_AND_CONFIRM,"Citizenship acquired through birth within a country's territory, irrespective of the nationality of the parents, is known as...",medium,Civic Education,36.0,Right And Duities Of A Citizen,36.0,,
+738,2-SKIM_AND_CONFIRM,"A 'vicious cycle' of political apathy is often described wherein low citizen engagement leads to policies that are less representative, which in turn further reduces citizen motivation to participate. This dynamic primarily undermines which core democratic principle?",hard,Civic Education,36.0,Right And Duities Of A Citizen,36.0,,
+879,2-SKIM_AND_CONFIRM,"Which of the following political reforms, designed to increase direct citizen participation in government, was a hallmark of the Progressive Era in the early 20th century?",medium,Civic Education,36.0,Right And Duities Of A Citizen,36.0,,
+250,2-SKIM_AND_CONFIRM,The principle of insurance that states an insured person cannot make a profit from an insurance claim is,medium,Commerce,59.0,principles of insurance,59.0,,
+849,2-SKIM_AND_CONFIRM,The concept of data integrity primarily focuses on which aspect of data within a system?,medium,Data Processing,132.0,Basic Definitions of Data and Information,132.0,,
+58,2-SKIM_AND_CONFIRM,Which of the following scenarios would likely NOT immediately demonstrate the Law of Diminishing Marginal Utility?,medium,Economics,123.0,Trade Restrictions And Exchange Rate,123.0,,
+247,2-SKIM_AND_CONFIRM,Which of the following is NOT a function of the Central Bank in an economy?,medium,Economics,119.0,Commercial And Central Banking,119.0,,
+755,2-SKIM_AND_CONFIRM,"If the income elasticity of demand for a product is negative, the product is classified as a(n):",medium,Economics,124.0,National Income,124.0,,
+238,2-SKIM_AND_CONFIRM,In which of the following words is the 'ch' sound pronounced as /ʃ/ (like in 'shoe')?,medium,Physics,305.0,Wave Properties and Sound,305.0,,
+468,2-SKIM_AND_CONFIRM,The Richards Constitution of 1946 was notable for its introduction of...,medium,Government,167.0,Functions and Features of a Constitution,167.0,,
+473,2-SKIM_AND_CONFIRM,The primary function of the legislature in a modern democratic state is to...,easy,Mathematics,211.0,"Measures of Central Tendency (Mean, Median, Mode)",211.0,,
+480,2-SKIM_AND_CONFIRM,Disenfranchisement in an election primarily means...,medium,Mathematics,211.0,"Measures of Central Tendency (Mean, Median, Mode)",211.0,,
+483,2-SKIM_AND_CONFIRM,The Clifford Constitution of 1922 is notable for introducing...,medium,Government,167.0,Functions and Features of a Constitution,167.0,,
+703,2-SKIM_AND_CONFIRM,Which organ of government is constitutionally responsible for the interpretation of laws?,easy,Government,223.0,Democracy and Forms of Government,223.0,,
+878,2-SKIM_AND_CONFIRM,"The 14th Amendment to the U.S. Constitution, ratified during the Reconstruction Era, was primarily designed to:",medium,Government,167.0,Functions and Features of a Constitution,167.0,,
+784,2-SKIM_AND_CONFIRM,Which of the following was a primary political motivation for European colonialism in the 19th and early 20th centuries?,medium,History,284.0,Causes of Colonial Rule,284.0,,
+788,2-SKIM_AND_CONFIRM,"Following independence, many new states faced the challenge of ""nation-building,"" which refers to:",medium,History,282.0,Struggle for Independence,282.0,,
+448,2-SKIM_AND_CONFIRM,"In classical Greek drama, a protagonist who suffers a downfall due to a fatal flaw or error in judgment is characteristic of a...",medium,Literature in English,246.0,Character Analysis,246.0,,
+449,2-SKIM_AND_CONFIRM,Which literary device involves the repetition of initial consonant sounds in words that are close to one another?,medium,Physics,305.0,Wave Properties and Sound,305.0,,
+704,2-SKIM_AND_CONFIRM,"In drama, lines spoken by a character that are meant to be heard by the audience but not by the other characters on stage are called?",easy,Mathematics,211.0,"Measures of Central Tendency (Mean, Median, Mode)",211.0,,
+63,2-SKIM_AND_CONFIRM,"Which cell type is primarily responsible for the resorption of bone matrix during bone remodeling, a process crucial for calcium homeostasis?",hard,Mathematics,211.0,"Measures of Central Tendency (Mean, Median, Mode)",211.0,,
+205,2-SKIM_AND_CONFIRM,Find the value(s) of k if the quadratic equation x^2 + (k+1)x + 9 = 0 has equal roots.,medium,Mathematics,199.0,Quadratic Equations,199.0,,
+206,2-SKIM_AND_CONFIRM,Solve the simultaneous equations: x + y = 7 and 2x - y = 5.,easy,Mathematics,197.0,Linear Equations and Inequalities,197.0,,
+358,2-SKIM_AND_CONFIRM,Factor the quadratic expression: x² + 7x + 12,medium,Mathematics,199.0,Quadratic Equations,199.0,,
+359,2-SKIM_AND_CONFIRM,"Solve the system of equations:
+ y = 2x - 1 
+ 3x + y = 9",medium,Mathematics,197.0,Linear Equations and Inequalities,197.0,,
+897,2-SKIM_AND_CONFIRM,Factor the quadratic expression: x^2 + 7x + 12,medium,Mathematics,199.0,Quadratic Equations,199.0,,
+900,2-SKIM_AND_CONFIRM,"Solve the system of equations:
+x + y = 5
+x - y = 1",medium,Mathematics,197.0,Linear Equations and Inequalities,197.0,,
+1031,2-SKIM_AND_CONFIRM,Factor the quadratic expression: x^2 + 7x + 12,medium,Mathematics,199.0,Quadratic Equations,199.0,,
+1032,2-SKIM_AND_CONFIRM,"Solve the system of equations:
+2x + y = 7
+x - y = 2",medium,Mathematics,197.0,Linear Equations and Inequalities,197.0,,
+114,2-SKIM_AND_CONFIRM,"Three resistors of 2Ω, 3Ω, and 5Ω are connected in series to a 10V battery. What is the total current flowing in the circuit?",medium,Physics,219.0,"Electric Current, Voltage and Resistance",219.0,,
+119,2-SKIM_AND_CONFIRM,The force on a current-carrying conductor in a magnetic field is maximum when the conductor is placed:,medium,Physics,219.0,"Electric Current, Voltage and Resistance",219.0,,
+121,2-SKIM_AND_CONFIRM,Which of the following electromagnetic waves has the longest wavelength?,easy,Physics,305.0,Wave Properties and Sound,305.0,,
+335,2-SKIM_AND_CONFIRM,"A stone is dropped from a height. Assuming negligible air resistance, what is its acceleration?",medium,Physics,219.0,"Electric Current, Voltage and Resistance",219.0,,
+336,2-SKIM_AND_CONFIRM,"An object is dropped from a cliff. After 3 seconds, assuming g = 10 m/s² and no air resistance, what is its speed?",medium,Physics,219.0,"Electric Current, Voltage and Resistance",219.0,,
+339,2-SKIM_AND_CONFIRM,"For a projectile launched into the air, what is its vertical acceleration at the highest point of its trajectory (neglecting air resistance)?",medium,Physics,219.0,"Electric Current, Voltage and Resistance",219.0,,
+350,2-SKIM_AND_CONFIRM,"If an object is moving with uniform velocity, its acceleration must be:",medium,Physics,214.0,Acceleration and Equations of Motion,214.0,,
+415,2-SKIM_AND_CONFIRM,"In a photoelectric experiment, increasing the intensity of the incident light, while keeping its frequency constant, will result in an increase in the:",medium,Physics,219.0,"Electric Current, Voltage and Resistance",219.0,,
+416,2-SKIM_AND_CONFIRM,A straight conductor carrying current in a uniform magnetic field experiences a force. The direction of this force is given by:,easy,Physics,219.0,"Electric Current, Voltage and Resistance",219.0,,
+424,2-SKIM_AND_CONFIRM,"According to Lenz's Law, the direction of the induced current in a conductor placed in a changing magnetic field is such that it:",easy,Physics,219.0,"Electric Current, Voltage and Resistance",219.0,,
+428,2-SKIM_AND_CONFIRM,A resistor of 10 Ω is connected across a 5 V battery. What is the current flowing through the resistor?,easy,Physics,219.0,"Electric Current, Voltage and Resistance",219.0,,
+438,2-SKIM_AND_CONFIRM,The direction of the magnetic field lines around a straight current-carrying conductor can be determined by:,easy,Physics,219.0,"Electric Current, Voltage and Resistance",219.0,,
+646,2-SKIM_AND_CONFIRM,"A boy pushes a wall with a force of 100 N for 5 seconds, but the wall does not move. What is the work done by the boy?",easy,Physics,218.0,"Work, Power and Energy Conservation",218.0,,
+702,2-SKIM_AND_CONFIRM,The supreme power and authority of a state to make and enforce laws within its territory without external interference is known as?,easy,Physics,218.0,"Work, Power and Energy Conservation",218.0,,
+829,2-SKIM_AND_CONFIRM,"The principle that all individuals, institutions, and entities are accountable to laws that are publicly promulgated, equally enforced, and independently adjudicated is called:",medium,Physics,215.0,Newton's Laws of Motion,215.0,,
+964,2-SKIM_AND_CONFIRM,"Arrange the following electromagnetic waves in order of increasing wavelength:
+I. X-rays
+II. Visible light
+III. Radio waves
+IV. Ultraviolet",medium,Physics,222.0,Reflection of Light,222.0,,
+863,2-SKIM_AND_CONFIRM,Which sentence would be out of place (mismatching register) in an instruction manual for a complex electronic device?,medium,Chemistry,25.0,Electronic configuration,25.0,,
+87,2-SKIM_AND_CONFIRM,Osteoporosis is a condition characterized by a reduction in bone mass. This is primarily due to what imbalance in the ongoing process of bone remodeling?,hard,Mathematics,211.0,"Measures of Central Tendency (Mean, Median, Mode)",211.0,,
+816,2-SKIM_AND_CONFIRM,Kí ni ète pàtàkì kan tí 'Ayan Ogbufo' ṣeé ṣe fún àṣà Yorùbá?,medium,Yoruba,259.0,Ìgbéyàwó àti Ètò Ẹbí Yorùbá,259.0,,
+820,2-SKIM_AND_CONFIRM,Báwo ni 'Ayan Ogbufo' ṣe ń ranwọ́ láti mọ ìdánimọ̀ Yorùbá?,medium,Yoruba,259.0,Ìgbéyàwó àti Ètò Ẹbí Yorùbá,259.0,,
+81,2-SKIM_AND_CONFIRM,"In adults, hematopoiesis (blood cell formation) primarily occurs in the red bone marrow, which is predominantly found in which areas?",hard,Biology,76.0,cell division,76.0,,
+107,2-SKIM_AND_CONFIRM,"A farmer observes a crop plant with fibrous roots, leaves exhibiting parallel venation, and a single cotyledon in its embryo. This plant can be categorized as a:",medium,Agricultural Science,101.0,Farm Animal Management,101.0,,
+128,2-SKIM_AND_CONFIRM,Choose the word that is **opposite in meaning** to the underlined word: Her **benevolent** nature made her a popular figure in the community.,medium,Mathematics,211.0,"Measures of Central Tendency (Mean, Median, Mode)",211.0,,
+129,2-SKIM_AND_CONFIRM,Choose the word that is **nearest in meaning** to the underlined word: The professor's **erudite** lecture captivated the audience.,medium,Mathematics,211.0,"Measures of Central Tendency (Mean, Median, Mode)",211.0,,
+130,2-SKIM_AND_CONFIRM,"To ""let the cat out of the bag"" means to:",easy,Mathematics,211.0,"Measures of Central Tendency (Mean, Median, Mode)",211.0,,
+131,2-SKIM_AND_CONFIRM,"The manager decided to **call off** the meeting due to low attendance. What does ""call off"" mean?",easy,Mathematics,211.0,"Measures of Central Tendency (Mean, Median, Mode)",211.0,,
+133,2-SKIM_AND_CONFIRM,Which of the following words has a different vowel sound from the others?,medium,Physics,305.0,Wave Properties and Sound,305.0,,
+134,2-SKIM_AND_CONFIRM,Which of the following words has the same consonant sound as 'ch' in **church**?,medium,Physics,305.0,Wave Properties and Sound,305.0,,
+148,2-SKIM_AND_CONFIRM,The most appropriate mode of transport for bulky and heavy goods over long distances at a low cost is:,medium,Mathematics,211.0,"Measures of Central Tendency (Mean, Median, Mode)",211.0,,
+166,2-SKIM_AND_CONFIRM,"The scientific name for humans, *Homo sapiens*, follows the system of binomial nomenclature, where *Homo* represents the:",medium,Mathematics,272.0,Binomial Theorem,272.0,,
+169,2-SKIM_AND_CONFIRM,Viruses are considered non-living outside a host cell primarily because they:,medium,Biology,76.0,cell division,76.0,,
+183,2-SKIM_AND_CONFIRM,Which of the following items appearing on the bank statement would require a debit entry in the Cash Book?,hard,Accounting,92.0,Double-Entry Principle,92.0,,
+213,2-SKIM_AND_CONFIRM,"Find the mean of the numbers: 2, 5, 8, 11, 14.",easy,Mathematics,211.0,"Measures of Central Tendency (Mean, Median, Mode)",211.0,,
+222,2-SKIM_AND_CONFIRM,"The repetition of initial consonant sounds in words close to each other, such as 'Peter Piper picked a peck of pickled peppers', is called:",easy,Physics,305.0,Wave Properties and Sound,305.0,,
+229,2-SKIM_AND_CONFIRM,"When a character says one thing but means the opposite, it is an example of:",medium,Mathematics,211.0,"Measures of Central Tendency (Mean, Median, Mode)",211.0,,
+231,2-SKIM_AND_CONFIRM,Choose the option that is NEAREST IN MEANING to the word 'VIGILANT' as used in a sentence.,easy,Mathematics,211.0,"Measures of Central Tendency (Mean, Median, Mode)",211.0,,
+232,2-SKIM_AND_CONFIRM,Choose the option that is OPPOSITE IN MEANING to the word 'PROMPT'.,medium,Mathematics,211.0,"Measures of Central Tendency (Mean, Median, Mode)",211.0,,
+258,2-SKIM_AND_CONFIRM,The fastest but most expensive mode of transporting goods over long distances is,easy,Mathematics,211.0,"Measures of Central Tendency (Mean, Median, Mode)",211.0,,
+268,2-SKIM_AND_CONFIRM,Which factor does NOT affect the rate of a chemical reaction?,easy,Chemistry,24.0,neutralization Reaction,24.0,,
+297,2-SKIM_AND_CONFIRM,An error where a debit error in one account is cancelled out by an equal credit error in another account is known as a(n):,hard,Biology,76.0,cell division,76.0,,
+373,2-SKIM_AND_CONFIRM,Which of the following statements is a central tenet of the cell theory?,medium,Biology,76.0,cell division,76.0,,
+387,2-SKIM_AND_CONFIRM,"The outer boundary of an animal cell, which regulates the passage of substances into and out of the cell, is the:",medium,Biology,76.0,cell division,76.0,,
+394,2-SKIM_AND_CONFIRM,"The concept that new properties emerge at each successive level of biological organization (e.g., a heart can pump blood, but individual heart cells cannot) is called:",medium,Biology,76.0,cell division,76.0,,
+418,2-SKIM_AND_CONFIRM,Which of the following factors primarily affects the speed of sound in air?,medium,Physics,213.0,"Distance, Displacement, Speed and Velocity",213.0,,
+426,2-SKIM_AND_CONFIRM,A car travels at a constant speed of 72 km/h. How far does it travel in 10 seconds?,easy,Physics,213.0,"Distance, Displacement, Speed and Velocity",213.0,,
+478,2-SKIM_AND_CONFIRM,An ideology that advocates for collective or governmental ownership and administration of the means of production and distribution of goods is...,medium,Mathematics,211.0,"Measures of Central Tendency (Mean, Median, Mode)",211.0,,
+481,2-SKIM_AND_CONFIRM,Which of the following is a key characteristic of the civil service in a modern state?,medium,Mathematics,211.0,"Measures of Central Tendency (Mean, Median, Mode)",211.0,,
+485,2-SKIM_AND_CONFIRM,Which of the following is a primary function of local government councils in Nigeria?,easy,Government,223.0,Democracy and Forms of Government,223.0,,
+493,2-SKIM_AND_CONFIRM,"The verification principle, which claims that statements are only meaningful if they can be empirically verified, poses a significant challenge to:",medium,Mathematics,211.0,"Measures of Central Tendency (Mean, Median, Mode)",211.0,,
+625,2-SKIM_AND_CONFIRM,"For the curve y = x^3 - 3x^2 + 2, find the x-coordinate(s) of its stationary point(s).",medium,Mathematics,288.0,Coordinate Geometry,288.0,,
+657,2-SKIM_AND_CONFIRM,The principle of double entry means that,medium,Mathematics,211.0,"Measures of Central Tendency (Mean, Median, Mode)",211.0,,
+661,2-SKIM_AND_CONFIRM,Which part of the human body transports oxygen to tissues?,easy,Biology,15.0,Transport in plant,15.0,,
+684,2-SKIM_AND_CONFIRM,"Find the mean of 2, 4 and 6.",medium,Mathematics,211.0,"Measures of Central Tendency (Mean, Median, Mode)",211.0,,
+691,2-SKIM_AND_CONFIRM,Àròkọ jẹ́:,medium,Yoruba,310.0,Ìtumọ̀ àti Ìwé-Àròkọ (Translation & Comprehension),310.0,,
+696,2-SKIM_AND_CONFIRM,"From the options provided, choose the word that is opposite in meaning to the word underlined.The student was known for his unassuming nature.",easy,Mathematics,211.0,"Measures of Central Tendency (Mean, Median, Mode)",211.0,,
+747,2-SKIM_AND_CONFIRM,"A situation where two countries agree to exchange goods and services directly, without any cash payment, but through a clearing account that tracks debits and credits, is best described as:",hard,Accounting,97.0,"Trading, Profit and Loss Account",97.0,,
+818,2-SKIM_AND_CONFIRM,Àwọn ọ̀nà ìkọ̀wé wo ni a sábà máa ń ṣàlàyé nínú oríkì nígbà 'Ayan Ogbufo'?,medium,Yoruba,245.0,Ìkọ̀wé Àlàyé àti Àròyé,245.0,,
+822,2-SKIM_AND_CONFIRM,"Bí Oríkì kan bá ṣàpèjúwe ènìyàn kan gẹ́gẹ́ bí 'Ọmọ Àgbẹ̀dẹ ní 'lé tí won ti ń lu irin', kí ni 'Ayan Ogbufo' lè ṣàlàyé nípa ìlà yí?",medium,Yoruba,245.0,Ìkọ̀wé Àlàyé àti Àròyé,245.0,,
+889,2-SKIM_AND_CONFIRM,"The repetition of initial consonant sounds in words that are close to each other, such as 'Peter Piper picked a peck of pickled peppers,' is known as what?",medium,Physics,305.0,Wave Properties and Sound,305.0,,
+905,2-SKIM_AND_CONFIRM,What is the primary function of ribosomes in a cell?,medium,Biology,76.0,cell division,76.0,,
+910,2-SKIM_AND_CONFIRM,Which of the following statements about plant cells is true?,medium,Biology,76.0,cell division,76.0,,
+912,2-SKIM_AND_CONFIRM,The process by which cells take in substances from their environment by forming a vesicle from their cell membrane is called:,medium,Biology,76.0,cell division,76.0,,
+956,2-SKIM_AND_CONFIRM,"When you stand near a bonfire, you feel its warmth primarily due to which mode of heat transfer?",medium,Mathematics,211.0,"Measures of Central Tendency (Mean, Median, Mode)",211.0,,
+975,2-SKIM_AND_CONFIRM,Choose the word that means the same as 'Mitigate'.,medium,Mathematics,211.0,"Measures of Central Tendency (Mean, Median, Mode)",211.0,,
+985,2-SKIM_AND_CONFIRM,The catalytic activity of many transition metals and their compounds is primarily attributed to:,medium,Chemistry,115.0,Isomerism in Organic Compounds,115.0,,
+180,2-SKIM_AND_CONFIRM,"When a debt is considered irrecoverable and written off, the entry to record this in the ledger is:",medium,Accounting,92.0,Double-Entry Principle,92.0,,
+778,2-SKIM_AND_CONFIRM,"A new partner, Chris, is admitted to an existing partnership by contributing cash of $50,000 and equipment valued at $30,000. The journal entry to record Chris's admission would include:",medium,Accounting,92.0,Double-Entry Principle,92.0,,
+104,2-SKIM_AND_CONFIRM,"To encourage root development in stem cuttings for vegetative propagation, which plant hormone is commonly applied, as it plays a significant role in cell elongation and root initiation?",medium,Biology,22.0,fertilization and development,22.0,,
+164,2-SKIM_AND_CONFIRM,During which phase of mitosis do sister chromatids separate and move to opposite poles of the cell?,medium,Biology,76.0,cell division,76.0,,
+197,2-SKIM_AND_CONFIRM,"In the photoelectric effect, increasing the intensity of incident light primarily causes an increase in:",hard,Physics,219.0,"Electric Current, Voltage and Resistance",219.0,,
+332,2-SKIM_AND_CONFIRM,A body is moving with uniform velocity. Which of the following graphs best represents its velocity-time relationship?,medium,Physics,213.0,"Distance, Displacement, Speed and Velocity",213.0,,
+333,2-SKIM_AND_CONFIRM,The area under a velocity-time graph represents which physical quantity?,medium,Physics,213.0,"Distance, Displacement, Speed and Velocity",213.0,,
+343,2-SKIM_AND_CONFIRM,What does the slope of a velocity-time (v-t) graph represent?,medium,Physics,213.0,"Distance, Displacement, Speed and Velocity",213.0,,
+352,2-SKIM_AND_CONFIRM,A velocity-time graph showing a straight line sloping downwards represents:,medium,Physics,213.0,"Distance, Displacement, Speed and Velocity",213.0,,
+497,2-SKIM_AND_CONFIRM,"Which philosopher is most closely associated with the development of Virtue Ethics, emphasising character and moral excellence rather than rules or consequences?",medium,Biology,22.0,fertilization and development,22.0,,
+509,2-SKIM_AND_CONFIRM,The Anopheles mosquito is a known vector for which of the following diseases?,easy,Mathematics,287.0,Vector Algebra,287.0,,
+518,2-SKIM_AND_CONFIRM,"A solution is prepared by dissolving sodium bicarbonate (NaHCO3) in water. Given Ka1 for H2CO3 = 4.3 × 10^-7 and Ka2 for H2CO3 = 5.6 × 10^-11, predict the approximate pH of the NaHCO3 solution.",hard,Chemistry,31.0,Hydro Carbon,31.0,,
+891,2-SKIM_AND_CONFIRM,"In poetry, the poet's deliberate choice of words and phrases to convey a specific meaning, tone, or style is referred to as what?",medium,Mathematics,211.0,"Measures of Central Tendency (Mean, Median, Mode)",211.0,,
+947,2-SKIM_AND_CONFIRM,"Which category of compounds is generally known for forming extremely complex and diverse molecular structures, including long chains, branched structures, and rings?",medium,Chemistry,115.0,Isomerism in Organic Compounds,115.0,,
+952,2-SKIM_AND_CONFIRM,"Catalysis plays a crucial role in both organic and inorganic chemistry. However, in industrial organic synthesis, catalysts are frequently employed to:",medium,Chemistry,115.0,Isomerism in Organic Compounds,115.0,,
+736,2-SKIM_AND_CONFIRM,"Some scholars argue that the increasing consumerization of politics, where citizens are treated more as consumers of political products (candidates, policies) rather than active participants, contributes to apathy by:",hard,Civic Education,36.0,Right And Duities Of A Citizen,36.0,,
+969,2-SKIM_AND_CONFIRM,Choose the word that is a synonym of 'Obligatory'.,medium,English Language,135.0,Word Meaning in Contex,135.0,,
+970,2-SKIM_AND_CONFIRM,Which word is an antonym of 'Profound'?,medium,English Language,135.0,Word Meaning in Contex,135.0,,
+976,2-SKIM_AND_CONFIRM,Which word is an antonym of 'Scrutinize'?,medium,English Language,135.0,Word Meaning in Contex,135.0,,
+981,2-SKIM_AND_CONFIRM,Choose the word that is a synonym of 'Candid'.,medium,English Language,135.0,Word Meaning in Contex,135.0,,
+982,2-SKIM_AND_CONFIRM,Which word is an antonym of 'Turbulent'?,medium,English Language,135.0,Word Meaning in Contex,135.0,,
+464,2-SKIM_AND_CONFIRM,A key function of political parties in a democracy is to...,easy,Government,223.0,Democracy and Forms of Government,223.0,,
+726,2-SKIM_AND_CONFIRM,"In a well-established democracy, a sustained period of high political apathy among the electorate is most likely to contribute to which of the following outcomes?",hard,Government,223.0,Democracy and Forms of Government,223.0,,
+827,2-SKIM_AND_CONFIRM,"A system of governance where supreme power is vested in the people and exercised by them directly or indirectly through a system of representation, usually involving periodically held free elections, is known as a/an:",medium,Government,221.0,"Power, Authority, and Legitimacy",221.0,,
+833,2-SKIM_AND_CONFIRM,"In the context of governance, what is the primary role of a national constitution?",medium,Government,167.0,Functions and Features of a Constitution,167.0,,
+874,2-SKIM_AND_CONFIRM,"Which collection of essays was written by Alexander Hamilton, James Madison, and John Jay to persuade citizens to ratify the U.S. Constitution, arguing for a strong federal government?",medium,Government,223.0,Democracy and Forms of Government,223.0,,
+962,2-SKIM_AND_CONFIRM,In which type of wave do the particles of the medium oscillate perpendicular to the direction of wave propagation?,medium,Agricultural Science,99.0,Methods of Crop Propagation,99.0,,
+62,2-SKIM_AND_CONFIRM,"During endochondral ossification, the primary ossification center typically forms in which region of the hyaline cartilage model?",hard,Mathematics,291.0,Indices and Standard Form,291.0,,
+511,3-PICK_FROM_SUBJECT,Which process is primarily responsible for returning carbon dioxide to the atmosphere in the carbon cycle?,easy,Biology,,,18.0,,
+410,3-PICK_FROM_SUBJECT,The fundamental accounting equation for a sole proprietorship is:,easy,Mathematics,,,92.0,,predicted_subject was Mathematics; content is Accounting (fundamental accounting equation). Corrected subject to Accounting; Double-Entry Principle is closest subtopic
+824,3-PICK_FROM_SUBJECT,What is the primary purpose of governance in a society?,medium,Government,,,221.0,,"'Good governance' concept not explicitly covered by Government subtopic list; closest is Power, Authority, and Legitimacy"
+825,3-PICK_FROM_SUBJECT,Which principle of good governance ensures that public officials are held responsible for their decisions and actions?,medium,Government,,,221.0,,"'Good governance' concept not explicitly covered by Government subtopic list; closest is Power, Authority, and Legitimacy"
+832,3-PICK_FROM_SUBJECT,What is a primary benefit of strong local governance?,medium,Government,,,221.0,,"'Good governance' concept not explicitly covered by Government subtopic list; closest is Power, Authority, and Legitimacy"
+228,3-PICK_FROM_SUBJECT,"What is the literary term for the general atmosphere or feeling created by the setting, imagery, and author's style in a literary work?",medium,Biology,,,258.0,,predicted_subject was Biology; content is Literature in English (literary term 'mood'). Corrected subject+subtopic to Tone & Mood
+892,3-PICK_FROM_SUBJECT,A poem with the rhyme scheme ABAB CDCD EFEF GG is characteristic of which traditional poetic form?,medium,English Language,,,256.0,,predicted_subject was English Language; content is Literature in English (sonnet rhyme scheme). Corrected subject+subtopic to Poetic Devices
+192,3-PICK_FROM_SUBJECT,"A ray of light passes from air into a glass block with a refractive index of 1.5. If the angle of incidence is 30°, what is the angle of refraction? (sin 30° = 0.5, sin 19.5° ≈ 0.33)",medium,Mathematics,,,224.0,,predicted_subject was Mathematics; content is Physics (refraction of light calculation). Corrected subject+subtopic to Refraction of Light
+303,3-PICK_FROM_SUBJECT,"According to the accrual concept, expenses are recognized:",medium,Accounting,,,,,"Depreciation/accrual concept not covered by Accounting subtopic list (closest topic is Final Accounts, but no exact match)"
+105,3-PICK_FROM_SUBJECT,"From an agricultural perspective, what is the primary advantage of seed dormancy in many crop species?",medium,Biology,,,99.0,,"predicted_subject was Biology; content is Agricultural Science (seed dormancy). Corrected subject to Agricultural Science, closest subtopic Methods of Crop Propagation"
+157,3-PICK_FROM_SUBJECT,The enzyme responsible for the initial digestion of protein in the human stomach is called:,medium,Biology,,,,,Human digestive enzymes (pepsin) not covered by Biology subtopic list
+170,3-PICK_FROM_SUBJECT,The ability of living organisms to maintain a stable internal environment despite changes in external conditions is known as:,medium,Biology,,,,,Homeostasis concept not covered by Biology subtopic list
+253,3-PICK_FROM_SUBJECT,Funds obtained from the sale of shares to the general public are known as,medium,Biology,,,64.0,,predicted_subject was Biology; content is Commerce (share capital). Corrected subject+subtopic to Limited Liability Companies And cooperatives
+283,3-PICK_FROM_SUBJECT,The end products of aerobic respiration in animals are:,easy,Biology,,,,,End products of aerobic respiration not covered by Biology subtopic list
+325,3-PICK_FROM_SUBJECT,"In the IELTS Listening test, how does the difficulty generally progress through the four sections?",medium,Biology,,,,,"IELTS test-specific content, not part of this curriculum's subject list"
+366,3-PICK_FROM_SUBJECT,A key characteristic of all living organisms is their ability to maintain a stable internal environment despite external changes. This process is known as:,medium,Biology,,,,,Homeostasis concept not covered by Biology subtopic list
+379,3-PICK_FROM_SUBJECT,The increase in size and complexity of an organism over time is best described as:,medium,Biology,,,,,'Growth' as a basic characteristic of life not covered by Biology subtopic list
+390,3-PICK_FROM_SUBJECT,The study of how organisms interact with each other and their environment is known as:,medium,Biology,,,18.0,,
+393,3-PICK_FROM_SUBJECT,"When your body temperature rises, you sweat to cool down, and when it drops, you shiver to generate heat. This is an example of:",medium,Biology,,,,,Homeostasis concept not covered by Biology subtopic list
+498,3-PICK_FROM_SUBJECT,Which two sacraments are generally recognised by most Protestant denominations as being instituted by Christ?,medium,Biology,,,,,"predicted_subject was Biology; content is CRS (Christian sacraments), but no matching CRS subtopic exists"
+508,3-PICK_FROM_SUBJECT,Which enzyme is responsible for the initial digestion of starch in the human mouth?,easy,Biology,,,,,Human digestive enzymes (amylase) not covered by Biology subtopic list
+908,3-PICK_FROM_SUBJECT,"Which organelle is involved in the modification, sorting, and packaging of proteins and lipids for secretion or delivery to other organelles?",medium,Biology,,,,,Golgi apparatus function - not covered by Biology subtopic list (only mitochondria and nucleus are listed organelles)
+924,3-PICK_FROM_SUBJECT,What is the fundamental unit of structure and function in all known living organisms?,medium,Biology,,,,,General 'cell theory' concept not covered by Biology subtopic list (only cell division and specific organelles are listed)
+926,3-PICK_FROM_SUBJECT,The process by which living organisms produce new individuals of their own kind is called:,medium,Biology,,,,,General definition of reproduction given; cannot confidently choose between Asexual and Sexual Reproduction subtopics without more context
+935,3-PICK_FROM_SUBJECT,Which of the following is NOT considered a basic need for most living organisms?,medium,Biology,,,,,Basic 'characteristics of living things' concept not covered by Biology subtopic list
+938,3-PICK_FROM_SUBJECT,A unifying characteristic that distinguishes living organisms from non-living matter is their ability to:,medium,Biology,,,,,Basic 'characteristics of living things' concept not covered by Biology subtopic list
+1,3-PICK_FROM_SUBJECT,What is the correct IUPAC name for the compound CH3CH(CH3)CH2CH3?,medium,Chemistry,,,116.0,,
+72,3-PICK_FROM_SUBJECT,Which large foramen at the base of the occipital bone transmits the spinal cord as it exits the cranial cavity?,hard,Chemistry,,,,,"predicted_subject was Chemistry; content is human anatomy (occipital bone/foramen magnum), not covered by any subject's subtopic list"
+108,3-PICK_FROM_SUBJECT,The physiological process in plants where flowering and other developmental stages are triggered by the relative lengths of day and night is called:,medium,Biology,,,,photoperiodism - no matching subtopic exists,Photoperiodism not covered by Biology subtopic list
+201,3-PICK_FROM_SUBJECT,Convert the binary number 10111_2 to base 10.,easy,Chemistry,,,,,"predicted_subject was Chemistry; content is Data Processing (binary-to-decimal conversion), but no matching Data Processing subtopic exists (number systems not covered)"
+273,3-PICK_FROM_SUBJECT,Which of these polymers is a natural polymer?,easy,Chemistry,,,31.0,,Low confidence: natural vs synthetic polymers not explicitly covered; Hydro Carbon is closest general organic chemistry subtopic
+275,3-PICK_FROM_SUBJECT,"In the contact process for the manufacture of H₂SO₄, the catalyst used is:",medium,Chemistry,,,,,Industrial contact process (H2SO4 manufacture) not covered by Chemistry subtopic list
+290,3-PICK_FROM_SUBJECT,The two strands of a DNA molecule are held together by:,medium,Chemistry,,,80.0,,predicted_subject was Chemistry; content is Biology (DNA structure/base pairing). Corrected subject+subtopic to DNA
+439,3-PICK_FROM_SUBJECT,"For a body to be in stable equilibrium, its center of gravity must be:",medium,Physics,,,,stable equilibrium/center of gravity - no exact subtopic,Stable equilibrium/center of gravity not covered by Physics subtopic list
+510,3-PICK_FROM_SUBJECT,Which of the following nitrogenous bases is NOT found in a DNA molecule?,easy,Chemistry,,,80.0,,predicted_subject was Chemistry; content is Biology (DNA nitrogenous bases). Corrected subject+subtopic to DNA
+514,3-PICK_FROM_SUBJECT,The movement of water molecules across a selectively permeable membrane from a region of higher water concentration to a region of lower water concentration is called:,medium,Chemistry,,,15.0,,predicted_subject was Chemistry; content is Biology (osmosis). Corrected subject to Biology; Transport in plant is closest available subtopic
+609,3-PICK_FROM_SUBJECT,A characteristic property of a base is that it:,easy,Chemistry,,,5.0,,
+663,3-PICK_FROM_SUBJECT,Which of the following is the reason why CCl4  is a non-polar molecule?,easy,Chemistry,,,111.0,,
+685,3-PICK_FROM_SUBJECT,"In the Gospel of Matthew, which prophet foretold that a virgin would conceive and bear a son?",easy,CRS,,,,,Prophecy/nativity content (Isaiah foretelling virgin birth) not covered by CRS subtopic list
+708,3-PICK_FROM_SUBJECT,Convert 10110₂ to base ten.,medium,Chemistry,,,,,"predicted_subject was Chemistry; content is Data Processing (binary-to-decimal conversion), but no matching Data Processing subtopic exists (number systems not covered)"
+741,3-PICK_FROM_SUBJECT,A country imposes a requirement that a certain percentage of the components used in the production of cars sold within its borders must be manufactured domestically. This trade policy is known as a:,hard,Mathematics,,,123.0,,predicted_subject was Mathematics; content is Economics (local content trade requirement). Corrected subject+subtopic to Trade Restrictions And Exchange Rate
+41,3-PICK_FROM_SUBJECT,"The Law of Diminishing Marginal Utility states that as an individual consumes more units of a good per unit of time, the additional satisfaction derived from each successive unit:",medium,Economics,,,126.0,,Marginal utility theory not explicitly covered by Economics subtopic list; closest is Demand And Supply
+42,3-PICK_FROM_SUBJECT,"When marginal utility is positive but diminishing, total utility is:",medium,Economics,,,126.0,,Marginal utility theory not explicitly covered by Economics subtopic list; closest is Demand And Supply
+43,3-PICK_FROM_SUBJECT,Total utility reaches its maximum point when marginal utility is:,medium,Economics,,,126.0,,Marginal utility theory not explicitly covered by Economics subtopic list; closest is Demand And Supply
+44,3-PICK_FROM_SUBJECT,Which of the following is a key assumption for the Law of Diminishing Marginal Utility to hold true?,medium,Economics,,,126.0,,Marginal utility theory not explicitly covered by Economics subtopic list; closest is Demand And Supply
+46,3-PICK_FROM_SUBJECT,"If an individual consumes a unit of a good for which marginal utility is negative, what will happen to their total utility?",medium,Economics,,,126.0,,Marginal utility theory not explicitly covered by Economics subtopic list; closest is Demand And Supply
+48,3-PICK_FROM_SUBJECT,Marginal utility refers to the:,medium,Economics,,,126.0,,Marginal utility theory not explicitly covered by Economics subtopic list; closest is Demand And Supply
+49,3-PICK_FROM_SUBJECT,"If graphed, the marginal utility curve for most goods typically:",medium,Economics,,,126.0,,Marginal utility theory not explicitly covered by Economics subtopic list; closest is Demand And Supply
+50,3-PICK_FROM_SUBJECT,Utility in economics is a measure of:,medium,Economics,,,126.0,utility in economics - subject only,Marginal utility/utility theory not explicitly covered by Economics subtopic list; closest is Demand And Supply
+51,3-PICK_FROM_SUBJECT,"According to the Law of Diminishing Marginal Utility, a rational consumer will continue to consume a good as long as its marginal utility is:",medium,Economics,,,126.0,,Marginal utility theory not explicitly covered by Economics subtopic list; closest is Demand And Supply
+52,3-PICK_FROM_SUBJECT,The Law of Diminishing Marginal Utility is generally considered:,medium,Biology,,,126.0,,"predicted_subject was Biology; content is Economics (marginal utility). Corrected subject to Economics; marginal utility theory not explicitly covered, closest is Demand And Supply"
+53,3-PICK_FROM_SUBJECT,"Consider a situation where a person is extremely thirsty and drinks several glasses of water. The first glass provides immense satisfaction, the second less, and by the fifth, they feel completely satisfied. What happens to the marginal utility of the sixth glass of water?",medium,Economics,,,126.0,,Marginal utility theory not explicitly covered by Economics subtopic list; closest is Demand And Supply
+54,3-PICK_FROM_SUBJECT,The concept of diminishing marginal utility helps explain why consumers are generally willing to pay _____ for initial units of a product and _____ for subsequent units.,medium,Biology,,,126.0,,"predicted_subject was Biology; content is Economics (marginal utility). Corrected subject to Economics; marginal utility theory not explicitly covered, closest is Demand And Supply"
+55,3-PICK_FROM_SUBJECT,Which of the following is NOT an implication of the Law of Diminishing Marginal Utility?,medium,Economics,,,126.0,,Marginal utility theory not explicitly covered by Economics subtopic list; closest is Demand And Supply
+56,3-PICK_FROM_SUBJECT,"If a consumer prefers variety and finds that consuming the same good repeatedly decreases their enjoyment quickly, this is consistent with:",medium,Economics,,,126.0,diminishing marginal utility - subject only,Marginal utility/utility theory not explicitly covered by Economics subtopic list; closest is Demand And Supply
+57,3-PICK_FROM_SUBJECT,The Law of Diminishing Marginal Utility implies that the value a consumer places on an extra unit of a good is inversely related to the:,medium,Economics,,,126.0,,Marginal utility theory not explicitly covered by Economics subtopic list; closest is Demand And Supply
+59,3-PICK_FROM_SUBJECT,What happens to the total utility when marginal utility is zero?,medium,Economics,,,126.0,,Marginal utility theory not explicitly covered by Economics subtopic list; closest is Demand And Supply
+60,3-PICK_FROM_SUBJECT,"If a marginal utility curve eventually falls below the x-axis, it indicates that:",medium,Economics,,,126.0,,Marginal utility theory not explicitly covered by Economics subtopic list; closest is Demand And Supply
+756,3-PICK_FROM_SUBJECT,The law of diminishing marginal utility states that:,medium,Economics,,,126.0,,Marginal utility theory not explicitly covered by Economics subtopic list; closest is Demand And Supply
+367,3-PICK_FROM_SUBJECT,Which level of organization represents the fundamental unit of life?,medium,Biology,,,,fundamental unit of life - subject only,"Basic Biology/physiology concept (kidney function, virus classification, water properties, cell theory) not covered by Biology subtopic list"
+382,3-PICK_FROM_SUBJECT,"Water is crucial for life due to its unique properties, including its ability to dissolve many substances. This property is known as:",medium,Biology,,,,water properties/solvent - subject only,"Basic Biology/physiology concept (kidney function, virus classification, water properties, cell theory) not covered by Biology subtopic list"
+383,3-PICK_FROM_SUBJECT,Viruses are often considered to be at the edge of life because they:,medium,Biology,,,,virus edge-of-life question - subject only,"Basic Biology/physiology concept (kidney function, virus classification, water properties, cell theory) not covered by Biology subtopic list"
+218,3-PICK_FROM_SUBJECT,"A 14-line poem, typically written in iambic pentameter, with a specific rhyme scheme, is called a:",medium,English Language,,,256.0,,predicted_subject was English Language; content is Literature in English (sonnet definition). Corrected subject+subtopic to Poetic Devices
+444,3-PICK_FROM_SUBJECT,"A sonnet is a lyric poem consisting of fourteen lines, usually written in iambic pentameter, with a particular rhyme scheme. Which of the following is NOT a typical form of a sonnet?",medium,English Language,,,256.0,,predicted_subject was English Language; content is Literature in English (sonnet forms). Corrected subject+subtopic to Poetic Devices
+838,3-PICK_FROM_SUBJECT,"While faith is essential, what role do 'good works' play in Christian living, according to many Christian traditions?",medium,CRS,,,,faith and works - subject only,Christian doctrine of faith and works not covered by CRS subtopic list
+887,3-PICK_FROM_SUBJECT,"Which type of poetry is characterized by its lack of a consistent meter, rhyme scheme, or any regular musical pattern, relying instead on natural speech rhythms?",medium,English Language,,,256.0,,predicted_subject was English Language; content is Literature in English (free verse). Corrected subject+subtopic to Poetic Devices
+11,3-PICK_FROM_SUBJECT,Simplify $\sqrt{43 - 12\sqrt{7}}$.,hard,Mathematics,,,291.0,,Surd/radical simplification; classified under Indices and Standard Form (Number and Numeration)
+14,3-PICK_FROM_SUBJECT,Solve the equation $\sqrt{x+5} + \sqrt{x} = 5$ for $x$.,hard,Mathematics,,,291.0,,Surd/radical simplification; classified under Indices and Standard Form (Number and Numeration)
+17,3-PICK_FROM_SUBJECT,Simplify the expression $\frac{(\sqrt{7}+1)^2}{3-\sqrt{7}}$.,hard,Mathematics,,,291.0,,Surd/radical simplification; classified under Indices and Standard Form (Number and Numeration)
+19,3-PICK_FROM_SUBJECT,Simplify $\sqrt{12+6\sqrt{3}}$.,hard,Mathematics,,,291.0,,Surd/radical simplification; classified under Indices and Standard Form (Number and Numeration)
+21,3-PICK_FROM_SUBJECT,Simplify $(\sqrt{6}+\sqrt{2})(\sqrt{18}-2\sqrt{2})$.,hard,Mathematics,,,291.0,,Surd/radical simplification; classified under Indices and Standard Form (Number and Numeration)
+23,3-PICK_FROM_SUBJECT,Simplify $\sqrt[4]{1024}$.,hard,Mathematics,,,291.0,,Surd/radical simplification; classified under Indices and Standard Form (Number and Numeration)
+25,3-PICK_FROM_SUBJECT,Simplify $\sqrt{8+\sqrt{60}}$.,hard,Mathematics,,,291.0,,Surd/radical simplification; classified under Indices and Standard Form (Number and Numeration)
+27,3-PICK_FROM_SUBJECT,Solve the equation $\sqrt{x+1}-\sqrt{x-1}=1$.,hard,Mathematics,,,291.0,,Surd/radical simplification; classified under Indices and Standard Form (Number and Numeration)
+28,3-PICK_FROM_SUBJECT,Simplify $\frac{1+\sqrt{2}-\sqrt{3}}{1+\sqrt{2}+\sqrt{3}}$.,hard,Mathematics,,,291.0,,Surd/radical simplification; classified under Indices and Standard Form (Number and Numeration)
+32,3-PICK_FROM_SUBJECT,Simplify the expression: \( \sqrt{14 - 6\sqrt{5}} \),hard,Mathematics,,,291.0,,Surd/radical simplification; classified under Indices and Standard Form (Number and Numeration)
+33,3-PICK_FROM_SUBJECT,Solve the equation: \( \sqrt{x+3} + \sqrt{x-2} = 5 \),hard,Mathematics,,,291.0,,Surd/radical simplification; classified under Indices and Standard Form (Number and Numeration)
+36,3-PICK_FROM_SUBJECT,Simplify \( \sqrt[3]{26 + 15\sqrt{3}} \).,hard,Mathematics,,,291.0,,Surd/radical simplification; classified under Indices and Standard Form (Number and Numeration)
+39,3-PICK_FROM_SUBJECT,Simplify \( \sqrt{10 + 2\sqrt{6} + 2\sqrt{10} + 2\sqrt{15}} \).,hard,Mathematics,,,291.0,,Surd/radical simplification; classified under Indices and Standard Form (Number and Numeration)
+71,3-PICK_FROM_SUBJECT,"What is the primary organic component of the bone matrix, responsible for providing its significant tensile strength and flexibility?",hard,Mathematics,,,,,"predicted_subject was Mathematics; content is human anatomy (bone matrix/collagen), not covered by Biology or any subject's subtopic list"
+202,3-PICK_FROM_SUBJECT,Simplify: (81^(1/4)) * (64^(1/3)).,easy,Mathematics,,,209.0,,
+214,3-PICK_FROM_SUBJECT,"A bag contains 5 red balls and 3 blue balls. If a ball is selected at random, what is the probability that it is blue?",easy,Mathematics,,,,,Probability questions - no Probability subtopic exists in Mathematics subtopic list (Statistics only covers central tendency/dispersion)
+292,3-PICK_FROM_SUBJECT,The fundamental accounting equation is best represented as:,easy,Mathematics,,,92.0,,predicted_subject was Mathematics; content is Accounting (fundamental accounting equation). Corrected subject to Accounting; Double-Entry Principle is closest subtopic
+306,3-PICK_FROM_SUBJECT,Simplify $\sqrt{72}$.,medium,Mathematics,,,291.0,,Surd/radical simplification; classified under Indices and Standard Form (Number and Numeration)
+307,3-PICK_FROM_SUBJECT,Simplify $3\sqrt{20} + \sqrt{45}$.,medium,Mathematics,,,291.0,,Surd/radical simplification; classified under Indices and Standard Form (Number and Numeration)
+310,3-PICK_FROM_SUBJECT,Simplify $2\sqrt{3} ( \sqrt{3} + \sqrt{27} )$.,medium,Mathematics,,,291.0,,Surd/radical simplification; classified under Indices and Standard Form (Number and Numeration)
+313,3-PICK_FROM_SUBJECT,Expand and simplify $(3 + \sqrt{2})^2$.,medium,Mathematics,,,291.0,,Surd/radical simplification; classified under Indices and Standard Form (Number and Numeration)
+314,3-PICK_FROM_SUBJECT,Simplify $\frac{12}{\sqrt{18}}$.,medium,Mathematics,,,291.0,,Surd/radical simplification; classified under Indices and Standard Form (Number and Numeration)
+357,3-PICK_FROM_SUBJECT,Expand and simplify the expression: (2x + 3)(x - 4),medium,Mathematics,,,197.0,,General algebraic simplification/expansion; Linear Equations and Inequalities is closest available subtopic
+360,3-PICK_FROM_SUBJECT,Find the solutions for the equation: x² - 5x = 14,medium,Mathematics,,,199.0,,
+364,3-PICK_FROM_SUBJECT,Simplify the expression: (x³y²)⁴,medium,Mathematics,,,209.0,,
+365,3-PICK_FROM_SUBJECT,Simplify the rational expression: (4x - 8) / (x - 2),medium,Mathematics,,,197.0,,General algebraic simplification/expansion; Linear Equations and Inequalities is closest available subtopic
+553,3-PICK_FROM_SUBJECT,Simplify: 5x+3x−2x,easy,Mathematics,,,197.0,,General algebraic simplification/expansion; Linear Equations and Inequalities is closest available subtopic
+620,3-PICK_FROM_SUBJECT,Differentiate y = (2x - 3)^5 with respect to x.,easy,Mathematics,,,274.0,,
+621,3-PICK_FROM_SUBJECT,Find dy/dx if y = sin(4x).,easy,Mathematics,,,274.0,,
+622,3-PICK_FROM_SUBJECT,Differentiate y = x^2 cos(x) with respect to x.,medium,Mathematics,,,274.0,,
+627,3-PICK_FROM_SUBJECT,Evaluate ∫ cos(5x) dx.,easy,Mathematics,,,275.0,,Low confidence: basic indefinite integral; 'Applications of Integration' is closest available subtopic to a plain integration subtopic
+630,3-PICK_FROM_SUBJECT,Differentiate y = e^(3x) with respect to x.,easy,Mathematics,,,274.0,,
+683,3-PICK_FROM_SUBJECT,Simplify: 4x + 3x,medium,Mathematics,,,197.0,,General algebraic simplification/expansion; Linear Equations and Inequalities is closest available subtopic
+805,3-PICK_FROM_SUBJECT,"A continuous random variable X has a probability density function f(x) = (1/2)x for 0 ≤ x ≤ 2, and f(x) = 0 otherwise. What is the probability P(X > 1)?",medium,Mathematics,,,,,Probability questions - no Probability subtopic exists in Mathematics subtopic list (Statistics only covers central tendency/dispersion)
+807,3-PICK_FROM_SUBJECT,"For the probability density function f(x) = (1/2)x for 0 ≤ x ≤ 2, and f(x) = 0 otherwise, what is the expected value E[X]?",medium,Mathematics,,,,,Probability questions - no Probability subtopic exists in Mathematics subtopic list (Statistics only covers central tendency/dispersion)
+895,3-PICK_FROM_SUBJECT,Simplify the expression: 5x + 3y - 2x + 7y,medium,Mathematics,,,197.0,,General algebraic simplification/expansion; Linear Equations and Inequalities is closest available subtopic
+896,3-PICK_FROM_SUBJECT,Simplify: (x^3 * y^2)^2,medium,Mathematics,,,209.0,,
+901,3-PICK_FROM_SUBJECT,Which of the following is a solution to the equation x^2 - 4x + 3 = 0?,medium,Mathematics,,,199.0,,
+903,3-PICK_FROM_SUBJECT,Simplify the expression: √72,medium,Mathematics,,,291.0,,Surd/radical simplification; classified under Indices and Standard Form (Number and Numeration)
+1017,3-PICK_FROM_SUBJECT,Differentiate $f(x) = (3x^2 - 4x + 1)^5$.,medium,Mathematics,,,274.0,,
+1018,3-PICK_FROM_SUBJECT,What is the derivative of $f(x) = \sin(2x)$?,medium,Mathematics,,,274.0,,
+1020,3-PICK_FROM_SUBJECT,Differentiate $f(x) = \ln(5x+2)$.,medium,Mathematics,,,274.0,,
+1024,3-PICK_FROM_SUBJECT,Find the derivative of $f(x) = x \cos(3x)$.,medium,Mathematics,,,274.0,,
+1025,3-PICK_FROM_SUBJECT,What is the derivative of $f(x) = \tan(x)$?,medium,Mathematics,,,274.0,,
+1028,3-PICK_FROM_SUBJECT,Differentiate $y = e^{\sin(x)}$.,medium,Mathematics,,,274.0,,
+1033,3-PICK_FROM_SUBJECT,Simplify the expression: (x^3 * y^-2)^2 / x^2,medium,Mathematics,,,209.0,,
+1037,3-PICK_FROM_SUBJECT,What is the domain of the function f(x) = (x + 3) / (x - 4)?,medium,Mathematics,,,295.0,domain of a function - subject only,"Domain of a function - closest Mathematics subtopic is Graphs of Linear and Quadratic Functions, low confidence"
+1038,3-PICK_FROM_SUBJECT,Solve the equation: x^2 - 6x + 8 = 0,medium,Mathematics,,,199.0,,
+1040,3-PICK_FROM_SUBJECT,Simplify: (5x^2 - 3x + 2) - (2x^2 + 4x - 7),medium,Mathematics,,,197.0,,General algebraic simplification/expansion; Linear Equations and Inequalities is closest available subtopic
+1041,3-PICK_FROM_SUBJECT,Expand and simplify: (2x - 3)(x + 5),medium,Mathematics,,,197.0,,General algebraic simplification/expansion; Linear Equations and Inequalities is closest available subtopic
+1044,3-PICK_FROM_SUBJECT,What is the slope of the line represented by the equation 3x + 4y = 12?,medium,Mathematics,,,288.0,,
+115,3-PICK_FROM_SUBJECT,"A block of wood floats on water such that 80% of its volume is submerged. If the density of water is 1000 kg/m³, what is the density of the wood?",medium,Physics,,,,,Floatation/density (Archimedes' principle) not covered by Physics subtopic list
+117,3-PICK_FROM_SUBJECT,Which type of radiation has the highest penetrating power?,easy,Physics,,,,radiation penetrating power - subject only,"Radioactivity/nuclear physics (isotopes, half-life, penetrating power) not covered by Physics subtopic list"
+120,3-PICK_FROM_SUBJECT,A fixed mass of gas at constant temperature has its pressure doubled. What happens to its volume?,medium,Physics,,,,,Gas laws (Boyle's/pressure-temperature) not covered by Physics subtopic list
+122,3-PICK_FROM_SUBJECT,"A simple pendulum of length L has a period T. If the length of the pendulum is doubled, its new period will be:",medium,Physics,,,,pendulum period - subject only,Simple harmonic motion/pendulum not covered by Physics subtopic list
+123,3-PICK_FROM_SUBJECT,An object is placed at the principal focus of a concave mirror. The image formed will be:,hard,Physics,,,222.0,,
+195,3-PICK_FROM_SUBJECT,"According to Faraday's Law of Electromagnetic Induction, the magnitude of the induced electromotive force (EMF) in a circuit is directly proportional to:",medium,Physics,,,,,Electromagnetic induction (Faraday's Law) not covered by Physics subtopic list
+196,3-PICK_FROM_SUBJECT,"The half-life of a radioactive isotope is 10 days. If a sample initially contains 80 g of the isotope, how much will remain after 30 days?",medium,Physics,,,,half-life decay - subject only,"Radioactivity/nuclear physics (isotopes, half-life, penetrating power) not covered by Physics subtopic list"
+199,3-PICK_FROM_SUBJECT,"A block of wood floats in water with 60% of its volume submerged. If the density of water is 1000 kg/m³, what is the density of the wood?",hard,Physics,,,,,Floatation/density (Archimedes' principle) not covered by Physics subtopic list
+271,3-PICK_FROM_SUBJECT,Which gas is commonly used in filling balloons and airships because of its low density and non-flammability?,easy,Chemistry,,,,gas for balloons - subject only,Gas laws / separation techniques not covered by Chemistry subtopic list (same gap identified in Physics gas-law questions)
+414,3-PICK_FROM_SUBJECT,"An ideal gas initially at a pressure P, volume V, and temperature T is compressed isothermally to half its original volume. What is its new pressure?",easy,Physics,,,,,Gas laws (Boyle's/pressure-temperature) not covered by Physics subtopic list
+421,3-PICK_FROM_SUBJECT,"A radioactive isotope has a half-life of 6 hours. If a sample initially contains 80 g of the isotope, how much will remain after 18 hours?",medium,Physics,,,,half-life decay - subject only,"Radioactivity/nuclear physics (isotopes, half-life, penetrating power) not covered by Physics subtopic list"
+431,3-PICK_FROM_SUBJECT,Two forces of 3 N and 4 N act at right angles to each other. What is the magnitude of their resultant force?,medium,Physics,,,215.0,,Low confidence: resultant of forces (vector addition); Newton's Laws of Motion is closest available Force subtopic
+432,3-PICK_FROM_SUBJECT,Which type of radiation has the highest penetrating power?,easy,Physics,,,,radiation penetrating power - subject only,"Radioactivity/nuclear physics (isotopes, half-life, penetrating power) not covered by Physics subtopic list"
+437,3-PICK_FROM_SUBJECT,A force of 100 N acts on an area of 0.5 m². Calculate the pressure exerted.,easy,Physics,,,,,Pressure (force/area) not covered by Physics subtopic list
+465,3-PICK_FROM_SUBJECT,Which of the following is an example of an associational pressure group?,medium,Physics,,,,,"predicted_subject was Physics; content is about political pressure groups (Government/Civic Education topic), but no matching subtopic exists in either subject's list"
+482,3-PICK_FROM_SUBJECT,A tactic commonly employed by pressure groups to influence government policy by directly contacting policymakers is known as...,hard,Physics,,,,,"predicted_subject was Physics; content is about political pressure groups (Government/Civic Education topic), but no matching subtopic exists in either subject's list"
+686,3-PICK_FROM_SUBJECT,The SI unit of force is:,medium,Physics,,,215.0,,Low confidence: SI unit of force; Newton's Laws of Motion is closest available Force subtopic
+710,3-PICK_FROM_SUBJECT,A gas of volume 400 cm³ at 27°C is heated at a constant pressure to a temperature of 45°C. What is its new volume?,medium,Physics,,,,,Gas laws (Boyle's/pressure-temperature) not covered by Physics subtopic list
+798,3-PICK_FROM_SUBJECT,Which of the following is typically considered a force in a company's *macroenvironment*?,medium,Physics,,,186.0,,predicted_subject was Physics; content is Marketing (macroenvironment/marketing environment approach). Corrected subject to Marketing; Marketing Concepts and Consumer Needs is closest subtopic
+799,3-PICK_FROM_SUBJECT,A company that takes aggressive actions to affect the forces in its marketing environment rather than simply watching and reacting to them is exhibiting which approach?,medium,Physics,,,186.0,,predicted_subject was Physics; content is Marketing (macroenvironment/marketing environment approach). Corrected subject to Marketing; Marketing Concepts and Consumer Needs is closest subtopic
+957,3-PICK_FROM_SUBJECT,"An ideal gas is contained in a rigid, sealed container. If the absolute temperature of the gas is doubled, what happens to its pressure?",medium,Physics,,,,,Gas laws (Boyle's/pressure-temperature) not covered by Physics subtopic list
+968,3-PICK_FROM_SUBJECT,"A police car's siren emits a constant frequency. As the police car approaches a stationary observer, the observer hears a siren with a:",medium,Physics,,,305.0,,
+988,3-PICK_FROM_SUBJECT,Which isotope of hydrogen is radioactive and used in radiolabelling experiments?,medium,Physics,,,,radioactive hydrogen isotope - subject only,"Radioactivity/nuclear physics (isotopes, half-life, penetrating power) not covered by Physics subtopic list"
+732,3-PICK_FROM_SUBJECT,The 'bystander effect' can be considered a psychological parallel to which explanation for political apathy?,hard,Psychology,,,327.0,,Only one Psychology subtopic exists in the entire reference list; forced assignment despite closer topical overlap with Civic Education (political apathy)
+711,3-PICK_FROM_SUBJECT,"Kini itumo owe yii: ""Agba ti ko ni eran ninu obe re, a maa n sọrọ ni iworoworo""?",medium,Yoruba,,,311.0,Yoruba proverb - subject only,Yoruba proverb (òwe) - classified as Oral Literature
+45,3-PICK_FROM_SUBJECT,"Sarah enjoys eating chocolate bars. The first bar gives her immense pleasure. The second bar is still good, but less satisfying than the first. The third bar gives her only a little extra pleasure. This scenario best illustrates the:",medium,Economics,,,126.0,diminishing marginal utility scenario - subject only,Marginal utility/utility theory not explicitly covered by Economics subtopic list; closest is Demand And Supply
+79,3-PICK_FROM_SUBJECT,"During the process of bone fracture repair, the initial soft callus that forms is primarily composed of what type of tissue?",hard,Biology,,,,,predicted_subject was Biology; content is human anatomy/histology (bone fracture repair) not covered by any Biology subtopic
+135,3-PICK_FROM_SUBJECT,"""I will visit my aunt tomorrow,"" John said. Convert this to reported speech.",medium,English Language,,,130.0,reported speech - subject only,Reported speech (tense backshift) - closest English Language subtopic is Tenses
+144,3-PICK_FROM_SUBJECT,A wholesaler performs the function of 'breaking bulk' by:,medium,Commerce,,,52.0,wholesaler breaking bulk - subject only,Wholesaler function - closest Commerce subtopic is Home Trade And Foreign Trade
+151,3-PICK_FROM_SUBJECT,What is the main purpose of warehousing in commerce?,easy,Commerce,,,55.0,warehousing purpose - subject only,Warehousing - closest Commerce subtopic is Aid To Trade
+152,3-PICK_FROM_SUBJECT,A 'merger' occurs when:,hard,Commerce,,,64.0,merger definition - subject only,Merger - closest Commerce subtopic is Limited Liability Companies And cooperatives
+167,3-PICK_FROM_SUBJECT,The functional unit of the kidney responsible for filtering blood and producing urine is the:,medium,Biology,,,,nephron kidney function - subject only,"Basic Biology/physiology concept (kidney function, virus classification, water properties, cell theory) not covered by Biology subtopic list"
+188,3-PICK_FROM_SUBJECT,A pump lifts 200 kg of water through a vertical height of 10 m in 5 seconds. Calculate the power developed by the pump (take g = 10 m/s²).,medium,Physics,,,218.0,power of a pump - subject only,power of a pump - subject only
+190,3-PICK_FROM_SUBJECT,Which of the following statements correctly describes Boyle's Law?,easy,Chemistry,,,,Boyle's Law - subject only,Gas laws / separation techniques not covered by Chemistry subtopic list (same gap identified in Physics gas-law questions)
+219,3-PICK_FROM_SUBJECT,"When a story is told by a character who is also a participant in the events, using 'I' and 'me', it is employing which point of view?",medium,Literature in English,,,250.0,first-person point of view - subject only,"Point of view/narrative technique - closest Literature in English subtopic is Setting/Plot Structure, low confidence"
+241,3-PICK_FROM_SUBJECT,"He said, 'I will visit my aunt tomorrow.' Which of these is the correct reported speech?",medium,English Language,,,130.0,reported speech - subject only,Reported speech (tense backshift) - closest English Language subtopic is Tenses
+242,3-PICK_FROM_SUBJECT,The old woman was knocked down by a speeding car. Which of these is the active voice equivalent?,easy,English Language,,,143.0,active/passive voice - subject only,Active/passive voice transformation - closest English Language subtopic is Sentence Patterns and Construction
+246,3-PICK_FROM_SUBJECT,What is the primary function of commerce?,easy,Commerce,,,52.0,primary function of commerce - subject only,"General 'function of commerce' - closest available is Home Trade And Foreign Trade, low confidence"
+251,3-PICK_FROM_SUBJECT,A warehouse that stores goods on which customs duties have not yet been paid is called a,medium,Commerce,,,53.0,bonded warehouse - subject only,International trade documentation/customs - closest Commerce subtopic is Foreign Trade
+255,3-PICK_FROM_SUBJECT,A document issued by the carrier acknowledging receipt of goods for shipment and detailing their quantity and condition is a,hard,Commerce,,,53.0,bill of lading - subject only,International trade documentation/customs - closest Commerce subtopic is Foreign Trade
+259,3-PICK_FROM_SUBJECT,Which of the following is a function of a wholesaler to the manufacturer?,medium,Commerce,,,52.0,wholesaler function - subject only,Wholesaler function - closest Commerce subtopic is Home Trade And Foreign Trade
+265,3-PICK_FROM_SUBJECT,What is the oxidation state of sulfur in H₂SO₄?,easy,Chemistry,,,,,Oxidation state/redox concept not covered by Chemistry subtopic list
+267,3-PICK_FROM_SUBJECT,"According to the Kinetic Theory of Gases, which of the following statements is true for an ideal gas?",medium,Chemistry,,,,Kinetic Theory of Gases - subject only,Gas laws / separation techniques not covered by Chemistry subtopic list (same gap identified in Physics gas-law questions)
+270,3-PICK_FROM_SUBJECT,Which of the following methods is most suitable for separating a mixture of ethanol (boiling point 78°C) and water (boiling point 100°C)?,easy,Chemistry,,,,fractional distillation separation - subject only,Gas laws / separation techniques not covered by Chemistry subtopic list (same gap identified in Physics gas-law questions)
+284,3-PICK_FROM_SUBJECT,The primary function of the kidney in humans is to:,easy,Biology,,,,kidney function - subject only,"Basic Biology/physiology concept (kidney function, virus classification, water properties, cell theory) not covered by Biology subtopic list"
+301,3-PICK_FROM_SUBJECT,An amount owed by a customer that is considered irrecoverable is referred to as:,easy,Accounting,,,97.0,bad debt definition - subject only,"Bad debts adjustment - no exact Accounting subtopic; closest is Trading, Profit and Loss Account"
+320,3-PICK_FROM_SUBJECT,"What is the minimum word count for IELTS Academic Writing Task 2, and what percentage of the total writing score does it contribute?",medium,Mathematics,,,,,"IELTS test-specific content, not part of this curriculum's subject list"
+624,3-PICK_FROM_SUBJECT,Find the gradient of the curve y = x^3 - 2x + 1 at the point x = 2.,medium,Mathematics,,,274.0,,
+789,3-PICK_FROM_SUBJECT,"The concept of ""sovereignty"" for newly independent states primarily entails:",medium,Government,,,221.0,,
+819,3-PICK_FROM_SUBJECT,Ta ni ó ni iṣẹ́ àti kọ oríkì tí a lè wá tún ṣe 'Ayan Ogbufo' rẹ̀ lẹ́yìn náà?,medium,Yoruba,,,311.0,,
+177,3-PICK_FROM_SUBJECT,"A machine costing N50,000 has an estimated useful life of 5 years and a scrap value of N5,000. Using the straight-line method, the annual depreciation will be:",medium,Accounting,,,,,"Depreciation/accrual concept not covered by Accounting subtopic list (closest topic is Final Accounts, but no exact match)"
+299,3-PICK_FROM_SUBJECT,Which depreciation method results in a constant amount of depreciation expense being charged each year over the asset's useful life?,medium,Accounting,,,,,"Depreciation/accrual concept not covered by Accounting subtopic list (closest topic is Final Accounts, but no exact match)"
+401,3-PICK_FROM_SUBJECT,"A machine was purchased for N50,000 on 1st January 2022. Its useful life is 5 years and residual value is N5,000. Using the straight-line method, what is the depreciation for the year ended 31st December 2022?",medium,Accounting,,,,,"Depreciation/accrual concept not covered by Accounting subtopic list (closest topic is Final Accounts, but no exact match)"
+372,3-PICK_FROM_SUBJECT,The gradual change in the heritable characteristics of biological populations over successive generations is known as:,medium,Biology,,,21.0,,Best available match; general definition of evolution isn't a perfect fit for 'Evidence Of Evolution' but closest of the three evolution subtopics
+381,3-PICK_FROM_SUBJECT,Which of the following is NOT one of the generally recognized domains of life?,medium,Biology,,,,,Basic 'domains of life' classification concept not covered by Biology subtopic list
+475,3-PICK_FROM_SUBJECT,A constitution that is difficult to amend is generally referred to as a(n)...,medium,Biology,,,166.0,,predicted_subject was Biology; content is Government (rigid constitution). Corrected subject+subtopic to Types Of Constitution
+673,3-PICK_FROM_SUBJECT,Inflation refers to a general:,medium,Biology,,,125.0,,predicted_subject was Biology; content is Economics (inflation). Corrected subject+subtopic to Inflation And Unemployment
+740,3-PICK_FROM_SUBJECT,"A WTO member country grants a tariff reduction on a specific product to one of its trading partners. According to the foundational principles of the WTO, this reduction must generally be extended to all other WTO members. Which principle is being applied here?",hard,Biology,,,123.0,,predicted_subject was Biology; content is Economics (WTO/MFN trade principle). Corrected subject+subtopic to Trade Restrictions And Exchange Rate
+775,3-PICK_FROM_SUBJECT,"In the absence of a specific agreement, how are profits and losses shared among partners in a general partnership?",medium,Biology,,,63.0,,predicted_subject was Biology; content is Commerce (partnership profit sharing). Corrected subject+subtopic to Sole Proprietorship And Partnership
+840,3-PICK_FROM_SUBJECT,Why is participation in a Christian community (church) generally considered important for Christian living?,medium,Biology,,,,,"predicted_subject was Biology; content is CRS (importance of church community), but no matching CRS subtopic exists"
+925,3-PICK_FROM_SUBJECT,Which characteristic of living organisms involves obtaining and using energy to power life processes?,medium,Biology,,,,,Basic 'characteristics of living things' concept not covered by Biology subtopic list
+730,3-PICK_FROM_SUBJECT,"Recent research suggests that younger generations in established democracies exhibit different patterns of political engagement compared to older generations. While traditional forms of participation like voting may decline, engagement in non-traditional activism (e.g., online petitions, boycotts, social movements) may increase. This phenomenon is best described as:",hard,Biology,,,37.0,,predicted_subject was Biology; content is Civic Education (political engagement/apathy across generations). Corrected subject+subtopic to Features Of Democracy
+802,3-PICK_FROM_SUBJECT,"Legislation regulating business, increased emphasis on ethics, and social responsibility issues are characteristics of which macroenvironmental force?",medium,Physics,,,,,"predicted_subject was Physics; content is Marketing (macroenvironment/PESTLE forces), but no matching Marketing subtopic exists"
+850,3-PICK_FROM_SUBJECT,"In a relational database table, what is the main function of a primary key?",medium,Chemistry,,,136.0,,predicted_subject was Chemistry; content is Data Processing (database primary key). Corrected subject+subtopic to Computer Files and Database Models
+972,3-PICK_FROM_SUBJECT,Select the synonym for 'Ephemeral'.,medium,English Language,,,157.0,,
+991,3-PICK_FROM_SUBJECT,Which trend is generally observed for the atomic radii of alkali metals (Group 1) as one moves down the group?,medium,Biology,,,30.0,,predicted_subject was Biology; content is Chemistry (atomic radii of alkali metals). Corrected subject+subtopic to Periodic Properties Of Element
+828,3-PICK_FROM_SUBJECT,Active citizen participation in governance primarily helps to:,medium,Government,,,221.0,,"'Good governance' concept not explicitly covered by Government subtopic list; closest is Power, Authority, and Legitimacy"
+400,3-PICK_FROM_SUBJECT,Depreciation is charged on fixed assets to reflect their __________.,medium,Accounting,,,,,"Depreciation/accrual concept not covered by Accounting subtopic list (closest topic is Final Accounts, but no exact match)"
+973,3-PICK_FROM_SUBJECT,What is the antonym of 'Benevolent'?,medium,English Language,,,158.0,,
+978,3-PICK_FROM_SUBJECT,Find the synonym for 'Pernicious'.,medium,English Language,,,157.0,,
+979,3-PICK_FROM_SUBJECT,What is the antonym of 'Ubiquitous'?,medium,English Language,,,158.0,,
+813,3-PICK_FROM_SUBJECT,"In a high school, 60% of students play basketball, 30% play soccer, and 10% play both. What is the probability that a randomly selected student plays soccer GIVEN that they play basketball?",medium,Mathematics,,,,,Probability questions - no Probability subtopic exists in Mathematics subtopic list (Statistics only covers central tendency/dispersion)
+830,3-PICK_FROM_SUBJECT,"Which of the following is considered a major obstacle to good governance, leading to economic inequality and a loss of public trust?",medium,Government,,,221.0,,"'Good governance' concept not explicitly covered by Government subtopic list; closest is Power, Authority, and Legitimacy"
+800,3-PICK_FROM_SUBJECT,Increasing governmental regulations regarding environmental protection and resource scarcity are key aspects of which macroenvironmental force?,medium,Physics,,,186.0,,predicted_subject was Physics; content is Marketing (macroenvironment/marketing environment approach). Corrected subject to Marketing; Marketing Concepts and Consumer Needs is closest subtopic
+78,3-PICK_FROM_SUBJECT,"The ligamentum flavum, connecting the laminae of adjacent vertebrae, is distinctive due to its high proportion of what type of tissue?",hard,Biology,,,,,predicted_subject was Biology; content is detailed human anatomy (ligamentum flavum) not covered by any Biology subtopic
+682,4-WEAK_HINT_VERIFY,"According to the first creation account, on which day did God create man in His image?",easy,Financial Accounting,153.0,"Trading, Profit and Loss Account",,,
+999,4-WEAK_HINT_VERIFY,"Which time management technique involves setting a timer for 25 minutes of focused work, followed by a short break?",medium,Business admin,264.0,Functions of Management,,,
+323,4-WEAK_HINT_VERIFY,"When describing a trend in an Academic Writing Task 1 graph, which of the following is LEAST appropriate to include?",medium,English Language,163.0,Formal Letter Writing,,,
+440,4-WEAK_HINT_VERIFY,Which of the following phenomena is responsible for the splitting of white light into its component colors when it passes through a prism?,easy,Physics,222.0,Reflection of Light,,,
+882,4-WEAK_HINT_VERIFY,"Which landmark piece of legislation, passed in 1964, prohibited discrimination based on race, color, religion, sex, or national origin in public accommodations and employment?",medium,Civic Education,66.0,National Identity and Unity,,,
+677,4-WEAK_HINT_VERIFY,"Obedience to traffic rules, respecting the rights of others, and orderliness are ways of exhibiting which core national value?",easy,Civic Education,69.0,Fundamental Human Rights,,,
+155,4-WEAK_HINT_VERIFY,Trade between two different countries is referred to as:,easy,Commerce,55.0,Aid To Trade,,,
+669,4-WEAK_HINT_VERIFY,Trade carried out within a country is called:,medium,Commerce,55.0,Aid To Trade,,,
+748,4-WEAK_HINT_VERIFY,Which body within the World Trade Organization (WTO) is responsible for adjudicating trade disputes between member countries?,hard,Commerce,55.0,Aid To Trade,,,
+750,4-WEAK_HINT_VERIFY,"The Theory of Second Best suggests that in a situation where ideal free trade conditions cannot be fully met due to existing distortions, moving towards free trade in only *some* sectors might not necessarily improve overall welfare. This concept implies:",hard,Commerce,55.0,Aid To Trade,,,
+752,4-WEAK_HINT_VERIFY,The primary purpose of Incoterms (International Commercial Terms) in international trade is to:,hard,Economics,122.0,Balance Of Trade And Payment,,,
+753,4-WEAK_HINT_VERIFY,A 'beggar-thy-neighbor' policy in international trade refers to:,hard,Economics,122.0,Balance Of Trade And Payment,,,
+145,4-WEAK_HINT_VERIFY,The marketing mix element that deals with the strategies for making a product available to target consumers is known as:,easy,GNS,204.0,Production and Marketing Strategies,,,
+257,4-WEAK_HINT_VERIFY,An agency established by the government to set standards for goods and protect consumers from substandard products in Nigeria is the,medium,Government,223.0,Democracy and Forms of Government,,,
+746,4-WEAK_HINT_VERIFY,An export subsidy provided by a government to its domestic producers will typically result in:,hard,Government,223.0,Democracy and Forms of Government,,,
+751,4-WEAK_HINT_VERIFY,"If a country's export price index increases by 10% and its import price index increases by 5%, what can be concluded about its commodity terms of trade?",hard,Commerce,55.0,Aid To Trade,,,
+803,4-WEAK_HINT_VERIFY,"A shift towards greater concern for personal health and fitness among consumers, influencing product choices and marketing messages, is an example of a change in which macroenvironmental factor?",medium,Marketing,186.0,Marketing Concepts and Consumer Needs,,,
+139,4-WEAK_HINT_VERIFY,"Identify the adverb in the following sentence: ""The athlete ran **quickly** to catch up with his opponents.""",easy,English Language,143.0,Sentence Patterns and Construction,,,
+764,4-WEAK_HINT_VERIFY,What part of speech is the word 'beautifully' in the sentence: 'She sings beautifully.'?,medium,English Language,143.0,Sentence Patterns and Construction,,,
+766,4-WEAK_HINT_VERIFY,What part of speech is 'on' in the sentence: 'The book is on the table.'?,medium,English Language,143.0,Sentence Patterns and Construction,,,
+767,4-WEAK_HINT_VERIFY,Identify the adjective in the sentence: 'The lazy cat slept all day.',medium,English Language,143.0,Sentence Patterns and Construction,,,
+768,4-WEAK_HINT_VERIFY,"What part of speech is 'she' in the sentence: 'When she arrived, everyone cheered.'?",medium,English Language,143.0,Sentence Patterns and Construction,,,
+770,4-WEAK_HINT_VERIFY,What part of speech is 'Wow!' in the sentence: 'Wow! That was an amazing performance.'?,medium,English Language,143.0,Sentence Patterns and Construction,,,
+771,4-WEAK_HINT_VERIFY,What part of speech is the word 'Freedom' in the sentence: 'Freedom is a cherished value.'?,medium,English Language,143.0,Sentence Patterns and Construction,,,
+772,4-WEAK_HINT_VERIFY,Consider the sentence: 'I have a lot of work to do.' What part of speech is 'work' in this context?,medium,English Language,143.0,Sentence Patterns and Construction,,,
+773,4-WEAK_HINT_VERIFY,"In the sentence 'He is a fast runner,' what part of speech is the word 'fast'?",medium,English Language,143.0,Sentence Patterns and Construction,,,
+378,4-WEAK_HINT_VERIFY,"When a plant grows towards a light source, this is an example of which characteristic of life?",medium,Physics,222.0,Reflection of Light,,,
+929,4-WEAK_HINT_VERIFY,A plant bending towards a light source is an example of which characteristic of life?,medium,Physics,222.0,Reflection of Light,,,
+463,4-WEAK_HINT_VERIFY,"In a multi-party system, elections are often decided by...",medium,Biology,85.0,Functions of the nervous system,,,
+880,4-WEAK_HINT_VERIFY,President Franklin D. Roosevelt's New Deal programs during the Great Depression led to a significant and lasting expansion of which aspect of American government?,medium,Government,223.0,Democracy and Forms of Government,,,
+136,4-WEAK_HINT_VERIFY,The children are playing football. Convert this sentence to the passive voice.,medium,English Language,143.0,Sentence Patterns and Construction,,,
+216,4-WEAK_HINT_VERIFY,Which literary device involves giving human qualities or actions to inanimate objects or abstract ideas?,easy,Civic Education,69.0,Fundamental Human Rights,,,
+451,4-WEAK_HINT_VERIFY,William Shakespeare is renowned for writing plays and sonnets during which historical period?,medium,English Language,163.0,Formal Letter Writing,,,
+885,4-WEAK_HINT_VERIFY,Which literary device involves giving human qualities or attributes to inanimate objects or abstract ideas?,medium,Civic Education,69.0,Fundamental Human Rights,,,
+18,4-WEAK_HINT_VERIFY,"If $\frac{2+\sqrt{3}}{2-\sqrt{3}} = a+b\sqrt{3}$, where $a$ and $b$ are rational numbers, find the values of $a$ and $b$.",hard,Civic Education,65.0,Types and Importance of Values.,,,
+143,4-WEAK_HINT_VERIFY,Which type of business organization has its owners' liability limited to the amount of capital they invested?,easy,Commerce,64.0,Limited Liability Companies And cooperatives,,,
+149,4-WEAK_HINT_VERIFY,Which of these is an example of an internal source of business finance?,medium,Business admin,268.0,Types of Business Communication,,,
+172,4-WEAK_HINT_VERIFY,The concept that states that the business is considered separate and distinct from its owners is known as the:,easy,Business admin,268.0,Types of Business Communication,,,
+248,4-WEAK_HINT_VERIFY,"A business owned and managed by one person, who bears all risks and enjoys all profits, is known as a",easy,Business admin,268.0,Types of Business Communication,,,
+291,4-WEAK_HINT_VERIFY,Which accounting concept states that a business is considered a separate entity from its owner(s)?,easy,Business admin,268.0,Types of Business Communication,,,
+300,4-WEAK_HINT_VERIFY,Expenditure incurred to acquire a new delivery van for the business is an example of:,easy,Business admin,268.0,Types of Business Communication,,,
+644,4-WEAK_HINT_VERIFY,"In a hydroelectric power station, what is the sequence of energy conversion?",medium,Physics,218.0,"Work, Power and Energy Conservation",,,
+112,4-WEAK_HINT_VERIFY,"Which of the following describes the relationship between heat energy, mass, specific heat capacity, and temperature change?",easy,Physics,217.0,Kinetic and Potential Energy,,,
+189,4-WEAK_HINT_VERIFY,How much heat energy is required to raise the temperature of 2 kg of water from 20°C to 70°C? (Specific heat capacity of water = 4200 J kg⁻¹ K⁻¹),medium,Physics,217.0,Kinetic and Potential Energy,,,
+637,4-WEAK_HINT_VERIFY,"According to the Work-Energy Theorem, the net work done on an object results in a change in its:",medium,Physics,217.0,Kinetic and Potential Energy,,,
+954,4-WEAK_HINT_VERIFY,"A 2 kg metal block requires 18,000 J of heat energy to raise its temperature by 20 °C. What is the specific heat capacity of the metal?",medium,Physics,217.0,Kinetic and Potential Energy,,,
+97,4-WEAK_HINT_VERIFY,"Which male accessory gland contributes a fluid rich in fructose to semen, providing an energy source for sperm?",medium,Physics,217.0,Kinetic and Potential Energy,,,
+116,4-WEAK_HINT_VERIFY,Which of the following is true for a light ray travelling from a denser medium to a rarer medium at an angle greater than the critical angle?,medium,Physics,222.0,Reflection of Light,,,
+124,4-WEAK_HINT_VERIFY,A 60W light bulb is left on for 5 hours. How much electrical energy is consumed?,medium,Physics,217.0,Kinetic and Potential Energy,,,
+138,4-WEAK_HINT_VERIFY,Choose the sentence with the correct punctuation.,medium,English Language,143.0,Sentence Patterns and Construction,,,
+140,4-WEAK_HINT_VERIFY,"""The wind whispered secrets through the trees."" This sentence is an example of which figure of speech?",easy,English Language,143.0,Sentence Patterns and Construction,,,
+150,4-WEAK_HINT_VERIFY,The process of informing potential customers about a product or service and persuading them to buy it is known as:,easy,Marketing,190.0,New Product Development Process,,,
+162,4-WEAK_HINT_VERIFY,Which gas is primarily transported by haemoglobin in the human blood?,easy,Civic Education,69.0,Fundamental Human Rights,,,
+171,4-WEAK_HINT_VERIFY,What is the primary purpose of accounting?,easy,Financial Accounting,147.0,Meaning and Objectives of Accounting,,,
+178,4-WEAK_HINT_VERIFY,An expense incurred but not yet paid at the end of the accounting period is known as a(n):,easy,Financial Accounting,147.0,Meaning and Objectives of Accounting,,,
+179,4-WEAK_HINT_VERIFY,"Under the imprest system of petty cash, the petty cashier is reimbursed at intervals for the exact amount spent, thereby restoring the fund to its original amount. This ensures:",medium,Biology,85.0,Functions of the nervous system,,,
+198,4-WEAK_HINT_VERIFY,Which of the following statements is true for a body undergoing Simple Harmonic Motion?,medium,Physics,214.0,Acceleration and Equations of Motion,,,
+252,4-WEAK_HINT_VERIFY,Which of the following is NOT one of the traditional 4 P's of the marketing mix?,medium,Marketing,186.0,Marketing Concepts and Consumer Needs,,,
+254,4-WEAK_HINT_VERIFY,Which of these communication channels allows for immediate feedback in real-time?,easy,Business admin,267.0,Barriers to Effective Communication,,,
+256,4-WEAK_HINT_VERIFY,A characteristic feature of a public limited company is that its shares are,medium,Financial Accounting,156.0,Public Accounts and Fund Accounting,,,
+281,4-WEAK_HINT_VERIFY,Blood is pumped from the right ventricle to the lungs through the:,medium,Civic Education,39.0,Fundamental Human Right,,,
+293,4-WEAK_HINT_VERIFY,Which of the following accounts is classified as a Nominal Account?,easy,Accounting,97.0,"Trading, Profit and Loss Account",,,
+295,4-WEAK_HINT_VERIFY,Sales of goods on credit are initially recorded in which book of original entry?,medium,Financial Accounting,150.0,"Subsidiary Books (Sales Day Book, Purchases Day Book, etc.)",,,
+304,4-WEAK_HINT_VERIFY,The system used for petty cash where a fixed amount is reimbursed at regular intervals to restore the fund to its original level is known as the:,medium,Biology,85.0,Functions of the nervous system,,,
+317,4-WEAK_HINT_VERIFY,"For Academic IELTS Writing Task 1, candidates are typically required to:",medium,English Language,163.0,Formal Letter Writing,,,
+318,4-WEAK_HINT_VERIFY,"How many passages typically feature in the IELTS Academic Reading test, and what is the total time allotted for this section?",medium,English Language,128.0,Reading and Understanding Passages,,,
+375,4-WEAK_HINT_VERIFY,Which biological process converts light energy into chemical energy in the form of glucose?,medium,Physics,217.0,Kinetic and Potential Energy,,,
+398,4-WEAK_HINT_VERIFY,Which of the following is an example of a nominal account?,easy,Financial Accounting,153.0,"Trading, Profit and Loss Account",,,
+411,4-WEAK_HINT_VERIFY,"A mass attached to a spring oscillates with simple harmonic motion. If the spring constant is doubled, how does the period of oscillation change?",medium,Physics,214.0,Acceleration and Equations of Motion,,,
+413,4-WEAK_HINT_VERIFY,The refractive index of a certain glass is 1.5. What is the critical angle for light passing from this glass into air? (sin 41.8° = 0.667),medium,Physics,222.0,Reflection of Light,,,
+435,4-WEAK_HINT_VERIFY,"When a ray of light passes from air into a denser medium, it bends:",easy,Physics,222.0,Reflection of Light,,,
+441,4-WEAK_HINT_VERIFY,“The car sped like a bullet down the highway.” The figure of speech used in this sentence is a(n)...,easy,English Language,143.0,Sentence Patterns and Construction,,,
+452,4-WEAK_HINT_VERIFY,"Wole Soyinka, the first African Nobel laureate in Literature, is best known for his works in which genre?",medium,Yoruba,312.0,Lítírésọ̀ Akọọ́lẹ̀ – Eré Oníṣe (Written Literature – Drama),,,
+453,4-WEAK_HINT_VERIFY,"A literary work that criticizes human misconduct and foolishness with the intent of shaming individuals, corporations, government, or society itself into improvement is known as a...",hard,Civic Education,69.0,Fundamental Human Rights,,,
+457,4-WEAK_HINT_VERIFY,A system of government in which power is exercised directly by the people or their elected representatives is known as...,easy,Biology,85.0,Functions of the nervous system,,,
+458,4-WEAK_HINT_VERIFY,A federal system of government is characterized by...,medium,Biology,85.0,Functions of the nervous system,,,
+470,4-WEAK_HINT_VERIFY,The primary objective of the Economic Community of West African States (ECOWAS) is to...,medium,Geography,323.0,"Primary, secondary, tertiary, quaternary sectors",,,
+479,4-WEAK_HINT_VERIFY,The primary objective of the Economic Community of West African States (ECOWAS) is to...,easy,Geography,323.0,"Primary, secondary, tertiary, quaternary sectors",,,
+634,4-WEAK_HINT_VERIFY,What is the S.I. unit of energy?,easy,Physics,217.0,Kinetic and Potential Energy,,,
+645,4-WEAK_HINT_VERIFY,The energy stored in a stretched or compressed spring is known as:,easy,Physics,217.0,Kinetic and Potential Energy,,,
+647,4-WEAK_HINT_VERIFY,A machine has an input energy of 200 J and an output useful energy of 150 J. What is its efficiency?,medium,Physics,217.0,Kinetic and Potential Energy,,,
+648,4-WEAK_HINT_VERIFY,Which of the following scenarios best describes the conversion of chemical energy to electrical energy?,hard,Physics,217.0,Kinetic and Potential Energy,,,
+652,4-WEAK_HINT_VERIFY,Rural-to-urban migration is primarily caused by:,easy,Geography,320.0,Rural-urban migration,,,
+658,4-WEAK_HINT_VERIFY,One of the functions of management is,medium,Business admin,264.0,Functions of Management,,,
+671,4-WEAK_HINT_VERIFY,One major function of money is:,medium,Economics,118.0,Function Of Money,,,
+674,4-WEAK_HINT_VERIFY,Choose the correct sentence:,medium,English Language,143.0,Sentence Patterns and Construction,,,
+678,4-WEAK_HINT_VERIFY,Accounting is the process of:,medium,Financial Accounting,147.0,Meaning and Objectives of Accounting,,,
+679,4-WEAK_HINT_VERIFY,The book containing individual accounts is called:,medium,Accounting,94.0,Balancing Ledger Accounts,,,
+681,4-WEAK_HINT_VERIFY,The arm of government that makes laws is the:,medium,Government,223.0,Democracy and Forms of Government,,,
+692,4-WEAK_HINT_VERIFY,Marketing is concerned with:,medium,Marketing,186.0,Marketing Concepts and Consumer Needs,,,
+700,4-WEAK_HINT_VERIFY,"Which of the following defines a ""hypothesis"" in research and scientific writing?",easy,English Language,163.0,Formal Letter Writing,,,
+701,4-WEAK_HINT_VERIFY,"In communication skills, which of the following is considered an ""expressive"" skill central to academic performance?",easy,Business admin,267.0,Barriers to Effective Communication,,,
+765,4-WEAK_HINT_VERIFY,"Identify the conjunction in the sentence: 'I wanted to go, but it started raining.'",medium,English Language,143.0,Sentence Patterns and Construction,,,
+776,4-WEAK_HINT_VERIFY,Which of the following would typically *decrease* a partner's capital account?,medium,Financial Accounting,153.0,"Trading, Profit and Loss Account",,,
+785,4-WEAK_HINT_VERIFY,"""Indirect rule,"" a common British colonial administrative strategy, primarily aimed to:",medium,History,285.0,Economic Activities in Pre-Colonial Africa,,,
+793,4-WEAK_HINT_VERIFY,A common economic policy challenge for post-colonial governments was:,medium,History,285.0,Economic Activities in Pre-Colonial Africa,,,
+794,4-WEAK_HINT_VERIFY,"Which of the following refers to actors close to the company that affect its ability to serve its customers, such as suppliers, marketing intermediaries, customer markets, competitors, and publics?",medium,Marketing,186.0,Marketing Concepts and Consumer Needs,,,
+795,4-WEAK_HINT_VERIFY,A company's local community groups and neighborhood residents are examples of which type of public in its marketing environment?,medium,Financial Accounting,156.0,Public Accounts and Fund Accounting,,,
+801,4-WEAK_HINT_VERIFY,Markets consisting of government agencies that buy goods and services to produce public services or transfer them to others who need them are known as:,medium,Financial Accounting,155.0,Government Revenue and Expenditure,,,
+826,4-WEAK_HINT_VERIFY,"In a democratic system, which branch of government is primarily responsible for making laws?",medium,Biology,85.0,Functions of the nervous system,,,
+831,4-WEAK_HINT_VERIFY,The system designed to prevent any one branch of government from becoming too powerful by allowing each branch to limit the powers of the others is known as:,medium,Biology,85.0,Functions of the nervous system,,,
+845,4-WEAK_HINT_VERIFY,Which of the following best describes the transformation of data into information?,medium,Data Processing,132.0,Basic Definitions of Data and Information,,,
+846,4-WEAK_HINT_VERIFY,What is the primary purpose of metadata in a data processing system?,medium,Biology,85.0,Functions of the nervous system,,,
+847,4-WEAK_HINT_VERIFY,"For storing a product's price, which data type is most appropriate to ensure accuracy and prevent rounding errors?",medium,Marketing,190.0,New Product Development Process,,,
+851,4-WEAK_HINT_VERIFY,What is the term for having the same piece of data stored multiple times in different places within a data processing system?,medium,Biology,85.0,Functions of the nervous system,,,
+856,4-WEAK_HINT_VERIFY,Which sentence is most appropriate for a formal academic essay?,medium,English Language,165.0,Argumentative Essay,,,
+876,4-WEAK_HINT_VERIFY,The Supreme Court case of *Marbury v. Madison* (1803) is historically significant for establishing which principle in American government?,medium,Government,223.0,Democracy and Forms of Government,,,
+877,4-WEAK_HINT_VERIFY,"During the 'Age of Jackson,' or the Jacksonian Era (roughly 1820s-1840s), a significant political development was the expansion of suffrage to include:",medium,Geography,322.0,Life expectancy and development indicators,,,
+883,4-WEAK_HINT_VERIFY,"Following the Civil Rights Movement and the passage of landmark legislation in the 1960s, a significant political realignment occurred in the United States, most notably the shift of conservative white voters in the South from the Democratic Party to which party?",medium,Civic Education,69.0,Fundamental Human Rights,,,
+958,4-WEAK_HINT_VERIFY,An engine does 250 J of work and releases 100 J of heat to its surroundings during a cycle. What is the change in the internal energy of the engine system?,medium,Biology,85.0,Functions of the nervous system,,,
+967,4-WEAK_HINT_VERIFY,Light passes from a medium with a refractive index of 1.5 into a medium with a refractive index of 1.3. Which of the following will occur?,medium,Physics,222.0,Reflection of Light,,,
+987,4-WEAK_HINT_VERIFY,Which type of hydride is formed when hydrogen reacts with highly electropositive s-block elements (Group 1 and 2)?,medium,Fine Arts,176.0,"Elements of Art (Line, Shape, Form, Color, Texture, Value, Space)",,,
+1000,4-WEAK_HINT_VERIFY,"When actively reading, which note-taking method involves dividing your paper into three sections: main notes, cues, and summary?",medium,GNS,196.0,Reading Comprehension and Summary Writing,,,
+1002,4-WEAK_HINT_VERIFY,"Which study strategy is most effective for long-term retention of factual information, involving revisiting material at increasing intervals?",medium,Data Processing,132.0,Basic Definitions of Data and Information,,,
+1004,4-WEAK_HINT_VERIFY,"During the pre-writing stage of the writing process, what is the main goal?",medium,English Language,163.0,Formal Letter Writing,,,
+1005,4-WEAK_HINT_VERIFY,"When writing the first draft of an essay, what should be the primary focus?",medium,English Language,165.0,Argumentative Essay,,,
+1006,4-WEAK_HINT_VERIFY,Which aspect is the main focus during the revision stage of the writing process?,medium,English Language,163.0,Formal Letter Writing,,,
+1007,4-WEAK_HINT_VERIFY,What is the primary task during the editing stage of the writing process?,medium,English Language,163.0,Formal Letter Writing,,,
+1008,4-WEAK_HINT_VERIFY,"What is the final step in the writing process, primarily focused on catching surface-level errors like typos and formatting issues?",medium,English Language,163.0,Formal Letter Writing,,,
+1009,4-WEAK_HINT_VERIFY,Which sentence correctly uses a semicolon?,medium,English Language,143.0,Sentence Patterns and Construction,,,
+1011,4-WEAK_HINT_VERIFY,Which option correctly fixes the run-on sentence: 'The bell rang everyone rushed out of the classroom'?,medium,English Language,143.0,Sentence Patterns and Construction,,,
+1012,4-WEAK_HINT_VERIFY,"Which sentence uses the correct form of 'their,' 'there,' or 'they're'?",medium,English Language,143.0,Sentence Patterns and Construction,,,
+1013,4-WEAK_HINT_VERIFY,What is the primary purpose of citing sources in academic writing?,medium,English Language,163.0,Formal Letter Writing,,,
+1047,4-WEAK_HINT_VERIFY,The main objective of accounting is to:,easy,Financial Accounting,147.0,Meaning and Objectives of Accounting,,,
+1051,4-WEAK_HINT_VERIFY,3. Identify the correct sentence.,medium,English Language,143.0,Sentence Patterns and Construction,,,
+181,4-WEAK_HINT_VERIFY,The Trading Account is prepared to ascertain the:,easy,Financial Accounting,153.0,"Trading, Profit and Loss Account",,,
+744,4-WEAK_HINT_VERIFY,New Trade Theory emphasizes that a significant portion of international trade can be explained by:,hard,Economics,122.0,Balance Of Trade And Payment,,,
+796,4-WEAK_HINT_VERIFY,"Which macroenvironmental factor is concerned with shifts in age structure, geographic population shifts, and increasing diversity?",medium,Geography,318.0,Natural increase and population trends,,,
+860,4-WEAK_HINT_VERIFY,Which phrase is most appropriate for a formal business letter closing?,medium,English Language,163.0,Formal Letter Writing,,,
+403,4-WEAK_HINT_VERIFY,Control accounts are maintained to __________.,medium,Accounting,94.0,Balancing Ledger Accounts,,,
+407,4-WEAK_HINT_VERIFY,The accounting concept that requires anticipating no profits but providing for all foreseeable losses is known as the __________ concept.,easy,Financial Accounting,147.0,Meaning and Objectives of Accounting,,,
+408,4-WEAK_HINT_VERIFY,Prime cost in a manufacturing account is the sum of __________.,medium,Financial Accounting,153.0,"Trading, Profit and Loss Account",,,
+697,4-WEAK_HINT_VERIFY,"Complete the sentence with the most appropriate option:""He can lift this heavy log of wood, ________?""",easy,English Language,143.0,Sentence Patterns and Construction,,,
+769,4-WEAK_HINT_VERIFY,Which word is the main verb in the sentence: 'The children played happily in the park.'?,medium,English Language,143.0,Sentence Patterns and Construction,,,
+289,4-WEAK_HINT_VERIFY,All of the following factors can directly influence population density EXCEPT:,hard,Geography,318.0,Natural increase and population trends,,,
+76,4-WEAK_HINT_VERIFY,"Which carpal bone articulates with the first metacarpal bone, providing the thumb with its unique saddle joint and extensive range of motion?",hard,Physics,214.0,Acceleration and Equations of Motion,,,
+324,5-FULL_REVIEW,How is the overall band score for IELTS Academic calculated?,medium,,,,,,
+327,5-FULL_REVIEW,Which of the following quantities is a scalar?,medium,,,,,,
+329,5-FULL_REVIEW,A train travels the first 100 km at 50 km/h and the next 100 km at 25 km/h. What is its average speed?,medium,,,,,,
+337,5-FULL_REVIEW,An object is dropped from rest. How far does it fall in the first 2 seconds? (Assume g = 10 m/s²),medium,,,,,,
+344,5-FULL_REVIEW,A car is moving at 60 km/h. A passenger inside walks towards the front of the car at 5 km/h relative to the car. What is the passenger's speed relative to the ground?,medium,,,,,,
+348,5-FULL_REVIEW,An object starts from rest and accelerates uniformly at 4 m/s². How far does it travel in 3 seconds?,medium,,,,,,
+356,5-FULL_REVIEW,"If 3x - 7 = 8, what is the value of x?",medium,,,,,,
+363,5-FULL_REVIEW,A number increased by 8 is equal to three times the number decreased by 4. What is the number?,medium,,,,,,
+377,5-FULL_REVIEW,What is the correct hierarchical order of biological organization from simpler to more complex?,medium,,,,,,
+380,5-FULL_REVIEW,A polar bear's thick fur provides insulation in cold environments. This is an example of a(n):,medium,,,,,,
+409,5-FULL_REVIEW,Which of the following ratios measures a company's ability to meet its short-term obligations?,easy,,,,,,
+419,5-FULL_REVIEW,Which of the following materials is the best conductor of heat?,easy,,,,,,
+429,5-FULL_REVIEW,What is the amount of heat required to change 2 kg of ice at 0°C to water at 0°C? (Latent heat of fusion of ice = 334 J/g),medium,,,,,,
+433,5-FULL_REVIEW,A machine lifts a load of 500 N through a vertical height of 2 m in 5 seconds. What is the power developed by the machine?,medium,,,,,,
+445,5-FULL_REVIEW,Chinua Achebe's *Things Fall Apart* is primarily a critique of...,medium,,,,,,
+446,5-FULL_REVIEW,The central idea or underlying message that a writer explores in a literary work is known as the...,easy,,,,,,
+447,5-FULL_REVIEW,“I've told you a million times not to do that!” is an example of which figure of speech?,easy,,,,,,
+454,5-FULL_REVIEW,The use of hints or clues in a narrative to suggest future events is called...,easy,,,,,,
+456,5-FULL_REVIEW,The distinctive feature of a state which distinguishes it from other organizations is its possession of...,easy,,,,,,
+467,5-FULL_REVIEW,The policy of Indirect Rule in British West Africa was primarily aimed at...,medium,,,,,,
+471,5-FULL_REVIEW,Which of the following is NOT a characteristic feature of a state?,easy,,,,,,
+484,5-FULL_REVIEW,"The ultimate legal authority within a state, allowing it to govern itself without external interference, refers to...",hard,,,,,,
+488,5-FULL_REVIEW,Which ethical theory holds that the moral action is the one that maximises overall happiness or pleasure for the greatest number of people?,easy,,,,,,
+492,5-FULL_REVIEW,"Which theodicy argues that evil and suffering are necessary for humans to develop moral and spiritual character, thus 'soul-making'?",medium,,,,,,
+499,5-FULL_REVIEW,The 'Free Will Defence' is a common response to the problem of evil that argues:,medium,,,,,,
+500,5-FULL_REVIEW,"The meta-ethical theory that claims moral statements are simply expressions of personal feelings or attitudes, and not objectively true or false, is known as:",hard,,,,,,
+504,5-FULL_REVIEW,The oxygenated blood leaves the left ventricle of the heart and is pumped to the rest of the body through which major artery?,medium,,,,,,
+512,5-FULL_REVIEW,"The functional unit of the kidney, responsible for filtering blood and producing urine, is known as the:",easy,,,,,,
+523,5-FULL_REVIEW,The Ksp for silver chloride (AgCl) is 1.8 × 10^-10. What is the solubility of AgCl in a 0.010 M solution of calcium chloride (CaCl2)?,hard,,,,,,
+527,5-FULL_REVIEW,What is amoeba,easy,,,,,,
+613,5-FULL_REVIEW,What volume of 0.1 M HCl is required to completely neutralize 25 cm³ of 0.2 M NaOH?,medium,,,,,,
+617,5-FULL_REVIEW,The hydrolysis of sodium carbonate (Na₂CO₃) in water results in a solution that is:,medium,,,,,,
+629,5-FULL_REVIEW,"Find the area enclosed by the curve y = x^2, the x-axis, and the lines x = 1 and x = 3.",medium,,,,,,
+639,5-FULL_REVIEW,Power is defined as the:,easy,,,,,,
+640,5-FULL_REVIEW,The S.I. unit of power is the:,easy,,,,,,
+643,5-FULL_REVIEW,A machine lifts a 500 N load through a height of 4 meters in 2 seconds. What is the power developed by the machine?,medium,,,,,,
+653,5-FULL_REVIEW,what is roice?,easy,,,,,,
+655,5-FULL_REVIEW,One of the following is a cause of African nationalism,medium,,,,,,
+660,5-FULL_REVIEW,what is psycology ?,easy,,,,,,
+670,5-FULL_REVIEW,Which institution accepts deposits from customers?,medium,,,,,,
+675,5-FULL_REVIEW,"The opposite of ""ancient"" is:",medium,,,,,,
+676,5-FULL_REVIEW,"The opposite of ""ancient"" is:",medium,,,,,,
+680,5-FULL_REVIEW,The supreme law of a country is the:,medium,,,,,,
+689,5-FULL_REVIEW,Which word contains a silent letter?,medium,,,,,,
+693,5-FULL_REVIEW,Which of the following is a promotional tool?,medium,,,,,,
+694,5-FULL_REVIEW,What is the first step in the data processing cycle?,easy,,,,,,
+698,5-FULL_REVIEW,Which of the following does a textile artist use to form recurring designs or patterns on fabric?,easy,,,,,,
+699,5-FULL_REVIEW,Traditional thorn carving in Nigeria is primarily practiced in which of these towns?,easy,,,,,,
+709,5-FULL_REVIEW,"In an elastic collision, which of the following statements is correct?",medium,,,,,,
+712,5-FULL_REVIEW,"Yiyan wo ninu awon wọnyi lo tọ fun ọrọ naa ""Òjò""?",medium,,,,,,
+713,5-FULL_REVIEW,which part of plant make food using sunlight,easy,,,,,,
+724,5-FULL_REVIEW,Which of the following best distinguishes political apathy from rational abstention in a democratic context?,hard,,,,,,
+727,5-FULL_REVIEW,"While often conflated, political cynicism differs from political apathy primarily in that cynicism involves:",hard,,,,,,
+729,5-FULL_REVIEW,"The 'dumbing down' of political discourse in mass media, characterized by sensationalism and a focus on personalities over policy, is argued to contribute to political apathy primarily by:",hard,,,,,,
+731,5-FULL_REVIEW,"To effectively combat political apathy through civic education, curricula should prioritize which of the following approaches?",hard,,,,,,
+734,5-FULL_REVIEW,"While both can lead to disengagement, political alienation primarily differs from political apathy in that alienated individuals typically:",hard,,,,,,
+735,5-FULL_REVIEW,"Beyond low voter turnout, which of the following is considered a strong indicator of widespread political apathy in a democratic society?",hard,,,,,,
+739,5-FULL_REVIEW,Which of the following best explains the Leontief Paradox as a challenge to the Heckscher-Ohlin theory?,hard,,,,,,
+757,5-FULL_REVIEW,"In a perfectly competitive market, individual firms are:",medium,,,,,,
+758,5-FULL_REVIEW,Which of the following is an example of a fixed cost in the short run for a manufacturing firm?,medium,,,,,,
+759,5-FULL_REVIEW,A negative externality occurs when:,medium,,,,,,
+761,5-FULL_REVIEW,Which condition must a monopolist satisfy to maximize profits?,medium,,,,,,
+762,5-FULL_REVIEW,A point inside the Production Possibilities Frontier (PPF) indicates:,medium,,,,,,
+763,5-FULL_REVIEW,The primary goal of a firm in a market economy is typically assumed to be:,medium,,,,,,
+790,5-FULL_REVIEW,"The ""Scramble for Africa"" during the late 19th century directly resulted in:",medium,,,,,,
+791,5-FULL_REVIEW,"Which of the following governmental structures was most commonly inherited by former colonies from their European colonizers, particularly in Africa and Asia?",medium,,,,,,
+792,5-FULL_REVIEW,The Cold War significantly influenced the decolonization process by:,medium,,,,,,
+804,5-FULL_REVIEW,"A rectangular garden is to be enclosed by a fence on three sides, with an existing wall forming the fourth side. If 120 meters of fencing material are available, what is the maximum area of the garden?",medium,,,,,,
+806,5-FULL_REVIEW,Find the area of the region bounded by the curves y = x² and y = 2x.,medium,,,,,,
+815,5-FULL_REVIEW,Èwo nínú àwọn wọ̀nyí ni ó jẹ́ orísun pàtàkì tí wọ́n máa ń lò fún 'Ayan Ogbufo'?,medium,,,,,,
+817,5-FULL_REVIEW,Èwo nínú àwọn wọ̀nyí ni kò ní sábà jẹ́ koko ọ̀rọ̀ fún 'Ayan Ogbufo'?,medium,,,,,,
+821,5-FULL_REVIEW,Èwo nínú àwọn ẹ̀ka ìmọ̀ yí ni 'Ayan Ogbufo' jẹ́ ìbámu pẹ̀lú jùlọ?,medium,,,,,,
+823,5-FULL_REVIEW,Kí ni iṣẹ́ ẹ̀kọ́ pàtàkì tí 'Ayan Ogbufo' ṣe nínú yàrá ìkẹ́kọ̀ọ́ tàbí ní ipò ìmọ̀-ẹ̀kọ́?,medium,,,,,,
+834,5-FULL_REVIEW,"Which of the following best describes the Christian concept of ""agape"" love?",medium,,,,,,
+835,5-FULL_REVIEW,"In Christian living, what is the primary purpose of regular personal prayer?",medium,,,,,,
+837,5-FULL_REVIEW,What does the Christian principle of stewardship primarily refer to?,medium,,,,,,
+841,5-FULL_REVIEW,"When faced with an ethical dilemma, what is a common Christian approach to moral decision-making?",medium,,,,,,
+843,5-FULL_REVIEW,"In Christian living, what is implied by the concept of ""witnessing"" or ""evangelism""?",medium,,,,,,
+844,5-FULL_REVIEW,"In the data hierarchy, what is a collection of related fields treated as a single unit?",medium,,,,,,
+852,5-FULL_REVIEW,"In the context of data processing, a collection of related records, often stored on a storage device, is typically referred to as a:",medium,,,,,,
+861,5-FULL_REVIEW,"In a legal document, which word would typically be preferred over 'start'?",medium,,,,,,
+864,5-FULL_REVIEW,Which High Renaissance artist is renowned for painting 'The Last Supper' and 'Mona Lisa'?,medium,,,,,,
+865,5-FULL_REVIEW,"The Baroque art movement, prominent in the 17th century, is often characterized by which of the following?",medium,,,,,,
+866,5-FULL_REVIEW,"The Rococo style, emerging in 18th-century France, is best described as:",medium,,,,,,
+867,5-FULL_REVIEW,"Which Neoclassical painter is famous for works like 'The Oath of the Horatii' and 'The Death of Marat,' embodying civic virtue and classical ideals?",medium,,,,,,
+869,5-FULL_REVIEW,"The Impressionist movement, originating in France in the late 19th century, is known for its artists' focus on:",medium,,,,,,
+870,5-FULL_REVIEW,Which of these artists is NOT considered a Post-Impressionist?,medium,,,,,,
+871,5-FULL_REVIEW,"Pioneered by Pablo Picasso and Georges Braque in the early 20th century, Cubism is characterized by:",medium,,,,,,
+872,5-FULL_REVIEW,"The Surrealist art movement, launched in the 1920s, aimed to unlock the power of the:",medium,,,,,,
+875,5-FULL_REVIEW,"The first major political parties in the United States, the Federalists and the Democratic-Republicans, primarily differed over what fundamental issue?",medium,,,,,,
+881,5-FULL_REVIEW,"During the Cold War, the U.S. foreign policy strategy aimed at preventing the spread of communism was known as:",medium,,,,,,
+911,5-FULL_REVIEW,What is the function of lysosomes?,medium,,,,,,
+913,5-FULL_REVIEW,Which of the following is a function of the cytoskeleton?,medium,,,,,,
+927,5-FULL_REVIEW,Maintaining a stable internal environment despite changes in the external environment is a characteristic known as:,medium,,,,,,
+934,5-FULL_REVIEW,Viruses are often considered to be on the border of living and non-living because they:,medium,,,,,,
+955,5-FULL_REVIEW,Which statement best describes the latent heat of vaporization?,medium,,,,,,
+959,5-FULL_REVIEW,"For an ideal gas, which of the following quantities is directly proportional to its absolute temperature?",medium,,,,,,
+960,5-FULL_REVIEW,"A bimetallic strip, made of brass and steel, is initially straight at room temperature. If the strip is heated, it bends with the brass on the outside of the curve. What does this indicate?",medium,,,,,,
+966,5-FULL_REVIEW,"A string fixed at both ends is vibrating at its third harmonic. How many nodes are present on the string, excluding the endpoints?",medium,,,,,,
+984,5-FULL_REVIEW,Which of the following properties is *most* characteristic of transition metals?,medium,,,,,,
+989,5-FULL_REVIEW,The industrial production of hydrogen primarily involves:,medium,,,,,,
+992,5-FULL_REVIEW,The characteristic golden-yellow flame observed during a flame test is indicative of which s-block element?,medium,,,,,,
+993,5-FULL_REVIEW,A high Biochemical Oxygen Demand (BOD) value for a water sample indicates:,medium,,,,,,
+994,5-FULL_REVIEW,"Which of the following is a primary greenhouse gas responsible for global warming, produced mainly from the combustion of fossil fuels?",medium,,,,,,
+996,5-FULL_REVIEW,What is a key defining characteristic that often gives nanomaterials unique properties compared to their bulk counterparts?,medium,,,,,,
+997,5-FULL_REVIEW,"Which of the following is an example of a 2D nanomaterial known for its exceptional strength, conductivity, and transparency?",medium,,,,,,
+1001,5-FULL_REVIEW,What is the primary purpose of active reading compared to passive reading?,medium,,,,,,
+1003,5-FULL_REVIEW,"To effectively recall a list of unrelated items, such as a shopping list, which memory technique would be most beneficial?",medium,,,,,,
+1015,5-FULL_REVIEW,What is the derivative of $y = (2x+1)(x^2-3)$?,medium,,,,,,
+1016,5-FULL_REVIEW,Find $\frac{dy}{dx}$ for $y = \frac{x^2}{x+1}$.,medium,,,,,,
+1019,5-FULL_REVIEW,Find $\frac{dy}{dx}$ for $y = e^{3x^2}$.,medium,,,,,,
+1021,5-FULL_REVIEW,Find $\frac{dy}{dx}$ if $x^2 + y^2 = 25$.,medium,,,,,,
+1023,5-FULL_REVIEW,What is the slope of the tangent line to the curve $y = x^3 - 2x + 1$ at $x=2$?,medium,,,,,,
+1029,5-FULL_REVIEW,What is your name?,medium,,,,,,
+1034,5-FULL_REVIEW,Factor completely: 4x^2 - 25,medium,,,,,,
+1039,5-FULL_REVIEW,"A certain number is six less than twice another number. If their sum is 24, what is the larger number?",medium,,,,,,
+1045,5-FULL_REVIEW,2+2,easy,,,,,,
+486,5-FULL_REVIEW,"Which philosopher famously proposed the 'Five Ways' as arguments for the existence of God, including a version of the Cosmological Argument?",easy,,,,,,
+842,5-FULL_REVIEW,Which virtue is emphasized in Christian living as recognizing one's dependence on God and serving others rather than oneself?,medium,,,,,,
+126,5-FULL_REVIEW,The principal's ______ address at the graduation ceremony inspired all the students.,medium,,,,,,
+127,5-FULL_REVIEW,Neither the students nor their teacher ______ aware of the changes to the timetable.,medium,,,,,,
+137,5-FULL_REVIEW,"If I had known you were coming, I ______ a cake.",medium,,,,,,
+233,5-FULL_REVIEW,"The boy, along with his parents, _______ to the village every Christmas.",medium,,,,,,
+234,5-FULL_REVIEW,"If I had known about the party, I _______ there.",medium,,,,,,
+235,5-FULL_REVIEW,The manager decided to _______ the meeting until next week due to unforeseen circumstances.,easy,,,,,,
+236,5-FULL_REVIEW,"Despite his initial failure, he refused to give up and decided to _______.",hard,,,,,,
+239,5-FULL_REVIEW,The student complained _______ the teacher _______ his poor grades.,medium,,,,,,
+240,5-FULL_REVIEW,"_______ it was raining heavily, we decided to go for a walk.",easy,,,,,,
+243,5-FULL_REVIEW,The committee reached a _______ decision after hours of debate.,medium,,,,,,
+244,5-FULL_REVIEW,It is unwise to count your chickens before they are _______.,easy,,,,,,
+245,5-FULL_REVIEW,He drives _______ than his brother.,medium,,,,,,
+397,5-FULL_REVIEW,A transaction involving the purchase of goods on credit would primarily be recorded in the __________.,easy,,,,,,
+402,5-FULL_REVIEW,The primary purpose of preparing a bank reconciliation statement is to __________.,medium,,,,,,
+404,5-FULL_REVIEW,"In a non-profit organization, a 'surplus' occurs when __________.",easy,,,,,,
+406,5-FULL_REVIEW,A document issued by a seller to a customer for goods returned by the customer is called a __________.,easy,,,,,,
+688,5-FULL_REVIEW,"Choose the correct option:
+
+""The boys _____ playing football.""",medium,,,,,,
+971,5-FULL_REVIEW,"Her __________ nature made her popular among her peers, always ready to help and offer a kind word.",medium,,,,,,
+974,5-FULL_REVIEW,"The __________ decision of the committee was met with widespread approval, as it addressed the core issues effectively.",medium,,,,,,
+977,5-FULL_REVIEW,"Despite the __________ evidence, the defense attorney managed to cast doubt on the prosecution's case.",medium,,,,,,
+980,5-FULL_REVIEW,"The artist's __________ style was evident in every brushstroke, making her work instantly recognizable.",medium,,,,,,
+983,5-FULL_REVIEW,His __________ for detail ensured that every aspect of the project was meticulously planned and executed.,medium,,,,,,
+217,5-FULL_REVIEW,"The moment of greatest tension or emotional intensity in a plot, where the main conflict is confronted, is known as the:",medium,,,,,,
+64,5-FULL_REVIEW,"The sella turcica, a saddle-shaped depression that houses the pituitary gland, is a prominent feature of which cranial bone?",hard,,,,,,
+65,5-FULL_REVIEW,Which of the following features is characteristic of cervical vertebrae (C2-C6) and helps to distinguish them from other vertebral types?,hard,,,,,,
+67,5-FULL_REVIEW,Which specific part of the os coxa (hip bone) articulates with the sacrum to form the sacroiliac joint?,hard,,,,,,
+74,5-FULL_REVIEW,The only direct bony articulation between the axial skeleton and the pectoral girdle is formed by which joint?,hard,,,,,,
+77,5-FULL_REVIEW,"The lambdoid suture, one of the major sutures of the skull, separates the parietal bones from which other cranial bone?",hard,,,,,,
+82,5-FULL_REVIEW,Intramembranous ossification is the specific process responsible for the formation of which of the following bone types?,hard,,,,,,
+90,5-FULL_REVIEW,The radiocarpal joint (wrist joint) primarily involves the articulation between the distal end of the radius and which specific carpal bones?,hard,,,,,,
+496,6-OFF_CURRICULUM_CHECK,David Hume argued against the credibility of miracles primarily because:,hard,,,,,OFF_CURRICULUM: philosophy of religion (Hume/miracles) - not in curriculum,OFF_CURRICULUM: philosophy of religion (Hume/miracles) - not in curriculum
+737,6-OFF_CURRICULUM_CHECK,Which historical period or phenomenon is often cited as a significant turning point in the study and perception of political apathy in Western democracies?,hard,,,,,OFF_CURRICULUM: political science theory - not in curriculum,OFF_CURRICULUM: political science theory - not in curriculum
+487,6-OFF_CURRICULUM_CHECK,"The argument that a benevolent, omnipotent, and omniscient God cannot logically coexist with evil and suffering is known as what?",easy,,,,,OFF_CURRICULUM: philosophy (problem of evil) - not in curriculum,OFF_CURRICULUM: philosophy (problem of evil) - not in curriculum
+489,6-OFF_CURRICULUM_CHECK,"The Christian doctrine that God exists as three co-equal, co-eternal persons – Father, Son, and Holy Spirit – is known as what?",easy,,,,,OFF_CURRICULUM: theology (Trinity doctrine) - not covered by CRS subtopic list,OFF_CURRICULUM: theology (Trinity doctrine) - not covered by CRS subtopic list
+490,6-OFF_CURRICULUM_CHECK,St. Anselm's Ontological Argument for God's existence begins with the premise that God is:,medium,,,,,OFF_CURRICULUM: philosophy (ontological argument) - not in curriculum,OFF_CURRICULUM: philosophy (ontological argument) - not in curriculum
+66,6-OFF_CURRICULUM_CHECK,A gomphosis is a specific type of fibrous joint characterized by what unique anatomical attachment?,hard,,,,,OFF_CURRICULUM: advanced human anatomy - beyond WAEC/JAMB Biology scope,OFF_CURRICULUM: advanced human anatomy - beyond WAEC/JAMB Biology scope
+69,6-OFF_CURRICULUM_CHECK,The prominent projection known as the medial malleolus is an anatomical feature of which bone in the lower leg?,hard,,,,,OFF_CURRICULUM: advanced human anatomy - beyond WAEC/JAMB Biology scope,OFF_CURRICULUM: advanced human anatomy - beyond WAEC/JAMB Biology scope
+73,6-OFF_CURRICULUM_CHECK,A 'floating rib' is specifically characterized by which anatomical feature or lack thereof?,hard,,,,,OFF_CURRICULUM: advanced human anatomy - beyond WAEC/JAMB Biology scope,OFF_CURRICULUM: advanced human anatomy - beyond WAEC/JAMB Biology scope
+83,6-OFF_CURRICULUM_CHECK,"Which foramen, located between the petrous part of the temporal bone and the occipital bone, transmits cranial nerves IX (glossopharyngeal), X (vagus), and XI (accessory)?",hard,,,,,OFF_CURRICULUM: advanced human anatomy - beyond WAEC/JAMB Biology scope,OFF_CURRICULUM: advanced human anatomy - beyond WAEC/JAMB Biology scope
+88,6-OFF_CURRICULUM_CHECK,Volkmann's canals (perforating canals) in compact bone differ from Haversian canals (central canals) in which key anatomical aspect?,hard,,,,,OFF_CURRICULUM: advanced human anatomy - beyond WAEC/JAMB Biology scope,OFF_CURRICULUM: advanced human anatomy - beyond WAEC/JAMB Biology scope
+389,6-OFF_CURRICULUM_CHECK,"A testable explanation for an observation or phenomenon, which can be supported or refuted through experimentation, is called a:",medium,,,,,OFF_CURRICULUM: general scientific method/hypothesis definition - not subject specific,OFF_CURRICULUM: general scientific method/hypothesis definition - not subject specific
+491,6-OFF_CURRICULUM_CHECK,Immanuel Kant's ethical theory is primarily based on the concept of:,medium,,,,,OFF_CURRICULUM: philosophy (Kant ethics) - not in curriculum,OFF_CURRICULUM: philosophy (Kant ethics) - not in curriculum
+855,6-OFF_CURRICULUM_CHECK,"During a job interview for a corporate position, which phrase would be most suitable to describe your work experience?",medium,,,,,OFF_CURRICULUM: job interview soft skills - not in curriculum,OFF_CURRICULUM: job interview soft skills - not in curriculum
+868,6-OFF_CURRICULUM_CHECK,"Romanticism in art, which flourished in the early 19th century, placed a strong emphasis on:",medium,,,,,OFF_CURRICULUM: Western art history (Romanticism) - not in Fine Arts curriculum,OFF_CURRICULUM: Western art history (Romanticism) - not in Fine Arts curriculum
+873,6-OFF_CURRICULUM_CHECK,"The Dutch art movement 'De Stijl,' co-founded by Piet Mondrian, advocated for an aesthetic based on:",medium,,,,,OFF_CURRICULUM: Western art history (De Stijl/Mondrian) - not in Fine Arts curriculum,OFF_CURRICULUM: Western art history (De Stijl/Mondrian) - not in Fine Arts curriculum
+888,6-OFF_CURRICULUM_CHECK,"Many Romantic poets, such as William Wordsworth and Samuel Taylor Coleridge, often emphasized which of the following in their works?",medium,,,,,OFF_CURRICULUM: Western literature (Wordsworth/Coleridge) - not typical WAEC set text,OFF_CURRICULUM: Western literature (Wordsworth/Coleridge) - not typical WAEC set text
+80,6-OFF_CURRICULUM_CHECK,"The anular ligament is an important structure associated with which specific joint, helping to retain the head of the radius?",hard,,,,,OFF_CURRICULUM: advanced human anatomy - beyond WAEC/JAMB Biology scope,OFF_CURRICULUM: advanced human anatomy - beyond WAEC/JAMB Biology scope
+322,6-OFF_CURRICULUM_CHECK,Which criterion evaluates a candidate's ability to use a wide range of vocabulary accurately and appropriately in the IELTS Speaking test?,medium,,,,,OFF_CURRICULUM: IELTS test - not in Nigerian curriculum,OFF_CURRICULUM: IELTS test - not in Nigerian curriculum
+494,6-OFF_CURRICULUM_CHECK,"A key ethical concept often debated in the context of euthanasia and abortion is 'sanctity of life', which suggests that:",easy,,,,,OFF_CURRICULUM: bioethics (euthanasia/abortion) - not in curriculum,OFF_CURRICULUM: bioethics (euthanasia/abortion) - not in curriculum
+526,6-OFF_CURRICULUM_CHECK,what is life,easy,,,,,"OFF_CURRICULUM: vague philosophical prompt ""what is life"" - not exam-appropriate","OFF_CURRICULUM: vague philosophical prompt ""what is life"" - not exam-appropriate"
+75,6-OFF_CURRICULUM_CHECK,"Which tarsal bone articulates with the talus proximally and the cuneiforms distally, playing a key role in forming the medial longitudinal arch of the foot?",hard,,,,,OFF_CURRICULUM: advanced human anatomy - beyond WAEC/JAMB scope,OFF_CURRICULUM: advanced human anatomy - beyond WAEC/JAMB scope
+884,6-OFF_CURRICULUM_CHECK,What is a common characteristic that distinguishes a Shakespearean sonnet from a Petrarchan sonnet?,medium,,,,,OFF_CURRICULUM: Western sonnet forms (Shakespearean vs Petrarchan) - too specific/non-curriculum,OFF_CURRICULUM: Western sonnet forms (Shakespearean vs Petrarchan) - too specific/non-curriculum
+886,6-OFF_CURRICULUM_CHECK,"What is the most common meter used in Shakespeare's plays and sonnets, consisting of five pairs of unstressed and stressed syllables per line?",medium,,,,,OFF_CURRICULUM: iambic pentameter/Shakespeare specifics - too specific/non-curriculum,OFF_CURRICULUM: iambic pentameter/Shakespeare specifics - too specific/non-curriculum
+68,6-OFF_CURRICULUM_CHECK,"The coronoid fossa and olecranon fossa are depressions found on which bone, crucial for articulation at the elbow joint?",hard,,,,,OFF_CURRICULUM: advanced human anatomy - beyond WAEC/JAMB scope,OFF_CURRICULUM: advanced human anatomy - beyond WAEC/JAMB scope
+61,6-OFF_CURRICULUM_CHECK,"Which microscopic structure directly connects adjacent lacunae in compact bone, facilitating nutrient and waste exchange for osteocytes?",hard,,,,,OFF_CURRICULUM: advanced human anatomy - beyond WAEC/JAMB scope,OFF_CURRICULUM: advanced human anatomy - beyond WAEC/JAMB scope
+70,6-OFF_CURRICULUM_CHECK,"Insufficient production of vitamin D can lead to impaired mineralization of bone in children, resulting in a condition known as what?",hard,,,,,OFF_CURRICULUM: advanced human anatomy - beyond WAEC/JAMB scope,OFF_CURRICULUM: advanced human anatomy - beyond WAEC/JAMB scope
+84,6-OFF_CURRICULUM_CHECK,"Which of the following ligaments is considered the strongest in the body, preventing hyperextension of the hip joint by twisting when the joint extends?",hard,,,,,OFF_CURRICULUM: advanced human anatomy - beyond WAEC/JAMB scope,OFF_CURRICULUM: advanced human anatomy - beyond WAEC/JAMB scope
+85,6-OFF_CURRICULUM_CHECK,"The primary function of the patella (kneecap) is to serve as what type of bone, and how does this affect muscle action?",hard,,,,,OFF_CURRICULUM: advanced human anatomy - beyond WAEC/JAMB scope,OFF_CURRICULUM: advanced human anatomy - beyond WAEC/JAMB scope
+86,6-OFF_CURRICULUM_CHECK,The hyoid bone is unique among most bones because it does not articulate directly with any other bone. What is its primary functional role?,hard,,,,,OFF_CURRICULUM: advanced human anatomy - beyond WAEC/JAMB scope,OFF_CURRICULUM: advanced human anatomy - beyond WAEC/JAMB scope
+89,6-OFF_CURRICULUM_CHECK,"An abnormal lateral curvature of the spine, often accompanied by vertebral rotation, is medically known as what?",hard,,,,,OFF_CURRICULUM: advanced human anatomy - beyond WAEC/JAMB scope,OFF_CURRICULUM: advanced human anatomy - beyond WAEC/JAMB scope
+316,6-OFF_CURRICULUM_CHECK,The Academic IELTS test is divided into how many main modules or parts?,medium,,,,,OFF_CURRICULUM: IELTS test - not in Nigerian curriculum,OFF_CURRICULUM: IELTS test - not in Nigerian curriculum
+319,6-OFF_CURRICULUM_CHECK,Which of the following accurately describes the structure of the IELTS Speaking test?,medium,,,,,OFF_CURRICULUM: IELTS test - not in Nigerian curriculum,OFF_CURRICULUM: IELTS test - not in Nigerian curriculum
+321,6-OFF_CURRICULUM_CHECK,All of the following are common question types in the IELTS Listening test EXCEPT:,medium,,,,,OFF_CURRICULUM: IELTS test - not in Nigerian curriculum,OFF_CURRICULUM: IELTS test - not in Nigerian curriculum
