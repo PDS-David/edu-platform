@@ -828,17 +828,21 @@ router.post('/tests/:id/questions', protect, teacherOnly, async (req, res) => {
     // (or any question, for admins).
     // NOTE: Sequelize named replacements do NOT expand JS arrays into SQL
     // arrays for ANY() — must use positional params + UNNEST instead.
+    // BUGFIX (2026-07-03): questions.id is an INTEGER (see server/models/Question.js
+    // — Sequelize auto-increment PK), not a UUID. Casting question_ids to ::uuid[]
+    // here threw "operator does not exist: integer = uuid" on every attach attempt,
+    // which is why teachers couldn't select/attach any question in the Test Builder.
     const isAdmin = req.user.role === 'admin';
     let validQuestions;
     if (isAdmin) {
       const rows = await sequelize.query(
-        `SELECT id FROM questions WHERE id = ANY(ARRAY[${question_ids.map((_, i) => `$${i + 1}`).join(',')}]::uuid[]) AND is_active = true`,
+        `SELECT id FROM questions WHERE id = ANY(ARRAY[${question_ids.map((_, i) => `$${i + 1}`).join(',')}]::integer[]) AND is_active = true`,
         { bind: question_ids, type: QueryTypes.SELECT }
       );
       validQuestions = rows;
     } else {
       const rows = await sequelize.query(
-        `SELECT id FROM questions WHERE id = ANY(ARRAY[${question_ids.map((_, i) => `$${i + 1}`).join(',')}]::uuid[]) AND is_active = true AND submitted_by = $${question_ids.length + 1}`,
+        `SELECT id FROM questions WHERE id = ANY(ARRAY[${question_ids.map((_, i) => `$${i + 1}`).join(',')}]::integer[]) AND is_active = true AND submitted_by = $${question_ids.length + 1}`,
         { bind: [...question_ids, req.user.id], type: QueryTypes.SELECT }
       );
       validQuestions = rows;
