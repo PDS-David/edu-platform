@@ -52,6 +52,16 @@ export default function AuthProvider({ children }) {
     return res.user;
   };
 
+  // Standalone English Masterclass registration — creates its own account
+  // and grants EM access in one step, independent of the AISchoolonair
+  // register() above.
+  const registerForEM = async (payload) => {
+    const res = await authApi.emRegister(payload);
+    if (res.token) setToken(res.token, false);
+    setUser(res.user);
+    return res.user;
+  };
+
   // AUTH-002: single-session logout — server revokes the token
   const logout = async () => {
     try { await authApi.logout(); } catch {}
@@ -71,7 +81,7 @@ export default function AuthProvider({ children }) {
   return (
     <AuthContext.Provider value={{
       user, loading,
-      login, register, logout, logoutAll, updateUser,
+      login, register, registerForEM, logout, logoutAll, updateUser,
       isAuthenticated: !!user,
     }}>
       {children}
