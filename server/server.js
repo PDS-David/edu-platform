@@ -15,6 +15,33 @@ const logger = require('./config/logger');
 const requestId = require('./middleware/requestId');
 const requestLogger = require('./middleware/requestLogger');
 
+// PROCESS-LEVEL SAFETY NET
+// Express's app.use((err, req, res, next) => ...) error handler below only
+// catches errors passed via next(err) or thrown synchronously in middleware.
+// It does NOT catch a rejected promise from an async route handler that has
+// no try/catch of its own — that becomes an "unhandled rejection" at the
+// process level, and Node terminates the process on those by default.
+// Previously that termination happened silently (no log line at all), so an
+// outage looked like the app vanishing with no trace. These handlers make
+// sure we always log what broke before exiting, and exit deliberately so
+// Docker's `restart: unless-stopped` brings up a clean process rather than
+// continuing to run with unknown state.
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled Promise Rejection — restarting for a clean process', {
+    error: reason && reason.message ? reason.message : String(reason),
+    stack: reason && reason.stack,
+  });
+  setTimeout(() => process.exit(1), 200);
+});
+
+process.on('uncaughtException', (err) => {
+  logger.error('Uncaught Exception — restarting for a clean process', {
+    error: err.message,
+    stack: err.stack,
+  });
+  setTimeout(() => process.exit(1), 200);
+});
+
 // ENV
 // In production, rely on platform-provided environment variables (Hetzner api.env).
 // Only load a local `server/.env` file for local development, and never override
