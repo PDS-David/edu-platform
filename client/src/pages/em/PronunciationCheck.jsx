@@ -7,6 +7,14 @@
 // POST /english-masterclass/pronunciation-score → Gemini transcribes + scores.
 // Scoring is accent-fair by design (see the route's prompt): a Nigerian or
 // Indian accent is not marked down, only genuine mispronunciation is.
+//
+// Cost control: each scored recording is a Gemini call, so the parent
+// (PracticeSession) tracks a SOFT, SESSION-WIDE budget across all 10 words
+// and passes it down as `attemptsUsed` / `budget` / `onAttempt`. "Soft"
+// means: once the budget is used up, the mic exercise politely stops
+// offering new scored attempts for the rest of the session, but typing
+// answers and everything else keeps working normally — nothing is blocked,
+// nobody is locked out, it just stops spending API calls.
 
 import { useState, useRef, useEffect } from 'react';
 import api from '../../services/apiClient';
@@ -27,12 +35,15 @@ const scoreStyle = (s) =>
   : s >= 55 ? 'text-amber-700 bg-amber-50 border-amber-200'
   : 'text-red-700 bg-red-50 border-red-200';
 
-export default function PronunciationCheck({ word, onResult }) {
+export default function PronunciationCheck({ word, onResult, attemptsUsed = 0, budget = Infinity, onAttempt }) {
   const { recording, error: micError, supported, start, stop } = useMic();
   const [status, setStatus]           = useState('idle'); // idle | scoring | done | error
   const [result, setResult]           = useState(null);
   const [playbackUrl, setPlaybackUrl] = useState(null);
   const urlRef = useRef(null);
+
+  const budgetLeft   = Math.max(0, budget - attemptsUsed);
+  const budgetExhausted = budgetLeft <= 0;
 
   // Reset the widget whenever the word changes (new card).
   useEffect(() => {
@@ -65,6 +76,7 @@ export default function PronunciationCheck({ word, onResult }) {
       urlRef.current = url;
       setPlaybackUrl(url);
       setStatus('scoring');
+      onAttempt?.(); // counts against the session budget — only for recordings we actually send for scoring
       try {
         const base64 = await blobToBase64(blob);
         const r = await api.post('/english-masterclass/pronunciation-score', {
@@ -85,6 +97,7 @@ export default function PronunciationCheck({ word, onResult }) {
         setResult({ error: 'Could not check that recording. Please try again.' });
       }
     } else {
+      if (budgetExhausted) return; // soft cap — button is disabled in this state anyway
       setResult(null);
       start();
     }
@@ -96,13 +109,13 @@ export default function PronunciationCheck({ word, onResult }) {
         <button
           type="button"
           onClick={handleToggle}
-          disabled={status === 'scoring'}
+          disabled={status === 'scoring' || (budgetExhausted && !recording)}
           aria-pressed={recording}
           aria-label={recording ? 'Stop recording' : 'Say the word'}
           className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all shadow-sm ${
             recording
               ? 'bg-red-500 text-white'
-              : status === 'scoring'
+              : status === 'scoring' || budgetExhausted
               ? 'bg-gray-100 text-gray-400'
               : 'bg-white border-2 border-indigo-200 text-indigo-600 hover:bg-indigo-50'
           }`}
@@ -126,7 +139,7 @@ export default function PronunciationCheck({ word, onResult }) {
           </button>
         )}
 
-        {(status === 'done' || status === 'error') && (
+        {(status === 'done' || status === 'error') && !budgetExhausted && (
           <button
             type="button"
             onClick={() => { setStatus('idle'); setResult(null); }}
@@ -147,8 +160,19 @@ export default function PronunciationCheck({ word, onResult }) {
         </div>
       )}
 
-      {status === 'error' && result?.error && (
+      {status === 'error' && result?.error && !budgetExhausted && (
         <p className="text-center text-xs text-red-500 mt-2">{result.error}</p>
+      )}
+
+      {/* Soft session cap: friendly, not a dead end — typing still works fine. */}
+      {budgetExhausted ? (
+        <p className="text-center text-[11px] text-gray-400 mt-2">
+          You've used up your speaking checks for this session — nice practice! Typing still counts as usual.
+        </p>
+      ) : Number.isFinite(budget) && budgetLeft <= 3 && status !== 'scoring' && (
+        <p className="text-center text-[11px] text-gray-300 mt-2">
+          {budgetLeft} speaking {budgetLeft === 1 ? 'check' : 'checks'} left this session
+        </p>
       )}
     </div>
   );

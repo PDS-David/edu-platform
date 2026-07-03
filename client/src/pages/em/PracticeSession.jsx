@@ -19,6 +19,13 @@ import DiffBadge from './DiffBadge';
 import useAudio from './useAudio';
 import PronunciationCheck from './PronunciationCheck';
 
+// Soft, session-wide cap on scored speaking attempts. Each one is a Gemini
+// call, so this bounds the cost of a single practice session regardless of
+// how many times a student re-records a given word. "Soft" — once used up,
+// the mic exercise just stops offering new scored attempts; typing answers,
+// skipping, and everything else keeps working normally.
+const PRON_SESSION_BUDGET = 15;
+
 export default function PracticeSession({ cat, words, onComplete }) {
   const [currentIdx, setCurrentIdx]         = useState(0);
   const [input, setInput]                   = useState('');
@@ -34,6 +41,8 @@ export default function PracticeSession({ cat, words, onComplete }) {
   // optional per word, so words the student never records for simply have
   // no entry here — see the pronunciation_score fallback below.
   const pronScoresRef                       = useRef({});
+  // Session-wide soft cap bookkeeping (see PRON_SESSION_BUDGET above).
+  const [pronAttemptsUsed, setPronAttemptsUsed] = useState(0);
 
   const currentWord = words[currentIdx];
   const progress    = (currentIdx / words.length) * 100;
@@ -144,6 +153,9 @@ export default function PracticeSession({ cat, words, onComplete }) {
         <PronunciationCheck
           key={currentWord.id}
           word={currentWord.word}
+          attemptsUsed={pronAttemptsUsed}
+          budget={PRON_SESSION_BUDGET}
+          onAttempt={() => setPronAttemptsUsed(n => n + 1)}
           onResult={(score) => { pronScoresRef.current[currentWord.id] = score; }}
         />
 

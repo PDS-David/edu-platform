@@ -86,4 +86,25 @@ const adminActionLimiter = rateLimit({
   message: { success: false, error: 'Too many admin actions, please slow down and try again.' },
 });
 
-module.exports = { globalLimiter, aiLimiter, analyticsLimiter, authLimiter, streamingLimiter, adminActionLimiter };
+// ── Pronunciation-scoring limiter ─────────────────────────────────────────────
+// Backstop behind the client-side soft cap (PRON_SESSION_BUDGET in
+// PracticeSession.jsx). The client cap is what students actually see and is
+// friendly/soft; this is the server-side hard limit in case that's ever
+// bypassed (a modified client, direct API calls, etc). Each request is a
+// Gemini audio call, so this exists purely for cost control, not UX — hence
+// a looser window than the per-session budget. Keyed on user ID so a shared
+// school-lab IP doesn't throttle other students.
+const pronunciationLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 40,                   // generous vs. the ~15/session client soft cap — a student doing 2 sessions in an hour is normal
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { xForwardedForHeader: false, trustProxy: false },
+  keyGenerator: (req) => {
+    if (req.user && req.user.id) return `pron:${req.user.id}`;
+    return ipKeyGenerator(req);
+  },
+  message: { success: false, error: "You've done a lot of speaking practice this hour — please try again a bit later." },
+});
+
+module.exports = { globalLimiter, aiLimiter, analyticsLimiter, authLimiter, streamingLimiter, adminActionLimiter, pronunciationLimiter };
