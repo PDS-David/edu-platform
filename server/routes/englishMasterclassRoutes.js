@@ -8,6 +8,7 @@ const router     = express.Router();
 const { Pool }   = require('pg');
 const { generate } = require('../services/ai');
 const { authorize } = require('../middleware/auth');
+const { pronunciationLimiter } = require('../middleware/rateLimiter');
 
 const db = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -180,7 +181,7 @@ Say only the word, nothing else: "${word}"`
 // not about matching one accent. This is the "internationally acceptable"
 // framing requested — a Nigerian student should not be marked down for
 // sounding Nigerian.
-router.post('/pronunciation-score', async (req, res) => {
+router.post('/pronunciation-score', pronunciationLimiter, async (req, res) => {
   const { word, audio, mime_type } = req.body;
   if (!word)  return res.status(400).json({ success: false, error: 'word is required' });
   if (!audio) return res.status(400).json({ success: false, error: 'audio is required' });
