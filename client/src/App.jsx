@@ -37,7 +37,6 @@ import SubjectCatalog from "./pages/SubjectCatalog";
 
 // Student
 import StudentDashboard, { DashboardContent } from "./pages/StudentDashboard";
-import EnglishMasterclass from "./pages/EnglishMasterclass";
 import AdminEnglishMasterclass from "./pages/AdminEnglishMasterclass";
 import StudentSubjectsPage from "./pages/StudentSubjectsPage";
 import StudentFilesPage from "./pages/StudentFilesPage";
@@ -148,8 +147,12 @@ export default function App() {
             <Route path="exam-types" element={<StudentExamTypesPage />} />
           </Route>
 
-          {/* English Masterclass — standalone route, own full-screen shell */}
-          <Route path="/student/english-masterclass" element={<EnglishMasterclass />} />
+          {/* Legacy route — this used to render English Masterclass inside the
+              AISchoolonair student shell (no EM branding, no EM-registration
+              gate on the frontend). EM is now a fully separate product with
+              its own portal; redirect any stale bookmarks/links there instead
+              of leaving a confusing, backend-403'd dead end live. */}
+          <Route path="/student/english-masterclass" element={<Navigate to="/em/dashboard" replace />} />
         </Route>
 
         {/* TEACHER */}
