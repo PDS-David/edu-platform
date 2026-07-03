@@ -24,10 +24,16 @@ export default function SessionSummary({ cat, attempts, onPracticeAgain, onBackT
   const correct  = attempts.filter(a => a.correct).length;
   const accuracy = Math.round((correct / attempts.length) * 100);
 
+  // Speaking practice is optional per word — only show a tile for it if the
+  // student actually used the mic on at least one word this session.
+  const pronScores = attempts.map(a => a.pronunciation_score).filter(s => typeof s === 'number');
+  const avgPron = pronScores.length ? Math.round(pronScores.reduce((s, v) => s + v, 0) / pronScores.length) : null;
+
   const stats = [
     { label: 'Words',    value: attempts.length, color: 'blue'   },
     { label: 'Correct',  value: correct,          color: 'green'  },
     { label: 'Accuracy', value: `${accuracy}%`,   color: 'purple' },
+    ...(avgPron !== null ? [{ label: 'Speaking', value: `${avgPron}%`, color: 'amber' }] : []),
   ];
 
   return (
@@ -55,7 +61,7 @@ export default function SessionSummary({ cat, attempts, onPracticeAgain, onBackT
           )}
         </div>
 
-        <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className={`grid gap-3 mb-6 ${stats.length === 4 ? 'grid-cols-4' : 'grid-cols-3'}`}>
           {stats.map(s => {
             const cls = COLOR_CLASSES[s.color] || COLOR_CLASSES.blue;
             return (
