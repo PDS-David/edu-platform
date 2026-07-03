@@ -25,6 +25,7 @@ import NotFound from "./pages/NotFound";
 
 // English Masterclass standalone portal
 import EMLoginPage from "./pages/em/EMLoginPage";
+import EMSignupPage from "./pages/em/EMSignupPage";
 import EMRegisterPage from "./pages/em/EMRegisterPage";
 import EMDashboard from "./pages/em/EMDashboard";
 import EMPractice  from "./pages/em/EMPractice";
@@ -89,6 +90,7 @@ export default function App() {
 
         {/* ENGLISH MASTERCLASS — public login */}
         <Route path="/em/login" element={<EMLoginPage />} />
+        <Route path="/em/signup" element={<EMSignupPage />} />
 
         {/* ENGLISH MASTERCLASS — protected portal (own layout, no AISchoolOnAir chrome) */}
         <Route element={<EMPrivateRoute />}>

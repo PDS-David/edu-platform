@@ -18,6 +18,7 @@ const router       = express.Router();
 const {
   register, login, logout, logoutAll, refreshToken,
   getMe, updatePassword, forgotPassword, resetPassword, verifyEmail,
+  registerForEnglishMasterclass,
 } = require('../controllers/auth');
 
 const { protect }     = require('../middleware/auth');
@@ -54,6 +55,11 @@ const registerWithEmail = async (req, res, next) => {
 
 // ─── Public routes ────────────────────────────────────────────────────────────
 router.post('/register',        authLimiter, registerWithEmail);
+// Standalone English Masterclass registration — independent account creation,
+// not layered on top of an AISchoolonair account. Deliberately NOT wrapped in
+// registerWithEmail's welcome-email side effect wrapper (separate product,
+// separate onboarding — can wire its own email later if wanted).
+router.post('/em-register',     authLimiter, registerForEnglishMasterclass);
 router.post('/login',           authLimiter, login);
 router.post('/forgot-password', authLimiter, forgotPassword);
 router.post('/reset-password',  authLimiter, resetPassword);

@@ -359,16 +359,15 @@ export default function EMLoginPage() {
               </div>
 
               <p className="text-center text-xs text-gray-500">
-                Not yet a student?{' '}
+                New to English Masterclass?{' '}
                 <Link
-                  to="/register"
+                  to="/em/signup"
                   className="font-semibold hover:underline"
                   style={{ color: SOVEREIGN[700] }}
                 >
-                  Create an AISchoolOnAir account
+                  Create an account
                 </Link>{' '}
-                first, then return here to sign in and complete a quick,
-                separate English Masterclass registration.
+                — no AISchoolonair account required.
               </p>
 
             </div>
