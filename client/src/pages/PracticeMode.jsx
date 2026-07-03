@@ -484,8 +484,17 @@ export default function PracticeMode() {
   const [errMsg,         setErrMsg]         = useState('');
   const [subjects,       setSubjects]       = useState([]);
   const [pickedSubject,  setPickedSubject]  = useState(subjectId ? { id: subjectId, name: subjectName } : null);
+  // BUGFIX (2026-07-03): "Try Again" and the error-screen "Retry" button used
+  // to call loadQuestions with no arguments (or, on the error screen, with
+  // the click event itself as the first argument). Since loadQuestions only
+  // filters by subject_id when a truthy sid is passed, retrying silently
+  // dropped the subject filter and pulled random questions from every
+  // subject. This tracks the last params actually used to load questions so
+  // retry can reuse them exactly.
+  const [activeParams,   setActiveParams]   = useState({ sid: subjectId, bcode: boardCode });
 
   const loadQuestions = async (sid, bcode) => {
+    setActiveParams({ sid, bcode });
     setPhase('loading');
     setErrMsg('');
     try {
@@ -602,7 +611,7 @@ export default function PracticeMode() {
               Go Back
             </button>
             <button
-              onClick={loadQuestions}
+              onClick={() => loadQuestions(activeParams.sid, activeParams.bcode)}
               className="flex-1 bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors"
             >
               Retry
@@ -660,7 +669,7 @@ export default function PracticeMode() {
       score={score}
       total={questions.length}
       subjectName={subjectName}
-      onRetry={loadQuestions}
+      onRetry={() => loadQuestions(activeParams.sid, activeParams.bcode)}
       onBack={() => navigate('/student/dashboard')}
     />
   );
