@@ -3,7 +3,7 @@
 ## Context
 
 Repository: PDS-David/edu-platform
-Token: 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
+Token: (provided out-of-band by the project owner — never commit it to this file or any other tracked file; export it as GITHUB_TOKEN in your shell instead)
 Production: https://www.aischoolonair.ng
 
 This is a large EdTech platform (Nigerian exam prep). You are being asked to
@@ -184,6 +184,27 @@ This is intentional and the fallback works. However:
   `window.speechSynthesis.onvoiceschanged = () => { ... }` since voices
   aren't synchronously available on first call in some browsers
 
+### GAP 4a — Speaking practice (DONE)
+Mic-based pronunciation scoring, integrated into the existing practice card
+(no new page/card):
+- `POST /api/english-masterclass/pronunciation-score` — takes `{ word, audio
+  (base64), mime_type }`, sends the clip to Gemini alongside a prompt that
+  explicitly forbids penalising non-British/non-American accents (Nigerian,
+  Indian, etc. are all valid), returns `{ score, heard, matched, feedback }`.
+- `client/src/pages/em/useMic.js` — MediaRecorder hook (works across Chrome,
+  Firefox, Safari 14.1+, Edge; deliberately not the browser's built-in
+  SpeechRecognition, which is Chrome-only and accent-inconsistent).
+- `client/src/pages/em/PronunciationCheck.jsx` — inline "Say it" widget
+  rendered inside the same practice card, below Listen/phonetic and above
+  the typed-answer form.
+- `em_practice_sessions.pronunciation_score` — nullable, session average of
+  any per-word scores recorded; null (not 0) if the student never used the
+  mic that session. Column added in BOTH `run_complete_migration.js` (the
+  actual deploy-path script called from `deploy.sh`) and
+  `run_english_masterclass_migration.js`, to avoid the exact
+  canonical-vs-deploy-path drift flagged in the earlier schema audit.
+- SessionSummary shows a 4th "Speaking" tile only when a score exists.
+
 ### GAP 4 — Admin sidebar item style
 In `AdminDashboard.jsx`, the English Masterclass nav item uses `icon: null`
 and renders a hardcoded `🇬🇧` emoji span. This works but is inconsistent with
@@ -234,8 +255,8 @@ Run through this as a student (David Temitope account or any student):
 4. Syntax check server files: `node --check server/routes/englishMasterclassRoutes.js`
 5. Pull before pushing — concurrent agents are active on this repo:
    ```bash
-   git pull --rebase https://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@github.com/PDS-David/edu-platform.git main
-   git push https://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@github.com/PDS-David/edu-platform.git main
+   git pull --rebase https://${GITHUB_TOKEN}@github.com/PDS-David/edu-platform.git main
+   git push https://${GITHUB_TOKEN}@github.com/PDS-David/edu-platform.git main
    ```
 6. Commit messages: `fix(english-masterclass): ...` or `feat(english-masterclass): ...`
 7. All work goes directly to `main` — no branches
