@@ -425,6 +425,13 @@ router.post('/admin/categories', adminOnly, async (req, res) => {
     `, [name, description || '', difficulty || 'Beginner', icon_emoji || '📚', order_index || 0, req.user.id]);
     res.status(201).json({ success: true, data: row });
   } catch (err) {
+    // 23505 = unique_violation (em_categories_name_difficulty_unique)
+    if (err.code === '23505') {
+      return res.status(409).json({
+        success: false,
+        error: `A "${difficulty || 'Beginner'}" category named "${name}" already exists.`,
+      });
+    }
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -448,6 +455,12 @@ router.patch('/admin/categories/:id', adminOnly, async (req, res) => {
     if (!row) return res.status(404).json({ success: false, error: 'Category not found' });
     res.json({ success: true, data: row });
   } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({
+        success: false,
+        error: `A "${difficulty || 'that'}" category named "${name}" already exists.`,
+      });
+    }
     res.status(500).json({ success: false, error: err.message });
   }
 });

@@ -4,24 +4,28 @@
 
 import { useState, useEffect, useCallback, useRef, useId } from 'react';
 import api from '../services/apiClient';
+import { DIFF_STYLE } from './em/DiffBadge';
 import {
   Plus, Trash2, Pencil, Save, X, Loader2, Sparkles,
   ChevronDown, ChevronRight, BookOpen, AlertCircle,
-  CheckCircle2, RefreshCw, Volume2,
+  CheckCircle2, RefreshCw, Volume2, AlertTriangle,
 } from 'lucide-react';
 
 const DIFFICULTIES = ['Beginner', 'Intermediate', 'Advanced'];
-const DIFF_COLORS  = {
-  Beginner:     'bg-green-100 text-green-700',
-  Intermediate: 'bg-blue-100 text-blue-700',
-  Advanced:     'bg-purple-100 text-purple-700',
-};
+// Badge colours now come from the shared DIFF_STYLE (./em/DiffBadge) so the
+// admin panel always matches the student-facing colour for a given
+// difficulty. This file used to keep its own local DIFF_COLORS map, which
+// had drifted out of sync (green vs. emerald for Beginner).
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
 function Toast({ msg, type }) {
   if (!msg) return null;
   return (
-    <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white ${type === 'error' ? 'bg-red-500' : 'bg-green-600'}`}>
+    <div
+      role="status"
+      aria-live="polite"
+      className={`fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white ${type === 'error' ? 'bg-red-500' : 'bg-green-600'}`}
+    >
       {type === 'error' ? <AlertCircle size={15} /> : <CheckCircle2 size={15} />}
       {msg}
     </div>
@@ -252,7 +256,7 @@ function GenerateWordsPanel({ category, onGenerated, toast }) {
 }
 
 // ── Category row with expandable word list ────────────────────────────────────
-function CategoryRow({ cat, onRefresh, toast }) {
+function CategoryRow({ cat, allCategories, onRefresh, toast }) {
   const [expanded, setExpanded]   = useState(false);
   const [words, setWords]         = useState([]);
   const [loadingW, setLoadingW]   = useState(false);
@@ -261,6 +265,7 @@ function CategoryRow({ cat, onRefresh, toast }) {
   const [savingCat, setSavingCat] = useState(false);
   const [wordModal, setWordModal] = useState(null); // null | 'new' | {word object for edit}
   const [deleting, setDeleting]   = useState(null);
+  const wordsRegionId = useId();
 
   const loadWords = useCallback(async () => {
     setLoadingW(true);
@@ -280,6 +285,10 @@ function CategoryRow({ cat, onRefresh, toast }) {
   };
 
   const saveCat = async () => {
+    const dupe = findDuplicate(allCategories, editForm.name, editForm.difficulty, cat.id);
+    if (dupe) {
+      return toast(`A "${editForm.difficulty}" category named "${dupe.name}" already exists.`, 'error');
+    }
     setSavingCat(true);
     try {
       await api.patch(`/english-masterclass/admin/categories/${cat.id}`, editForm);
@@ -323,13 +332,18 @@ function CategoryRow({ cat, onRefresh, toast }) {
     <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
       {/* Category header */}
       <div className="flex items-center gap-3 px-5 py-4">
-        <button onClick={toggle} className="flex items-center gap-2 flex-1 min-w-0 text-left">
+        <button
+          onClick={toggle}
+          className="flex items-center gap-2 flex-1 min-w-0 text-left"
+          aria-expanded={expanded}
+          aria-controls={wordsRegionId}
+        >
           <span className="text-xl shrink-0">{cat.icon_emoji || '📚'}</span>
           {!editing ? (
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <span className="font-bold text-gray-900 truncate">{cat.name}</span>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${DIFF_COLORS[cat.difficulty]}`}>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${(DIFF_STYLE[cat.difficulty] || DIFF_STYLE.Beginner).badge}`}>
                   {cat.difficulty}
                 </span>
               </div>
@@ -376,7 +390,7 @@ function CategoryRow({ cat, onRefresh, toast }) {
 
       {/* Expanded words section */}
       {expanded && (
-        <div className="border-t border-gray-100 px-5 py-4 bg-gray-50">
+        <div id={wordsRegionId} className="border-t border-gray-100 px-5 py-4 bg-gray-50">
           <GenerateWordsPanel category={cat} onGenerated={loadWords} toast={toast} />
 
           <div className="flex items-center justify-between mt-4 mb-3">
@@ -404,7 +418,7 @@ function CategoryRow({ cat, onRefresh, toast }) {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold text-gray-900">{w.word}</span>
                       {w.phonetic && <span className="text-xs text-gray-400 italic">{w.phonetic}</span>}
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${DIFF_COLORS[w.difficulty]}`}>
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${(DIFF_STYLE[w.difficulty] || DIFF_STYLE.Beginner).badge}`}>
                         {w.difficulty}
                       </span>
                     </div>
@@ -442,6 +456,32 @@ function CategoryRow({ cat, onRefresh, toast }) {
   );
 }
 
+// ── Duplicate-category helpers ───────────────────────────────────────────────
+// Client-side guard so an admin gets an immediate, friendly warning instead
+// of a round-trip to the server's 409 (see englishMasterclassRoutes.js).
+// Case/whitespace-insensitive on name, matched within the same difficulty.
+function findDuplicate(categories, name, difficulty, excludeId) {
+  const target = name.trim().toLowerCase();
+  return categories.find(c =>
+    c.id !== excludeId &&
+    c.difficulty === difficulty &&
+    c.name.trim().toLowerCase() === target
+  );
+}
+
+// Groups categories by (name, difficulty) and returns only the groups with
+// more than one row — i.e. leftover duplicates from the em_categories bug
+// that haven't been cleaned up yet (see server/scripts/dedupe_em_categories.js).
+function findDuplicateGroups(categories) {
+  const groups = new Map();
+  for (const c of categories) {
+    const key = `${c.name.trim().toLowerCase()}__${c.difficulty}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(c);
+  }
+  return [...groups.values()].filter(g => g.length > 1);
+}
+
 // ═════════════════════════════════════════════════════════════════════════════
 // MAIN ADMIN PAGE
 // ═════════════════════════════════════════════════════════════════════════════
@@ -472,8 +512,14 @@ export default function AdminEnglishMasterclass() {
 
   useEffect(() => { loadCategories(); }, [loadCategories]);
 
+  const duplicateGroups = findDuplicateGroups(categories);
+
   const addCategory = async () => {
     if (!newCat.name.trim()) return showToast('Category name is required', 'error');
+    const dupe = findDuplicate(categories, newCat.name, newCat.difficulty);
+    if (dupe) {
+      return showToast(`A "${newCat.difficulty}" category named "${dupe.name}" already exists.`, 'error');
+    }
     setSavingCat(true);
     try {
       await api.post('/english-masterclass/admin/categories', newCat);
@@ -553,6 +599,25 @@ export default function AdminEnglishMasterclass() {
         </div>
       )}
 
+      {/* Duplicate-category warning — leftover from the em_categories bug;
+          run server/scripts/dedupe_em_categories.js to clean these up. */}
+      {!loading && duplicateGroups.length > 0 && (
+        <div className="flex items-start gap-2 mb-5 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+          <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold">
+              {duplicateGroups.length} duplicate categor{duplicateGroups.length === 1 ? 'y' : 'ies'} detected
+              ({duplicateGroups.reduce((s, g) => s + g.length, 0)} rows total).
+            </p>
+            <p className="text-amber-700 mt-0.5">
+              These are leftover from a fixed data bug. Run{' '}
+              <code className="bg-amber-100 px-1 rounded">node server/scripts/dedupe_em_categories.js --apply</code>{' '}
+              on the server to merge them (student progress is preserved).
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Category list */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
@@ -568,7 +633,7 @@ export default function AdminEnglishMasterclass() {
       ) : (
         <div className="space-y-3">
           {categories.map(cat => (
-            <CategoryRow key={cat.id} cat={cat} onRefresh={loadCategories} toast={showToast} />
+            <CategoryRow key={cat.id} cat={cat} allCategories={categories} onRefresh={loadCategories} toast={showToast} />
           ))}
         </div>
       )}
