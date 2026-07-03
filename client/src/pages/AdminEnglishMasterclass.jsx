@@ -7,15 +7,16 @@ import api from '../services/apiClient';
 import {
   Plus, Trash2, Pencil, Save, X, Loader2, Sparkles,
   ChevronDown, ChevronRight, BookOpen, AlertCircle,
-  CheckCircle2, RefreshCw, Volume2,
+  CheckCircle2, RefreshCw,
 } from 'lucide-react';
+import { DIFFICULTY_LEVELS, DIFFICULTY_STYLES } from './em/constants';
 
-const DIFFICULTIES = ['Beginner', 'Intermediate', 'Advanced'];
-const DIFF_COLORS  = {
-  Beginner:     'bg-green-100 text-green-700',
-  Intermediate: 'bg-blue-100 text-blue-700',
-  Advanced:     'bg-purple-100 text-purple-700',
-};
+const DIFFICULTIES = DIFFICULTY_LEVELS;
+// Combined badge classes, built from the shared style tokens so this panel
+// stays visually consistent with the student-facing DiffBadge/LevelSection.
+const DIFF_COLORS = Object.fromEntries(
+  DIFFICULTY_LEVELS.map(d => [d, `${DIFFICULTY_STYLES[d].badgeBg} ${DIFFICULTY_STYLES[d].badgeText}`])
+);
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
 function Toast({ msg, type }) {
