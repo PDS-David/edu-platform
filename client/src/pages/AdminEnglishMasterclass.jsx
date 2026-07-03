@@ -4,18 +4,19 @@
 
 import { useState, useEffect, useCallback, useRef, useId } from 'react';
 import api from '../services/apiClient';
-import { DIFF_STYLE } from './em/DiffBadge';
 import {
   Plus, Trash2, Pencil, Save, X, Loader2, Sparkles,
   ChevronDown, ChevronRight, BookOpen, AlertCircle,
-  CheckCircle2, RefreshCw, Volume2, AlertTriangle,
+  CheckCircle2, RefreshCw, AlertTriangle,
 } from 'lucide-react';
+import { DIFFICULTY_LEVELS, DIFFICULTY_STYLES } from './em/constants';
 
-const DIFFICULTIES = ['Beginner', 'Intermediate', 'Advanced'];
-// Badge colours now come from the shared DIFF_STYLE (./em/DiffBadge) so the
-// admin panel always matches the student-facing colour for a given
-// difficulty. This file used to keep its own local DIFF_COLORS map, which
-// had drifted out of sync (green vs. emerald for Beginner).
+const DIFFICULTIES = DIFFICULTY_LEVELS;
+// Combined badge classes, built from the shared style tokens so this panel
+// stays visually consistent with the student-facing DiffBadge/LevelSection.
+const DIFF_COLORS = Object.fromEntries(
+  DIFFICULTY_LEVELS.map(d => [d, `${DIFFICULTY_STYLES[d].badgeBg} ${DIFFICULTY_STYLES[d].badgeText}`])
+);
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
 function Toast({ msg, type }) {
@@ -343,7 +344,7 @@ function CategoryRow({ cat, allCategories, onRefresh, toast }) {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <span className="font-bold text-gray-900 truncate">{cat.name}</span>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${(DIFF_STYLE[cat.difficulty] || DIFF_STYLE.Beginner).badge}`}>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${DIFF_COLORS[cat.difficulty]}`}>
                   {cat.difficulty}
                 </span>
               </div>
@@ -418,7 +419,7 @@ function CategoryRow({ cat, allCategories, onRefresh, toast }) {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold text-gray-900">{w.word}</span>
                       {w.phonetic && <span className="text-xs text-gray-400 italic">{w.phonetic}</span>}
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${(DIFF_STYLE[w.difficulty] || DIFF_STYLE.Beginner).badge}`}>
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${DIFF_COLORS[w.difficulty]}`}>
                         {w.difficulty}
                       </span>
                     </div>

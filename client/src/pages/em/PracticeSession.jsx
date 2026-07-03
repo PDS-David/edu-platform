@@ -17,6 +17,14 @@ import {
 } from 'lucide-react';
 import DiffBadge from './DiffBadge';
 import useAudio from './useAudio';
+import PronunciationCheck from './PronunciationCheck';
+
+// Soft, session-wide cap on scored speaking attempts. Each one is a Gemini
+// call, so this bounds the cost of a single practice session regardless of
+// how many times a student re-records a given word. "Soft" — once used up,
+// the mic exercise just stops offering new scored attempts; typing answers,
+// skipping, and everything else keeps working normally.
+const PRON_SESSION_BUDGET = 15;
 
 export default function PracticeSession({ cat, words, onComplete }) {
   const [currentIdx, setCurrentIdx]         = useState(0);
@@ -29,6 +37,12 @@ export default function PracticeSession({ cat, words, onComplete }) {
   const [sessionStart]                      = useState(Date.now());
   const { playing, play }                   = useAudio();
   const inputRef                            = useRef(null);
+  // word_id -> latest pronunciation score (0-100). Speaking practice is
+  // optional per word, so words the student never records for simply have
+  // no entry here — see the pronunciation_score fallback below.
+  const pronScoresRef                       = useRef({});
+  // Session-wide soft cap bookkeeping (see PRON_SESSION_BUDGET above).
+  const [pronAttemptsUsed, setPronAttemptsUsed] = useState(0);
 
   const currentWord = words[currentIdx];
   const progress    = (currentIdx / words.length) * 100;
@@ -69,13 +83,19 @@ export default function PracticeSession({ cat, words, onComplete }) {
     if (!currentWord) return;
     const isCorrect = input.trim().toLowerCase() === currentWord.word.toLowerCase();
     setFeedback(isCorrect ? 'correct' : 'wrong');
-    const newAttempts = [...attempts, { word_id: currentWord.id, word: currentWord.word, correct: isCorrect, userAnswer: input.trim() }];
+    const newAttempts = [...attempts, {
+      word_id: currentWord.id, word: currentWord.word, correct: isCorrect, userAnswer: input.trim(),
+      pronunciation_score: pronScoresRef.current[currentWord.id] ?? null,
+    }];
     setAttempts(newAttempts);
     setTimeout(() => advance(newAttempts), 900);
   };
 
   const handleSkip = () => {
-    const newAttempts = [...attempts, { word_id: currentWord.id, word: currentWord.word, correct: false, userAnswer: '' }];
+    const newAttempts = [...attempts, {
+      word_id: currentWord.id, word: currentWord.word, correct: false, userAnswer: '',
+      pronunciation_score: pronScoresRef.current[currentWord.id] ?? null,
+    }];
     setAttempts(newAttempts);
     setShowExplain(false);
     setExplanation(null);
@@ -124,8 +144,22 @@ export default function PracticeSession({ cat, words, onComplete }) {
         </div>
 
         {currentWord.phonetic && (
-          <p className="text-center text-sm text-gray-400 italic mb-4">{currentWord.phonetic}</p>
+          <p className="text-center text-sm text-gray-400 italic mb-1">{currentWord.phonetic}</p>
         )}
+
+        {/* Speaking practice — the mic-based pronunciation exercise. Kept in
+           this same card (not a separate card/page) with its own reset key
+           per word so it doesn't carry state across words. */}
+        <PronunciationCheck
+          key={currentWord.id}
+          word={currentWord.word}
+          attemptsUsed={pronAttemptsUsed}
+          budget={PRON_SESSION_BUDGET}
+          onAttempt={() => setPronAttemptsUsed(n => n + 1)}
+          onResult={(score) => { pronScoresRef.current[currentWord.id] = score; }}
+        />
+
+        <div className="mt-2" />
 
         {feedback && (
           <div className={`flex items-center justify-center gap-2 py-3 rounded-xl mb-4 ${

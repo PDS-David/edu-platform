@@ -235,6 +235,96 @@ exports.register = async (req, res, next) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// REGISTER — English Masterclass (standalone pathway)
+//
+// Deliberately NOT "register for AISchoolonair, then add EM on top." This
+// creates an account and grants EM access in the same step — no dependency
+// on already having (or being sent to create) an AISchoolonair account.
+// Shares the `users` table as an implementation detail only; nothing in
+// this flow requires, checks, or references AISchoolonair registration.
+// ─────────────────────────────────────────────────────────────────────────────
+exports.registerForEnglishMasterclass = async (req, res, next) => {
+  try {
+    const rawEmail   = normaliseEmail(req.body.email);
+    const password   = req.body.password;
+    const first_name = normaliseName(req.body.first_name || req.body.firstName || '');
+    const last_name  = normaliseName(req.body.last_name  || req.body.lastName  || first_name);
+
+    const emailCheck = validateEmail(rawEmail);
+    if (!emailCheck.valid) {
+      return res.status(400).json({ success: false, error: emailCheck.error });
+    }
+    const passCheck = validatePassword(password);
+    if (!passCheck.valid) {
+      return res.status(400).json({ success: false, error: passCheck.error });
+    }
+    const fnCheck = validateName(first_name, 'First name');
+    if (!fnCheck.valid) {
+      return res.status(400).json({ success: false, error: fnCheck.error });
+    }
+
+    const salt           = await bcrypt.genSalt(12);
+    const hashedPassword = await bcrypt.hash(password, salt);
+    const verificationToken        = randomToken();
+    const verificationTokenExpires = new Date(Date.now() + 86400000);
+
+    // Same ON CONFLICT DO NOTHING pattern as /register (R-03) — no phone
+    // required (EM has no phone-based flows), em_registered_at set to NOW()
+    // in the same INSERT so registering IS the EM registration, in one step.
+    const rows = await db.query(
+      `INSERT INTO users
+         (email, password, first_name, last_name, role,
+          verification_token, verification_token_expires,
+          is_active, is_verified, subscription_status,
+          em_registered_at,
+          created_at, updated_at)
+       VALUES
+         (:email, :password, :first_name, :last_name, 'student',
+          :verificationToken, :verificationTokenExpires,
+          true, false, 'free_trial',
+          NOW(),
+          NOW(), NOW())
+       ON CONFLICT (email) DO NOTHING
+       RETURNING
+         id, email, first_name, last_name, role,
+         is_active, is_verified, subscription_status,
+         onboarding_complete, xp_points, study_streak_days,
+         em_registered_at, created_at`,
+      {
+        replacements: {
+          email: rawEmail, password: hashedPassword, first_name, last_name,
+          verificationToken, verificationTokenExpires,
+        },
+        type: QueryTypes.SELECT,
+      }
+    );
+
+    if (!rows.length) {
+      return res.status(409).json({ success: false, error: 'An account with that email already exists' });
+    }
+
+    const user = safeUser(rows[0]);
+    const { ipAddress, userAgent } = clientMeta(req);
+
+    const { accessToken, refreshToken } = await tokenService.issueTokenPair({
+      userId: user.id, role: user.role,
+      rememberMe: false, ipAddress, userAgent,
+      deviceHint: 'em-register',
+    });
+
+    setImmediate(() => audit.register({ userId: user.id, email: user.email, ipAddress, userAgent }));
+    setRefreshCookie(res, refreshToken, false);
+
+    return res.status(201).json({ success: true, token: accessToken, user });
+
+  } catch (err) {
+    console.error('[registerForEnglishMasterclass]', err.message);
+    if (handleUniqueViolation(err, res)) return;
+    next(err);
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // LOGIN
 // AUTH-001  Lockout logic
 // AUTH-002  Token registered server-side

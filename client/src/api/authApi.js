@@ -10,6 +10,12 @@ export const register = async (payload) => {
   return res.data ?? res;
 };
 
+// Standalone English Masterclass registration — independent of /auth/register.
+export const emRegister = async (payload) => {
+  const res = await apiClient.post('/auth/em-register', payload);
+  return res.data ?? res;
+};
+
 export const getMe = async () => {
   const res = await apiClient.get('/auth/me');
   return res.data ?? res;
