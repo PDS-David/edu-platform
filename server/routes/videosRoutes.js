@@ -282,29 +282,34 @@ router.get('/token', protect, async (req, res) => {
     return res.status(400).json({ success: false, error: 'Valid videoId required' });
   }
 
-  // Verify the user actually has access before issuing a token
-  const rows = await sequelize.query(
-    `SELECT id, course_id, required_tier, is_free, upload_status FROM videos WHERE id = :videoId`,
-    { replacements: { videoId }, type: QueryTypes.SELECT }
-  ).catch(() => []);
+  try {
+    // Verify the user actually has access before issuing a token
+    const rows = await sequelize.query(
+      `SELECT id, course_id, required_tier, is_free, upload_status FROM videos WHERE id = :videoId`,
+      { replacements: { videoId }, type: QueryTypes.SELECT }
+    );
 
-  if (!rows.length) {
-    return res.status(404).json({ success: false, error: 'Video not found' });
+    if (!rows.length) {
+      return res.status(404).json({ success: false, error: 'Video not found' });
+    }
+
+    const video = rows[0];
+
+    if (!hasTierAccess(req.user.role, video.required_tier, video.is_free)) {
+      return res.status(403).json({ success: false, error: 'Access denied', code: 'TIER_REQUIRED' });
+    }
+
+    const token = issueStreamToken(req.user.id, videoId);
+    const streamUrl = `${SERVER_BASE_URL}/api/videos/stream/${videoId}/master.m3u8?tok=${token}`;
+
+    return res.status(200).json({
+      success: true,
+      data: { token, expiresIn: STREAM_TOKEN_TTL, streamUrl },
+    });
+  } catch (err) {
+    logger.error('[Videos] token issue error', { err: err.message, videoId });
+    return res.status(500).json({ success: false, error: 'Failed to issue stream token' });
   }
-
-  const video = rows[0];
-
-  if (!hasTierAccess(req.user.role, video.required_tier, video.is_free)) {
-    return res.status(403).json({ success: false, error: 'Access denied', code: 'TIER_REQUIRED' });
-  }
-
-  const token = issueStreamToken(req.user.id, videoId);
-  const streamUrl = `${SERVER_BASE_URL}/api/videos/stream/${videoId}/master.m3u8?tok=${token}`;
-
-  return res.status(200).json({
-    success: true,
-    data: { token, expiresIn: STREAM_TOKEN_TTL, streamUrl },
-  });
 });
 
 // =============================================================================
