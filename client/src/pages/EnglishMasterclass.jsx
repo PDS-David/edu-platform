@@ -29,7 +29,12 @@ export default function EnglishMasterclass({ embedded = false, defaultTab = 'pra
   const { user } = useAuth(); // eslint-disable-line no-unused-vars
 
   const [activeTab, setActiveTab]       = useState(defaultTab);
-  const [view, setView]                 = useState('levels'); // levels | session | summary
+  // levels | starting | session | summary
+  // 'starting' is used only when EMDashboard pre-selected a category
+  // (initialCategory) — it prevents the full category grid (LevelsView)
+  // from flashing on screen while the words for that category are still
+  // being fetched. See handleStartCategory in EMDashboard.jsx.
+  const [view, setView]                 = useState(initialCategory ? 'starting' : 'levels');
   const [categories, setCategories]     = useState([]);
   const [levelProgress, setLevelProgress] = useState(null);
   const [loadingInit, setLoadingInit]   = useState(true);
@@ -72,6 +77,7 @@ export default function EnglishMasterclass({ embedded = false, defaultTab = 'pra
       setView('session');
     } catch (e) {
       alert(e.message || 'Could not load words. Please try another category.');
+      setView('levels'); // don't get stuck on the 'starting' spinner if this was the auto-start call
     } finally {
       setLoadingCatId(null);
     }
@@ -131,6 +137,12 @@ export default function EnglishMasterclass({ embedded = false, defaultTab = 'pra
                 className="flex items-center gap-1 text-xs text-indigo-600 font-semibold hover:underline">
                 <RefreshCw size={12} aria-hidden="true" /> Retry
               </button>
+            </div>
+          )}
+          {!loadingInit && !initError && view === 'starting' && (
+            <div className="flex items-center justify-center py-24" role="status">
+              <Loader2 size={24} className="animate-spin text-indigo-500 mr-3" aria-hidden="true" />
+              <span className="text-gray-500 text-sm">Starting your practice session…</span>
             </div>
           )}
           {!loadingInit && !initError && view === 'levels' && (
