@@ -1,0 +1,326 @@
+subtopic_id,subtopic_name,topic_name,subject_name
+92,Double-Entry Principle,Bookkeeping,Accounting
+91,Source Documents,Bookkeeping,Accounting
+98,Balance Sheet,Final Accounts,Accounting
+97,"Trading, Profit and Loss Account",Final Accounts,Accounting
+94,Balancing Ledger Accounts,Ledger Accounts,Accounting
+93,Posting from Journals to Ledgers,Ledger Accounts,Accounting
+90,Classification of Financial Transactions,logbook,Accounting
+89,Recording Daily Transactions,logbook,Accounting
+96,Errors Revealed and Not Revealed by a Trial Balance,Trial Balance,Accounting
+95,Preparation of Trial Balance,Trial Balance,Accounting
+101,Farm Animal Management,Animal Production,Agricultural Science
+102,Livestock Feeding and Nutrition,Animal Production,Agricultural Science
+100,Crop Pests and Diseases,Crop Production,Agricultural Science
+99,Methods of Crop Propagation,Crop Production,Agricultural Science
+106,Farm Planning and Organization,Farm Management,Agricultural Science
+105,Farm Records and Accounts,Farm Management,Agricultural Science
+108,Importance of Farm Records,Log Booking,Agricultural Science
+107,Recording Farm Activities,Log Booking,Agricultural Science
+104,Soil Fertility and Conservation,Soil Science,Agricultural Science
+103,Soil Formation,Soil Science,Agricultural Science
+22,fertilization and development,Biolo,Biology
+8,reproductive system,Biolo,Biology
+76,cell division,Cell biology,Biology
+77,plasmodea,Cell biology,Biology
+79,mitocondrea,cell structure and organelles,Biology
+78,nucleus,cell structure and organelles,Biology
+18,Ecosystem,Ecology,Biology
+17,Enviromental conservation,Ecology,Biology
+16,Food Chain,Ecology,Biology
+20,Adaptation,evolution,Biology
+21,Evidence Of Evolution,evolution,Biology
+19,Natural Selecton,evolution,Biology
+80,DNA,genetics,Biology
+81,Genes,genetics,Biology
+83,Genetic variation,Heredity and inheritance,Biology
+82,Mendelian inheritance,Heredity and inheritance,Biology
+85,Functions of the nervous system,Nervous system,Biology
+84,Stucture of the nervous system,Nervous system,Biology
+13,Autotrophic Nutrition,Nutrition,Biology
+12,Heterotrophic Nutrition,Nutrition,Biology
+72,mode of nutrition,Nutrition,Biology
+71,photosyntensis,Nutrition,Biology
+11,Photosynthesis,Nutrition,Biology
+9,asexual reproduction,reproductive system,Biology
+10,Sexual  Reproduction,reproductive system,Biology
+14,Blood Circulation,Transport System,Biology
+15,Transport in plant,Transport System,Biology
+267,Barriers to Effective Communication,Communication in Business,Business admin
+268,Types of Business Communication,Communication in Business,Business admin
+266,Characteristics of an Entrepreneur,Entrepreneurship,Business admin
+265,Small Business Management,Entrepreneurship,Business admin
+261,Importance of Business Records,Log Booking,Business admin
+262,Recording Business Activities,Log Booking,Business admin
+264,Functions of Management,Management,Business admin
+263,Levels of Management,Management,Business admin
+271,Functions of an Office,Office Practice,Business admin
+270,Office Equipment and Their Uses,Office Practice,Business admin
+5,Acid,"Acid,Base and salts",Chemistry
+24,neutralization Reaction,"Acid,Base and salts",Chemistry
+25,Electronic configuration,Atomic Structure,Chemistry
+26,Subatomic Particle,Atomic Structure,Chemistry
+75,Electronic Configurations and Rules,Atomic Structure and Periodicity,Chemistry
+74,Periodic Law and Atomic Properties,Atomic Structure and Periodicity,Chemistry
+73,Quantum Numbers and Orbital Shapes,Atomic Structure and Periodicity,Chemistry
+28,Covalent Bounding,Chemical Bonding,Chemistry
+27,Ionic Bounding,Chemical Bonding,Chemistry
+110,"Intermolecular Forces (Hydrogen bonding, van der Waals)",Chemical Bonding and Molecular Geometry,Chemistry
+109,"Ionic, Covalent, and Coordinate Bonding",Chemical Bonding and Molecular Geometry,Chemistry
+111,Valence Shell Electron Pair Repulsion (VSEPR) Theory,Chemical Bonding and Molecular Geometry,Chemistry
+116,"Aliphatic Hydrocarbons (Alkanes, Alkenes, Alkynes)",Organic Chemistry,Chemistry
+117,Aromatic Hydrocarbons (Benzene and its derivatives),Organic Chemistry,Chemistry
+31,Hydro Carbon,Organic Chemistry,Chemistry
+115,Isomerism in Organic Compounds,Organic Chemistry,Chemistry
+33,Petroleum And Petrolchemical,Organic Chemistry,Chemistry
+29,Group and Period,Periodic Table,Chemistry
+30,Periodic Properties Of Element,Periodic Table,Chemistry
+86,Avogadro’s Constant and Molar Mass,The Mole Concept and Stoichiometry,Chemistry
+87,Empirical and Molecular Formulae,The Mole Concept and Stoichiometry,Chemistry
+88,Solution Stoichiometry and Titration,The Mole Concept and Stoichiometry,Chemistry
+112,Enthalpy and Entropy Changes,Thermochemistry and Energetics,Chemistry
+113,"Hess’s Law of Heat Summation,",Thermochemistry and Energetics,Chemistry
+114,Spontaneity of Reactions and Gibbs Free Energy,Thermochemistry and Energetics,Chemistry
+36,Right And Duities Of A Citizen,Citizenship,Civic Education
+35,type of citizen,Citizenship,Civic Education
+70,Duties and Obligations of Citizens,Citizenship and Human Rights,Civic Education
+69,Fundamental Human Rights,Citizenship and Human Rights,Civic Education
+68,Modes of Acquiring Citizenship,Citizenship and Human Rights,Civic Education
+38,Electoral Process,Democracy,Civic Education
+37,Features Of Democracy,Democracy,Civic Education
+39,Fundamental Human Right,Human Right,Civic Education
+40,Protection Of Human Right,Human Right,Civic Education
+44,Intigrity And Honesty,National Value,Civic Education
+43,Patriotism,National Value,Civic Education
+41,Equality before The Law,Rule Of Law,Civic Education
+42,Suprmacy Of The Law,Rule Of Law,Civic Education
+67,Integrity and Discipline.,Values and National Consciousness,Civic Education
+66,National Identity and Unity,Values and National Consciousness,Civic Education
+65,Types and Importance of Values.,Values and National Consciousness,Civic Education
+58,Function Of Commercial Bank,Banking,Commerce
+57,Function Of Commercial Bank,Banking,Commerce
+6,book,Book keeping,Commerce
+64,Limited Liability Companies And cooperatives,Business Organizations,Commerce
+63,Sole Proprietorship And Partnership,Business Organizations,Commerce
+59,principles of insurance,Insurance,Commerce
+60,Type Of Insurance,Insurance,Commerce
+55,Aid To Trade,Trade,Commerce
+53,Foreign Trade,Trade,Commerce
+52,Home Trade And Foreign Trade,Trade,Commerce
+62,Advantage and Disadvantage Of Transportation,Transportation,Commerce
+61,Modes Of Transportation,Transportation,Commerce
+46,David as a Man After God's Own Heart,Leadership Roles in Ancient Israel,CRS
+45,The Call of Moses and Joshua,Leadership Roles in Ancient Israel,CRS
+47,The Reign of King Solomon,Leadership Roles in Ancient Israel,CRS
+50,Discipleship and Cost,The Baptism and Temptation of Jesus,CRS
+48,The Baptism of Jesus,The Baptism and Temptation of Jesus,CRS
+49,The Three Temptations,The Baptism and Temptation of Jesus,CRS
+56,Jesus' Teaching on Love and Forgiveness,The Sermon on the Mount & Jesus' Teachings,CRS
+54,Salt and Light / The Lord's Prayer,The Sermon on the Mount & Jesus' Teachings,CRS
+51,The Beatitudes,The Sermon on the Mount & Jesus' Teachings,CRS
+23,God as Creator and Controller,The Sovereignty of God,CRS
+32,The Covenant with Noah and Abraham,The Sovereignty of God,CRS
+34,The New Covenant,The Sovereignty of God,CRS
+132,Basic Definitions of Data and Information,Data and Information Concepts,Data Processing
+136,Computer Files and Database Models,Data and Information Concepts,Data Processing
+134,Data Quality and Security,Data and Information Concepts,Data Processing
+142,Information Transmission,ICT and Internet Technologies,Data Processing
+140,Internet Services and Email,ICT and Internet Technologies,Data Processing
+138,Networking and Network Topologies,ICT and Internet Technologies,Data Processing
+146,"Database Management Systems (DBMS - e.g., MS Access)",Office Productivity and Application Packages,Data Processing
+145,"Spreadsheets (e.g., Microsoft Excel)",Office Productivity and Application Packages,Data Processing
+144,"Word Processing (e.g., Microsoft Word)",Office Productivity and Application Packages,Data Processing
+122,Balance Of Trade And Payment,International Trade,Economics
+123,Trade Restrictions And Exchange Rate,International Trade,Economics
+125,Inflation And Unemployment,Macroeconomics,Economics
+124,National Income,Macroeconomics,Economics
+126,Demand And Supply,Microeconomics,Economics
+127,Price Determination And Elasticity,Microeconomics,Economics
+119,Commercial And Central Banking,Money And Banking,Economics
+118,Function Of Money,Money And Banking,Economics
+121,Goverment Expenditure And Budgeting,Public Finance,Economics
+120,Goverment Revenue And Taxation,Public Finance,Economics
+129,Interpretation of Information,Comprehension,English Language
+128,Reading and Understanding Passages,Comprehension,English Language
+165,Argumentative Essay,Essay Writing & Comprehension,English Language
+164,Comprehension,Essay Writing & Comprehension,English Language
+163,Formal Letter Writing,Essay Writing & Comprehension,English Language
+131,Concord (Subject-Verb Agreement),Grammar,English Language
+130,Tenses,Grammar,English Language
+158,Antonyms (Opposite Meaning),Lexis and Structure,English Language
+159,Sentence Completion (Grammar/Concord),Lexis and Structure,English Language
+157,Synonyms (Nearest Meaning),Lexis and Structure,English Language
+162,Emphatic Stress,Oral English,English Language
+161,Rhymes,Oral English,English Language
+160,Vowel and Consonant Sounds,Oral English,English Language
+137,Nouns and Pronouns,Part Of Speech,English Language
+139,Verbs and Adjectives,Part Of Speech,English Language
+143,Sentence Patterns and Construction,Sentence Structure,English Language
+141,"Simple, Compound and Complex Sentences",Sentence Structure,English Language
+133,Synonyms and Antonyms,Vocabulary,English Language
+135,Word Meaning in Contex,Vocabulary,English Language
+149,Journal and Journal Entries,Book Of Original Entry,Financial Accounting
+150,"Subsidiary Books (Sales Day Book, Purchases Day Book, etc.)",Book Of Original Entry,Financial Accounting
+154,Balance Sheet,Final Account,Financial Accounting
+153,"Trading, Profit and Loss Account",Final Account,Financial Accounting
+147,Meaning and Objectives of Accounting,Introduction To Accounting,Financial Accounting
+148,Users of Accounting Information,Introduction To Accounting,Financial Accounting
+151,Posting from Journal to Ledger,Ledger And Trial Balance,Financial Accounting
+152,Preparation of Trial Balance,Ledger And Trial Balance,Financial Accounting
+155,Government Revenue and Expenditure,Public Sector Accounting,Financial Accounting
+156,Public Accounts and Fund Accounting,Public Sector Accounting,Financial Accounting
+184,"Ceramics, Sculpture, and Exhibition",Applied and Industrial Arts,Fine Arts
+182,"Graphics and Lettering (Posters, Logos, Layouts)",Applied and Industrial Arts,Fine Arts
+183,"Textile Design (Dyeing, Weaving, Printing)",Applied and Industrial Arts,Fine Arts
+178,Color Theory and Psychology,Elements and Principles of Design,Fine Arts
+176,"Elements of Art (Line, Shape, Form, Color, Texture, Value, Space)",Elements and Principles of Design,Fine Arts
+177,"Principles of Design (Balance, Contrast, Emphasis, Movement, Pattern, Rhythm, Unity)",Elements and Principles of Design,Fine Arts
+181,Nigerian Crafts and Folk Art,History of Nigerian Art,Fine Arts
+180,Pioneering Nigerian Contemporary Artists,History of Nigerian Art,Fine Arts
+179,"Traditional Nigerian Arts and Crafts (Nok, Ife, Benin, Igbo-Ukwu)",History of Nigerian Art,Fine Arts
+321,"HDI, GDP per capita, literacy rate",development,Geography
+322,Life expectancy and development indicators,development,Geography
+324,Employment structure,economic development,Geography
+323,"Primary, secondary, tertiary, quaternary sectors",economic development,Geography
+317,"Birth rates, death rates, fertility rates",Population,Geography
+318,Natural increase and population trends,Population,Geography
+325,Foreign direct investment (FDI),resource management,Geography
+326,Impact of multinational corporations (MNCs),resource management,Geography
+319,Causes of urbanisation,Urbanisation,Geography
+320,Rural-urban migration,Urbanisation,Geography
+200,Business Planning and Feasibility Studies,Entrepreneurship and Business Studies,GNS
+204,Production and Marketing Strategies,Entrepreneurship and Business Studies,GNS
+202,Sources of Finance and Capital Management,Entrepreneurship and Business Studies,GNS
+210,"Citizenship, National Integration, and Governance",Nigerian Peoples and Culture,GNS
+208,Nigerian Cultural Heritage and Value Systems,Nigerian Peoples and Culture,GNS
+206,Pre-colonial History and Political Systems,Nigerian Peoples and Culture,GNS
+198,Essay Writing and Referencing,Use of English and Communication Skills,GNS
+195,Fundamentals of Grammar and Syntax,Use of English and Communication Skills,GNS
+196,Reading Comprehension and Summary Writing,Use of English and Communication Skills,GNS
+225,Citizenship and Human Rights,Basic Concepts in Government,Government
+223,Democracy and Forms of Government,Basic Concepts in Government,Government
+221,"Power, Authority, and Legitimacy",Basic Concepts in Government,Government
+167,Functions and Features of a Constitution,Constitution,Government
+166,Types Of Constitution,Constitution,Government
+169,Electoral Systems and Elections,Democracy,Government
+168,Principles and Features of Democracy,Democracy,Government
+172,Functions of the Executive,Executive,Government
+173,Powers of the President and Governor,Executive,Government
+174,Functions of the Judiciary,Judiciary,Government
+175,Structure of the Court System,Judiciary,Government
+170,Functions of the Legislature,Legislature,Government
+171,Law-Making Process,Legislature,Government
+227,The Executive,Organs of Government,Government
+228,The Judiciary,Organs of Government,Government
+226,The Legislature,Organs of Government,Government
+230,Constitutional Development,Political and Constitutional Developments in Nigeria,Government
+232,Military Rule and Nigerian Federalism,Political and Constitutional Developments in Nigeria,Government
+229,Pre-Colonial Administration,Political and Constitutional Developments in Nigeria,Government
+284,Causes of Colonial Rule,Colonialism in Africa,History
+283,Effects of Colonialism,Colonialism in Africa,History
+278,Recording Historical Events,Log Booking,History
+277,Recording Historical Events,Log Booking,History
+281,Rise of Nationalist Movements,Nationalism and Independence,History
+282,Struggle for Independence,Nationalism and Independence,History
+280,Amalgamation of Nigeria (1914),Nigerian History,History
+279,Nigeria's Independence (1960),Nigerian History,History
+285,Economic Activities in Pre-Colonial Africa,Pre-Colonial African Societies,History
+286,Traditional Political Systems,Pre-Colonial African Societies,History
+252,Conflict & Action,Drama (Play Analysis),Literature in English
+255,Dramatic Devices,Drama (Play Analysis),Literature in English
+253,Thematic Dichotomy,Drama (Play Analysis),Literature in English
+256,Poetic Devices,Poetry (Verse Analysis),Literature in English
+257,Themes & Messages,Poetry (Verse Analysis),Literature in English
+258,Tone & Mood,Poetry (Verse Analysis),Literature in English
+246,Character Analysis,Prose Fiction (Novel Analysis),Literature in English
+250,Setting/Plot Structure,Prose Fiction (Novel Analysis),Literature in English
+248,Thematic Exploration,Prose Fiction (Novel Analysis),Literature in English
+193,Channels of Distribution,Distribution and Channels of Marketing,Marketing
+194,Functions of Middlemen,Distribution and Channels of Marketing,Marketing
+186,Marketing Concepts and Consumer Needs,IntroductionTto Marketing,Marketing
+185,Meaning and Functions of Marketing,IntroductionTto Marketing,Marketing
+188,Factors Affecting Pricing Decisions,Pricing,Marketing
+187,Pricing Methods and Strategies,Pricing,Marketing
+190,New Product Development Process,Product Planning And Development,Marketing
+189,Product Life Cycle,Product Planning And Development,Marketing
+191,Advertising and Sales Promotion,Promotion,Marketing
+192,Personal Selling and Public Relations,Promotion,Marketing
+197,Linear Equations and Inequalities,algebra,Mathematics
+199,Quadratic Equations,algebra,Mathematics
+272,Binomial Theorem,Algebra & Complex Numbers,Mathematics
+273,Partial Fractions,Algebra & Complex Numbers,Mathematics
+269,Polynomial Theory,Algebra & Complex Numbers,Mathematics
+295,Graphs of Linear and Quadratic Functions,Algebraic Processes,Mathematics
+293,Linear Equations,Algebraic Processes,Mathematics
+294,Quadratic Equations,Algebraic Processes,Mathematics
+201,Arithmetic Progression (AP),AP and GP,Mathematics
+203,Geometric Progression (GP),AP and GP,Mathematics
+205,Differentiation,calculus,Mathematics
+7,integration,calculus,Mathematics
+4,Differential,Calculus,Mathematics
+3,Integration,Calculus,Mathematics
+275,Applications of Integration,Calculus (Differentiation & Integration),Mathematics
+276,Differential Equations,Calculus (Differentiation & Integration),Mathematics
+274,Differentiation Rules,Calculus (Differentiation & Integration),Mathematics
+296,Mensuration (Area and Volume),Geometry and Mensuration,Mathematics
+297,Plane Geometry,Geometry and Mensuration,Mathematics
+298,Trigonometry,Geometry and Mensuration,Mathematics
+207,Laws of Indices,indices,Mathematics
+209,Simplification of Expressions Involving Indices,indices,Mathematics
+290,"Fractions, Decimals, and Approximations",Number and Numeration,Mathematics
+291,Indices and Standard Form,Number and Numeration,Mathematics
+292,Logarithms,Number and Numeration,Mathematics
+211,"Measures of Central Tendency (Mean, Median, Mode)",Statistics,Mathematics
+212,Measures of Dispersion (Range and Standard Deviation),Statistics,Mathematics
+289,Conic Sections,Vectors and Coordinate Geometry,Mathematics
+288,Coordinate Geometry,Vectors and Coordinate Geometry,Mathematics
+287,Vector Algebra,Vectors and Coordinate Geometry,Mathematics
+219,"Electric Current, Voltage and Resistance",Electricity,Physics
+220,Ohm's Law and Electric Circuits,Electricity,Physics
+303,Capacitors,Electricity and Magnetism,Physics
+304,Current Electricity,Electricity and Magnetism,Physics
+302,Electrostatics,Electricity and Magnetism,Physics
+217,Kinetic and Potential Energy,Energy,Physics
+218,"Work, Power and Energy Conservation",Energy,Physics
+216,Friction and Gravitation,Force,Physics
+215,Newton's Laws of Motion,Force,Physics
+222,Reflection of Light,Light,Physics
+224,Refraction of Light,Light,Physics
+301,Circular Motion and Gravitation,Mechanics,Physics
+299,Kinematics and Newton's Laws,Mechanics,Physics
+300,"Work, Energy, and Power",Mechanics,Physics
+214,Acceleration and Equations of Motion,Motion,Physics
+213,"Distance, Displacement, Speed and Velocity",Motion,Physics
+306,Geometrical Optics,Waves and Optics,Physics
+307,Optical Instruments,Waves and Optics,Physics
+305,Wave Properties and Sound,Waves and Optics,Physics
+327,meaning of psycology,Introduction to Psychology,Psychology
+239,Interpretation and Inference,Comprehension,Use of English
+238,Reading and Understanding Passages,Comprehension,Use of English
+235,Agreement of Pronouns and Antecedents,Concord,Use of English
+234,Subject-Verb Agreement,Concord,Use of English
+233,Sentence Completion,Lexis And Structure,Use of English
+231,Synonyms and Antonyms,Lexis And Structure,Use of English
+241,"Stress, Intonation and Rhymes",Oral English,Use of English
+240,Vowel and Consonant Sounds,Oral English,Use of English
+237,Formal and Informal Expressions,Register,Use of English
+236,"Occupational Registers (Legal, Medical, Educational, etc.)",Register,Use of English
+245,Ìkọ̀wé Àlàyé àti Àròyé,Aroko,Yoruba
+244,Ìkọ̀wé Lẹ́tà (Formal and Informal Letter Writing,Aroko,Yoruba
+259,Ìgbéyàwó àti Ètò Ẹbí Yorùbá,Asa Yoruba (Culture),Yoruba
+260,Ìṣe Ìbílẹ̀ àti Ìgbàgbọ́ Yorùbá,Asa Yoruba (Culture),Yoruba
+314,Ìgbéyàwó àti Ìtọ́mọ́dọ́mọ (Marriage & Child Upbringing),Àṣà Yorùbá (Yoruba Culture),Yoruba
+316,"Iṣẹ́ Ọwọ́, Oúnjẹ àti Ìgbàgbọ́ (Crafts, Foods, & Beliefs)",Àṣà Yorùbá (Yoruba Culture),Yoruba
+315,Ìṣèlú àti Ètò Àwùjọ (Politics & Social Systems),Àṣà Yorùbá (Yoruba Culture),Yoruba
+308,Fónọ́lọ́jì àti Orúkọ Mẹ́ẹ̀dógún (Phonology & Orthography),Èdè (Language & Grammar),Yoruba
+309,Ìṣàkóso Ọ̀rọ̀ (Grammar & Morphology),Èdè (Language & Grammar),Yoruba
+310,Ìtumọ̀ àti Ìwé-Àròkọ (Translation & Comprehension),Èdè (Language & Grammar),Yoruba
+242,Àwọn Ẹ̀ka Èdè Yorùbá (Parts of Speech,Ede Yoruba,Yoruba
+243,Àyẹ̀wò Gírámà Yorùbá,Ede Yoruba,Yoruba
+247,Ìjíròrò (Debate and Discussion),Ise Oro (Essay Writting),Yoruba
+249,Ìsọfúnni àti Ìtàn Àròsọ,Ise Oro (Essay Writting),Yoruba
+313,Lítírésọ̀ Akọọ́lẹ̀ – Àpilẹ̀kọ àti Ewì (Written Prose & Poetry),Lítírésọ̀ (Literature),Yoruba
+312,Lítírésọ̀ Akọọ́lẹ̀ – Eré Oníṣe (Written Literature – Drama),Lítírésọ̀ (Literature),Yoruba
+311,Lítírésọ̀ Àlọ́hùn (Oral Literature),Lítírésọ̀ (Literature),Yoruba
+254,Ewì Yorùbá,litireso Yoruba,Yoruba
+251,Ìtàn Àròsọ àti Eré Onítàn,litireso Yoruba,Yoruba
