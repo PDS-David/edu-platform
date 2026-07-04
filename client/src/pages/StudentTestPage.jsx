@@ -20,6 +20,40 @@ function TimerPill({ seconds }) {
   );
 }
 
+function SubmitConfirmModal({ onConfirm, onCancel }) {
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center px-4 bg-black/40"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="submit-test-confirm-title"
+    >
+      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl border border-gray-100">
+        <h2 id="submit-test-confirm-title" className="text-base font-bold text-gray-900 mb-1.5">
+          Submit the test now?
+        </h2>
+        <p className="text-sm text-gray-500 mb-6">
+          You won't be able to change your answers after this.
+        </p>
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 rounded-xl border-2 border-gray-200 text-gray-700 font-semibold text-sm py-2.5 hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-semibold text-sm py-2.5 transition-colors"
+          >
+            Submit Test
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ResultScreen({ result, testTitle, onDone }) {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
@@ -48,6 +82,7 @@ export default function StudentTestPage() {
   const [submitting, setSubmitting] = useState(false);
   const [result,     setResult]     = useState(null);
   const [timeLeft,   setTimeLeft]   = useState(null);
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const timerRef        = useRef(null);
   const startTime       = useRef(Date.now());
   // BUG FIX (Bug 9): handleSubmit is defined after this useEffect, but the
@@ -80,8 +115,7 @@ export default function StudentTestPage() {
     return () => clearInterval(timerRef.current);
   }, [!!timeLeft]); // eslint-disable-line
 
-  const handleSubmit = useCallback(async (auto = false) => {
-    if (!auto && !window.confirm('Submit the test now?')) return;
+  const submitTest = useCallback(async () => {
     clearInterval(timerRef.current);
     setSubmitting(true);
     try {
@@ -100,6 +134,17 @@ export default function StudentTestPage() {
       setSubmitting(false);
     }
   }, [test, answers, testId]);
+
+  // Manual submit opens the in-app confirmation modal instead of the
+  // browser's native window.confirm. Auto-submit (timer hits zero) still
+  // bypasses confirmation entirely, same as before.
+  const handleSubmit = useCallback((auto = false) => {
+    if (auto) {
+      submitTest();
+    } else {
+      setShowSubmitConfirm(true);
+    }
+  }, [submitTest]);
 
   // Keep the ref in sync every render so the timer always calls the latest
   // version of handleSubmit (with current test + answers in its closure).
@@ -185,6 +230,13 @@ export default function StudentTestPage() {
           )}
         </div>
       </div>
+
+      {showSubmitConfirm && (
+        <SubmitConfirmModal
+          onCancel={() => setShowSubmitConfirm(false)}
+          onConfirm={() => { setShowSubmitConfirm(false); submitTest(); }}
+        />
+      )}
     </div>
   );
 }
