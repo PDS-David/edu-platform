@@ -213,10 +213,17 @@ export default function MockExamPage() {
           answers:       answersArray,
         });
 
-      // S3 fix: use real attempt_id so refresh/share works via GET endpoint
+      // S3 fix: use real attempt_id so refresh/share works via the GET endpoint
       const attemptId = res?.data?.attempt_id ?? res?.attempt_id ?? 'inline';
+      // BUG FIX (results-showing-0-of-0): inlineResult must be res.data, not
+      // res — res is the interceptor's normalised wrapper; the actual result
+      // fields (total_score, answers, etc.) live one level deeper at res.data.
+      // Passing res directly meant QuizResultsPage's inlineResult branch read
+      // every field as undefined and fell through to its zero/empty defaults —
+      // a real, correctly-graded 40-question mock rendering as "0 of 0".
+      // Same bug, same fix, as QuizPage.jsx's submit handler.
       navigate(`/student/quiz-results/${attemptId}`, {
-        state: { subjectId, subjectName, examBoardName, isMock: true, inlineResult: res },
+        state: { subjectId, subjectName, examBoardName, isMock: true, inlineResult: res.data },
       });
     } catch (err) {
       console.error('[MockExam] submit error:', err.message);
