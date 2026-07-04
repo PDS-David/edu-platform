@@ -35,7 +35,7 @@ const scoreStyle = (s) =>
   : s >= 55 ? 'text-amber-700 bg-amber-50 border-amber-200'
   : 'text-red-700 bg-red-50 border-red-200';
 
-export default function PronunciationCheck({ word, onResult, attemptsUsed = 0, budget = Infinity, onAttempt }) {
+export default function PronunciationCheck({ word, wordId, onResult, attemptsUsed = 0, budget = Infinity, onAttempt }) {
   const { recording, error: micError, supported, start, stop } = useMic();
   const [status, setStatus]           = useState('idle'); // idle | scoring | done | error
   const [result, setResult]           = useState(null);
@@ -81,6 +81,7 @@ export default function PronunciationCheck({ word, onResult, attemptsUsed = 0, b
         const base64 = await blobToBase64(blob);
         const r = await api.post('/english-masterclass/pronunciation-score', {
           word,
+          word_id: wordId || null,
           audio: base64,
           mime_type: blob.type || 'audio/webm',
         });
