@@ -177,21 +177,48 @@ const createSubject = async (req, res) => {
       });
     }
 
-    const result = await sequelize.query(
-      `INSERT INTO subjects (exam_board_id, name, code, description, level, is_active, created_at, updated_at)
-       VALUES (:exam_board_id, :name, UPPER(:code), :description, :level, true, NOW(), NOW())
-       RETURNING *`,
-      {
-        replacements: {
-          exam_board_id,
-          name,
-          code,
-          description: description || null,
-          level:       level       || null,
-        },
-        type: QueryTypes.SELECT,
-      }
+    // BUGFIX (2026-07-04): no duplicate check existed here at all -- see
+    // the matching migration note in run_complete_migration.js ("subjects:
+    // unique active (name, exam_board_id)"). Pre-check for a friendly
+    // message; the DB constraint below is the actual guarantee (defense
+    // in depth, same pattern used for em_categories).
+    const existing = await sequelize.query(
+      `SELECT id FROM subjects WHERE name = :name AND exam_board_id = :exam_board_id AND is_active = true`,
+      { replacements: { name, exam_board_id }, type: QueryTypes.SELECT }
     );
+    if (existing.length) {
+      return res.status(409).json({
+        success: false,
+        error:   `A subject named "${name}" already exists for this exam board.`,
+      });
+    }
+
+    let result;
+    try {
+      result = await sequelize.query(
+        `INSERT INTO subjects (exam_board_id, name, code, description, level, is_active, created_at, updated_at)
+         VALUES (:exam_board_id, :name, UPPER(:code), :description, :level, true, NOW(), NOW())
+         RETURNING *`,
+        {
+          replacements: {
+            exam_board_id,
+            name,
+            code,
+            description: description || null,
+            level:       level       || null,
+          },
+          type: QueryTypes.SELECT,
+        }
+      );
+    } catch (err) {
+      if (err.original?.code === '23505' || err.parent?.code === '23505') {
+        return res.status(409).json({
+          success: false,
+          error:   `A subject named "${name}" already exists for this exam board.`,
+        });
+      }
+      throw err;
+    }
 
     res.status(201).json({
       success: true,
