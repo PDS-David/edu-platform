@@ -166,6 +166,21 @@ async function run() {
       ADD COLUMN IF NOT EXISTS category        VARCHAR(50),
       ADD COLUMN IF NOT EXISTS image_url       TEXT`);
 
+  // BUGFIX (2026-07-04): createSubject (server/controllers/subjects.js) had
+  // no duplicate check at all -- no pre-check query, no DB constraint --
+  // so POST /subjects could create the same (name, exam_board_id) twice.
+  // Confirmed against a production dump: 'Mathematics'/CB and 'CRS'/JUPEB
+  // each exist as two rows, with the older one manually set is_active=false
+  // via direct DB access as an ad-hoc workaround (no admin UI exists to do
+  // this through the app). A plain UNIQUE constraint would conflict with
+  // that existing is_active=false row, so this is a PARTIAL unique index:
+  // it only enforces uniqueness among *active* subjects, so the historical
+  // deactivated duplicates are left alone but a second active subject with
+  // the same name+exam board can no longer be created going forward.
+  await exec('subjects: unique active (name, exam_board_id)', `
+    CREATE UNIQUE INDEX IF NOT EXISTS subjects_active_name_examboard_unique
+      ON subjects (name, exam_board_id) WHERE is_active = true`);
+
   await exec('questions: submitted_by + status/difficulty/type columns', `
     ALTER TABLE questions
       ADD COLUMN IF NOT EXISTS submitted_by          UUID         REFERENCES users(id) ON DELETE SET NULL,
