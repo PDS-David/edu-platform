@@ -9,6 +9,7 @@ const { Pool }   = require('pg');
 const { generate } = require('../services/ai');
 const { authorize } = require('../middleware/auth');
 const { pronunciationLimiter } = require('../middleware/rateLimiter');
+const r2 = require('../utils/r2Storage');
 
 const db = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -182,7 +183,8 @@ Say only the word, nothing else: "${word}"`
 // framing requested — a Nigerian student should not be marked down for
 // sounding Nigerian.
 router.post('/pronunciation-score', pronunciationLimiter, async (req, res) => {
-  const { word, audio, mime_type } = req.body;
+  const { word, word_id, audio, mime_type } = req.body;
+  const userId = req.user.id;
   if (!word)  return res.status(400).json({ success: false, error: 'word is required' });
   if (!audio) return res.status(400).json({ success: false, error: 'audio is required' });
 
@@ -231,6 +233,31 @@ Respond in this exact JSON format, no markdown, no extra text:
     }
 
     const score = Math.max(0, Math.min(100, Math.round(data.score)));
+
+    // Persist the attempt, including the audio clip itself, so scores can be
+    // audited/re-graded later instead of only surviving as a session average.
+    // Non-fatal: a storage failure must not break the student's result.
+    let audioUrl = null;
+    try {
+      if (r2.isR2Enabled()) {
+        const buffer = Buffer.from(audio, 'base64');
+        const ext = (mime_type || 'audio/webm').split('/')[1]?.split(';')[0] || 'webm';
+        const uploaded = await r2.uploadBuffer({
+          buffer,
+          originalname: `pronunciation-${userId}-${Date.now()}.${ext}`,
+          mimetype: mime_type || 'audio/webm',
+        });
+        audioUrl = uploaded?.url || null;
+      }
+      await db.query(`
+        INSERT INTO em_pronunciation_attempts
+          (user_id, word_id, word_text, audio_url, heard, score, matched, feedback)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+      `, [userId, word_id || null, word, audioUrl, data.heard || null, score, !!data.matched, data.feedback || null]);
+    } catch (persistErr) {
+      console.warn('[EM] pronunciation-score persistence failed:', persistErr.message);
+    }
+
     return res.json({
       success: true,
       score,
@@ -241,6 +268,72 @@ Respond in this exact JSON format, no markdown, no extra text:
   } catch (err) {
     console.error('[EM] POST /pronunciation-score', err.message);
     res.status(500).json({ success: false, error: 'Pronunciation check is temporarily unavailable. Please try again shortly.' });
+  }
+});
+
+// POST /api/english-masterclass/writing-score
+// Short writing exercise: student writes a sentence using `word`, in
+// response to `prompt`. Gemini grades usage/grammar/clarity and the
+// attempt is persisted (unlike pronunciation, there's no separate binary
+// blob to store — the text submission IS the artifact, so it's saved as-is).
+router.post('/writing-score', pronunciationLimiter, async (req, res) => {
+  const { word, word_id, prompt, text } = req.body;
+  const userId = req.user.id;
+  if (!word)  return res.status(400).json({ success: false, error: 'word is required' });
+  if (!text || !text.trim()) return res.status(400).json({ success: false, error: 'text is required' });
+  if (text.length > 2000) {
+    return res.status(413).json({ success: false, error: 'That response is too long. Please keep it to a sentence or two.' });
+  }
+
+  const effectivePrompt = prompt || `Write one sentence using the word "${word}" correctly.`;
+
+  try {
+    const gradingPrompt = `You are a supportive British English writing coach for learners around the world (Nigeria, India, and elsewhere all use valid, legitimate English). Do NOT penalise regional vocabulary or spelling choices that are correct in World Englishes — only genuine grammar errors or misuse of the target word.
+
+The student was asked to: "${effectivePrompt}"
+Target word: "${word}"
+Student's response: "${text.trim()}"
+
+Evaluate whether the word was used correctly (right meaning, right grammatical form) and whether the sentence is grammatically sound. Respond in this exact JSON format, no markdown, no extra text:
+{
+  "score": <integer 0-100>,
+  "used_word_correctly": <true or false>,
+  "grammar_notes": "one short note on any grammar issue, or empty string if none",
+  "feedback": "one short, encouraging sentence (max 20 words), specific if possible"
+}`;
+
+    const raw = await generate(gradingPrompt, 'writing-score');
+    const cleaned = raw.replace(/```json|```/g, '').trim();
+
+    let data;
+    try { data = JSON.parse(cleaned); } catch { data = null; }
+
+    if (!data || typeof data.score !== 'number') {
+      return res.json({ success: false, error: 'Could not evaluate that response. Please try again.' });
+    }
+
+    const score = Math.max(0, Math.min(100, Math.round(data.score)));
+
+    try {
+      await db.query(`
+        INSERT INTO em_writing_submissions
+          (user_id, word_id, word_text, prompt, submission_text, score, used_word_correctly, grammar_notes, feedback)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      `, [userId, word_id || null, word, effectivePrompt, text.trim(), score, !!data.used_word_correctly, data.grammar_notes || null, data.feedback || null]);
+    } catch (persistErr) {
+      console.warn('[EM] writing-score persistence failed:', persistErr.message);
+    }
+
+    return res.json({
+      success: true,
+      score,
+      used_word_correctly: !!data.used_word_correctly,
+      grammar_notes: data.grammar_notes || '',
+      feedback: data.feedback || '',
+    });
+  } catch (err) {
+    console.error('[EM] POST /writing-score', err.message);
+    res.status(500).json({ success: false, error: 'Writing check is temporarily unavailable. Please try again shortly.' });
   }
 });
 
@@ -320,12 +413,21 @@ router.post('/sessions', async (req, res) => {
     ? Math.round((pronScores.reduce((s, v) => s + v, 0) / pronScores.length) * 100) / 100
     : null;
 
+  // Same logic for writing_score: null (not 0) when nobody attempted the
+  // writing exercise for any word this session, so averages aren't dragged down.
+  const writingScores = Array.isArray(answers)
+    ? answers.map(a => a.writing_score).filter(s => typeof s === 'number')
+    : [];
+  const avgWriting = writingScores.length
+    ? Math.round((writingScores.reduce((s, v) => s + v, 0) / writingScores.length) * 100) / 100
+    : null;
+
   try {
     // 1. Save session
     await db.query(`
-      INSERT INTO em_practice_sessions (user_id, category_id, category_name, total_words, correct_words, accuracy, duration_secs, pronunciation_score)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-    `, [userId, category_id || null, category_name, total_words, correct_words, accuracy, duration_secs || 0, avgPronunciation]);
+      INSERT INTO em_practice_sessions (user_id, category_id, category_name, total_words, correct_words, accuracy, duration_secs, pronunciation_score, writing_score)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+    `, [userId, category_id || null, category_name, total_words, correct_words, accuracy, duration_secs || 0, avgPronunciation, avgWriting]);
 
     // 2. Update per-word progress
     if (Array.isArray(answers)) {
@@ -512,13 +614,6 @@ router.post('/admin/categories', adminOnly, async (req, res) => {
     `, [name, description || '', difficulty || 'Beginner', icon_emoji || '📚', order_index || 0, req.user.id]);
     res.status(201).json({ success: true, data: row });
   } catch (err) {
-    // 23505 = unique_violation (em_categories_name_difficulty_unique)
-    if (err.code === '23505') {
-      return res.status(409).json({
-        success: false,
-        error: `A "${difficulty || 'Beginner'}" category named "${name}" already exists.`,
-      });
-    }
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -542,12 +637,6 @@ router.patch('/admin/categories/:id', adminOnly, async (req, res) => {
     if (!row) return res.status(404).json({ success: false, error: 'Category not found' });
     res.json({ success: true, data: row });
   } catch (err) {
-    if (err.code === '23505') {
-      return res.status(409).json({
-        success: false,
-        error: `A "${difficulty || 'that'}" category named "${name}" already exists.`,
-      });
-    }
     res.status(500).json({ success: false, error: err.message });
   }
 });

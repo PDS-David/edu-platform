@@ -18,6 +18,7 @@ import {
 import DiffBadge from './DiffBadge';
 import useAudio from './useAudio';
 import PronunciationCheck from './PronunciationCheck';
+import WritingCheck from './WritingCheck';
 
 // Soft, session-wide cap on scored speaking attempts. Each one is a Gemini
 // call, so this bounds the cost of a single practice session regardless of
@@ -25,6 +26,8 @@ import PronunciationCheck from './PronunciationCheck';
 // the mic exercise just stops offering new scored attempts; typing answers,
 // skipping, and everything else keeps working normally.
 const PRON_SESSION_BUDGET = 15;
+// Same idea for the writing exercise — separate budget, separate Gemini call.
+const WRITING_SESSION_BUDGET = 15;
 
 export default function PracticeSession({ cat, words, onComplete }) {
   const [currentIdx, setCurrentIdx]         = useState(0);
@@ -43,6 +46,9 @@ export default function PracticeSession({ cat, words, onComplete }) {
   const pronScoresRef                       = useRef({});
   // Session-wide soft cap bookkeeping (see PRON_SESSION_BUDGET above).
   const [pronAttemptsUsed, setPronAttemptsUsed] = useState(0);
+  // Same pattern for the writing exercise (see WRITING_SESSION_BUDGET above).
+  const writingScoresRef                        = useRef({});
+  const [writingAttemptsUsed, setWritingAttemptsUsed] = useState(0);
 
   const currentWord = words[currentIdx];
   const progress    = (currentIdx / words.length) * 100;
@@ -86,6 +92,7 @@ export default function PracticeSession({ cat, words, onComplete }) {
     const newAttempts = [...attempts, {
       word_id: currentWord.id, word: currentWord.word, correct: isCorrect, userAnswer: input.trim(),
       pronunciation_score: pronScoresRef.current[currentWord.id] ?? null,
+      writing_score: writingScoresRef.current[currentWord.id] ?? null,
     }];
     setAttempts(newAttempts);
     setTimeout(() => advance(newAttempts), 900);
@@ -95,6 +102,7 @@ export default function PracticeSession({ cat, words, onComplete }) {
     const newAttempts = [...attempts, {
       word_id: currentWord.id, word: currentWord.word, correct: false, userAnswer: '',
       pronunciation_score: pronScoresRef.current[currentWord.id] ?? null,
+      writing_score: writingScoresRef.current[currentWord.id] ?? null,
     }];
     setAttempts(newAttempts);
     setShowExplain(false);
@@ -151,12 +159,24 @@ export default function PracticeSession({ cat, words, onComplete }) {
            this same card (not a separate card/page) with its own reset key
            per word so it doesn't carry state across words. */}
         <PronunciationCheck
-          key={currentWord.id}
+          key={`pron-${currentWord.id}`}
           word={currentWord.word}
+          wordId={currentWord.id}
           attemptsUsed={pronAttemptsUsed}
           budget={PRON_SESSION_BUDGET}
           onAttempt={() => setPronAttemptsUsed(n => n + 1)}
           onResult={(score) => { pronScoresRef.current[currentWord.id] = score; }}
+        />
+
+        {/* Writing practice — same card, same per-word reset pattern. */}
+        <WritingCheck
+          key={`write-${currentWord.id}`}
+          word={currentWord.word}
+          wordId={currentWord.id}
+          attemptsUsed={writingAttemptsUsed}
+          budget={WRITING_SESSION_BUDGET}
+          onAttempt={() => setWritingAttemptsUsed(n => n + 1)}
+          onResult={(score) => { writingScoresRef.current[currentWord.id] = score; }}
         />
 
         <div className="mt-2" />
