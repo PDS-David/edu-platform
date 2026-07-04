@@ -98,6 +98,41 @@ function ExamQuestion({ question, questionNumber, selected, onSelect }) {
   );
 }
 
+// ── In-app submit confirmation (replaces window.confirm) ──────────────────────
+function SubmitConfirmModal({ onConfirm, onCancel }) {
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center px-4 bg-black/60"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="submit-confirm-title"
+    >
+      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
+        <h2 id="submit-confirm-title" className="text-base font-bold text-gray-900 mb-1.5">
+          Submit your exam?
+        </h2>
+        <p className="text-sm text-gray-500 mb-6">
+          You cannot change your answers after this.
+        </p>
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 rounded-xl border-2 border-gray-200 text-gray-700 font-semibold text-sm py-2.5 hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-semibold text-sm py-2.5 transition-colors"
+          >
+            Submit Exam
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Submitting overlay ────────────────────────────────────────────────────────
 function MarkingScreen() {
   return (
@@ -124,6 +159,7 @@ export default function MockExamPage() {
   const [submitting,  setSubmitting]  = useState(false);
   const [upgradeWall, setUpgradeWall] = useState(false);
   const [timeLeft,    setTimeLeft]    = useState(EXAM_DURATION);
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
 
   const startTime = useRef(Date.now());
   const timerRef  = useRef(null);
@@ -158,8 +194,7 @@ export default function MockExamPage() {
     return () => clearInterval(timerRef.current);
   }, [loading, questions.length]); // eslint-disable-line
 
-  const handleSubmit = useCallback(async (autoSubmit = false) => {
-    if (!autoSubmit && !window.confirm('Submit your exam? You cannot change answers after this.')) return;
+  const submitExam = useCallback(async () => {
     clearInterval(timerRef.current);
     setSubmitting(true);
     try {
@@ -189,6 +224,19 @@ export default function MockExamPage() {
       setSubmitting(false);
     }
   }, [questions, answers, subjectId, subjectName, examBoardName, navigate]);
+
+  // Manual submit opens the in-app confirmation modal (see SubmitConfirmModal
+  // below) instead of the browser's native window.confirm — a plain OS dialog
+  // stamped with the site's URL looked like a leftover debug prompt, not part
+  // of the app. Auto-submit (timer hits zero) skips confirmation entirely,
+  // same as before.
+  const handleSubmit = useCallback((autoSubmit = false) => {
+    if (autoSubmit) {
+      submitExam();
+    } else {
+      setShowSubmitConfirm(true);
+    }
+  }, [submitExam]);
 
   if (submitting) return <MarkingScreen />;
 
@@ -294,6 +342,13 @@ export default function MockExamPage() {
           </div>
         </div>
       </div>
+
+      {showSubmitConfirm && (
+        <SubmitConfirmModal
+          onCancel={() => setShowSubmitConfirm(false)}
+          onConfirm={() => { setShowSubmitConfirm(false); submitExam(); }}
+        />
+      )}
     </div>
   );
 }
