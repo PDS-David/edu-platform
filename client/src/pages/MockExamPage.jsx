@@ -6,7 +6,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import api from '../services/apiClient';
-import { ChevronLeft, Loader2, ArrowLeft } from 'lucide-react';
+import { ChevronLeft, Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { UpgradeWall } from './PricingPage';
 
 const LABELS     = ['01', '02', '03', '04', '05'];
@@ -67,22 +67,31 @@ function ExamQuestion({ question, questionNumber, selected, onSelect }) {
         </div>
 
         <div className="px-5 pb-5 space-y-2">
-          {question.options?.map((opt, i) => (
-            <button
-              key={opt.id}
-              onClick={() => onSelect(opt.option_text || opt.text || String(opt.id ?? ''))}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${
-                selected === opt.id
-                  ? 'border-blue-400 bg-blue-50'
-                  : 'border-gray-200 hover:border-blue-300 cursor-pointer'
-              }`}
-            >
-              <span className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 bg-gray-100 text-gray-500">
-                {LABELS[i]}
-              </span>
-              <span className="text-sm text-gray-800 flex-1">{opt.option_text}</span>
-            </button>
-          ))}
+          {question.options?.map((opt, i) => {
+            const optText = opt.option_text || opt.text || String(opt.id ?? '');
+            const isSelected = selected === optText;
+            return (
+              <button
+                key={opt.id}
+                onClick={() => onSelect(optText)}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${
+                  isSelected
+                    ? 'border-blue-400 bg-blue-50'
+                    : 'border-gray-200 hover:border-blue-300 cursor-pointer'
+                }`}
+              >
+                <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                  isSelected ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-500'
+                }`}>
+                  {LABELS[i]}
+                </span>
+                <span className="text-sm text-gray-800 flex-1">{opt.option_text}</span>
+                {isSelected && (
+                  <CheckCircle2 className="w-4 h-4 text-blue-500 shrink-0" aria-hidden="true" />
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>
