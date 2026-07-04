@@ -297,7 +297,16 @@ export default function QuizPage() {
       navigate(`/student/quiz-results/${attemptId}`, {
         state: {
           subtopicId, subtopicName, subjectName, examBoardName,
-          inlineResult: res,  // kept so first load is instant, no extra GET
+          // BUG FIX (results-showing-0-of-0): this was `inlineResult: res`,
+          // but res is the interceptor's normalised wrapper — the actual
+          // result fields (total_score, answers, etc.) live at res.data, per
+          // the comment right above this block. QuizResultsPage's inlineResult
+          // branch reads them flat (r.total_score, r.answers, ...), so passing
+          // `res` instead of `res.data` meant every field read back undefined
+          // and silently fell through to its `?? 0` / `?? []` default —
+          // rendering a fully-formed but entirely empty/zeroed results page
+          // immediately after a real, correctly-graded submission.
+          inlineResult: res.data,
         },
       });
     } catch {

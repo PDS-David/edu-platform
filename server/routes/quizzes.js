@@ -375,7 +375,7 @@ router.get('/attempt/:attemptId', protect, async (req, res) => {
   try {
     // Anchor row — find the reference attempt
     const anchor = await sequelize.query(
-      `SELECT pa.id, pa.student_id, pa.attempted_at, pa.question_id,
+      `SELECT pa.id, pa.student_id, pa.attempted_at, pa.question_id, pa.session_id,
               q.subtopic_id
        FROM practice_attempts pa
        JOIN questions q ON q.id = pa.question_id
@@ -387,22 +387,47 @@ router.get('/attempt/:attemptId', protect, async (req, res) => {
       return res.status(404).json({ success: false, error: 'Attempt not found' });
     }
 
-    const { attempted_at, subtopic_id } = anchor[0];
+    const { attempted_at, subtopic_id, session_id } = anchor[0];
 
-    // All attempts in this session window (5 min before → 30s after anchor)
-    const sessionRows = await sequelize.query(
-      `SELECT pa.id, pa.question_id, pa.is_correct,
-              pa.time_taken_seconds, pa.attempted_at,
-              pa.selected_option_text,
-              q.question_text, q.correct_answer, q.explanation, q.marks, q.options
-       FROM practice_attempts pa
-       JOIN questions q ON q.id = pa.question_id
-       WHERE pa.student_id = :studentId
-         AND pa.attempted_at BETWEEN (:anchor::timestamptz - INTERVAL '5 minutes')
-                                 AND (:anchor::timestamptz + INTERVAL '30 seconds')
-       ORDER BY pa.attempted_at ASC`,
-      { replacements: { studentId: req.user.id, anchor: attempted_at }, type: QueryTypes.SELECT }
-    );
+    // BUG FIX (mock-exam-0-of-0): this used to reconstruct "the same session"
+    // from a time window alone (anchor ±5min/+30s). That's a guess, and a bad
+    // one for anything slower than a quick single-subtopic quiz — a 40-question
+    // mock exam, or just a slow request, can land rows outside that window, or
+    // pull in unrelated rows from a genuinely different session that happens to
+    // fall inside it. practice_attempts already has a session_id, written once
+    // per submission specifically to identify "these rows belong together" —
+    // use it directly instead of re-deriving the grouping from timestamps.
+    // Falls back to the old time-window approach only for rows recorded before
+    // the session_id column existed (it's nullable, added via a later
+    // migration — see run_complete_migration.js), so historical results still
+    // resolve.
+    const sessionRows = session_id
+      ? await sequelize.query(
+          `SELECT pa.id, pa.question_id, pa.is_correct,
+                  pa.time_taken_seconds, pa.attempted_at,
+                  pa.selected_option_text,
+                  q.question_text, q.correct_answer, q.explanation, q.marks, q.options
+           FROM practice_attempts pa
+           JOIN questions q ON q.id = pa.question_id
+           WHERE pa.student_id = :studentId
+             AND pa.session_id = :sessionId
+           ORDER BY pa.attempted_at ASC`,
+          { replacements: { studentId: req.user.id, sessionId: session_id }, type: QueryTypes.SELECT }
+        )
+      : await sequelize.query(
+          `SELECT pa.id, pa.question_id, pa.is_correct,
+                  pa.time_taken_seconds, pa.attempted_at,
+                  pa.selected_option_text,
+                  q.question_text, q.correct_answer, q.explanation, q.marks, q.options
+           FROM practice_attempts pa
+           JOIN questions q ON q.id = pa.question_id
+           WHERE pa.student_id = :studentId
+             AND pa.session_id IS NULL
+             AND pa.attempted_at BETWEEN (:anchor::timestamptz - INTERVAL '5 minutes')
+                                     AND (:anchor::timestamptz + INTERVAL '30 seconds')
+           ORDER BY pa.attempted_at ASC`,
+          { replacements: { studentId: req.user.id, anchor: attempted_at }, type: QueryTypes.SELECT }
+        );
 
     const answers = sessionRows.map(row => {
       // Find which option text was selected — stored in options JSONB
