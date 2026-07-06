@@ -28,13 +28,12 @@ export default function WritingCheck({ word, wordId, onResult, attemptsUsed = 0,
   const budgetLeft      = Math.max(0, budget - attemptsUsed);
   const budgetExhausted = budgetLeft <= 0;
 
-  // Vary how many sentences are asked for — weighted toward 1 (low friction
-  // most of the time), with occasional 3- or 5-sentence prompts for deeper
-  // practice, e.g. "use autumn in three sentences". Stable for the life of
-  // this word's card (doesn't reroll on every re-render); rerolls when the
-  // word changes.
+  // Always require 3-5 sentences (never fewer) — gives students real writing
+  // practice on every word, rather than the occasional single-sentence card.
+  // Stable for the life of this word's card (doesn't reroll on every
+  // re-render); rerolls when the word changes.
   const sentenceCount = useMemo(() => {
-    const pool = [1, 1, 1, 3, 3, 5];
+    const pool = [3, 4, 5];
     return pool[Math.floor(Math.random() * pool.length)];
   }, [word]);
 
