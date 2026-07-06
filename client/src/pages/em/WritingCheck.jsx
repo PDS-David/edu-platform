@@ -11,7 +11,7 @@
 // Cost control: mirrors PronunciationCheck's soft, session-wide budget —
 // see WRITING_SESSION_BUDGET in PracticeSession.jsx.
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import api from '../../services/apiClient';
 import { PenLine, Loader2, RotateCcw } from 'lucide-react';
 
@@ -27,7 +27,20 @@ export default function WritingCheck({ word, wordId, onResult, attemptsUsed = 0,
 
   const budgetLeft      = Math.max(0, budget - attemptsUsed);
   const budgetExhausted = budgetLeft <= 0;
-  const prompt           = `Write one sentence using the word "${word}".`;
+
+  // Vary how many sentences are asked for — weighted toward 1 (low friction
+  // most of the time), with occasional 3- or 5-sentence prompts for deeper
+  // practice, e.g. "use autumn in three sentences". Stable for the life of
+  // this word's card (doesn't reroll on every re-render); rerolls when the
+  // word changes.
+  const sentenceCount = useMemo(() => {
+    const pool = [1, 1, 1, 3, 3, 5];
+    return pool[Math.floor(Math.random() * pool.length)];
+  }, [word]);
+
+  const prompt = sentenceCount === 1
+    ? `Write one sentence using the word "${word}".`
+    : `Write ${sentenceCount} different sentences using the word "${word}".`;
 
   // Reset whenever the word changes (new card).
   useEffect(() => {
@@ -47,6 +60,7 @@ export default function WritingCheck({ word, wordId, onResult, attemptsUsed = 0,
         word_id: wordId || null,
         prompt,
         text: text.trim(),
+        sentence_count: sentenceCount,
       });
       if (r.data?.success) {
         setResult(r.data);
@@ -65,17 +79,38 @@ export default function WritingCheck({ word, wordId, onResult, attemptsUsed = 0,
   return (
     <div className="mt-4">
       <p className="text-center text-xs text-gray-400 mb-2">{prompt}</p>
-      <form onSubmit={handleSubmit} className="flex items-center gap-2 flex-wrap justify-center">
-        <label htmlFor={`writing-input-${word}`} className="sr-only">Write a sentence using {word}</label>
-        <input
-          id={`writing-input-${word}`}
-          type="text"
-          value={text}
-          onChange={e => setText(e.target.value)}
-          disabled={status === 'scoring' || (budgetExhausted && status !== 'done')}
-          placeholder={budgetExhausted ? 'Writing checks used up for this session' : `Use "${word}" in a sentence…`}
-          className="flex-1 min-w-[200px] px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
-        />
+      <form
+        onSubmit={handleSubmit}
+        className={sentenceCount === 1
+          ? 'flex items-center gap-2 flex-wrap justify-center'
+          : 'flex flex-col items-center gap-2'}
+      >
+        <label htmlFor={`writing-input-${word}`} className="sr-only">
+          Write {sentenceCount === 1 ? 'a sentence' : `${sentenceCount} sentences`} using {word}
+        </label>
+        {sentenceCount === 1 ? (
+          <input
+            id={`writing-input-${word}`}
+            type="text"
+            value={text}
+            onChange={e => setText(e.target.value)}
+            disabled={status === 'scoring' || (budgetExhausted && status !== 'done')}
+            placeholder={budgetExhausted ? 'Writing checks used up for this session' : `Use "${word}" in a sentence…`}
+            className="flex-1 min-w-[200px] px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
+          />
+        ) : (
+          <textarea
+            id={`writing-input-${word}`}
+            value={text}
+            onChange={e => setText(e.target.value)}
+            disabled={status === 'scoring' || (budgetExhausted && status !== 'done')}
+            placeholder={budgetExhausted
+              ? 'Writing checks used up for this session'
+              : `Write ${sentenceCount} sentences using "${word}", one per line…`}
+            rows={sentenceCount}
+            className="w-full max-w-md px-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all resize-none"
+          />
+        )}
         <button
           type="submit"
           disabled={!text.trim() || status === 'scoring' || budgetExhausted}
