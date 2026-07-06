@@ -1478,6 +1478,70 @@ async function run() {
           SELECT user_id FROM em_word_progress
         )`);
 
+  // ── EM pronunciation + writing grading persistence ──────────────────────────
+  // BUG FIX (silent-insert-failure): database/em_grading_persistence.sql
+  // defines these tables, but that file is never executed on deploy — only
+  // this script is (see the deploy.sh / .dockerignore note elsewhere in this
+  // repo re: standalone SQL files under database/). Both POST
+  // /english-masterclass/pronunciation-score and /writing-score already
+  // INSERT into these tables in production right now; without them existing,
+  // every one of those inserts has been silently failing (caught and
+  // console.warn'd, so scoring itself still worked — students got feedback,
+  // nothing was ever saved for review/audit). Wiring the same DDL in here so
+  // it actually runs.
+  await exec('em_pronunciation_attempts: create table', `
+    CREATE TABLE IF NOT EXISTS em_pronunciation_attempts (
+      id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id          UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      word_id          UUID REFERENCES em_words(id) ON DELETE SET NULL,
+      word_text        TEXT NOT NULL,
+      audio_url        TEXT,
+      heard            TEXT,
+      score            NUMERIC(5,2) NOT NULL,
+      matched          BOOLEAN NOT NULL DEFAULT false,
+      feedback         TEXT,
+      created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`
+  );
+  await exec('em_pronunciation_attempts: indexes', `
+    CREATE INDEX IF NOT EXISTS idx_em_pronunciation_attempts_user ON em_pronunciation_attempts(user_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_em_pronunciation_attempts_word ON em_pronunciation_attempts(word_id)`
+  );
+
+  await exec('em_writing_submissions: create table', `
+    CREATE TABLE IF NOT EXISTS em_writing_submissions (
+      id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id              UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      word_id              UUID REFERENCES em_words(id) ON DELETE SET NULL,
+      word_text            TEXT NOT NULL,
+      prompt               TEXT NOT NULL,
+      submission_text      TEXT NOT NULL,
+      score                NUMERIC(5,2) NOT NULL,
+      used_word_correctly  BOOLEAN NOT NULL DEFAULT false,
+      grammar_notes        TEXT,
+      feedback             TEXT,
+      created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`
+  );
+  await exec('em_writing_submissions: indexes', `
+    CREATE INDEX IF NOT EXISTS idx_em_writing_submissions_user ON em_writing_submissions(user_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_em_writing_submissions_word ON em_writing_submissions(word_id)`
+  );
+
+  // sentence_count / sentences_written — needed for the multi-sentence
+  // writing prompts ("use X in 3 sentences"); nullable so existing rows
+  // (single-sentence, from before this existed) are unaffected.
+  await exec('em_writing_submissions: add sentence-count columns', `
+    ALTER TABLE em_writing_submissions
+      ADD COLUMN IF NOT EXISTS sentence_count_required INTEGER,
+      ADD COLUMN IF NOT EXISTS sentence_count_written  INTEGER,
+      ADD COLUMN IF NOT EXISTS sentence_count_met       BOOLEAN`
+  );
+
+  await exec('em_practice_sessions: add writing_score',
+    `ALTER TABLE em_practice_sessions ADD COLUMN IF NOT EXISTS writing_score NUMERIC(5,2)`
+  );
+
   console.log('\n✅ Migration complete.\n');
   await pool.end();
 }

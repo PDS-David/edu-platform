@@ -277,29 +277,40 @@ Respond in this exact JSON format, no markdown, no extra text:
 // attempt is persisted (unlike pronunciation, there's no separate binary
 // blob to store — the text submission IS the artifact, so it's saved as-is).
 router.post('/writing-score', pronunciationLimiter, async (req, res) => {
-  const { word, word_id, prompt, text } = req.body;
+  const { word, word_id, prompt, text, sentence_count } = req.body;
   const userId = req.user.id;
   if (!word)  return res.status(400).json({ success: false, error: 'word is required' });
   if (!text || !text.trim()) return res.status(400).json({ success: false, error: 'text is required' });
-  if (text.length > 2000) {
-    return res.status(413).json({ success: false, error: 'That response is too long. Please keep it to a sentence or two.' });
+  if (text.length > 4000) {
+    return res.status(413).json({ success: false, error: 'That response is too long. Please shorten it a little.' });
   }
 
-  const effectivePrompt = prompt || `Write one sentence using the word "${word}" correctly.`;
+  // How many sentences was the student actually asked for? Default to 1 for
+  // older clients / direct API calls that don't send it.
+  const requiredCount = Number.isInteger(sentence_count) && sentence_count > 0 ? sentence_count : 1;
+
+  const effectivePrompt = prompt || (requiredCount === 1
+    ? `Write one sentence using the word "${word}" correctly.`
+    : `Write ${requiredCount} different sentences using the word "${word}" correctly.`);
 
   try {
     const gradingPrompt = `You are a supportive British English writing coach for learners around the world (Nigeria, India, and elsewhere all use valid, legitimate English). Do NOT penalise regional vocabulary or spelling choices that are correct in World Englishes — only genuine grammar errors or misuse of the target word.
 
 The student was asked to: "${effectivePrompt}"
+They needed to write exactly ${requiredCount} distinct sentence(s), each correctly using the target word.
 Target word: "${word}"
 Student's response: "${text.trim()}"
 
-Evaluate whether the word was used correctly (right meaning, right grammatical form) and whether the sentence is grammatically sound. Respond in this exact JSON format, no markdown, no extra text:
+First, count how many separate sentences the student actually wrote (lines/sentences separated by line breaks, full stops, or similar). Then evaluate whether the target word was used correctly (right meaning, right grammatical form) in each sentence, and whether each sentence is grammatically sound.
+
+Respond in this exact JSON format, no markdown, no extra text:
 {
-  "score": <integer 0-100>,
-  "used_word_correctly": <true or false>,
+  "score": <integer 0-100, reflecting BOTH correct usage/grammar AND whether they wrote the required number of sentences>,
+  "sentences_written": <integer, how many distinct sentences you counted>,
+  "sentence_count_met": <true if sentences_written >= ${requiredCount}, false otherwise>,
+  "used_word_correctly": <true if the word was used correctly in all or nearly all sentences, false otherwise>,
   "grammar_notes": "one short note on any grammar issue, or empty string if none",
-  "feedback": "one short, encouraging sentence (max 20 words), specific if possible"
+  "feedback": "one short, encouraging sentence (max 20 words). If they wrote fewer than ${requiredCount} sentences, gently say so."
 }`;
 
     const raw = await generate(gradingPrompt, 'writing-score');
@@ -313,13 +324,19 @@ Evaluate whether the word was used correctly (right meaning, right grammatical f
     }
 
     const score = Math.max(0, Math.min(100, Math.round(data.score)));
+    const sentencesWritten = Number.isInteger(data.sentences_written) ? data.sentences_written : null;
+    const sentenceCountMet = typeof data.sentence_count_met === 'boolean'
+      ? data.sentence_count_met
+      : (sentencesWritten !== null ? sentencesWritten >= requiredCount : null);
 
     try {
       await db.query(`
         INSERT INTO em_writing_submissions
-          (user_id, word_id, word_text, prompt, submission_text, score, used_word_correctly, grammar_notes, feedback)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-      `, [userId, word_id || null, word, effectivePrompt, text.trim(), score, !!data.used_word_correctly, data.grammar_notes || null, data.feedback || null]);
+          (user_id, word_id, word_text, prompt, submission_text, score, used_word_correctly, grammar_notes, feedback,
+           sentence_count_required, sentence_count_written, sentence_count_met)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+      `, [userId, word_id || null, word, effectivePrompt, text.trim(), score, !!data.used_word_correctly, data.grammar_notes || null, data.feedback || null,
+          requiredCount, sentencesWritten, sentenceCountMet]);
     } catch (persistErr) {
       console.warn('[EM] writing-score persistence failed:', persistErr.message);
     }
@@ -328,6 +345,9 @@ Evaluate whether the word was used correctly (right meaning, right grammatical f
       success: true,
       score,
       used_word_correctly: !!data.used_word_correctly,
+      sentence_count_required: requiredCount,
+      sentences_written: sentencesWritten,
+      sentence_count_met: sentenceCountMet,
       grammar_notes: data.grammar_notes || '',
       feedback: data.feedback || '',
     });
