@@ -1,21 +1,29 @@
 // client/src/pages/OnboardingPage.jsx
 // Route: /onboarding  (redirect here after registration – students only)
 //
-// CHANGE v2.0 – Removed exam board selection step.
-//   Students already choose their curriculum during registration.
-//   Onboarding now starts directly at subject selection (3-step flow):
-//     Step 1 → Select subjects
-//     Step 2 → Daily goal
-//     Step 3 → Study schedule
+// CHANGE v3.0 – Exam type is now the FIRST onboarding step, not something
+// silently inferred from registration.
+//   4-step flow:
+//     Step 1 → Choose exam type
+//     Step 2 → Select subjects
+//              For exam types where every "subject" is really a compulsory
+//              section of one fixed test (IELTS, TOEFL, SAT — see
+//              REQUIRES_ALL_SUBJECTS below), there is nothing to pick: this
+//              step instead shows a read-only confirmation of exactly what
+//              the student will be studying, before the dashboard ever loads.
+//     Step 3 → Daily goal
+//     Step 4 → Study schedule
 //
-//   On mount the component auto-detects the student's curriculum from their
-//   user profile and fetches matching subjects. If no curriculum is found it
-//   falls back to loading ALL subjects so the student is never blocked.
+//   Registration still records a curriculum choice (pending_exam_board_ids),
+//   so it's used to pre-select a sensible default on Step 1 — but the
+//   student's real, final choice (and the subjects it produces) is made and
+//   shown here, inside onboarding, not assumed from a form filled in earlier.
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, Loader2, ChevronRight, ChevronLeft } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useCatalog } from '../hooks/useCatalog';
 import api from '../services/apiClient';
 
 const GOALS = [
@@ -33,111 +41,98 @@ const TIMES = [
   { value: 'evening',   label: 'Evening',   note: '6pm – 10pm',  emoji: '', featured: true },
 ];
 
-const extractList = (r) => {
-  if (Array.isArray(r))       return r;
-  if (Array.isArray(r?.data)) return r.data;
-  return [];
-};
+// S4: per-exam-type subject limits enforced at selection time.
+// JAMB/UTME → 4, WAEC/NECO → 9, JUPEB → 4, others → 10 (generous fallback)
+const ONBOARDING_LIMITS = { JAMB: 4, UTME: 4, WAEC: 9, NECO: 9, JUPEB: 4 };
+
+// Exam types where the "subjects" under them are really the fixed, compulsory
+// sections of a single test — e.g. IELTS = Listening/Reading/Writing/Speaking,
+// TOEFL = Reading/Listening/Speaking/Writing, SAT = Reading&Writing/Math.
+// There is no picking involved: every section is required, so onboarding
+// skips the picker and simply confirms what the student will be studying.
+// Unlike JAMB/WAEC/JUPEB above, adding a board here means "show all, pick none".
+const REQUIRES_ALL_SUBJECTS = ['IELTS', 'TOEFL', 'SAT'];
+
+const TOTAL_STEPS = 4;
 
 export default function OnboardingPage() {
   const { user, updateUser } = useAuth();
   const navigate             = useNavigate();
+  const { examTypes, loadingTypes, fetchSubjectsForType } = useCatalog();
 
-  // 3-step flow: 1=subjects, 2=goal, 3=schedule
-  const [step,      setStep]      = useState(1);
+  // 4-step flow: 1=exam type, 2=subjects, 3=goal, 4=schedule
+  const [step, setStep] = useState(1);
 
-  // Subjects
-  const [allSubs,   setAllSubs]   = useState([]);
-  const [subjects,  setSubjects]  = useState([]);   // selected subject IDs
-  const [loadingS,  setLoadingS]  = useState(true);
+  // Step 1: exam type
+  const [selectedBoard, setSelectedBoard]           = useState(null); // full board object
+  const [loadingSubjectsFor, setLoadingSubjectsFor]  = useState(false);
+  const [loadError, setLoadError]                   = useState('');
 
-  // The board codes we detected from the user's registration curriculum
-  const [detectedBoards, setDetectedBoards] = useState([]);
+  // Step 2: subjects
+  const [allSubs,  setAllSubs]  = useState([]);
+  const [subjects, setSubjects] = useState([]); // selected subject IDs
 
   // Goal & schedule
   const [goal,      setGoal]      = useState(20);
   const [studyDays, setStudyDays] = useState([]);
   const [studyTime, setStudyTime] = useState('evening');
   const [saving,    setSaving]    = useState(false);
+  const [saveError, setSaveError] = useState('');
 
-  // ── On mount: detect curriculum from user profile and load subjects ────────
+  // ── Pre-select a default exam type from registration, if one was chosen ──
+  // Convenience only — the student still confirms (or changes) it on Step 1.
   useEffect(() => {
-    const loadSubjects = async () => {
-      setLoadingS(true);
-      try {
-        let subs = [];
-
-        // Priority 1: use pending_exam_board_ids stored during registration.
-        // These are the exam board IDs the student explicitly chose on sign-up.
-        const pendingIds = user?.pending_exam_board_ids || [];
-
-        if (pendingIds.length > 0) {
-          setDetectedBoards(pendingIds);
-          const results = await Promise.all(
-            pendingIds.map(id =>
-              api.get('/subjects', { params: { exam_board_id: id } })
-                .then(r => extractList(r))
-                .catch(() => [])
-            )
-          );
-          subs = results.flat();
-        }
-
-        // Priority 2: fuzzy-match curriculum string (legacy / fallback)
-        if (subs.length === 0) {
-          const curriculum = user?.curriculum || user?.exam_board || '';
-          if (curriculum) {
-            const boardsRes = await api.get('/exam-boards').catch(() => ({ data: [] }));
-            const allBoards = extractList(boardsRes);
-            const matched   = allBoards.find(b =>
-              b.code?.toLowerCase()  === curriculum.toLowerCase() ||
-              b.name?.toLowerCase().includes(curriculum.toLowerCase()) ||
-              curriculum.toLowerCase().includes(b.code?.toLowerCase())
-            );
-            if (matched) {
-              setDetectedBoards([matched.id]);
-              const r = await api.get('/subjects', { params: { exam_board_id: matched.id } })
-                .catch(() => ({ data: [] }));
-              subs = extractList(r);
-            }
-          }
-        }
-
-        // Priority 3: fall back to all subjects (deduplicated by name via server)
-        if (subs.length === 0) {
-          const allRes = await api.get('/subjects?for_test_builder=true').catch(() => ({ data: [] }));
-          subs = extractList(allRes);
-        }
-
-        // Deduplicate by subject NAME so the same subject that exists across
-        // multiple exam boards only shows once in the picker.
-        const byName = new Map();
-        subs.forEach(s => { if (!byName.has(s.name)) byName.set(s.name, s); });
-        setAllSubs([...byName.values()]);
-      } catch {
-        setAllSubs([]);
-      } finally {
-        setLoadingS(false);
-      }
-    };
-
-    loadSubjects();
-  }, []); // eslint-disable-line
-
-  // S4: per-exam-type subject limits enforced at selection time.
-  // The detected boards are fetched from the user's pending_exam_board_ids during
-  // mount and stored as board codes in detectedBoards.
-  // JAMB/UTME → 4, WAEC/NECO → 9, JUPEB → 4, others → 10 (generous fallback)
-  const ONBOARDING_LIMITS = { JAMB: 4, UTME: 4, WAEC: 9, NECO: 9, JUPEB: 4 };
-  const subjectLimit = (() => {
-    for (const code of detectedBoards) {
-      const limit = ONBOARDING_LIMITS[String(code).toUpperCase()];
-      if (limit !== undefined) return limit;
+    if (selectedBoard || loadingTypes || examTypes.length === 0) return;
+    const pendingIds = user?.pending_exam_board_ids || [];
+    if (pendingIds.length > 0) {
+      const match = examTypes.find(b => String(b.id) === String(pendingIds[0]));
+      if (match) setSelectedBoard(match);
     }
-    return 10;
-  })();
+  }, [loadingTypes, examTypes]); // eslint-disable-line
+
+  const requiresAllSubjects = useMemo(
+    () => !!selectedBoard && REQUIRES_ALL_SUBJECTS.includes(String(selectedBoard.code).toUpperCase()),
+    [selectedBoard]
+  );
+
+  // Only actually show the "you'll be taking all of these" confirmation once
+  // we've confirmed there ARE subjects to show — an exam type flagged above
+  // with no subjects seeded yet falls back to the normal picker (which shows
+  // its own "no subjects found" message) instead of confirming an empty list.
+  const showConfirmation = requiresAllSubjects && allSubs.length > 0;
+
+  const subjectLimit = useMemo(() => {
+    if (!selectedBoard) return 10;
+    if (requiresAllSubjects) return allSubs.length || 10;
+    return ONBOARDING_LIMITS[String(selectedBoard.code).toUpperCase()] ?? 10;
+  }, [selectedBoard, requiresAllSubjects, allSubs.length]);
+
+  // ── Advance from Step 1 → Step 2: fetch subjects for the chosen exam type ──
+  const goToSubjects = async () => {
+    if (!selectedBoard) return;
+    setLoadingSubjectsFor(true);
+    setLoadError('');
+    try {
+      const subs = await fetchSubjectsForType(selectedBoard.id);
+      setAllSubs(subs);
+
+      if (subs.length > 0 && REQUIRES_ALL_SUBJECTS.includes(String(selectedBoard.code).toUpperCase())) {
+        // Every subject is compulsory for this exam type — pre-select all of
+        // them; Step 2 below just confirms this to the student.
+        setSubjects(subs.map(s => s.id));
+      } else {
+        setSubjects([]);
+      }
+      setStep(2);
+    } catch {
+      setLoadError('Could not load subjects for that exam type. Please try again.');
+    } finally {
+      setLoadingSubjectsFor(false);
+    }
+  };
 
   const toggleSubject = (id) => {
+    if (showConfirmation) return; // nothing to toggle — every subject is required
     if (subjects.includes(id)) {
       setSubjects(prev => prev.filter(s => s !== id));
     } else {
@@ -147,14 +142,12 @@ export default function OnboardingPage() {
   };
 
   // ── Save preferences and redirect to student dashboard ────────────────────
-  const [saveError, setSaveError] = useState('');
-
   const finish = async () => {
     setSaving(true);
     setSaveError('');
     try {
       await api.patch('/users/preferences', {
-        exam_boards:          detectedBoards,
+        exam_boards:          selectedBoard ? [selectedBoard.id] : [],
         subject_ids:          subjects,
         daily_goal:           goal,
         preferred_study_days: JSON.stringify(studyDays),
@@ -184,16 +177,22 @@ export default function OnboardingPage() {
   };
 
   const canNext =
-    step === 1 ? subjects.length > 0 :
+    step === 1 ? !!selectedBoard :
+    step === 2 ? subjects.length > 0 :
     true;
+
+  const handleNext = () => {
+    if (step === 1) { goToSubjects(); return; }
+    setStep(s => s + 1);
+  };
 
   return (
     <div className="min-h-screen bg-[#0a4a3f] flex flex-col items-center justify-center px-4 py-10">
       <div className="w-full max-w-md">
 
-        {/* 3-step progress dots */}
+        {/* 4-step progress dots */}
         <div className="flex justify-center gap-2 mb-8">
-          {[1, 2, 3].map(s => (
+          {Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map(s => (
             <div
               key={s}
               className={`h-1.5 rounded-full transition-all ${
@@ -207,20 +206,92 @@ export default function OnboardingPage() {
 
         <div className="bg-white rounded-3xl p-6 shadow-2xl">
 
-          {/* ── Step 1: Select subjects ───────────────────────────────────── */}
+          {/* ── Step 1: Choose exam type ─────────────────────────────────── */}
           {step === 1 && (
+            <>
+              <h2 className="text-xl font-bold text-gray-900 mb-1">What are you preparing for?</h2>
+              <p className="text-sm text-gray-500 mb-4">
+                This decides which subjects you'll see next.
+              </p>
+
+              {loadingTypes ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 size={20} className="text-blue-400 animate-spin" />
+                </div>
+              ) : examTypes.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-8">
+                  No exam types found. Please contact support.
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 gap-2 max-h-72 overflow-y-auto">
+                  {examTypes.map(b => {
+                    const sel = selectedBoard?.id === b.id;
+                    const isAllRequired = REQUIRES_ALL_SUBJECTS.includes(String(b.code).toUpperCase());
+                    return (
+                      <button
+                        key={b.id}
+                        onClick={() => setSelectedBoard(b)}
+                        className={`flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all ${
+                          sel ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300'
+                        }`}
+                      >
+                        <span className="text-lg">{b.icon_emoji || ''}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-semibold truncate ${sel ? 'text-blue-700' : 'text-gray-700'}`}>
+                            {b.name}
+                          </p>
+                          {b.subject_count > 0 && (
+                            <p className="text-xs text-gray-400">
+                              {isAllRequired
+                                ? `${b.subject_count} compulsory section${b.subject_count === 1 ? '' : 's'}`
+                                : `${b.subject_count} subjects available`}
+                            </p>
+                          )}
+                        </div>
+                        {sel && <Check size={16} className="text-blue-500 shrink-0" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {loadError && (
+                <p className="text-xs text-red-500 mt-3">{loadError}</p>
+              )}
+            </>
+          )}
+
+          {/* ── Step 2: Subjects (picker, or confirmation for fixed exams) ── */}
+          {step === 2 && showConfirmation && (
+            <>
+              <h2 className="text-xl font-bold text-gray-900 mb-1">Here's what you'll be studying</h2>
+              <p className="text-sm text-gray-500 mb-4">
+                {selectedBoard?.name} is a fixed set of sections — you'll be taking all {allSubs.length} of them.
+              </p>
+              <div className="grid grid-cols-1 gap-2 max-h-72 overflow-y-auto">
+                {allSubs.map(s => (
+                  <div
+                    key={s.id}
+                    className="flex items-center gap-3 p-3 rounded-xl border-2 border-blue-500 bg-blue-50"
+                  >
+                    <span className="text-lg">{s.icon_emoji || ''}</span>
+                    <p className="text-sm font-semibold text-blue-700 flex-1">{s.name}</p>
+                    <Check size={16} className="text-blue-500 shrink-0" />
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {step === 2 && !showConfirmation && (
             <>
               <h2 className="text-xl font-bold text-gray-900 mb-1">Select your subjects</h2>
               <p className="text-sm text-gray-500 mb-1">Pick your subjects — 14-day free trial, full access</p>
               <p className="text-xs text-blue-600 font-medium mb-4">{subjects.length} selected</p>
 
-              {loadingS ? (
-                <div className="flex justify-center py-8">
-                  <Loader2 size={20} className="text-blue-400 animate-spin" />
-                </div>
-              ) : allSubs.length === 0 ? (
+              {allSubs.length === 0 ? (
                 <p className="text-sm text-gray-400 text-center py-8">
-                  No subjects found. Please contact support.
+                  No subjects found for this exam type. Please contact support.
                 </p>
               ) : (
                 <div className="grid grid-cols-2 gap-2 max-h-72 overflow-y-auto">
@@ -254,8 +325,8 @@ export default function OnboardingPage() {
             </>
           )}
 
-          {/* ── Step 2: Daily goal ────────────────────────────────────────── */}
-          {step === 2 && (
+          {/* ── Step 3: Daily goal ────────────────────────────────────────── */}
+          {step === 3 && (
             <>
               <h2 className="text-xl font-bold text-gray-900 mb-1">Set your study goal</h2>
               <p className="text-sm text-gray-500 mb-5">
@@ -286,8 +357,8 @@ export default function OnboardingPage() {
             </>
           )}
 
-          {/* ── Step 3: Study schedule ────────────────────────────────────── */}
-          {step === 3 && (
+          {/* ── Step 4: Study schedule ────────────────────────────────────── */}
+          {step === 4 && (
             <>
               <h2 className="text-xl font-bold text-gray-900 mb-1">Set your study schedule</h2>
               <p className="text-sm text-gray-500 mb-5">
@@ -352,13 +423,16 @@ export default function OnboardingPage() {
               <ChevronLeft size={14} /> Back
             </button>
 
-            {step < 3 ? (
+            {step < TOTAL_STEPS ? (
               <button
-                onClick={() => setStep(s => s + 1)}
-                disabled={!canNext}
+                onClick={handleNext}
+                disabled={!canNext || (step === 1 && loadingSubjectsFor)}
                 className="flex items-center gap-1.5 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-semibold text-sm px-6 py-2.5 rounded-xl transition-colors"
               >
-                Next <ChevronRight size={14} />
+                {step === 1 && loadingSubjectsFor
+                  ? <><Loader2 size={13} className="animate-spin" /> Loading…</>
+                  : <>Next <ChevronRight size={14} /></>
+                }
               </button>
             ) : (
               <button
