@@ -93,33 +93,10 @@ const CellIcon = ({ val }) => {
 // ══════════════════════════════════════════════════════════════════════════════
 export default function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [loginMenuOpen, setLoginMenuOpen] = useState(false);       // desktop "Login" dropdown
-  const [mobileLoginOpen, setMobileLoginOpen] = useState(false);   // mobile "Login" submenu
   const [startFreeMenuOpen, setStartFreeMenuOpen] = useState(false);       // desktop "Start Free" dropdown
   const [mobileStartFreeOpen, setMobileStartFreeOpen] = useState(false);   // mobile "Start Free" submenu
   const [stats, setStats] = useState(STATS_FALLBACK);
-  const loginMenuRef = useRef(null);
   const startFreeMenuRef = useRef(null);
-
-  // Click-to-open / click-outside-to-close for the desktop Login dropdown.
-  // Previously used onMouseEnter/onMouseLeave, which broke because the
-  // dropdown panel sits `mt-2` below the button: that gap falls outside the
-  // wrapper's actual rendered box (the panel is absolutely positioned, so it
-  // doesn't extend the wrapper's flow height), so the pointer briefly left
-  // the hoverable area while crossing the gap and mouseleave fired before
-  // the user could reach the menu items. Click-based toggling avoids the
-  // gap issue entirely and also works on touch devices, where hover never
-  // fired in the first place.
-  useEffect(() => {
-    if (!loginMenuOpen) return;
-    const handleClickOutside = (e) => {
-      if (loginMenuRef.current && !loginMenuRef.current.contains(e.target)) {
-        setLoginMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [loginMenuOpen]);
 
   // Same click-to-open / click-outside-to-close pattern for the nav
   // "Start Free" dropdown (see below for why this became a dropdown).
@@ -166,36 +143,17 @@ export default function LandingPage() {
           <>
             {/* Desktop nav links */}
             <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-gray-600">
-              <a href="#features"     className="hover:text-blue-600 transition-colors">Features</a>
-              <a href="#subjects"     className="hover:text-blue-600 transition-colors">Subjects</a>
-
-              {/* Login — dropdown so it's never confused with a single product's
-                  login, and doesn't imply English Masterclass is a page section */}
-              <div className="relative" ref={loginMenuRef}>
-                <button
-                  type="button"
-                  onClick={() => setLoginMenuOpen(o => !o)}
-                  aria-expanded={loginMenuOpen}
-                  className="flex items-center gap-1 hover:text-blue-600 transition-colors"
-                >
-                  Login
-                  <ChevronDown size={14} className={`transition-transform ${loginMenuOpen ? 'rotate-180' : ''}`} />
-                </button>
-                {loginMenuOpen && (
-                  <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-50">
-                    <Link to="/login" onClick={() => setLoginMenuOpen(false)}
-                      className="block px-4 py-2.5 hover:bg-gray-50 transition-colors">
-                      <p className="font-semibold text-gray-900 text-sm">AISchoolonair</p>
-                      <p className="text-xs text-gray-400">Exam practice &amp; AI tutoring</p>
-                    </Link>
-                    <Link to="/em/login" onClick={() => setLoginMenuOpen(false)}
-                      className="block px-4 py-2.5 hover:bg-gray-50 transition-colors">
-                      <p className="font-semibold text-gray-900 text-sm">English Masterclass</p>
-                      <p className="text-xs text-gray-400">British English training</p>
-                    </Link>
-                  </div>
-                )}
-              </div>
+              {/* AISchoolonair / English Masterclass — promoted from the old
+                  "Login" dropdown to direct top-level links, replacing the
+                  Features/Subjects anchor links. Since both destinations
+                  are now visible directly in the nav, a separate "Login"
+                  item is no longer needed. */}
+              <Link to="/login" className="hover:text-blue-600 transition-colors">
+                AISchoolonair
+              </Link>
+              <Link to="/em/login" className="hover:text-blue-600 transition-colors">
+                English Masterclass
+              </Link>
 
               {/* Start Free — was a plain Link to /register, which silently sent
                   every visitor (including ones interested in English
@@ -230,7 +188,7 @@ export default function LandingPage() {
               </div>
             </nav>
             {/* Mobile hamburger */}
-            <button onClick={() => { setMenuOpen(o => !o); setMobileLoginOpen(false); }} className="md:hidden p-2 text-gray-500 hover:text-gray-700">
+            <button onClick={() => { setMenuOpen(o => !o); setMobileStartFreeOpen(false); }} className="md:hidden p-2 text-gray-500 hover:text-gray-700">
               {menuOpen ? <X size={22} /> : <Menu size={22} />}
             </button>
           </>
@@ -242,39 +200,23 @@ export default function LandingPage() {
       {/* Mobile dropdown menu */}
       {menuOpen && (
         <div className="md:hidden bg-white border-b border-gray-100 px-4 py-4 space-y-3 sticky top-14 z-40">
-          {['Features', 'Subjects'].map(s => (
-            <a key={s} href={`#${s.toLowerCase()}`} onClick={() => setMenuOpen(false)}
-              className="block text-sm font-medium text-gray-700 hover:text-blue-600 py-1">
-              {s}
-            </a>
-          ))}
+          {/* AISchoolonair / English Masterclass — direct links, mirroring the
+              desktop nav change above. Previously this mobile menu still had
+              Features/Subjects anchor links AND a separate expandable "Login"
+              submenu, left over from before the desktop nav was updated — so
+              mobile visitors still saw the old "Login" picker even though
+              desktop had already removed it. Bringing mobile in line: no
+              anchor links, no separate Login item, just direct links. */}
+          <Link to="/login" onClick={() => setMenuOpen(false)} className="block py-1">
+            <p className="text-sm font-medium text-gray-700">AISchoolonair</p>
+            <p className="text-xs text-gray-400">Exam practice &amp; AI tutoring</p>
+          </Link>
+          <Link to="/em/login" onClick={() => setMenuOpen(false)} className="block py-1">
+            <p className="text-sm font-medium text-gray-700">English Masterclass</p>
+            <p className="text-xs text-gray-400">British English training</p>
+          </Link>
 
-          {/* Login — expandable submenu, mirrors the desktop dropdown */}
-          <div>
-            <button
-              type="button"
-              onClick={() => setMobileLoginOpen(o => !o)}
-              aria-expanded={mobileLoginOpen}
-              className="flex items-center justify-between w-full text-sm font-medium text-gray-700 py-1"
-            >
-              Login
-              <ChevronDown size={16} className={`transition-transform ${mobileLoginOpen ? 'rotate-180' : ''}`} />
-            </button>
-            {mobileLoginOpen && (
-              <div className="pl-3 mt-1 space-y-2 border-l-2 border-gray-100">
-                <Link to="/login" onClick={() => setMenuOpen(false)} className="block py-1">
-                  <p className="text-sm font-medium text-gray-700">AISchoolonair</p>
-                  <p className="text-xs text-gray-400">Exam practice &amp; AI tutoring</p>
-                </Link>
-                <Link to="/em/login" onClick={() => setMenuOpen(false)} className="block py-1">
-                  <p className="text-sm font-medium text-gray-700">English Masterclass</p>
-                  <p className="text-xs text-gray-400">British English training</p>
-                </Link>
-              </div>
-            )}
-          </div>
-
-          {/* Start Free — expandable submenu, mirrors the Login submenu above */}
+          {/* Start Free — expandable submenu, mirrors the desktop dropdown */}
           <div>
             <button
               type="button"
