@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Eye, EyeOff, ChevronDown, ChevronUp, AlertCircle, RefreshCw } from 'lucide-react';
@@ -323,22 +324,51 @@ function getGradeOptions(curriculum) {
 function CountryCodePicker({ selected, onChange }) {
   const [open,   setOpen]   = useState(false);
   const [search, setSearch] = useState('');
+  const [coords, setCoords] = useState(null);
   const ref       = useRef(null);
+  const btnRef    = useRef(null);
+  const panelRef  = useRef(null);
   const searchRef = useRef(null);
 
   useEffect(() => {
     const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+      const clickedTrigger = ref.current && ref.current.contains(e.target);
+      const clickedPanel   = panelRef.current && panelRef.current.contains(e.target);
+      if (!clickedTrigger && !clickedPanel) setOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  // BUG FIX (country-list-not-showing): this dropdown lives inside the phone
+  // field's wrapper div, which has overflow-hidden (needed to clip that row
+  // into one rounded pill shape). Being position:absolute inside that
+  // ancestor meant the panel was clipped down to a sliver — the search box
+  // barely showed, and the actual country list below it was invisible.
+  // Render it through a portal to document.body instead, positioned via the
+  // button's real on-screen coordinates, so no ancestor's overflow/z-index
+  // can clip or bury it.
   useEffect(() => {
-    if (open) {
+    if (open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setCoords({ top: r.bottom + 4, left: r.left, width: Math.max(r.width, 256) });
       setSearch('');
       setTimeout(() => searchRef.current?.focus(), 50);
     }
+  }, [open]);
+
+  // Keep the panel anchored if the page scrolls/resizes while open, and close
+  // on scroll of anything else (simplest correct behaviour — avoids a stale
+  // floating panel drifting away from its trigger).
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
   }, [open]);
 
   const q = search.trim().toLowerCase();
@@ -351,6 +381,7 @@ function CountryCodePicker({ selected, onChange }) {
   return (
     <div className="relative" ref={ref}>
       <button
+        ref={btnRef}
         type="button"
         onClick={() => setOpen(o => !o)}
         className="flex items-center gap-1.5 px-3 py-3 bg-gray-50 hover:bg-gray-100 transition-colors border-r border-gray-300 rounded-l-lg"
@@ -359,12 +390,16 @@ function CountryCodePicker({ selected, onChange }) {
         <span className="text-sm font-medium text-gray-700">{selected.dial}</span>
         <ChevronDown size={13} className="text-gray-400" />
       </button>
-      {open && (
-        <div className="absolute top-full left-0 z-50 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl w-64 max-h-72 overflow-hidden flex flex-col">
+      {open && coords && createPortal(
+        <div
+          ref={panelRef}
+          className="fixed z-[100] bg-white border border-gray-200 rounded-lg shadow-xl max-h-72 overflow-hidden flex flex-col"
+          style={{ top: coords.top, left: coords.left, width: coords.width }}
+        >
           {/* Search — added when the list grew from 10 hard-coded countries to
               192 (see COUNTRY_CODES comment above); scrolling a list that
               long without a filter is impractical. */}
-          <div className="p-2 border-b border-gray-100 sticky top-0 bg-white">
+          <div className="p-2 border-b border-gray-100">
             <input
               ref={searchRef}
               type="text"
@@ -392,7 +427,8 @@ function CountryCodePicker({ selected, onChange }) {
               </button>
             ))}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
