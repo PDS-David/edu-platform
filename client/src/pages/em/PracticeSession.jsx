@@ -245,10 +245,10 @@ export default function PracticeSession({ cat, words, onComplete }) {
                   <p className="text-gray-700"><span className="font-semibold">Tip:</span> {explanation.usage_tip}</p>
                 </div>
               )}
-              {explanation.british_vs_american && explanation.british_vs_american !== 'null' && (
+              {explanation.regional_note && explanation.regional_note !== 'null' && (
                 <div className="flex items-start gap-2">
-                  <span className="text-sm shrink-0" aria-hidden="true">🇬🇧🆚🇺🇸</span>
-                  <p className="text-gray-600 text-xs">{explanation.british_vs_american}</p>
+                  <span className="text-sm shrink-0" aria-hidden="true">🌍</span>
+                  <p className="text-gray-600 text-xs">{explanation.regional_note}</p>
                 </div>
               )}
             </div>
