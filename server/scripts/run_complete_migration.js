@@ -1600,6 +1600,42 @@ async function run() {
     `ALTER TABLE em_practice_sessions ADD COLUMN IF NOT EXISTS writing_score NUMERIC(5,2)`
   );
 
+  // ── SCHOOL TENANCY (initial slice) ──────────────────────────────────────────
+  // database/migration_school_tenancy.sql defines this schema, but per the note
+  // above, standalone files under database/ are never executed on deploy — only
+  // this script is. Wiring the same DDL in here so schools/register, /join, and
+  // /me/roster actually have somewhere to read/write on a real deploy.
+  await exec('enum: school_admin role', `
+    DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_type t JOIN pg_enum e ON e.enumtypid=t.oid
+        WHERE t.typname='enum_users_role' AND e.enumlabel='school_admin')
+      THEN ALTER TYPE enum_users_role ADD VALUE 'school_admin'; END IF;
+    EXCEPTION WHEN others THEN NULL; END $$`);
+
+  await exec('schools: create table', `
+    CREATE TABLE IF NOT EXISTS schools (
+      id            UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+      name          VARCHAR(255) NOT NULL,
+      join_code     VARCHAR(20)  NOT NULL UNIQUE,
+      address       TEXT,
+      contact_email VARCHAR(255),
+      is_active     BOOLEAN      NOT NULL DEFAULT true,
+      created_by    UUID         REFERENCES users(id) ON DELETE SET NULL,
+      created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+      updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    )`
+  );
+  await exec('schools: join_code index',
+    `CREATE INDEX IF NOT EXISTS idx_schools_join_code ON schools(join_code)`
+  );
+
+  await exec('users: add school_id column',
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS school_id UUID REFERENCES schools(id) ON DELETE SET NULL`
+  );
+  await exec('users: school_id index',
+    `CREATE INDEX IF NOT EXISTS idx_users_school_id ON users(school_id) WHERE school_id IS NOT NULL`
+  );
+
   console.log('\n✅ Migration complete.\n');
   await pool.end();
 }

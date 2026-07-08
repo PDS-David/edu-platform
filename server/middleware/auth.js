@@ -31,7 +31,7 @@ const protect = async (req, res, next) => {
     const decoded = await tokenService.verifyAccessToken(token);
 
     const users = await db.query(
-      `SELECT id, email, first_name, last_name, role,
+      `SELECT id, email, first_name, last_name, role, school_id,
               is_active, subscription_status, subscription_expires_at,
               daily_goal, em_registered_at
        FROM users

@@ -232,6 +232,7 @@ const { protect } = require('./middleware/auth');
 
 // ROUTES
 const authRoutes = safeRequire('./routes/authRoutes');
+const schoolRoutes = safeRequire('./routes/schoolRoutes');
 const userRoutes = safeRequire('./routes/users');
 const subjectRoutes = safeRequire('./routes/subjectsRoutes');
 const topicsRoutes = safeRequire('./routes/topicsRoutes');
@@ -278,6 +279,7 @@ const explanationRoutes = safeRequire('./routes/explanationRoute');
 
 // MOUNT ROUTES
 if (authRoutes) app.use('/api/auth', authRoutes);
+if (schoolRoutes) app.use('/api/schools', schoolRoutes);
 if (userRoutes) app.use('/api/users', protect, userRoutes);
 if (subjectRoutes) app.use('/api/subjects', protect, subjectRoutes);
 if (topicsRoutes) app.use('/api/topics', protect, topicsRoutes);
