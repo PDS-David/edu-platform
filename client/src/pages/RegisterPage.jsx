@@ -812,25 +812,6 @@ const RegisterPage = () => {
                   />
                 </div>
 
-                {/* Phone */}
-                <div className="relative">
-                  <label className="absolute -top-2 left-3 px-1 bg-white text-xs text-gray-500 font-medium z-10">
-                    Phone Number *
-                  </label>
-                  <div className="flex border border-gray-300 rounded-lg overflow-hidden focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-colors">
-                    <CountryCodePicker selected={countryCode} onChange={setCountryCode} />
-                    <input
-                      name="phone"
-                      type="tel"
-                      value={formData.phone}
-                      onChange={handleChange}
-                      placeholder="Phone number"
-                      required
-                      className="flex-1 px-3 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none bg-white"
-                    />
-                  </div>
-                </div>
-
                 {/* Password */}
                 <div className="relative">
                   <label className="absolute -top-2 left-3 px-1 bg-white text-xs text-gray-500 font-medium z-10">
@@ -854,12 +835,32 @@ const RegisterPage = () => {
                   >
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
+
                   {/* FIX B: Live password strength indicator */}
                   {formData.password.length > 0 && formData.password.length < 8 && (
                     <p className="text-xs text-amber-600 mt-1 ml-1">
                       {8 - formData.password.length} more character{8 - formData.password.length !== 1 ? 's' : ''} needed
                     </p>
                   )}
+                </div>
+
+                {/* Phone */}
+                <div className="relative">
+                  <label className="absolute -top-2 left-3 px-1 bg-white text-xs text-gray-500 font-medium z-10">
+                    Phone Number *
+                  </label>
+                  <div className="flex border border-gray-300 rounded-lg overflow-hidden focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-colors">
+                    <CountryCodePicker selected={countryCode} onChange={setCountryCode} />
+                    <input
+                      name="phone"
+                      type="tel"
+                      value={formData.phone}
+                      onChange={handleChange}
+                      placeholder="Phone number"
+                      required
+                      className="flex-1 px-3 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none bg-white"
+                    />
+                  </div>
                 </div>
 
                 {/* Role selector removed — this ever only had one option
