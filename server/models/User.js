@@ -43,7 +43,7 @@ User.init(
     country: DataTypes.STRING(100),
 
     role: {
-      type: DataTypes.ENUM('student', 'teacher', 'admin'),
+      type: DataTypes.ENUM('student', 'teacher', 'admin', 'school_admin'),
       allowNull: false,
       defaultValue: 'student',
     },
