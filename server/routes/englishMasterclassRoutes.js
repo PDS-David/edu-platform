@@ -133,8 +133,8 @@ router.post('/audio', async (req, res) => {
       model: 'gemini-2.5-flash',
       contents: [{
         parts: [{
-          text: `You are a British English language tutor. 
-Speak the following word clearly with a standard British Received Pronunciation (RP) accent, 
+          text: `You are an English language tutor. 
+Speak the following word clearly in standard, neutral English pronunciation, 
 slowly and clearly so a learner can hear each sound distinctly. 
 Say only the word, nothing else: "${word}"`
         }]
@@ -366,18 +366,18 @@ router.post('/word-explain', async (req, res) => {
   if (!word) return res.status(400).json({ success: false, error: 'word is required' });
 
   try {
-    const prompt = `You are an expert British English teacher. A student in Nigeria is learning British English.
+    const prompt = `You are an expert English language teacher helping a student in Nigeria build strong, internationally understood English vocabulary.
 
 Provide the following for the word: "${word}"
-Context (category): ${context || 'General British English'}
+Context (category): ${context || 'General English vocabulary'}
 
 Respond in this exact JSON format (no markdown, no extra text):
 {
-  "definition": "A clear, simple definition in British English",
-  "phonetic": "British IPA pronunciation e.g. /wɔːtə/",
-  "example_sentence": "A natural example sentence showing British usage",
+  "definition": "A clear, simple definition in plain English",
+  "phonetic": "IPA pronunciation e.g. /ˈwɔːtər/",
+  "example_sentence": "A natural example sentence showing everyday usage",
   "usage_tip": "A tip specific to Nigerian learners — common mistake to avoid or cultural note",
-  "british_vs_american": "If the word differs from American English, explain briefly. Otherwise write null."
+  "regional_note": "If this word or its spelling commonly differs across English-speaking regions (e.g. British vs American), briefly note that as neutral trivia. Otherwise write null."
 }`;
 
     const raw = await generate(prompt, 'explain');
@@ -748,23 +748,23 @@ router.post('/admin/generate-words', adminOnly, async (req, res) => {
   }
 
   try {
-    const prompt = `You are an expert British English language teacher creating vocabulary lists for Nigerian students learning British English.
+    const prompt = `You are an expert English language teacher creating vocabulary lists for Nigerian students building strong, internationally understood English.
 
 Generate ${Math.min(count, 20)} vocabulary words for the category: "${category_name}" (difficulty: ${difficulty || 'Beginner'}).
 
 IMPORTANT: 
-- Use only genuine British English words, spellings, and pronunciations.
-- Phonetics must use British IPA (Received Pronunciation).
-- Example sentences must reflect British cultural context.
-- Spellings must be British (e.g. colour not color, realise not realize).
+- Use widely understood, everyday English words — the kind used across English-speaking countries, not words specific to one region only.
+- Phonetics should use standard IPA.
+- Example sentences should be natural and clear, in an everyday, internationally understood context.
+- Spelling conventions (e.g. colour/color, realise/realize) are both acceptable — prefer whichever is more natural for the word; consistency within a single word entry matters more than which convention is chosen.
 
 Respond ONLY with a JSON array, no markdown, no extra text:
 [
   {
     "word": "the exact word",
-    "phonetic": "/British IPA/",
-    "definition": "Clear British English definition",
-    "example_sentence": "Natural British English example sentence"
+    "phonetic": "/IPA/",
+    "definition": "Clear, simple English definition",
+    "example_sentence": "A natural example sentence"
   }
 ]`;
 
