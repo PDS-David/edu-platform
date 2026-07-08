@@ -29,7 +29,7 @@ export default function LevelsView({ levelProgress, byDiff, onStart, loadingCatI
           <h2 className="text-xl font-bold mb-1">Welcome to English Masterclass 🎓</h2>
           <p className="text-sm text-indigo-100 leading-relaxed">
             Master English vocabulary step by step. Start with <span className="font-semibold">Beginner</span> categories below.
-            Score 60% or higher to unlock the next level!
+            Answer 30 questions at 70% accuracy or higher to unlock the next level!
           </p>
         </div>
       )}
@@ -57,6 +57,7 @@ export default function LevelsView({ levelProgress, byDiff, onStart, loadingCatI
           categories={byDiff[diff]}
           unlocked={levelProgress?.unlocked?.[diff] ?? (diff === 'Beginner')}
           categoryProgress={levelProgress?.category_progress}
+          levelDetail={levelProgress?.level_detail}
           onStart={onStart}
           loadingId={loadingCatId}
         />

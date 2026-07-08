@@ -107,6 +107,7 @@ export default function LevelSection({
   categories,
   unlocked,
   categoryProgress,
+  levelDetail,
   onStart,
   loadingId,
 }) {
@@ -136,7 +137,7 @@ export default function LevelSection({
 
       {/* Locked gate */}
       {!unlocked && (
-        <LevelGate level={level} requiredLevel={reqMap[level]} />
+        <LevelGate level={level} requiredLevel={reqMap[level]} detail={levelDetail?.[reqMap[level]]} />
       )}
 
       {/* Unlocked — category list */}
