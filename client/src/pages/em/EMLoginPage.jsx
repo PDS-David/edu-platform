@@ -5,7 +5,7 @@
 // Design system applied (see constants.js):
 //   • Page bg:       SOVEREIGN[950] → SOVEREIGN[900] gradient
 //   • Left panel:    SOVEREIGN[800] solid (not gradient — spec says flat)
-//   • Accent bar:    CRIMSON[500] (British red — the designated EM accent)
+//   • Accent bar:    CRIMSON[500] (the designated EM accent colour)
 //   • Submit btn:    SOVEREIGN[700] flat, white text (no gold border-bottom)
 //   • Input focus:   SOVEREIGN[500] border
 //   • Back link:     SOVEREIGN[200] text
@@ -64,7 +64,7 @@ export default function EMLoginPage() {
       {/* ── Minimal EM top bar ────────────────────────────────────────────── */}
       <header className="flex items-center justify-between px-6 py-4">
         <div className="flex items-center gap-3">
-          {/* Crown icon — CRIMSON[500] (British accent, per design system) */}
+          {/* Crown icon — CRIMSON[500] (EM accent colour, per design system) */}
           <div
             className="w-9 h-9 rounded-xl flex items-center justify-center text-base shadow-sm"
             style={{ background: CRIMSON[500] }}
@@ -147,7 +147,7 @@ export default function EMLoginPage() {
               className="text-sm xl:text-base max-w-xs leading-relaxed relative z-10 mb-6"
               style={{ color: SOVEREIGN[200] }}
             >
-              Continue your journey to mastering British English vocabulary.
+              Continue your journey to mastering English vocabulary.
               Progress, streaks and level unlocks are waiting for you.
             </p>
 
@@ -155,7 +155,7 @@ export default function EMLoginPage() {
             <div className="grid grid-cols-2 gap-3 relative z-10 w-full max-w-xs">
               {[
                 { v: '3 Levels',   l: 'Beginner → Advanced' },
-                { v: '🇬🇧',         l: 'British English Only' },
+                { v: '🌍',         l: 'English for Everyone' },
                 { v: 'AI-Powered', l: 'Word Explanations'    },
                 { v: 'TTS Audio',  l: 'Listen & Spell'       },
               ].map((s, i) => (
@@ -198,7 +198,7 @@ export default function EMLoginPage() {
                     English Masterclass
                   </p>
                   <p className="text-[10px] tracking-widest text-gray-400 uppercase">
-                    British English Training
+                    English Learning Platform
                   </p>
                 </div>
               </div>

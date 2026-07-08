@@ -85,7 +85,7 @@ export default function EMSignupPage() {
           />
           <h1 className="text-2xl font-bold text-gray-900 mb-1">Create your account</h1>
           <p className="text-sm text-gray-500 mb-7">
-            Start learning British English — no AISchoolonair account needed.
+            Start learning English — no AISchoolonair account needed.
           </p>
 
           {error && (

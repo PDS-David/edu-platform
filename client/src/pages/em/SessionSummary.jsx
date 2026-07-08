@@ -45,7 +45,7 @@ export default function SessionSummary({ cat, attempts, onPracticeAgain, onBackT
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-1">Practice Complete!</h2>
           <p className="text-sm text-gray-500">
-            {accuracy >= 80 ? 'Excellent British English!' : accuracy >= 60 ? 'Good effort — keep going!' : 'Every word practised is progress!'}
+            {accuracy >= 80 ? 'Excellent work!' : accuracy >= 60 ? 'Good effort — keep going!' : 'Every word practised is progress!'}
           </p>
 
           {/* Unlock hint */}
