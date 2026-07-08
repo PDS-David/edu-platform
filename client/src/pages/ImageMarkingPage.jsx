@@ -13,7 +13,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../services/apiClient';
+import api, { TIMEOUT_AI } from '../services/apiClient';
 
 // ── Grade colour helper ───────────────────────────────────────────────────────
 function gradeColor(grade) {
@@ -166,8 +166,16 @@ export default function ImageMarkingPage() {
 
       // ── FIXED: api interceptor already unwraps response.data ─────────────
       // The resolved value IS the payload — no destructuring needed.
+      // BUG FIX ("server error" on AI Marking): this request was using
+      // apiClient's default 15s timeout. Multimodal image marking (plus a
+      // two-model fallback chain server-side if the primary model errors)
+      // routinely takes longer than that, especially on a slower connection
+      // uploading a multi-MB photo. TIMEOUT_AI (60s) exists specifically for
+      // "AI vision/marking (single image)" per its own comment in
+      // apiClient.js — it just was never actually applied here.
       const res = await api.post('/ai/mark-image', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: TIMEOUT_AI,
       });
 
       if (res && res.success) {
@@ -179,7 +187,10 @@ export default function ImageMarkingPage() {
         setError((res && res.error) || 'Marking failed. Please try again.');
       }
     } catch (err) {
-      setError(err?.message || 'Something went wrong. Please try again.');
+      const isTimeout = err?.code === 'ECONNABORTED' || /timeout/i.test(err?.message || '');
+      setError(isTimeout
+        ? 'This is taking longer than expected — the image may be large or the connection slow. Please try again.'
+        : (err?.message || 'Something went wrong. Please try again.'));
     } finally {
       setLoading(false);
     }

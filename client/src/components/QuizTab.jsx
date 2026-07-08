@@ -665,7 +665,14 @@ function HintModal({ question, onClose }) {
   useEffect(() => {
     api.post('/ai/hint', { question_id: question.id, hint_level: 1 })
       .then(r => {
-        const raw = r.hints || r.content || r.hint || '';
+        // BUG FIX (ai-hint-not-functioning): r.hints/r.content/r.hint don't
+        // exist at the top level of the interceptor's normalised response —
+        // only r.data is guaranteed to hold the actual payload (see
+        // apiClient.js's response interceptor: only a specific fixed set of
+        // fields get hoisted to the top, and hint/hints aren't in it). This
+        // always fell through to the '' fallback, so the hint panel silently
+        // rendered empty every time, with no visible error.
+        const raw = r.data?.hints || r.data?.hint || r.hints || r.content || r.hint || '';
         // Split by newlines or bullets
         const lines = typeof raw === 'string'
           ? raw.split(/\n|•|-/).map(s => s.trim()).filter(Boolean)
