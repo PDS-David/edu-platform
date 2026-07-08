@@ -1400,59 +1400,117 @@ async function run() {
      CREATE INDEX IF NOT EXISTS idx_em_word_progress_user ON em_word_progress(user_id);
      CREATE INDEX IF NOT EXISTS idx_em_sessions_user ON em_practice_sessions(user_id, created_at DESC)`
   );
+  // BUGFIX (2026-07-05): the original em_categories/em_words seed data
+  // branded this course as British-English-specific ('Everyday British',
+  // 'British Idioms', 'British Slang', 🇬🇧 icon, definitions like "An
+  // informal British word for a man"). English Masterclass teaches
+  // English generally, not one regional variety — this renames the
+  // existing categories IN PLACE (UPDATE, not a new INSERT) so the
+  // category id, all its words, and every student's existing progress on
+  // those words are preserved untouched; only the name/description/icon
+  // change. This must run BEFORE the seed INSERT below in the same
+  // migration execution: the seed INSERT's ON CONFLICT (name, difficulty)
+  // needs to see the already-renamed row to correctly no-op, rather than
+  // creating a duplicate empty category under the new name (which is
+  // exactly the em_categories duplicate-row bug fixed earlier — see
+  // dedupe_em_categories.js). Safe to run on every deploy: after the
+  // first run these UPDATEs simply match 0 rows.
+  await exec('em_categories: rename British-branded categories to neutral English framing', `
+    UPDATE em_categories SET
+      name = 'Everyday English',
+      description = 'Common words used in everyday English conversation',
+      icon_emoji = '🗣️'
+      WHERE name = 'Everyday British' AND difficulty = 'Beginner';
+    UPDATE em_categories SET
+      name = 'English Idioms',
+      description = 'Popular idioms and expressions used in everyday English'
+      WHERE name = 'British Idioms' AND difficulty = 'Intermediate';
+    UPDATE em_categories SET
+      name = 'Everyday Slang',
+      description = 'Informal, everyday slang terms'
+      WHERE name = 'British Slang' AND difficulty = 'Advanced';
+    UPDATE em_categories SET
+      description = 'Common spelling variations across English-speaking regions'
+      WHERE name = 'Spelling Patterns' AND difficulty = 'Beginner';
+  `);
   await exec('em_categories: seed default categories',
     `INSERT INTO em_categories (name, description, difficulty, icon_emoji, order_index)
      VALUES
-       ('Everyday British',  'Common words used in everyday British conversation',  'Beginner',     '🇬🇧', 1),
-       ('British Idioms',    'Popular idioms and expressions used in Britain',      'Intermediate', '💬',  2),
+       ('Everyday English', 'Common words used in everyday English conversation', 'Beginner',     '🗣️', 1),
+       ('English Idioms',   'Popular idioms and expressions used in everyday English', 'Intermediate', '💬',  2),
        ('Formal English',    'Vocabulary for professional and formal settings',     'Intermediate', '📝',  3),
-       ('British Slang',     'Informal slang terms used across Britain',            'Advanced',     '😄',  4),
+       ('Everyday Slang',   'Informal, everyday slang terms',                       'Advanced',     '😄',  4),
        ('Pronunciation',     'Words commonly mispronounced by non-native speakers', 'Advanced',     '🎙️', 5),
-       ('Spelling Patterns', 'Common British spelling patterns vs American',        'Beginner',     '✏️', 6)
+       ('Spelling Patterns', 'Common spelling variations across English-speaking regions', 'Beginner',     '✏️', 6)
      ON CONFLICT (name, difficulty) DO NOTHING`
   );
+  // Same rename-in-place treatment for em_words that had explicit British
+  // callouts baked into their definition text (category_id, word identity,
+  // and all em_word_progress rows are untouched — only the definition text
+  // changes). Matched by (category name at time of seeding, word) via a
+  // join so this doesn't depend on knowing specific word ids.
+  await exec('em_words: neutralise British-only definition wording', `
+    UPDATE em_words SET definition = 'Excellent; very good (informal)'
+      WHERE word = 'brilliant' AND definition = 'Excellent; very good (informal British)';
+    UPDATE em_words SET definition = 'An informal word for a man'
+      WHERE word = 'bloke' AND definition = 'An informal British word for a man';
+    UPDATE em_words SET definition = 'A word for an apartment'
+      WHERE word = 'flat' AND definition = 'An apartment in British English';
+    UPDATE em_words SET definition = 'Also spelled "color" in American English'
+      WHERE word = 'colour' AND definition = 'British spelling of color';
+    UPDATE em_words SET definition = 'Also spelled "honor" in American English'
+      WHERE word = 'honour' AND definition = 'British spelling of honor';
+    UPDATE em_words SET definition = 'Also spelled "realize" in American English'
+      WHERE word = 'realise' AND definition = 'British spelling of realize';
+    UPDATE em_words SET definition = 'Also spelled "center" in American English'
+      WHERE word = 'centre' AND definition = 'British spelling of center';
+    UPDATE em_words SET definition = 'Also spelled "defense" in American English'
+      WHERE word = 'defence' AND definition = 'British spelling of defense';
+    UPDATE em_words SET definition = 'Noun form (the verb is "license"); American English uses "license" for both'
+      WHERE word = 'licence' AND definition = 'British noun form (license is verb)';
+  `);
   await exec('em_words: seed default words',
     `INSERT INTO em_words (category_id, word, phonetic, definition, example_sentence)
      SELECT c.id, v.word, v.phonetic, v.definition, v.example_sentence
      FROM em_categories c
      JOIN (VALUES
-       ('Everyday British','queue','/kjuː/','A line of people or vehicles waiting','Please join the queue at the bus stop.'),
-       ('Everyday British','fortnight','/ˈfɔːtnaɪt/','A period of two weeks','I shall return in a fortnight.'),
-       ('Everyday British','biscuit','/ˈbɪskɪt/','A small flat crisp baked cake','Would you like a biscuit with your tea?'),
-       ('Everyday British','rubbish','/ˈrʌbɪʃ/','Waste material; also means nonsense','Please put the rubbish in the bin.'),
-       ('Everyday British','brilliant','/ˈbrɪliənt/','Excellent; very good (informal British)','That film was absolutely brilliant!'),
-       ('Everyday British','bloke','/bləʊk/','An informal British word for a man','He seems like a decent bloke.'),
-       ('Everyday British','flat','/flæt/','An apartment in British English','She lives in a flat in London.'),
-       ('Everyday British','jumper','/ˈdʒʌmpə/','A knitted sweater','It''s cold — put your jumper on.'),
-       ('Everyday British','autumn','/ˈɔːtəm/','The season between summer and winter','The leaves are beautiful in autumn.'),
-       ('Everyday British','pavement','/ˈpeɪvmənt/','A raised path for pedestrians','Please walk on the pavement, not the road.'),
-       ('British Idioms','chuffed','/tʃʌft/','Very pleased or satisfied','She was chuffed to bits with her results.'),
-       ('British Idioms','gobsmacked','/ˈɡɒbsmækt/','Utterly astonished','I was absolutely gobsmacked by the news.'),
-       ('British Idioms','over the moon','/ˌəʊvə ðə ˈmuːn/','Extremely happy','He was over the moon when he got the job.'),
-       ('British Idioms','gutted','/ˈɡʌtɪd/','Bitterly disappointed','I was gutted when we lost the match.'),
-       ('British Idioms','knackered','/ˈnækəd/','Extremely tired; worn out','I''m absolutely knackered after that shift.'),
-       ('British Idioms','blimey','/ˈblaɪmi/','An exclamation of surprise','Blimey, that''s a lot of money!'),
+       ('Everyday English','queue','/kjuː/','A line of people or vehicles waiting','Please join the queue at the bus stop.'),
+       ('Everyday English','fortnight','/ˈfɔːtnaɪt/','A period of two weeks','I shall return in a fortnight.'),
+       ('Everyday English','biscuit','/ˈbɪskɪt/','A small flat crisp baked cake','Would you like a biscuit with your tea?'),
+       ('Everyday English','rubbish','/ˈrʌbɪʃ/','Waste material; also means nonsense','Please put the rubbish in the bin.'),
+       ('Everyday English','brilliant','/ˈbrɪliənt/','Excellent; very good (informal)','That film was absolutely brilliant!'),
+       ('Everyday English','bloke','/bləʊk/','An informal word for a man','He seems like a decent bloke.'),
+       ('Everyday English','flat','/flæt/','A word for an apartment','She lives in a flat in London.'),
+       ('Everyday English','jumper','/ˈdʒʌmpə/','A knitted sweater','It''s cold — put your jumper on.'),
+       ('Everyday English','autumn','/ˈɔːtəm/','The season between summer and winter','The leaves are beautiful in autumn.'),
+       ('Everyday English','pavement','/ˈpeɪvmənt/','A raised path for pedestrians','Please walk on the pavement, not the road.'),
+       ('English Idioms','chuffed','/tʃʌft/','Very pleased or satisfied','She was chuffed to bits with her results.'),
+       ('English Idioms','gobsmacked','/ˈɡɒbsmækt/','Utterly astonished','I was absolutely gobsmacked by the news.'),
+       ('English Idioms','over the moon','/ˌəʊvə ðə ˈmuːn/','Extremely happy','He was over the moon when he got the job.'),
+       ('English Idioms','gutted','/ˈɡʌtɪd/','Bitterly disappointed','I was gutted when we lost the match.'),
+       ('English Idioms','knackered','/ˈnækəd/','Extremely tired; worn out','I''m absolutely knackered after that shift.'),
+       ('English Idioms','blimey','/ˈblaɪmi/','An exclamation of surprise','Blimey, that''s a lot of money!'),
        ('Formal English','commence','/kəˈmens/','To begin or start something','The ceremony will commence at noon.'),
        ('Formal English','endeavour','/ɪnˈdevə/','To try hard to achieve something','We shall endeavour to resolve this promptly.'),
        ('Formal English','subsequently','/ˈsʌbsɪkwəntli/','At a later time','He subsequently withdrew his application.'),
        ('Formal English','forthwith','/ˌfɔːθˈwɪð/','Immediately; without delay','You are required to respond forthwith.'),
        ('Formal English','notwithstanding','/ˌnɒtwɪθˈstændɪŋ/','Despite; in spite of','Notwithstanding the difficulties, progress was made.'),
-       ('British Slang','cheeky','/ˈtʃiːki/','Slightly rude but playful','Don''t be cheeky to your teacher!'),
-       ('British Slang','dodgy','/ˈdɒdʒi/','Dishonest or of poor quality','That restaurant looks a bit dodgy.'),
-       ('British Slang','peckish','/ˈpekɪʃ/','Slightly hungry','I''m feeling a bit peckish — fancy a biscuit?'),
-       ('British Slang','naff','/næf/','Lacking taste or style; inferior','That outfit is a bit naff.'),
-       ('British Slang','faff','/fæf/','To waste time on unimportant things','Stop faffing about and get ready!'),
+       ('Everyday Slang','cheeky','/ˈtʃiːki/','Slightly rude but playful','Don''t be cheeky to your teacher!'),
+       ('Everyday Slang','dodgy','/ˈdɒdʒi/','Dishonest or of poor quality','That restaurant looks a bit dodgy.'),
+       ('Everyday Slang','peckish','/ˈpekɪʃ/','Slightly hungry','I''m feeling a bit peckish — fancy a biscuit?'),
+       ('Everyday Slang','naff','/næf/','Lacking taste or style; inferior','That outfit is a bit naff.'),
+       ('Everyday Slang','faff','/fæf/','To waste time on unimportant things','Stop faffing about and get ready!'),
        ('Pronunciation','colonel','/ˈkɜːnl/','A senior military officer rank','The colonel gave the order to advance.'),
        ('Pronunciation','choir','/ˈkwaɪə/','A group of singers','She sings in the school choir.'),
        ('Pronunciation','Wednesday','/ˈwenzdɪ/','The day between Tuesday and Thursday','The meeting is on Wednesday.'),
        ('Pronunciation','Leicester','/ˈlɛstə/','A city in the East Midlands','Leicester is known for its football club.'),
        ('Pronunciation','Edinburgh','/ˈedɪnbrə/','The capital city of Scotland','Edinburgh Castle sits atop an ancient volcano.'),
-       ('Spelling Patterns','colour','/ˈkʌlə/','British spelling of color','The colour of the sky is deep blue.'),
-       ('Spelling Patterns','honour','/ˈɒnə/','British spelling of honor','It is an honour to meet you.'),
-       ('Spelling Patterns','realise','/ˈrɪəlaɪz/','British spelling of realize','I didn''t realise you were here.'),
-       ('Spelling Patterns','centre','/ˈsentə/','British spelling of center','Meet me at the town centre.'),
-       ('Spelling Patterns','defence','/dɪˈfens/','British spelling of defense','The country''s defence budget increased.'),
-       ('Spelling Patterns','licence','/ˈlaɪsns/','British noun form (license is verb)','You need a licence to drive in the UK.')
+       ('Spelling Patterns','colour','/ˈkʌlə/','Also spelled "color" in American English','The colour of the sky is deep blue.'),
+       ('Spelling Patterns','honour','/ˈɒnə/','Also spelled "honor" in American English','It is an honour to meet you.'),
+       ('Spelling Patterns','realise','/ˈrɪəlaɪz/','Also spelled "realize" in American English','I didn''t realise you were here.'),
+       ('Spelling Patterns','centre','/ˈsentə/','Also spelled "center" in American English','Meet me at the town centre.'),
+       ('Spelling Patterns','defence','/dɪˈfens/','Also spelled "defense" in American English','The country''s defence budget increased.'),
+       ('Spelling Patterns','licence','/ˈlaɪsns/','Noun form (the verb is "license"); American English uses "license" for both','You need a licence to drive in the UK.')
      ) AS v(category_name, word, phonetic, definition, example_sentence)
        ON c.name = v.category_name
      ON CONFLICT (category_id, word) DO NOTHING`
