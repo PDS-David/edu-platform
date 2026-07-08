@@ -24,13 +24,13 @@ export const SOVEREIGN = {
   50:  '#F0F4FD', // authenticated page background
 };
 
-// ── Crimson palette (British accent red) ─────────────────────────────────────
+// ── Crimson palette (EM accent colour) ────────────────────────────────────────
 // Used for: logo icon background, the "EM" monogram accent, destructive actions.
 // Never used for interactive primary elements — that is Sovereign.
 export const CRIMSON = {
   700: '#8B0A1A', // deep crimson — error states
   600: '#B30E21', // hover on crimson
-  500: '#CF142B', // primary accent — logo, British identity marker
+  500: '#CF142B', // primary accent — logo, EM brand identity marker
   400: '#E04356', // lighter accent
   200: '#F8C2C9', // light backgrounds
   50:  '#FFF0F2', // tint surfaces

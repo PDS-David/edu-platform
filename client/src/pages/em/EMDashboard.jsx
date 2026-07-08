@@ -153,7 +153,7 @@ function WelcomeBanner({ onStart }) {
         </div>
 
         <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3 leading-tight">
-          Your British English<br />journey starts here
+          Your English<br />journey starts here
         </h2>
 
         <p className="text-sm leading-relaxed mb-6 max-w-md" style={{ color: SOVEREIGN[200] }}>
@@ -180,7 +180,7 @@ function WelcomeBanner({ onStart }) {
         {/* Feature pills */}
         <div className="flex flex-wrap gap-2 mt-5">
           {[
-            '🎙️ British pronunciation audio',
+            '🎙️ Real pronunciation audio',
             '🤖 AI word explanations',
             '📈 Progressive level unlock',
             '🔥 Daily streak tracking',
