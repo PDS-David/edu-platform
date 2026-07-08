@@ -189,9 +189,9 @@ function WordModal({ word, categoryId, onClose, onSaved, toast }) {
               AI Fill
             </button>
           </div>
-          <Field id="word-field-phonetic" label="Phonetic (British IPA)" value={form.phonetic} onChange={set('phonetic')} placeholder="e.g. /kjuː/" />
-          <Field id="word-field-definition" label="Definition" value={form.definition} onChange={set('definition')} type="textarea" placeholder="British English definition" />
-          <Field id="word-field-example" label="Example Sentence" value={form.example_sentence} onChange={set('example_sentence')} type="textarea" placeholder="A natural British English example" />
+          <Field id="word-field-phonetic" label="Phonetic (IPA)" value={form.phonetic} onChange={set('phonetic')} placeholder="e.g. /kjuː/" />
+          <Field id="word-field-definition" label="Definition" value={form.definition} onChange={set('definition')} type="textarea" placeholder="Clear, simple English definition" />
+          <Field id="word-field-example" label="Example Sentence" value={form.example_sentence} onChange={set('example_sentence')} type="textarea" placeholder="A natural example sentence" />
           <Field id="word-field-difficulty" label="Difficulty" value={form.difficulty} onChange={set('difficulty')} type="select" />
         </div>
         <div className="px-5 pb-5 flex gap-3">
@@ -238,7 +238,7 @@ function GenerateWordsPanel({ category, onGenerated, toast }) {
         <Sparkles size={16} className="text-indigo-500 shrink-0" />
         <div>
           <p className="text-sm font-semibold text-indigo-800">Generate with AI</p>
-          <p className="text-xs text-indigo-600">Let Gemini create British English vocabulary for this category</p>
+          <p className="text-xs text-indigo-600">Let Gemini create English vocabulary for this category</p>
         </div>
       </div>
       <div className="flex items-center gap-2 shrink-0">
@@ -545,7 +545,7 @@ export default function AdminEnglishMasterclass() {
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center">
-            <span className="text-lg">🇬🇧</span>
+            <span className="text-lg">🎓</span>
           </div>
           <div>
             <h1 className="text-xl font-bold text-gray-900">English Masterclass</h1>
@@ -563,7 +563,7 @@ export default function AdminEnglishMasterclass() {
         <div className="bg-white border border-indigo-100 rounded-2xl shadow-sm p-5 mb-5">
           <h3 className="text-sm font-bold text-gray-800 mb-4">New Category</h3>
           <div className="grid grid-cols-2 gap-3 mb-3">
-            <Field label="Name *" value={newCat.name} onChange={setNC('name')} placeholder="e.g. British Idioms" />
+            <Field label="Name *" value={newCat.name} onChange={setNC('name')} placeholder="e.g. English Idioms" />
             <div className="flex gap-2">
               <div className="flex-1">
                 <Field label="Icon Emoji" value={newCat.icon_emoji} onChange={setNC('icon_emoji')} placeholder="📚" />

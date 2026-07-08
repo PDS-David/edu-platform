@@ -80,7 +80,7 @@ export default function EMLoginPage() {
               className="text-[10px] tracking-widest mt-0.5"
               style={{ color: SOVEREIGN[200] }}
             >
-              BRITISH ENGLISH TRAINING
+              ENGLISH FLUENCY TRAINING
             </p>
           </div>
         </div>

@@ -56,7 +56,7 @@ export default function EMRegisterPage() {
             English Masterclass
           </p>
           <p className="text-[10px] tracking-widest mt-0.5" style={{ color: SOVEREIGN[200] }}>
-            BRITISH ENGLISH TRAINING
+            ENGLISH FLUENCY TRAINING
           </p>
         </div>
       </header>

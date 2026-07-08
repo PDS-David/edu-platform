@@ -94,7 +94,7 @@ export default function EMLayout() {
                 className="text-[10px] tracking-widest mt-0.5"
                 style={{ color: SOVEREIGN[300] }}
               >
-                BRITISH ENGLISH TRAINING
+                ENGLISH FLUENCY TRAINING
               </p>
             </div>
           </NavLink>

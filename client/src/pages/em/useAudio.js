@@ -33,7 +33,7 @@ export default function useAudio() {
     if (!('speechSynthesis' in window)) { setPlaying(false); return; }
     window.speechSynthesis.cancel();
     const utt   = new SpeechSynthesisUtterance(word);
-    utt.lang    = 'en-GB';
+    utt.lang    = 'en'; // generic English — no preference for any one accent
     utt.rate    = 0.8;
     utt.pitch   = 1.0;
     utt.volume  = 1.0;
@@ -41,9 +41,11 @@ export default function useAudio() {
     utt.onerror = () => setPlaying(false);
 
     function speakWithVoice() {
-      const voices  = window.speechSynthesis.getVoices();
-      const british = voices.find(v => v.lang === 'en-GB') || voices.find(v => v.lang.startsWith('en'));
-      if (british) utt.voice = british;
+      const voices     = window.speechSynthesis.getVoices();
+      // Use whatever English voice the browser/OS already has available —
+      // not biased toward any particular accent.
+      const englishVoice = voices.find(v => v.lang.startsWith('en'));
+      if (englishVoice) utt.voice = englishVoice;
       window.speechSynthesis.speak(utt);
     }
 

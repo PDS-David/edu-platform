@@ -120,7 +120,7 @@ router.get('/categories/:id/words', async (req, res) => {
 });
 
 // POST /api/english-masterclass/audio
-// Generate British English TTS audio via Gemini, return base64 audio
+// Generate spoken-word TTS audio via Gemini, return base64 audio
 router.post('/audio', async (req, res) => {
   const { word } = req.body;
   if (!word) return res.status(400).json({ success: false, error: 'word is required' });
@@ -142,8 +142,14 @@ Say only the word, nothing else: "${word}"`
       generationConfig: {
         responseModalities: ['AUDIO'],
         speechConfig: {
+          // 'Kore' is one of Gemini's built-in TTS voices — a neutral voice
+          // name, not tied to any national accent. (The previous value,
+          // 'en-GB-Standard-B', is a Google Cloud Text-to-Speech voice name
+          // format, not a valid name for this API — it wasn't just
+          // British-branded, it likely wasn't working at all, silently
+          // falling through to the browser TTS fallback every time.)
           voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: 'en-GB-Standard-B' }
+            prebuiltVoiceConfig: { voiceName: 'Kore' }
           }
         }
       }
@@ -294,7 +300,7 @@ router.post('/writing-score', pronunciationLimiter, async (req, res) => {
     : `Write ${requiredCount} different sentences using the word "${word}" correctly.`);
 
   try {
-    const gradingPrompt = `You are a supportive British English writing coach for learners around the world (Nigeria, India, and elsewhere all use valid, legitimate English). Do NOT penalise regional vocabulary or spelling choices that are correct in World Englishes — only genuine grammar errors or misuse of the target word.
+    const gradingPrompt = `You are a supportive English writing coach for learners around the world (Nigeria, India, Britain, the US, and elsewhere all use valid, legitimate English). Do NOT penalise regional vocabulary or spelling choices that are correct in World Englishes — only genuine grammar errors or misuse of the target word.
 
 The student was asked to: "${effectivePrompt}"
 They needed to write exactly ${requiredCount} distinct sentence(s), each correctly using the target word.
