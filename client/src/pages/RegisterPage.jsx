@@ -809,31 +809,11 @@ const RegisterPage = () => {
                   )}
                 </div>
 
-                {/* Role selector */}
-                <div className="relative">
-                  <label className="absolute -top-2 left-3 px-1 bg-white text-xs text-gray-500 font-medium z-10">
-                    I am a *
-                  </label>
-                  <div className="flex gap-2 pt-1">
-                    {[
-                      { value: 'student', label: ' Student', desc: 'Access lessons & practice exams' },
-                    ].map(opt => (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => setFormData(f => ({ ...f, role: opt.value }))}
-                        className={`flex-1 flex flex-col items-center py-3 px-2 border-2 rounded-lg text-xs font-medium transition-all
-                          ${formData.role === opt.value
-                            ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
-                            : 'border-gray-200 bg-white text-gray-500 hover:border-indigo-300'}`}
-                      >
-                        <span className="text-lg mb-0.5">{opt.label.split(' ')[0]}</span>
-                        <span className="font-semibold">{opt.label.split(' ').slice(1).join(' ')}</span>
-                        <span className="text-gray-400 text-[10px] mt-0.5 text-center leading-tight">{opt.desc}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                {/* Role selector removed — this ever only had one option
+                    ('student'), always pre-selected, so it was a label plus
+                    a single always-active button with nothing to actually
+                    choose. formData.role stays 'student' by default in
+                    state; only the redundant UI is gone. */}
 
                 {/* Curriculum & Grade — only for students */}
                 {formData.role === 'student' && (
