@@ -7,9 +7,11 @@
 // can find as complete, literal strings in source. Replaced with a static
 // lookup map so every class is written out in full.
 //
-// Business logic (accuracy calc, unlock hints): UNTOUCHED from the original.
+// Unlock hint removed — the real cumulative 30-question/70%-accuracy check
+// now lives server-side (englishMasterclassRoutes.js) and surfaces via the
+// LevelUpCelebration modal, not a per-session guess here.
 
-import { CheckCircle2, XCircle, Award } from 'lucide-react';
+import { CheckCircle2, XCircle } from 'lucide-react';
 
 // Static colour map — fixes the production Tailwind purge bug (Task 9)
 const COLOR_CLASSES = {
@@ -47,18 +49,6 @@ export default function SessionSummary({ cat, attempts, onPracticeAgain, onBackT
           <p className="text-sm text-gray-500">
             {accuracy >= 80 ? 'Excellent work!' : accuracy >= 60 ? 'Good effort — keep going!' : 'Every word practised is progress!'}
           </p>
-
-          {/* Unlock hint */}
-          {cat?.difficulty === 'Beginner' && accuracy >= 60 && (
-            <div className="mt-3 inline-flex items-center gap-1.5 text-xs bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full font-semibold">
-              <Award size={12} aria-hidden="true" /> You may have unlocked Intermediate!
-            </div>
-          )}
-          {cat?.difficulty === 'Intermediate' && accuracy >= 60 && (
-            <div className="mt-3 inline-flex items-center gap-1.5 text-xs bg-purple-50 text-purple-700 px-3 py-1.5 rounded-full font-semibold">
-              <Award size={12} aria-hidden="true" /> You may have unlocked Advanced!
-            </div>
-          )}
         </div>
 
         <div className={`grid gap-3 mb-6 ${stats.length === 4 ? 'grid-cols-4' : 'grid-cols-3'}`}>

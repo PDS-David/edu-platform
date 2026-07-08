@@ -1,7 +1,7 @@
 // client/src/pages/EnglishMasterclass.jsx
 // English Masterclass practice orchestrator. Progressive difficulty:
-// Beginner always open, Intermediate/Advanced unlock after ≥60% accuracy
-// on the prior tier.
+// Beginner always open, Intermediate/Advanced unlock after answering 30+
+// questions cumulatively in the prior tier at ≥70% accuracy.
 //
 // Renders inside EMLayout via /em/practice (see EMPractice.jsx) — EMLayout's
 // top nav (Dashboard / Practice / Progress) is the ONLY navigation between
@@ -23,6 +23,7 @@ import { Loader2, AlertCircle, RefreshCw, ArrowLeft } from 'lucide-react';
 import LevelsView       from './em/LevelsView';
 import PracticeSession   from './em/PracticeSession';
 import SessionSummary    from './em/SessionSummary';
+import LevelUpCelebration from './em/LevelUpCelebration';
 
 export default function EnglishMasterclass({ initialCategory = null }) {
   // levels | starting | session | summary
@@ -38,6 +39,7 @@ export default function EnglishMasterclass({ initialCategory = null }) {
   const [selectedCat, setSelectedCat]   = useState(null);
   const [words, setWords]               = useState([]);
   const [loadingCatId, setLoadingCatId] = useState(null);
+  const [newlyUnlockedLevel, setNewlyUnlockedLevel] = useState(null);
   const [sessionAttempts, setSessionAttempts] = useState([]);
 
   // Load categories + level progress together on mount
@@ -83,7 +85,7 @@ export default function EnglishMasterclass({ initialCategory = null }) {
     setSessionAttempts(attempts);
     const correct = attempts.filter(a => a.correct).length;
     try {
-      await api.post('/english-masterclass/sessions', {
+      const { data } = await api.post('/english-masterclass/sessions', {
         category_id:   selectedCat?.id,
         category_name: selectedCat?.name || 'Unknown',
         total_words:   attempts.length,
@@ -91,6 +93,7 @@ export default function EnglishMasterclass({ initialCategory = null }) {
         duration_secs: durationSecs,
         answers:       attempts,
       });
+      if (data?.newly_unlocked_level) setNewlyUnlockedLevel(data.newly_unlocked_level);
     } catch (e) {
       console.warn('[EM] Session save failed:', e.message);
     }
@@ -110,6 +113,7 @@ export default function EnglishMasterclass({ initialCategory = null }) {
 
   return (
     <div className="px-4 sm:px-6 py-6">
+      <LevelUpCelebration level={newlyUnlockedLevel} onDismiss={() => setNewlyUnlockedLevel(null)} />
       <div className="max-w-4xl mx-auto">
 
         {loadingInit && (

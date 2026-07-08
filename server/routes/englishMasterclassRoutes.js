@@ -28,6 +28,55 @@ async function q1(sql, params = []) {
   return r.rows[0] || null;
 }
 
+// ─── level-unlock rules ────────────────────────────────────────────────────
+// A student unlocks the next difficulty tier once they've answered at least
+// QUESTIONS_PER_LEVEL questions (cumulative, across however many sessions it
+// takes — not one sitting) within the current tier, at LEVEL_UNLOCK_ACCURACY%
+// or better overall.
+//
+// Why cumulative rather than "one 30-question session": each category only
+// seeds 5-10 words today (see em_words seed data), so no single category
+// session can reach 30 questions without a large content-authoring pass this
+// change didn't include. Cumulative-across-sessions delivers the "30
+// questions per level" requirement today without reseeding content, and
+// naturally encourages practicing multiple categories within a tier before
+// advancing — which is arguably the better learning behaviour anyway.
+const QUESTIONS_PER_LEVEL     = 30;
+const LEVEL_UNLOCK_ACCURACY   = 70;
+
+// Cumulative { totalWords, correctWords } per difficulty for a user.
+async function getLevelTotals(userId) {
+  const rows = await q(`
+    SELECT c.difficulty,
+           COALESCE(SUM(ps.total_words), 0)::int   AS total_words,
+           COALESCE(SUM(ps.correct_words), 0)::int AS correct_words
+      FROM em_practice_sessions ps
+      JOIN em_categories c ON c.id = ps.category_id
+     WHERE ps.user_id = $1
+     GROUP BY c.difficulty
+  `, [userId]);
+  const byDiff = {};
+  rows.forEach(r => { byDiff[r.difficulty] = { totalWords: r.total_words, correctWords: r.correct_words }; });
+  return byDiff;
+}
+
+function hasPassedLevel(byDiff, diff) {
+  const t = byDiff[diff];
+  if (!t || t.totalWords < QUESTIONS_PER_LEVEL) return false;
+  return (t.correctWords / t.totalWords) * 100 >= LEVEL_UNLOCK_ACCURACY;
+}
+
+function computeUnlocked(byDiff) {
+  return {
+    Beginner:     true, // always open
+    Intermediate: hasPassedLevel(byDiff, 'Beginner'),
+    Advanced:     hasPassedLevel(byDiff, 'Intermediate'),
+  };
+}
+
+// Which tier does passing `diff` unlock? null if there's nothing further.
+const NEXT_LEVEL = { Beginner: 'Intermediate', Intermediate: 'Advanced', Advanced: null };
+
 // ═════════════════════════════════════════════════════════════════════════════
 // EM REGISTRATION — separate one-time opt-in, distinct from AISchoolOnAir signup
 // ═════════════════════════════════════════════════════════════════════════════
@@ -449,6 +498,10 @@ router.post('/sessions', async (req, res) => {
     : null;
 
   try {
+    // Snapshot unlock state BEFORE this session counts, so we can tell if
+    // saving it just pushed the student over the line into a new level.
+    const beforeUnlocked = computeUnlocked(await getLevelTotals(userId));
+
     // 1. Save session
     await db.query(`
       INSERT INTO em_practice_sessions (user_id, category_id, category_name, total_words, correct_words, accuracy, duration_secs, pronunciation_score, writing_score)
@@ -506,7 +559,18 @@ router.post('/sessions', async (req, res) => {
       `, [userId, correct_words, duration_secs || 0, accuracy, today]);
     }
 
-    res.json({ success: true, message: 'Session saved.' });
+    // Did saving this session just cross the 30-question / 70%-accuracy line
+    // for a level that was locked a moment ago? Compare snapshots.
+    const afterUnlocked = computeUnlocked(await getLevelTotals(userId));
+    let newlyUnlockedLevel = null;
+    if (!beforeUnlocked.Intermediate && afterUnlocked.Intermediate) newlyUnlockedLevel = 'Intermediate';
+    else if (!beforeUnlocked.Advanced && afterUnlocked.Advanced)     newlyUnlockedLevel = 'Advanced';
+
+    res.json({
+      success: true,
+      message: 'Session saved.',
+      newly_unlocked_level: newlyUnlockedLevel,
+    });
   } catch (err) {
     console.error('[EM] POST /sessions', err.message);
     res.status(500).json({ success: false, error: err.message });
@@ -558,20 +622,21 @@ router.get('/progress', async (req, res) => {
 router.get('/level-progress', async (req, res) => {
   const userId = req.user.id;
   try {
-    // Fetch all sessions for this user (with the category's difficulty)
-    const sessions = await q(`
-      SELECT ps.category_id, ps.accuracy, c.difficulty
-        FROM em_practice_sessions ps
-        JOIN em_categories c ON c.id = ps.category_id
-       WHERE ps.user_id = $1
-    `, [userId]);
+    const byDiff   = await getLevelTotals(userId);
+    const unlocked = computeUnlocked(byDiff);
 
-    const hasPassedDifficulty = (diff) =>
-      sessions.some(s => s.difficulty === diff && s.accuracy >= 60);
-
-    const beginnerUnlocked      = true;
-    const intermediateUnlocked  = hasPassedDifficulty('Beginner');
-    const advancedUnlocked      = hasPassedDifficulty('Intermediate');
+    // Per-level detail for progress bars: "18/30 questions, 82% accuracy".
+    const levelDetail = {};
+    ['Beginner', 'Intermediate', 'Advanced'].forEach(diff => {
+      const t = byDiff[diff] || { totalWords: 0, correctWords: 0 };
+      levelDetail[diff] = {
+        questions_answered: t.totalWords,
+        questions_required: QUESTIONS_PER_LEVEL,
+        accuracy: t.totalWords ? Math.round((t.correctWords / t.totalWords) * 1000) / 10 : 0,
+        accuracy_required: LEVEL_UNLOCK_ACCURACY,
+        passed: hasPassedLevel(byDiff, diff),
+      };
+    });
 
     // Per-category best accuracy
     const catBest = await q(`
@@ -594,11 +659,8 @@ router.get('/level-progress', async (req, res) => {
     res.json({
       success: true,
       data: {
-        unlocked: {
-          Beginner:     beginnerUnlocked,
-          Intermediate: intermediateUnlocked,
-          Advanced:     advancedUnlocked,
-        },
+        unlocked,
+        level_detail: levelDetail,
         category_progress: categoryProgress,
       },
     });

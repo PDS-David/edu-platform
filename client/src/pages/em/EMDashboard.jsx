@@ -496,7 +496,7 @@ export default function EMDashboard() {
           </h2>
           {!unlocked.Intermediate && (
             <span className="text-xs text-gray-400 hidden sm:block">
-              Score ≥60% in Beginner to unlock Intermediate
+              Answer 30 questions at ≥70% in Beginner to unlock Intermediate
             </span>
           )}
         </div>
@@ -510,7 +510,7 @@ export default function EMDashboard() {
         {/* Mobile hint */}
         {!unlocked.Intermediate && (
           <p className="text-xs text-gray-400 mt-2 text-center sm:hidden">
-            Score ≥60% in Beginner to unlock Intermediate
+            Answer 30 questions at ≥70% in Beginner to unlock Intermediate
           </p>
         )}
       </section>
@@ -537,6 +537,7 @@ export default function EMDashboard() {
             categories={byDiff[diff]}
             unlocked={unlocked[diff] ?? (diff === 'Beginner')}
             categoryProgress={catProgress}
+            levelDetail={levelProgress?.level_detail}
             onStart={handleStartCategory}
             loadingId={null}
           />
