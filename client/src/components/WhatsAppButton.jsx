@@ -8,15 +8,13 @@
 //      using the product (dashboards, quizzes, video, mock exams, English
 //      Masterclass practice, onboarding, etc.) — that's exactly where a
 //      floating green icon competing for attention was most disruptive.
-//   2. Dismissible (option B): a small × lets anyone close it, and that
-//      choice is remembered (localStorage) for 14 days so it doesn't keep
-//      reappearing for someone who's already said no thanks.
+//   2. Dismissible (option B): a small × lets anyone close it for the
+//      current page load. It's plain component state, not persisted
+//      anywhere — reloading the page (or coming back later) shows it
+//      again, it just isn't permanently gone once someone closes it.
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useLocation } from "react-router-dom";
-
-const DISMISS_KEY = "wa_widget_dismissed_until";
-const DISMISS_DAYS = 14;
 
 // Prefixes considered "in-app" — the student/teacher/admin is actively using
 // the product, not deciding whether to sign up or looking for help getting
@@ -34,22 +32,10 @@ const HIDE_PATH_PREFIXES = [
   "/em/progress",
 ];
 
-function isDismissed() {
-  const until = localStorage.getItem(DISMISS_KEY);
-  if (!until) return false;
-  return Date.now() < Number(until);
-}
-
 const WhatsAppButton = () => {
   const location = useLocation();
-  const [dismissed, setDismissed] = useState(isDismissed);
+  const [dismissed, setDismissed] = useState(false);
   const [hovered, setHovered] = useState(false);
-
-  // Re-check on every navigation in case the dismissal window has expired
-  // during this session (long-lived tabs, etc.).
-  useEffect(() => {
-    setDismissed(isDismissed());
-  }, [location.pathname]);
 
   const hiddenByRoute = HIDE_PATH_PREFIXES.some(prefix => location.pathname.startsWith(prefix));
 
@@ -62,7 +48,6 @@ const WhatsAppButton = () => {
   const handleDismiss = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    localStorage.setItem(DISMISS_KEY, String(Date.now() + DISMISS_DAYS * 24 * 60 * 60 * 1000));
     setDismissed(true);
   };
 
