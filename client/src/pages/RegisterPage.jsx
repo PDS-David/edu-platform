@@ -322,13 +322,15 @@ function getGradeOptions(curriculum) {
 
 // ── Country Code Picker ───────────────────────────────────────────────────────
 function CountryCodePicker({ selected, onChange }) {
-  const [open,   setOpen]   = useState(false);
-  const [search, setSearch] = useState('');
-  const [coords, setCoords] = useState(null);
+  const [open,        setOpen]        = useState(false);
+  const [search,      setSearch]      = useState('');
+  const [coords,      setCoords]      = useState(null);
+  const [activeIndex, setActiveIndex] = useState(0);
   const ref       = useRef(null);
   const btnRef    = useRef(null);
   const panelRef  = useRef(null);
   const searchRef = useRef(null);
+  const listRef   = useRef(null);
 
   useEffect(() => {
     const handler = (e) => {
@@ -353,6 +355,7 @@ function CountryCodePicker({ selected, onChange }) {
       const r = btnRef.current.getBoundingClientRect();
       setCoords({ top: r.bottom + 4, left: r.left, width: Math.max(r.width, 256) });
       setSearch('');
+      setActiveIndex(0);
       setTimeout(() => searchRef.current?.focus(), 50);
     }
   }, [open]);
@@ -378,6 +381,44 @@ function CountryCodePicker({ selected, onChange }) {
       )
     : COUNTRY_CODES;
 
+  // Typing changes the result set, so the highlighted row has to reset —
+  // otherwise activeIndex could point past the end of a shorter filtered list.
+  useEffect(() => { setActiveIndex(0); }, [search]);
+
+  // Keep the highlighted row scrolled into view as it moves via arrow keys.
+  useEffect(() => {
+    if (!open) return;
+    const el = listRef.current?.querySelector(`[data-idx="${activeIndex}"]`);
+    el?.scrollIntoView({ block: 'nearest' });
+  }, [activeIndex, open]);
+
+  const selectCountry = (c) => { onChange(c); setOpen(false); };
+
+  const handleKeyDown = (e) => {
+    if (!filtered.length && e.key !== 'Escape' && e.key !== 'Tab') return;
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setActiveIndex(i => (i + 1) % filtered.length);
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setActiveIndex(i => (i - 1 + filtered.length) % filtered.length);
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (filtered[activeIndex]) selectCountry(filtered[activeIndex]);
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setOpen(false);
+        btnRef.current?.focus();
+        break;
+      default:
+        break;
+    }
+  };
+
   return (
     <div className="relative" ref={ref}>
       <button
@@ -398,28 +439,40 @@ function CountryCodePicker({ selected, onChange }) {
         >
           {/* Search — added when the list grew from 10 hard-coded countries to
               192 (see COUNTRY_CODES comment above); scrolling a list that
-              long without a filter is impractical. */}
+              long without a filter is impractical. Arrow keys / Enter /
+              Escape work from here — the input keeps focus throughout, so
+              typing and navigating don't fight each other for it. */}
           <div className="p-2 border-b border-gray-100">
             <input
               ref={searchRef}
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
+              onKeyDown={handleKeyDown}
+              role="combobox"
+              aria-expanded="true"
+              aria-activedescendant={filtered[activeIndex] ? `country-opt-${filtered[activeIndex].code}` : undefined}
               placeholder="Search country or code…"
               className="w-full px-2.5 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:border-indigo-400"
             />
           </div>
-          <div className="overflow-y-auto">
+          <div ref={listRef} className="overflow-y-auto flex-1 min-h-0" role="listbox">
             {filtered.length === 0 && (
               <p className="px-3 py-4 text-sm text-gray-400 text-center">No matching country</p>
             )}
-            {filtered.map(c => (
+            {filtered.map((c, i) => (
               <button
                 key={c.code}
+                id={`country-opt-${c.code}`}
+                data-idx={i}
                 type="button"
-                onClick={() => { onChange(c); setOpen(false); }}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 text-left text-sm hover:bg-indigo-50 transition-colors
-                  ${selected.code === c.code ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-700'}`}
+                role="option"
+                aria-selected={selected.code === c.code}
+                onClick={() => selectCountry(c)}
+                onMouseEnter={() => setActiveIndex(i)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors
+                  ${i === activeIndex ? 'bg-indigo-100' : ''}
+                  ${selected.code === c.code ? 'text-indigo-700 font-semibold' : 'text-gray-700'}`}
               >
                 <span className="text-base">{c.flag}</span>
                 <span className="flex-1">{c.name}</span>
