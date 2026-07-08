@@ -134,6 +134,12 @@ exports.register = async (req, res, next) => {
     const first_name  = normaliseName(req.body.first_name || req.body.firstName || '');
     const last_name   = normaliseName(req.body.last_name  || req.body.lastName  || first_name);
     const rawPhone    = req.body.phone;                    // R-01: read phone
+    // BUG FIX (phone-registration-country-not-captured): the country picker
+    // next to the phone field was only ever used to prefix the dial code —
+    // the actual country choice was discarded, even though users.country
+    // already exists as a column (populated only via the later profile-
+    // update route, never at registration). Capture it here too.
+    const country     = (req.body.country || '').trim().slice(0, 100) || null;
     const pendingExamBoards = sanitisePendingExamBoards(req.body.pendingExamBoards);
 
     // ── 2. Validate ────────────────────────────────────────────────────────
@@ -177,7 +183,7 @@ exports.register = async (req, res, next) => {
     const rows = await db.query(
       `INSERT INTO users
          (email, password, first_name, last_name, role,
-          phone,
+          phone, country,
           verification_token, verification_token_expires,
           is_active, is_verified, subscription_status,
           subscription_expires_at,
@@ -185,7 +191,7 @@ exports.register = async (req, res, next) => {
           created_at, updated_at)
        VALUES
          (:email, :password, :first_name, :last_name, 'student',
-          :phone,
+          :phone, :country,
           :verificationToken, :verificationTokenExpires,
           true, false, 'free_trial',
           NOW() + INTERVAL '14 days',
@@ -193,7 +199,7 @@ exports.register = async (req, res, next) => {
           NOW(), NOW())
        ON CONFLICT (email) DO NOTHING
        RETURNING
-         id, email, first_name, last_name, role, phone,
+         id, email, first_name, last_name, role, phone, country,
          is_active, is_verified, subscription_status,
          onboarding_complete, xp_points, study_streak_days,
          pending_exam_board_ids, created_at`,
@@ -204,6 +210,7 @@ exports.register = async (req, res, next) => {
           first_name,
           last_name,
           phone,                                           // R-01
+          country,
           verificationToken,
           verificationTokenExpires,
           pendingIds: pendingExamBoards.length

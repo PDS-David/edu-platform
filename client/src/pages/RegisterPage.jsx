@@ -577,6 +577,7 @@ const RegisterPage = () => {
         lastName,
         email:             formData.email.trim().toLowerCase(),
         phone:             `${countryCode.dial}${formData.phone.trim()}`,
+        country:           countryCode.name,
         password:          formData.password,
         role:              formData.role,
         pendingExamBoards: selectedCurriculum?.id ? [selectedCurriculum.id] : [],
