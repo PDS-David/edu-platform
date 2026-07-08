@@ -18,6 +18,17 @@ const { QueryTypes } = require('sequelize');
 const db          = require('../config/database');
 const tokenService = require('../services/tokenService');
 const audit        = require('../services/authAuditService');
+// BUG FIX (phone-registration-nigeria-only): this file used to define its own
+// local normalisePhone() that assumed any number starting with '0' must be
+// Nigerian and rewrote it to +234 — silently corrupting any other country's
+// local-format number (many countries use the same leading-0 domestic
+// dialing convention, e.g. UK, India, South Africa, Kenya...). In practice
+// this specific branch was rarely hit via the registration form itself
+// (RegisterPage.jsx always prepends a real dial code first), but it was a
+// landmine for any other caller, and simply wrong regardless. Use the
+// existing correct, country-agnostic implementation (strip digits, prepend
+// '+', no country assumptions) instead of maintaining a second, buggy copy.
+const { normalisePhone } = require('../utils/registrationValidators');
 
 // ─── Configurable lockout policy ─────────────────────────────────────────────
 const MAX_FAILED_ATTEMPTS = parseInt(process.env.AUTH_MAX_FAILED_ATTEMPTS, 10) || 5;
@@ -32,12 +43,6 @@ function normaliseEmail(raw) {
 
 function normaliseName(raw) {
   return (raw || '').trim();
-}
-
-function normalisePhone(raw) {
-  if (!raw) return null;
-  const digits = raw.replace(/\D/g, '');
-  return digits.startsWith('0') ? '+234' + digits.slice(1) : '+' + digits;
 }
 
 function sanitisePendingExamBoards(raw) {

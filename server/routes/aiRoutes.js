@@ -222,10 +222,17 @@ No preamble, no markdown.`;
       hints = [cleaned];
     }
 
+    // BUG FIX (ai-hint-not-functioning): this branch used to return
+    // { success, hint, hints } at the top level, while the two branches
+    // above (concept_hint fast-path, no-API-key fallback) both wrap in
+    // { success, data: { hint, hints } } — violating this codebase's own
+    // documented convention (see apiClient.js's response interceptor:
+    // "every backend route must return { success: true, data: <payload> }").
+    // Frontend consumers reading r.data.hint (the correct pattern) got
+    // undefined specifically on this — the most common — branch.
     return res.status(200).json({
       success: true,
-      hint:    hints[0] || '',
-      hints,
+      data: { hint: hints[0] || '', hints },
     });
   } catch (err) {
     console.error('[POST /ai/hint]', err.message);
