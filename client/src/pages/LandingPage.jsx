@@ -77,8 +77,8 @@ const COMPARISON = [
 ];
 
 const EM_HIGHLIGHTS = [
-  { icon: Volume2, title: 'Real British Pronunciation', desc: 'Hear every word spoken aloud in Received Pronunciation, then practise saying it back.' },
-  { icon: Layers,  title: '6 Vocabulary Categories',     desc: 'From Everyday British to Idioms, Formal English, Slang, Pronunciation traps, and Spelling patterns.' },
+  { icon: Volume2, title: 'Real Spoken Pronunciation',   desc: 'Hear every word spoken aloud clearly, then practise saying it back.' },
+  { icon: Layers,  title: '6 Vocabulary Categories',     desc: 'From Everyday English to Idioms, Formal English, Slang, Pronunciation traps, and Spelling patterns.' },
   { icon: Flame,   title: 'Streaks & Progress Tracking', desc: 'Level up from Beginner to Advanced as your accuracy and practice streak grow.' },
 ];
 
@@ -181,7 +181,7 @@ export default function LandingPage() {
                     <Link to="/em/signup" onClick={() => setStartFreeMenuOpen(false)}
                       className="block px-4 py-2.5 hover:bg-gray-50 transition-colors">
                       <p className="font-semibold text-gray-900 text-sm">English Masterclass</p>
-                      <p className="text-xs text-gray-400">British English training</p>
+                      <p className="text-xs text-gray-400">English fluency training</p>
                     </Link>
                   </div>
                 )}
@@ -213,7 +213,7 @@ export default function LandingPage() {
           </Link>
           <Link to="/em/login" onClick={() => setMenuOpen(false)} className="block py-1">
             <p className="text-sm font-medium text-gray-700">English Masterclass</p>
-            <p className="text-xs text-gray-400">British English training</p>
+            <p className="text-xs text-gray-400">English fluency training</p>
           </Link>
 
           {/* Start Free — expandable submenu, mirrors the desktop dropdown */}
@@ -235,7 +235,7 @@ export default function LandingPage() {
                 </Link>
                 <Link to="/em/signup" onClick={() => setMenuOpen(false)} className="block py-1">
                   <p className="text-sm font-medium text-gray-700">English Masterclass</p>
-                  <p className="text-xs text-gray-400">British English training</p>
+                  <p className="text-xs text-gray-400">English fluency training</p>
                 </Link>
               </div>
             )}
@@ -470,14 +470,14 @@ export default function LandingPage() {
               className="inline-flex items-center gap-1.5 text-white text-xs font-bold px-3 py-1.5 rounded-full tracking-wide uppercase"
               style={{ background: CRIMSON[500] }}
             >
-              <Crown size={12} /> New · British English Training
+              <Crown size={12} /> New · English Fluency Training
             </span>
             <h2 className="text-2xl sm:text-3xl font-extrabold leading-tight">
-              Master British English with English Masterclass
+              Master English with English Masterclass
             </h2>
             <p className="text-sm sm:text-base leading-relaxed max-w-lg" style={{ color: SOVEREIGN[200] }}>
               A standalone vocabulary and pronunciation trainer built for non-native English
-              learners — real British audio, AI-generated explanations, and progress tracking,
+              learners — real spoken audio, AI-generated explanations, and progress tracking,
               separate from your exam practice.
             </p>
 
@@ -513,12 +513,12 @@ export default function LandingPage() {
           <div className="flex justify-center lg:justify-end">
             <div className="bg-white rounded-2xl shadow-2xl w-72 p-5 space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-gray-400">Everyday British</span>
+                <span className="text-xs font-medium text-gray-400">Everyday English</span>
                 <span
                   className="text-[11px] font-bold px-2 py-1 rounded-full text-white"
                   style={{ background: CRIMSON[500] }}
                 >
-                  🇬🇧 RP Audio
+                  🔊 Audio
                 </span>
               </div>
 

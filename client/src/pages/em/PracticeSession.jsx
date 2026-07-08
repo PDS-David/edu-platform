@@ -137,7 +137,7 @@ export default function PracticeSession({ cat, words, onComplete }) {
         : 'border-gray-100'
       }`}>
         <p className="text-center text-sm font-semibold text-gray-500 mb-6 uppercase tracking-wider">
-          🇬🇧 Listen and type what you hear
+          🎧 Listen and type what you hear
         </p>
 
         <div className="flex justify-center mb-8">

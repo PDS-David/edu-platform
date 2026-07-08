@@ -120,24 +120,6 @@ function WelcomeBanner({ onStart }) {
         }}
         aria-hidden="true"
       />
-      {/* Union Jack watermark */}
-      <div
-        className="absolute bottom-4 right-6 opacity-[0.07] pointer-events-none"
-        aria-hidden="true"
-      >
-        <svg viewBox="0 0 80 54" width="72" height="48" xmlns="http://www.w3.org/2000/svg">
-          <rect width="80" height="54" rx="4" fill="#012169"/>
-          <line x1="0" y1="0" x2="80" y2="54" stroke="white" strokeWidth="10"/>
-          <line x1="80" y1="0" x2="0" y2="54" stroke="white" strokeWidth="10"/>
-          <line x1="0" y1="0" x2="80" y2="54" stroke="#C8102E" strokeWidth="6"/>
-          <line x1="80" y1="0" x2="0" y2="54" stroke="#C8102E" strokeWidth="6"/>
-          <rect x="30" y="0" width="20" height="54" fill="white"/>
-          <rect x="0" y="17" width="80" height="20" fill="white"/>
-          <rect x="33" y="0" width="14" height="54" fill="#C8102E"/>
-          <rect x="0" y="20" width="80" height="14" fill="#C8102E"/>
-        </svg>
-      </div>
-
       <div className="relative z-10">
         <div className="flex items-center gap-2 mb-3">
           <div
@@ -438,7 +420,7 @@ export default function EMDashboard() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-0.5">
-            🇬🇧 English Masterclass
+            🎓 English Masterclass
           </p>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 leading-tight">
             {greeting}, {firstName}!
