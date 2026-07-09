@@ -822,6 +822,44 @@ router.put('/:id/assign-users', authorize('admin', 'teacher'), async (req, res) 
       candidateIds = [...new Set([...candidateIds, ...members.map(m => m.student_id)])];
     }
 
+    // School-boundary check (closes the cross-tenant assignment gap): a
+    // school-affiliated assigner (teacher or school_admin with a school_id)
+    // can only assign to students/classes within their own school.
+    // Standalone assigners (school_id IS NULL) are unaffected — this only
+    // activates once the assigner actually belongs to a school. Resource
+    // *visibility* was already scoped by school_id; this closes the one
+    // remaining path where an explicit assignment could still cross a
+    // school boundary regardless of that visibility scoping.
+    let skippedOutsideSchool = 0;
+    if (req.user.school_id) {
+      if (class_ids.length > 0) {
+        const ownClassRows = await sequelize.query(
+          `SELECT c.id FROM classes c
+             JOIN users t ON t.id = c.teacher_id
+            WHERE c.id IN (:classIds) AND t.school_id = :schoolId`,
+          { replacements: { classIds: class_ids, schoolId: req.user.school_id }, type: QueryTypes.SELECT }
+        );
+        const ownClassSet = new Set(ownClassRows.map(r => r.id));
+        const outsideClasses = class_ids.filter(cid => !ownClassSet.has(cid));
+        if (outsideClasses.length > 0) {
+          return res.status(403).json({
+            success: false,
+            error: `${outsideClasses.length} of the selected classes belong to a different school and cannot be assigned to.`,
+          });
+        }
+      }
+      if (candidateIds.length > 0) {
+        const ownStudentRows = await sequelize.query(
+          `SELECT id FROM users WHERE id IN (:cids) AND school_id = :schoolId`,
+          { replacements: { cids: candidateIds, schoolId: req.user.school_id }, type: QueryTypes.SELECT }
+        );
+        const ownStudentSet = new Set(ownStudentRows.map(r => r.id));
+        const before = candidateIds.length;
+        candidateIds = candidateIds.filter(id => ownStudentSet.has(id));
+        skippedOutsideSchool = before - candidateIds.length;
+      }
+    }
+
     let eligibleIds = candidateIds;
     if (meta.subject_id && candidateIds.length > 0) {
       const enrolledRows = await sequelize.query(
@@ -865,7 +903,8 @@ router.put('/:id/assign-users', authorize('admin', 'teacher'), async (req, res) 
       success:       true,
       student_count: insertedStudents,
       class_count:   insertedClasses,
-      skipped_count: candidateIds.length - eligibleIds.length,
+      skipped_count: (candidateIds.length - eligibleIds.length) + skippedOutsideSchool,
+      skipped_outside_school: skippedOutsideSchool || undefined,
       message:       insertedStudents || insertedClasses
         ? `Pushed to ${insertedStudents} student(s) and ${insertedClasses} class(es).`
         : 'No new assignments were created.',
