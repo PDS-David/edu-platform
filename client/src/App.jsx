@@ -68,6 +68,8 @@ import TeacherAddQuestionPage from "./pages/TeacherAddQuestionPage";
 
 // Admin
 import AdminDashboard from "./pages/AdminDashboard";
+import AdminSchools from "./pages/AdminSchools";
+import SchoolAdminDashboard from "./pages/SchoolAdminDashboard";
 
 // Global floating widget
 import WhatsAppButton from "./components/WhatsAppButton";
@@ -177,10 +179,18 @@ export default function App() {
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="dashboard" element={<AdminDashboard />} />
+            <Route path="schools" element={<AdminSchools />} />
             <Route path="questions/review" element={<QuestionReview />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="english-masterclass" element={<AdminEnglishMasterclass />} />
           </Route>
+        </Route>
+
+        {/* SCHOOL ADMIN — separate role from the platform-wide 'admin' above.
+            Scoped entirely to their own school; see SchoolAdminDashboard.jsx
+            and GET /api/schools/me* for how isolation is enforced. */}
+        <Route element={<PrivateRoute allowedRoles={["school_admin"]} />}>
+          <Route path="/school-admin/dashboard" element={<SchoolAdminDashboard />} />
         </Route>
 
         {/* FALLBACK */}

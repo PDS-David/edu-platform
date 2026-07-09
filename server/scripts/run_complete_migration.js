@@ -1636,6 +1636,19 @@ async function run() {
     `CREATE INDEX IF NOT EXISTS idx_users_school_id ON users(school_id) WHERE school_id IS NOT NULL`
   );
 
+  // resources.school_id — nullable, additive, same pattern as users.school_id
+  // above. NULL means global (visible everywhere, matching every existing
+  // resource's current behaviour unchanged); set means private to that one
+  // school. Per Da's decision: App Admin's uploads stay global/shared with
+  // every school, but resources pushed by a school's own admin or teachers
+  // stay within that school only.
+  await exec('resources: add school_id column',
+    `ALTER TABLE resources ADD COLUMN IF NOT EXISTS school_id UUID REFERENCES schools(id) ON DELETE SET NULL`
+  );
+  await exec('resources: school_id index',
+    `CREATE INDEX IF NOT EXISTS idx_resources_school_id ON resources(school_id) WHERE school_id IS NOT NULL`
+  );
+
   console.log('\n✅ Migration complete.\n');
   await pool.end();
 }

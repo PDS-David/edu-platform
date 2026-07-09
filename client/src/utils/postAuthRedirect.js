@@ -28,8 +28,9 @@ export function getPostAuthRedirect(user) {
     return onboarded ? '/student/dashboard' : '/onboarding';
   }
 
-  if (user.role === 'teacher') return '/teacher/dashboard';
-  if (user.role === 'admin')   return '/admin/dashboard';
+  if (user.role === 'teacher')      return '/teacher/dashboard';
+  if (user.role === 'admin')        return '/admin/dashboard';
+  if (user.role === 'school_admin') return '/school-admin/dashboard';
 
   return '/';
 }

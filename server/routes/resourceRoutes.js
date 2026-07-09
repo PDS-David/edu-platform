@@ -293,11 +293,11 @@ router.post(
             `INSERT INTO resources
                (title, resource_type, file_url, r2_key, file_size_bytes,
                 original_filename, stored_filename, mime_type, sha256,
-                is_staged, is_active, uploaded_by, created_at, updated_at)
+                is_staged, is_active, uploaded_by, school_id, created_at, updated_at)
              VALUES
                (:title, :rtype, :fileUrl, :r2Key, :size,
                 :origName, :storedName, :mime, :hash,
-                true, true, :uploadedBy, NOW(), NOW())
+                true, true, :uploadedBy, :schoolId, NOW(), NOW())
              RETURNING id, title, resource_type, file_url, r2_key,
                        file_size_bytes, original_filename, stored_filename,
                        mime_type, sha256, is_staged, is_active, created_at`,
@@ -313,6 +313,11 @@ router.post(
                 mime:        f.mimeType,
                 hash:        f.sha256,
                 uploadedBy:  req.user?.id || null,
+                // School isolation (Da's decision): App Admin uploads have no
+                // school_id, so they stay global/shared with every school.
+                // A school-affiliated teacher or school_admin's upload is
+                // tagged with their own school and stays private to it.
+                schoolId:    req.user?.school_id || null,
               },
             }
           );
@@ -406,8 +411,12 @@ router.get('/', async (req, res) => {
         )`;
     }
 
-    if (role === 'teacher') {
-      // Teachers only see resources they uploaded — not other teachers' files
+    if (role === 'teacher' || role === 'school_admin') {
+      // Teachers only see resources they uploaded — not other teachers' files.
+      // school_admin gets the same self-scoping here (their own uploads);
+      // broader same-school visibility across all staff isn't needed for
+      // this slice — a school_admin managing their school's roster/resources
+      // in bulk goes through the schools routes, not this per-file list.
       where += ` AND r.uploaded_by = :user_id`;
     }
 

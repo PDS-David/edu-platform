@@ -27,7 +27,7 @@ const express = require('express');
 const router  = express.Router();
 const crypto  = require('crypto');
 
-const { protect } = require('../middleware/auth');
+const { protect, authorize } = require('../middleware/auth');
 const User    = require('../models/User');
 const sequelize = require('../config/database');
 
@@ -45,9 +45,12 @@ function generateJoinCode() {
 }
 
 // ─── POST /api/schools/register ────────────────────────────────────────────
-// Public. Creates a new school AND its first school_admin user in one call.
-// This does not touch, read, or affect any existing user, class, or content.
-router.post('/register', async (req, res) => {
+// App Admin only. Creates a new school AND its first school_admin user in
+// one call — Da/App Admin sets this up manually, then hands the join_code
+// to the school directly (see project notes: schools are provisioned by App
+// Admin, not self-service). Previously this was public with no auth at all;
+// locked down per that decision.
+router.post('/register', protect, authorize('admin'), async (req, res) => {
   const { school_name, admin_email, admin_password, admin_first_name, admin_last_name } = req.body || {};
 
   if (!school_name || !admin_email || !admin_password) {
@@ -154,10 +157,57 @@ function requireSchoolAdmin(req, res, next) {
   next();
 }
 
+// ─── GET /api/schools ────────────────────────────────────────────────────────
+// App Admin only. Lists every tenant school with basic roster counts, so App
+// Admin can see all schools — the one role that isn't confined to a single
+// school's data, per the isolation model.
+router.get('/', protect, authorize('admin'), async (req, res) => {
+  try {
+    const rows = await q(
+      `SELECT sc.id, sc.name, sc.join_code, sc.address, sc.contact_email,
+              sc.is_active, sc.created_at,
+              COUNT(u.id) FILTER (WHERE u.role = 'school_admin') AS admin_count,
+              COUNT(u.id) FILTER (WHERE u.role = 'teacher')      AS teacher_count,
+              COUNT(u.id) FILTER (WHERE u.role = 'student')      AS student_count
+         FROM schools sc
+         LEFT JOIN users u ON u.school_id = sc.id
+        GROUP BY sc.id
+        ORDER BY sc.created_at DESC`,
+      []
+    );
+    return res.json({ success: true, data: rows });
+  } catch (err) {
+    console.error('[schools] GET /', err.message);
+    return res.status(500).json({ success: false, error: 'Could not load schools' });
+  }
+});
+
+// ─── GET /api/schools/me ─────────────────────────────────────────────────────
+// school_admin only. Their own school's basic details (name, join_code) —
+// separate from the roster endpoint below since the dashboard needs both.
+router.get('/me', protect, requireSchoolAdmin, async (req, res) => {
+  try {
+    const rows = await q(
+      `SELECT id, name, join_code, address, contact_email, created_at
+         FROM schools WHERE id = $1`,
+      [req.user.school_id]
+    );
+    if (!rows.length) return res.status(404).json({ success: false, error: 'School not found' });
+    return res.json({ success: true, data: rows[0] });
+  } catch (err) {
+    console.error('[schools] GET /me', err.message);
+    return res.status(500).json({ success: false, error: 'Could not load school' });
+  }
+});
+
 // ─── GET /api/schools/me/roster ─────────────────────────────────────────────
 // school_admin only. Read-only list of teachers/students linked to their
 // school. Explicitly scoped by school_id — cannot see any other school's
 // or any standalone (school_id IS NULL) accounts.
+//
+// NOTE: this must be declared before GET /:id/roster below — Express
+// matches routes in declaration order, and /:id/roster would otherwise
+// swallow this request with id="me", breaking it for every school_admin.
 router.get('/me/roster', protect, requireSchoolAdmin, async (req, res) => {
   try {
     const rows = await q(
@@ -170,6 +220,26 @@ router.get('/me/roster', protect, requireSchoolAdmin, async (req, res) => {
     return res.json({ success: true, data: rows });
   } catch (err) {
     console.error('[schools] GET /me/roster', err.message);
+    return res.status(500).json({ success: false, error: 'Could not load roster' });
+  }
+});
+
+// ─── GET /api/schools/:id/roster ────────────────────────────────────────────
+// App Admin only. Same shape as GET /me/roster, but for any school by ID —
+// App Admin can see every school's data; a school_admin still only ever sees
+// their own (via /me/roster above, which stays unchanged).
+router.get('/:id/roster', protect, authorize('admin'), async (req, res) => {
+  try {
+    const rows = await q(
+      `SELECT id, email, first_name, last_name, role, created_at
+         FROM users
+        WHERE school_id = $1
+        ORDER BY role, created_at DESC`,
+      [req.params.id]
+    );
+    return res.json({ success: true, data: rows });
+  } catch (err) {
+    console.error('[schools] GET /:id/roster', err.message);
     return res.status(500).json({ success: false, error: 'Could not load roster' });
   }
 });

@@ -2263,6 +2263,7 @@ const AdminDashboard = () => {
     { key: 'aigenerate',          icon: Sparkles,   label: 'AI Generate'        },
     { key: 'bulkupload',          icon: Upload,     label: 'Bulk Upload'        },
     { key: 'pastpapers',          icon: BookOpen,   label: 'Past Papers'        },
+    { key: 'schools',             icon: School,     label: 'Schools', href: '/admin/schools' },
     { key: 'settings',            icon: Settings,   label: 'Quick Links'        },
   ];
 
