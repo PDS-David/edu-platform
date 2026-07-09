@@ -1,11 +1,14 @@
 // client/src/pages/PricingPage.jsx
 import branding from '../config/branding';
+import PublicNav from '../components/PublicNav';
 
 const whatsapp = (branding.contact?.phones?.[0] || '+2348090123412').replace(/\s+/g, '');
 
 export default function PricingPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex flex-col items-center justify-center p-8 text-center">
+    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
+      <PublicNav />
+      <div className="flex flex-col items-center justify-center p-8 text-center">
       <h1 className="text-3xl font-bold text-gray-900 mb-3">Pricing</h1>
       <p className="text-gray-500 mb-2 max-w-md text-sm">
         Affordable plans for every student — JAMB, WAEC, NECO, JUPEB and more.
@@ -27,6 +30,7 @@ export default function PricingPage() {
         >
           ✉️ Send us an Email
         </a>
+      </div>
       </div>
     </div>
   );
