@@ -168,17 +168,6 @@ export default function PracticeSession({ cat, words, onComplete }) {
           onResult={(score) => { pronScoresRef.current[currentWord.id] = score; }}
         />
 
-        {/* Writing practice — same card, same per-word reset pattern. */}
-        <WritingCheck
-          key={`write-${currentWord.id}`}
-          word={currentWord.word}
-          wordId={currentWord.id}
-          attemptsUsed={writingAttemptsUsed}
-          budget={WRITING_SESSION_BUDGET}
-          onAttempt={() => setWritingAttemptsUsed(n => n + 1)}
-          onResult={(score) => { writingScoresRef.current[currentWord.id] = score; }}
-        />
-
         <div className="mt-2" />
 
         {feedback && (
@@ -211,6 +200,21 @@ export default function PracticeSession({ cat, words, onComplete }) {
             </button>
           </div>
         </form>
+
+        {/* Writing practice — same card, same per-word reset pattern. Shown
+           after the listen/say-it/type-it steps, since writing your own
+           sentences with the word comes last in the learning sequence. */}
+        <div className="mt-6 pt-6 border-t border-gray-100">
+          <WritingCheck
+            key={`write-${currentWord.id}`}
+            word={currentWord.word}
+            wordId={currentWord.id}
+            attemptsUsed={writingAttemptsUsed}
+            budget={WRITING_SESSION_BUDGET}
+            onAttempt={() => setWritingAttemptsUsed(n => n + 1)}
+            onResult={(score) => { writingScoresRef.current[currentWord.id] = score; }}
+          />
+        </div>
       </div>
 
       {/* AI Explain */}
