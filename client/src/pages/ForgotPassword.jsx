@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import PublicNav from "../components/PublicNav";
 import api from "../services/apiClient";
 
@@ -42,7 +43,12 @@ const ForgotPassword = () => {
             </button>
           </form>
         ) : (
-          <p>Check your email</p>
+          <div className="text-center">
+            <p>Check your email</p>
+            <Link to="/login" className="inline-block mt-3 text-sm font-semibold text-blue-600 hover:underline">
+              ← Back to Login
+            </Link>
+          </div>
         )}
       </div>
     </div>
