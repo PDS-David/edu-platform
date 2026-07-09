@@ -199,9 +199,20 @@ function validatePPTX(buf) {
 
 function validatePDF(buf) {
   if (!isPDFMagic(buf)) return { valid: false, reason: 'PDF missing %PDF- header — file is not a valid PDF' };
-  // Check for "%%EOF" marker somewhere in the last 2KB (allows for linearised PDFs)
-  const tail = buf.slice(Math.max(0, buf.length - 2048)).toString('binary');
-  if (!tail.includes('%%EOF')) return { valid: false, reason: 'PDF missing %%EOF trailer' };
+  // BUG FIX (past-papers-upload-failed-for-all-files): this used to only
+  // check the last 2KB for "%%EOF", on the assumption it's always right at
+  // the true end of the file. That's true for a freshly-generated, never-
+  // touched PDF, but not for one with an incremental update — which is
+  // extremely common in the real world: a digital signature, a filled form
+  // field, a watermark, an annotation, or simply re-saving through a second
+  // tool all append a new revision AFTER the original %%EOF, without
+  // necessarily writing a fresh one that lands within the last 2KB. A
+  // completely valid, normally-openable PDF could easily fail that check.
+  // Search the whole buffer instead — for a one-time upload validation this
+  // costs nothing worth optimising for, and it eliminates an entire class of
+  // false-positive rejections of genuinely valid PDFs.
+  const text = buf.toString('binary');
+  if (!text.includes('%%EOF')) return { valid: false, reason: 'PDF missing %%EOF trailer' };
   return { valid: true };
 }
 
