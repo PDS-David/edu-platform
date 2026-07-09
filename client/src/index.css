@@ -283,3 +283,29 @@
   background: #1a4fff;
   border-radius: 2px;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Printable reports (student report, English Masterclass progress report)
+   Usage: wrap the report content in a container with class "printable-report".
+   Anything with class "no-print" (buttons, nav, etc.) is hidden when printing
+   or saving as PDF via the browser's print dialog (Ctrl+P / Cmd+P).
+   ───────────────────────────────────────────────────────────────────────── */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .printable-report,
+  .printable-report * {
+    visibility: visible;
+  }
+  .printable-report {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    padding: 24px;
+  }
+  .no-print {
+    display: none !important;
+  }
+}

@@ -7,6 +7,8 @@ import {
   ChevronDown, AlertCircle, Search, UserPlus, Settings, Check, Trash2, Pencil,
 } from 'lucide-react';
 import TopNav from '../components/TopNav';
+import PrintReportButton from '../components/PrintReportButton';
+import PrintableReportHeader from '../components/PrintableReportHeader';
 import { useAuth } from '../context/AuthContext';
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
@@ -473,6 +475,7 @@ function AnalyticsTab() {
         </div>
         <StudentTable
           analytics={subjectAnalytics}
+          classLabel="Subject-assigned students"
           drillStudent={drillStudent}
           drillData={drillData}
           drillLoading={drillLoading}
@@ -502,6 +505,7 @@ function AnalyticsTab() {
       ) : (
         <StudentTable
           analytics={analytics}
+          classLabel={classes.find(c => c.id === selectedClass)?.name || null}
           drillStudent={drillStudent}
           drillData={drillData}
           drillLoading={drillLoading}
@@ -515,7 +519,7 @@ function AnalyticsTab() {
 }
 
 // ── Shared student analytics table ───────────────────────────────────────────
-function StudentTable({ analytics, drillStudent, drillData, drillLoading, openDrill, setDrillStudent, setDrillData }) {
+function StudentTable({ analytics, classLabel, drillStudent, drillData, drillLoading, openDrill, setDrillStudent, setDrillData }) {
   if (!analytics || analytics.students?.length === 0) return (
     <div className="text-center py-8 text-gray-400 text-sm border border-dashed border-gray-200 rounded-xl">No student data yet.</div>
   );
@@ -551,44 +555,52 @@ function StudentTable({ analytics, drillStudent, drillData, drillLoading, openDr
               <div className="col-span-2 text-center" onClick={e => e.stopPropagation()}><NudgeButton studentId={s.id} /></div>
             </div>
 
-            {/* Topic drill-down panel */}
+            {/* Topic drill-down panel — this is also the printable/downloadable report */}
             {drillStudent?.id === s.id && (
               <div className="bg-gray-50 border-t border-gray-100 px-6 py-4">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-xs font-mono font-semibold text-gray-500 uppercase">Topic breakdown — {s.name}</p>
-                  <button onClick={() => { setDrillStudent(null); setDrillData([]); }}
-                    className="text-xs text-gray-400 hover:text-gray-600">✕ Close</button>
-                </div>
-                {drillLoading ? (
-                  <div className="flex justify-center py-4"><Loader2 size={16} className="animate-spin text-violet-300" /></div>
-                ) : drillData.length === 0 ? (
-                  <p className="text-xs text-gray-400 text-center py-3">No practice data yet for this student.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {drillData.map(t => (
-                      <div key={t.topic_id} className="flex items-center gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between mb-0.5">
-                            <span className="text-xs text-gray-700 truncate">{t.topic}</span>
-                            <span className={`text-xs font-mono font-bold ml-2 ${accColor(t.accuracy_pct)}`}>
-                              {t.accuracy_pct != null ? `${t.accuracy_pct}%` : '—'}
-                            </span>
-                          </div>
-                          <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full rounded-full transition-all ${
-                                t.accuracy_pct >= 70 ? 'bg-green-400' :
-                                t.accuracy_pct >= 40 ? 'bg-amber-400' : 'bg-red-400'
-                              }`}
-                              style={{ width: `${Math.min(t.accuracy_pct ?? 0, 100)}%` }}
-                            />
-                          </div>
-                        </div>
-                        <span className="text-[10px] text-gray-400 font-mono shrink-0">{t.attempt_count} attempts</span>
-                      </div>
-                    ))}
+                <div className="printable-report">
+                  <PrintableReportHeader
+                    title="Student Performance Report"
+                    subtitle={`${s.name}${classLabel ? ` — ${classLabel}` : ''}`}
+                  />
+                  <div className="flex items-center justify-between mb-3 no-print">
+                    <div className="flex items-center gap-2">
+                      <PrintReportButton />
+                    </div>
+                    <button onClick={() => { setDrillStudent(null); setDrillData([]); }}
+                      className="text-xs text-gray-400 hover:text-gray-600">✕ Close</button>
                   </div>
-                )}
+                  {drillLoading ? (
+                    <div className="flex justify-center py-4"><Loader2 size={16} className="animate-spin text-violet-300" /></div>
+                  ) : drillData.length === 0 ? (
+                    <p className="text-xs text-gray-400 text-center py-3">No practice data yet for this student.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {drillData.map(t => (
+                        <div key={t.topic_id} className="flex items-center gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between mb-0.5">
+                              <span className="text-xs text-gray-700 truncate">{t.topic}</span>
+                              <span className={`text-xs font-mono font-bold ml-2 ${accColor(t.accuracy_pct)}`}>
+                                {t.accuracy_pct != null ? `${t.accuracy_pct}%` : '—'}
+                              </span>
+                            </div>
+                            <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all ${
+                                  t.accuracy_pct >= 70 ? 'bg-green-400' :
+                                  t.accuracy_pct >= 40 ? 'bg-amber-400' : 'bg-red-400'
+                                }`}
+                                style={{ width: `${Math.min(t.accuracy_pct ?? 0, 100)}%` }}
+                              />
+                            </div>
+                          </div>
+                          <span className="text-[10px] text-gray-400 font-mono shrink-0">{t.attempt_count} attempts</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
