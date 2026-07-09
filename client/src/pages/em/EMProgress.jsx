@@ -23,6 +23,9 @@ import {
   Loader2, AlertCircle, RefreshCw, LayoutDashboard,
 } from 'lucide-react';
 import { SOVEREIGN, EM_GOLD, SHADOW } from './constants';
+import { useAuth } from '../../context/AuthContext';
+import PrintReportButton from '../../components/PrintReportButton';
+import PrintableReportHeader from '../../components/PrintableReportHeader';
 
 // ── Static colour map — fixes the production Tailwind purge bug ───────────────
 // The original code used `text-${s.color}-500` / `bg-${s.color}-50` which are
@@ -95,6 +98,7 @@ function SessionRow({ session }) {
 // ─────────────────────────────────────────────────────────────────────────────
 export function ProgressContent() {
   const navigate = useNavigate();
+  const { user }  = useAuth();
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState(null);
@@ -187,8 +191,18 @@ export function ProgressContent() {
   }
 
   // ── Populated progress view ────────────────────────────────────────────────
+  const studentName = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.email;
+
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-2xl printable-report">
+
+      <div className="flex items-start justify-between gap-3 mb-2">
+        <PrintableReportHeader
+          title="English Masterclass Progress Report"
+          subtitle={studentName}
+        />
+        <PrintReportButton className="no-print shrink-0 mt-1" />
+      </div>
 
       {/* Stat cards grid — static colour classes, purge-safe */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
