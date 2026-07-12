@@ -70,6 +70,7 @@ import TeacherAddQuestionPage from "./pages/TeacherAddQuestionPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminSchools from "./pages/AdminSchools";
 import SchoolAdminDashboard from "./pages/SchoolAdminDashboard";
+import JoinSchoolPage from "./pages/JoinSchoolPage";
 
 // Global floating widget
 import WhatsAppButton from "./components/WhatsAppButton";
@@ -191,6 +192,12 @@ export default function App() {
             and GET /api/schools/me* for how isolation is enforced. */}
         <Route element={<PrivateRoute allowedRoles={["school_admin"]} />}>
           <Route path="/school-admin/dashboard" element={<SchoolAdminDashboard />} />
+        </Route>
+
+        {/* JOIN A SCHOOL — role-agnostic, any teacher or student. Was missing
+            entirely before: POST /api/schools/join existed but had no UI. */}
+        <Route element={<PrivateRoute allowedRoles={["student", "teacher"]} />}>
+          <Route path="/join-school" element={<JoinSchoolPage />} />
         </Route>
 
         {/* FALLBACK */}

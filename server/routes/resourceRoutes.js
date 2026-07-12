@@ -219,7 +219,7 @@ router.get('/health', (_req, res) => res.json({ success: true }));
    ================================ */
 router.post(
   '/bulk-upload',
-  authorize('admin', 'teacher'),
+  authorize('admin', 'teacher', 'school_admin'),
   upload.any(),
   async (req, res) => {
     try {
@@ -360,7 +360,7 @@ router.post(
 /* ================================
    STAGED FILES  (GET /api/resources/staged)
    ================================ */
-router.get('/staged', authorize('admin', 'teacher'), async (_req, res) => {
+router.get('/staged', authorize('admin', 'teacher', 'school_admin'), async (_req, res) => {
   try {
     await ensureExtraColumns();
     const rows = await sequelize.query(
@@ -505,15 +505,18 @@ router.get('/my-assignments', async (req, res) => {
 /* ================================
    RENAME  (PUT /api/resources/:id/rename)
    ================================ */
-router.put('/:id/rename', authorize('admin', 'teacher'), async (req, res) => {
+router.put('/:id/rename', authorize('admin', 'teacher', 'school_admin'), async (req, res) => {
   const { id } = req.params;
   const { title } = req.body;
   if (!title || !title.trim()) {
     return res.status(400).json({ success: false, error: 'title is required' });
   }
   try {
-    // Teachers can only rename resources they uploaded
-    if (req.user.role === 'teacher') {
+    // Teachers and school_admins can only rename resources they uploaded —
+    // App Admin (role === 'admin') is unrestricted, matching the existing
+    // pattern this check already used for 'teacher' before school_admin
+    // existed.
+    if (req.user.role === 'teacher' || req.user.role === 'school_admin') {
       const owned = await sequelize.query(
         `SELECT id FROM resources WHERE id = :id AND uploaded_by = :uid LIMIT 1`,
         { replacements: { id, uid: req.user.id }, type: QueryTypes.SELECT }
@@ -536,11 +539,24 @@ router.put('/:id/rename', authorize('admin', 'teacher'), async (req, res) => {
 /* ================================
    ASSIGN METADATA  (PUT /api/resources/:id/assign-meta)
    ================================ */
-router.put('/:id/assign-meta', authorize('admin', 'teacher'), async (req, res) => {
+router.put('/:id/assign-meta', authorize('admin', 'teacher', 'school_admin'), async (req, res) => {
   try {
     await ensureExtraColumns();
     const id = req.params.id;
     if (!id) return res.status(400).json({ success: false, error: 'Invalid resource id' });
+
+    // Ownership check (was missing entirely for this route before — a
+    // teacher/school_admin could previously edit metadata on any resource
+    // by ID, not just their own). App Admin stays unrestricted.
+    if (req.user.role === 'teacher' || req.user.role === 'school_admin') {
+      const owned = await sequelize.query(
+        `SELECT id FROM resources WHERE id = :id AND uploaded_by = :uid LIMIT 1`,
+        { replacements: { id, uid: req.user.id }, type: QueryTypes.SELECT }
+      );
+      if (!owned.length) {
+        return res.status(403).json({ success: false, error: 'Not authorised to edit this resource' });
+      }
+    }
 
     const { title, topic_id = null, subtopic_id = null, subject_id = null,
             push_type = 'learning_material', content_kind = 'learning_material' } = req.body || {};
@@ -738,16 +754,27 @@ router.get('/:id/download', protect, async (req, res) => {
 /* ================================
    DELETE STAGED FILE  (DELETE /api/resources/:id)
    ================================ */
-router.delete('/:id', authorize('admin', 'teacher'), async (req, res) => {
+router.delete('/:id', authorize('admin', 'teacher', 'school_admin'), async (req, res) => {
   try {
     const id = req.params.id;
     if (!id) return res.status(400).json({ success: false, error: 'Invalid id' });
 
     const rows = await sequelize.query(
-      `SELECT file_url, stored_filename FROM resources WHERE id = :id`,
+      `SELECT file_url, stored_filename, uploaded_by FROM resources WHERE id = :id`,
       { replacements: { id }, type: QueryTypes.SELECT }
     );
     if (!rows[0]) return res.status(404).json({ success: false, error: 'Resource not found' });
+
+    // BUG FIX (delete-had-no-ownership-check): this route had no ownership
+    // check at all — any teacher (or now school_admin) could delete any
+    // resource platform-wide just by knowing its ID, including another
+    // teacher's uploads, another school's private resources, or App Admin's
+    // global content. App Admin stays unrestricted.
+    if (req.user.role === 'teacher' || req.user.role === 'school_admin') {
+      if (rows[0].uploaded_by !== req.user.id) {
+        return res.status(403).json({ success: false, error: 'Not authorised to delete this resource' });
+      }
+    }
 
     await sequelize.query(`DELETE FROM resource_assignments      WHERE resource_id = :id`, { replacements: { id }, type: QueryTypes.DELETE }).catch(() => {});
     await sequelize.query(`DELETE FROM resource_user_assignments WHERE resource_id = :id`, { replacements: { id }, type: QueryTypes.DELETE }).catch(() => {});
@@ -773,7 +800,7 @@ router.delete('/:id', authorize('admin', 'teacher'), async (req, res) => {
 /* ================================
    ASSIGN USERS  (PUT /api/resources/:id/assign-users)
    ================================ */
-router.put('/:id/assign-users', authorize('admin', 'teacher'), async (req, res) => {
+router.put('/:id/assign-users', authorize('admin', 'teacher', 'school_admin'), async (req, res) => {
   await ensureResourceAssignments();
 
   const resourceId = req.params.id;
@@ -783,12 +810,27 @@ router.put('/:id/assign-users', authorize('admin', 'teacher'), async (req, res) 
 
   try {
     const guardRows = await sequelize.query(
-      `SELECT id, is_staged, subject_id, topic_id, subtopic_id, title, push_type FROM resources WHERE id = :rid`,
+      `SELECT id, is_staged, subject_id, topic_id, subtopic_id, title, push_type, school_id, uploaded_by FROM resources WHERE id = :rid`,
       { replacements: { rid: resourceId }, type: QueryTypes.SELECT }
     );
     if (!guardRows?.length) return res.status(404).json({ success: false, error: 'Resource not found' });
 
     const meta = guardRows[0];
+
+    // BUG FIX (assign-any-resource): this route never checked that the
+    // resource being assigned actually belongs to the person assigning it —
+    // a teacher/school_admin could push out ANY resource by ID, including
+    // another school's private upload. App Admin's global resources
+    // (school_id IS NULL) are always assignable by anyone with access to
+    // this route; a school-affiliated assigner can also only assign
+    // resources tagged to their own school. App Admin (role === 'admin')
+    // stays unrestricted.
+    if ((req.user.role === 'teacher' || req.user.role === 'school_admin') && meta.school_id) {
+      if (meta.school_id !== req.user.school_id) {
+        return res.status(403).json({ success: false, error: 'This resource belongs to a different school and cannot be assigned by you.' });
+      }
+    }
+
     if (meta.is_staged) return res.status(400).json({ success: false, error: 'This file is still in the staging tray.' });
     if (!meta.subject_id && !meta.topic_id && !meta.subtopic_id)
       return res.status(400).json({ success: false, error: 'This file has no subject or topic assigned yet.' });

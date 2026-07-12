@@ -275,6 +275,27 @@ exports.registerForEnglishMasterclass = async (req, res, next) => {
       return res.status(400).json({ success: false, error: fnCheck.error });
     }
 
+    // Optional school affiliation at signup — lets a tenant school's student
+    // get English Masterclass access tied to their school from the start,
+    // instead of only via an AISchoolonair account that separately joined a
+    // school. Same join_code a school hands out for AISchoolonair works here
+    // too, since it's the same schools table either way. If a code is
+    // provided but doesn't resolve, this is a clear 400 rather than a silent
+    // "registered anyway with no school" — someone who typed a code on
+    // purpose would want to know it didn't work, not find out later.
+    let schoolId = null;
+    const rawJoinCode = (req.body.join_code || '').trim().toUpperCase();
+    if (rawJoinCode) {
+      const schoolRows = await db.query(
+        `SELECT id FROM schools WHERE join_code = :code AND is_active = true`,
+        { replacements: { code: rawJoinCode }, type: QueryTypes.SELECT }
+      );
+      if (!schoolRows.length) {
+        return res.status(400).json({ success: false, error: 'That school join code was not recognised.' });
+      }
+      schoolId = schoolRows[0].id;
+    }
+
     const salt           = await bcrypt.genSalt(12);
     const hashedPassword = await bcrypt.hash(password, salt);
     const verificationToken        = randomToken();
@@ -288,24 +309,24 @@ exports.registerForEnglishMasterclass = async (req, res, next) => {
          (email, password, first_name, last_name, role,
           verification_token, verification_token_expires,
           is_active, is_verified, subscription_status,
-          em_registered_at,
+          em_registered_at, school_id,
           created_at, updated_at)
        VALUES
          (:email, :password, :first_name, :last_name, 'student',
           :verificationToken, :verificationTokenExpires,
           true, false, 'free_trial',
-          NOW(),
+          NOW(), :schoolId,
           NOW(), NOW())
        ON CONFLICT (email) DO NOTHING
        RETURNING
          id, email, first_name, last_name, role,
          is_active, is_verified, subscription_status,
          onboarding_complete, xp_points, study_streak_days,
-         em_registered_at, created_at`,
+         em_registered_at, school_id, created_at`,
       {
         replacements: {
           email: rawEmail, password: hashedPassword, first_name, last_name,
-          verificationToken, verificationTokenExpires,
+          verificationToken, verificationTokenExpires, schoolId,
         },
         type: QueryTypes.SELECT,
       }

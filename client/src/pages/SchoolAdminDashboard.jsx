@@ -93,7 +93,7 @@ export default function SchoolAdminDashboard() {
 
         {!loading && !error && (
           <>
-            <div className="grid grid-cols-3 gap-3 mb-6">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
               <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
                 <UserCheck size={16} className="text-indigo-500 mb-2" />
                 <p className="text-xl font-bold text-gray-900">{admins.length}</p>
@@ -108,6 +108,11 @@ export default function SchoolAdminDashboard() {
                 <GraduationCap size={16} className="text-indigo-500 mb-2" />
                 <p className="text-xl font-bold text-gray-900">{students.length}</p>
                 <p className="text-xs text-gray-400">Students</p>
+              </div>
+              <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
+                <span className="text-[11px] font-bold text-indigo-500 mb-2 block">EM</span>
+                <p className="text-xl font-bold text-gray-900">{(roster || []).filter(u => u.uses_english_masterclass).length}</p>
+                <p className="text-xs text-gray-400">Use English Masterclass</p>
               </div>
             </div>
 
@@ -136,8 +141,13 @@ export default function SchoolAdminDashboard() {
                 {(roster || []).map(u => (
                   <div key={u.id} className="flex items-center justify-between py-2.5 text-sm">
                     <span className="text-gray-800">{u.first_name} {u.last_name}</span>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                       <span className="text-xs text-gray-400">{u.email}</span>
+                      {u.uses_english_masterclass && (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600" title="Also uses English Masterclass">
+                          EM
+                        </span>
+                      )}
                       <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
                         {u.role.replace('_', ' ')}
                       </span>

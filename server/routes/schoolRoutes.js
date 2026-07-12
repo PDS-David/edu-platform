@@ -211,7 +211,8 @@ router.get('/me', protect, requireSchoolAdmin, async (req, res) => {
 router.get('/me/roster', protect, requireSchoolAdmin, async (req, res) => {
   try {
     const rows = await q(
-      `SELECT id, email, first_name, last_name, role, created_at
+      `SELECT id, email, first_name, last_name, role, created_at,
+              em_registered_at IS NOT NULL AS uses_english_masterclass
          FROM users
         WHERE school_id = $1
         ORDER BY role, created_at DESC`,
@@ -231,7 +232,8 @@ router.get('/me/roster', protect, requireSchoolAdmin, async (req, res) => {
 router.get('/:id/roster', protect, authorize('admin'), async (req, res) => {
   try {
     const rows = await q(
-      `SELECT id, email, first_name, last_name, role, created_at
+      `SELECT id, email, first_name, last_name, role, created_at,
+              em_registered_at IS NOT NULL AS uses_english_masterclass
          FROM users
         WHERE school_id = $1
         ORDER BY role, created_at DESC`,

@@ -195,9 +195,16 @@ function SchoolRow({ school }) {
               {roster.map(u => (
                 <div key={u.id} className="flex items-center justify-between text-xs py-1">
                   <span className="text-gray-700">{u.first_name} {u.last_name} <span className="text-gray-400">({u.email})</span></span>
-                  <span className="px-2 py-0.5 rounded-full bg-white border border-gray-200 text-gray-500 capitalize">
-                    {u.role.replace('_', ' ')}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {u.uses_english_masterclass && (
+                      <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 font-semibold" title="Also uses English Masterclass">
+                        EM
+                      </span>
+                    )}
+                    <span className="px-2 py-0.5 rounded-full bg-white border border-gray-200 text-gray-500 capitalize">
+                      {u.role.replace('_', ' ')}
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
