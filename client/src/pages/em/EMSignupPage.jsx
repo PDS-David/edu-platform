@@ -15,6 +15,8 @@ export default function EMSignupPage() {
   const [lastName,  setLastName]  = useState('');
   const [email,     setEmail]     = useState('');
   const [password,  setPassword]  = useState('');
+  const [joinCode,  setJoinCode]  = useState('');
+  const [showJoinCode, setShowJoinCode] = useState(false);
   const [showPass,  setShowPass]  = useState(false);
   const [error,     setError]     = useState('');
   const [loading,   setLoading]   = useState(false);
@@ -32,6 +34,10 @@ export default function EMSignupPage() {
         last_name:  lastName,
         email,
         password,
+        // Optional — links this new EM account to a tenant school the same
+        // way AISchoolonair's join code does (same schools table). Left
+        // blank for anyone signing up who isn't part of a school.
+        join_code: joinCode.trim() || undefined,
       });
       navigate('/em/dashboard', { replace: true });
     } catch (err) {
@@ -182,6 +188,36 @@ export default function EMSignupPage() {
                 </button>
               </div>
             </div>
+
+            {/* Optional school affiliation — collapsed by default since most
+               EM sign-ups aren't through a school. */}
+            {showJoinCode ? (
+              <div>
+                <label htmlFor="em-signup-joincode" className="block text-xs font-semibold text-gray-600 mb-1.5">
+                  School Join Code (optional)
+                </label>
+                <input
+                  id="em-signup-joincode"
+                  type="text"
+                  value={joinCode}
+                  onChange={e => setJoinCode(e.target.value.toUpperCase())}
+                  placeholder="e.g. AB3DEF9H"
+                  maxLength={8}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none uppercase tracking-widest font-mono"
+                  onFocus={e => { e.target.style.borderColor = SOVEREIGN[500]; e.target.style.boxShadow = `0 0 0 3px ${SOVEREIGN[500]}22`; }}
+                  onBlur={e => { e.target.style.borderColor = '#e5e7eb'; e.target.style.boxShadow = 'none'; }}
+                />
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowJoinCode(true)}
+                className="text-xs font-medium hover:underline text-left"
+                style={{ color: SOVEREIGN[600] }}
+              >
+                Signing up through a school? Add a join code
+              </button>
+            )}
 
             <button
               type="submit"
