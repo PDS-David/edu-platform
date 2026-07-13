@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams, useNavigate, Link } from "react-router-dom";
+import PublicNav from "../components/PublicNav";
 import api from "../services/apiClient";
 
 const ResetPassword = () => {
@@ -75,45 +76,63 @@ const ResetPassword = () => {
 
   if (success) {
     return (
-      <div className="max-w-sm mx-auto mt-12 text-center space-y-2">
-        <p className="text-green-700 font-medium">Password reset successful.</p>
-        <p className="text-sm text-gray-500">Redirecting you to log in...</p>
+      <div className="min-h-screen flex flex-col">
+        <PublicNav />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="max-w-sm mx-auto text-center space-y-2">
+            <p className="text-green-700 font-medium">Password reset successful.</p>
+            <p className="text-sm text-gray-500">Redirecting you to log in...</p>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3 max-w-sm mx-auto mt-12">
-      {error && (
-        <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{error}</p>
-      )}
+    <div className="min-h-screen flex flex-col">
+      <PublicNav />
+      <div className="flex-1 flex items-center justify-center">
+        <form onSubmit={handleSubmit} className="space-y-3 max-w-sm w-full mx-auto px-4">
+          {error && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{error}</p>
+          )}
 
-      <input
-        type="password"
-        placeholder="New password"
-        value={newPassword}
-        onChange={(e) => setNewPassword(e.target.value)}
-        disabled={submitting}
-        className="border p-2 rounded w-full disabled:opacity-60"
-      />
+          <input
+            type="password"
+            placeholder="New password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            disabled={submitting}
+            className="border p-2 rounded w-full disabled:opacity-60"
+          />
 
-      <input
-        type="password"
-        placeholder="Confirm password"
-        value={confirmPassword}
-        onChange={(e) => setConfirmPassword(e.target.value)}
-        disabled={submitting}
-        className="border p-2 rounded w-full disabled:opacity-60"
-      />
+          <input
+            type="password"
+            placeholder="Confirm password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            disabled={submitting}
+            className="border p-2 rounded w-full disabled:opacity-60"
+          />
 
-      <button
-        type="submit"
-        disabled={submitting}
-        className="bg-black text-white px-4 py-2 rounded disabled:opacity-60"
-      >
-        {submitting ? "Resetting..." : "Reset"}
-      </button>
-    </form>
+          <button
+            type="submit"
+            disabled={submitting}
+            className="bg-black text-white px-4 py-2 rounded disabled:opacity-60 w-full"
+          >
+            {submitting ? "Resetting..." : "Reset"}
+          </button>
+
+          {/* Previously this page had no way out at all if the token was
+              missing/expired — a dead end reachable only via browser back
+              (or PublicNav above, now that it's added). This is the direct
+              path forward for that exact case. */}
+          <Link to="/forgot-password" className="block text-center text-sm font-semibold text-blue-600 hover:underline pt-1">
+            ← Request a new reset link
+          </Link>
+        </form>
+      </div>
+    </div>
   );
 };
 
