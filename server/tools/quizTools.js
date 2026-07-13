@@ -106,6 +106,21 @@ async function startQuiz(userId, options = {}) {
 //
 // Returns a student's past quiz attempts for a given subtopic.
 // Mirrors the logic in GET /api/quizzes/history/:studentId/:subtopicId.
+//
+// BUG FIX: this previously queried subtopic_quiz_attempts for columns that
+// don't exist on it at all (qa.score, qa.total_questions, qa.correct_count —
+// the real columns are total_score, max_score, accuracy_pct), so every call
+// threw a genuine "column does not exist" error. But fixing just the column
+// names would still have been wrong: a repo-wide search found ZERO production
+// INSERT statements writing to subtopic_quiz_attempts (the only writer is a
+// test file exercising a separate, not-yet-wired-in pipeline) — actual quiz
+// completions are recorded in practice_attempts by POST /quizzes/attempt (see
+// routes/quizzes.js's own top-of-file comment: "Quiz history stored in
+// practice_attempts (no separate quiz_attempts table needed)"). Querying
+// subtopic_quiz_attempts, even with correct column names, would have kept
+// returning an empty history for every real student regardless of how many
+// quizzes they've actually taken. Rewritten to query practice_attempts,
+// matching what the live route this function claims to mirror actually does.
 // ---------------------------------------------------------------------------
 async function getQuizHistory(userId, subtopicId) {
   if (!userId || !subtopicId) {
@@ -114,17 +129,14 @@ async function getQuizHistory(userId, subtopicId) {
 
   try {
     const rows = await sequelize.query(
-      `SELECT
-         qa.id             AS attempt_id,
-         qa.score          AS score_pct,
-         qa.total_questions,
-         qa.correct_count,
-         qa.time_taken_ms,
-         qa.completed_at
-       FROM subtopic_quiz_attempts qa
-       WHERE qa.student_id  = :userId
-         AND qa.subtopic_id = :subtopicId
-       ORDER BY qa.completed_at DESC
+      `SELECT DATE(pa.attempted_at) AS date,
+              COUNT(*)::INTEGER AS attempts,
+              ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 1) AS accuracy_pct
+       FROM practice_attempts pa
+       JOIN questions q ON q.id = pa.question_id
+       WHERE pa.student_id = :userId AND q.subtopic_id = :subtopicId
+       GROUP BY DATE(pa.attempted_at)
+       ORDER BY date DESC
        LIMIT 10`,
       { replacements: { userId, subtopicId }, type: QueryTypes.SELECT }
     );
