@@ -168,6 +168,22 @@ describe('Magic-byte detection', () => {
   test('isPDFMagic: rejects HTML disguised as PDF', () => {
     expect(isPDFMagic(Buffer.from('<html><script>alert(1)</script></html>'))).toBe(false);
   });
+  test('isPDFMagic: accepts a real PDF with a small preamble before the header', () => {
+    // Real-world PDFs commonly carry a short preamble before "%PDF-" (print-
+    // ticket data from some print-to-PDF pipelines, MacBinary wrappers from
+    // certain email/export tools, etc.) and are still completely valid,
+    // normally-openable PDFs. The PDF spec / Adobe Acrobat convention only
+    // requires the header within the first 1024 bytes, not at byte 0 exactly.
+    const withPreamble = Buffer.concat([
+      Buffer.from('\x00\x00\x00\x00some-preamble-bytes-from-a-print-pipeline\r\n'),
+      makePDF(),
+    ]);
+    expect(isPDFMagic(withPreamble)).toBe(true);
+  });
+  test('isPDFMagic: still rejects a header that only appears beyond byte 1024', () => {
+    const tooLate = Buffer.concat([Buffer.alloc(1100, 0x20), Buffer.from('%PDF-1.4')]);
+    expect(isPDFMagic(tooLate)).toBe(false);
+  });
   test('isZipMagic: accepts ZIP', () => {
     expect(isZipMagic(makeZipWithEntries(['test.txt']))).toBe(true);
   });
