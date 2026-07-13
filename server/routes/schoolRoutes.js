@@ -28,6 +28,7 @@ const router  = express.Router();
 const crypto  = require('crypto');
 
 const { protect, authorize } = require('../middleware/auth');
+const { authLimiter, schoolJoinLimiter } = require('../middleware/rateLimiter');
 const User    = require('../models/User');
 const sequelize = require('../config/database');
 
@@ -50,7 +51,7 @@ function generateJoinCode() {
 // to the school directly (see project notes: schools are provisioned by App
 // Admin, not self-service). Previously this was public with no auth at all;
 // locked down per that decision.
-router.post('/register', protect, authorize('admin'), async (req, res) => {
+router.post('/register', protect, authorize('admin'), authLimiter, async (req, res) => {
   const { school_name, admin_email, admin_password, admin_first_name, admin_last_name } = req.body || {};
 
   if (!school_name || !admin_email || !admin_password) {
@@ -141,7 +142,7 @@ router.post('/register', protect, authorize('admin'), async (req, res) => {
 // Auth required. An existing teacher or student links their own account to a
 // school by entering its join_code. Purely opt-in — never touches an account
 // that doesn't explicitly call this.
-router.post('/join', protect, async (req, res) => {
+router.post('/join', protect, schoolJoinLimiter, async (req, res) => {
   const { join_code } = req.body || {};
   if (!join_code) {
     return res.status(400).json({ success: false, error: 'join_code is required' });

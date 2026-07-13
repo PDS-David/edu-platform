@@ -107,4 +107,23 @@ const pronunciationLimiter = rateLimit({
   message: { success: false, error: "You've done a lot of speaking practice this hour — please try again a bit later." },
 });
 
-module.exports = { globalLimiter, aiLimiter, analyticsLimiter, authLimiter, streamingLimiter, adminActionLimiter, pronunciationLimiter };
+// ── School-join limiter ───────────────────────────────────────────────────────
+// Keyed on the authenticated user's ID, not IP — same reasoning as
+// streamingLimiter/pronunciationLimiter: shared school-lab NAT IPs would
+// otherwise let one student's join-code attempts throttle the whole lab.
+// /api/schools/join runs after `protect`, so req.user.id is always present
+// here; the IP fallback below is defensive only, and should not be reachable.
+const schoolJoinLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,                   // same cadence as authLimiter — join_code entry is a similar low-frequency, mistake-prone action
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { xForwardedForHeader: false, trustProxy: false },
+  keyGenerator: (req) => {
+    if (req.user && req.user.id) return `schooljoin:${req.user.id}`;
+    return ipKeyGenerator(req);
+  },
+  message: { success: false, error: 'Too many school-join attempts, please try again later.' },
+});
+
+module.exports = { globalLimiter, aiLimiter, analyticsLimiter, authLimiter, streamingLimiter, adminActionLimiter, pronunciationLimiter, schoolJoinLimiter };
