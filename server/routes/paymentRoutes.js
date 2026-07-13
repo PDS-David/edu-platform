@@ -49,7 +49,6 @@ router.get('/plans', async (req, res) => {
     const plans = await sequelize.query(
       `SELECT
          id, plan_code, plan_name, price_monthly, price_yearly, currency,
-         features, max_exam_boards, max_subjects,
          has_analytics, has_video_access, has_test_builder, is_active
        FROM subscription_plans
        WHERE is_active = true
