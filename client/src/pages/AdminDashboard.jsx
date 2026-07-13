@@ -95,11 +95,20 @@ const CatalogPanel = () => {
 
   const showToast = (message, type = 'success') => { setToast({ message, type }); setTimeout(() => setToast(null), 3500); };
 
-  const fetchTypes = async () => {
-    setLoading(true);
+  // BUG FIX (admin-catalog-full-reload-on-single-save): fetchTypes()/fetchSubjects()
+  // were called after every single create/edit/delete/reactivate below, and since
+  // this component does `if (loading) return <spinner>`, every one of those small
+  // actions blanked the ENTIRE types+subjects list — including collapsing any
+  // currently-expanded type's subject list (expandedType/typeSubjects state).
+  // The `silent` flag lets these same functions still re-sync with the server
+  // (safer than hand-building the updated object locally, since these responses'
+  // exact shapes aren't guaranteed) without ever showing the blanking spinner —
+  // only the very first mount-time load does that now.
+  const fetchTypes = async (silent = false) => {
+    if (!silent) setLoading(true);
     try { const res = await api.get('/catalog/types'); if (res?.success) setTypes(res.data || []); }
     catch (err) { showToast(err?.status === 401 ? 'Session expired — please log back in' : 'Failed to load examination types', 'error'); }
-    finally { setLoading(false); }
+    finally { if (!silent) setLoading(false); }
   };
   useEffect(() => { fetchTypes(); }, []);
 
@@ -128,7 +137,7 @@ const CatalogPanel = () => {
     try {
       if (editingType) { await api.put(`/catalog/types/${editingType.id}`, typeForm); showToast('Examination type updated'); }
       else { await api.post('/catalog/types', typeForm); showToast('Examination type created'); }
-      setShowTypeModal(false); fetchTypes();
+      setShowTypeModal(false); fetchTypes(true);
     } catch (err) { showToast(err?.message || 'Failed to save', 'error'); }
     finally { setSaving(false); }
   };
@@ -139,7 +148,7 @@ const CatalogPanel = () => {
     try {
       if (editingSubject) { await api.put(`/catalog/subjects/${editingSubject.id}`, subjectForm); showToast('Subject updated'); }
       else { await api.post(`/catalog/types/${activeTypeId}/subjects`, subjectForm); showToast('Subject added'); }
-      setShowSubjectModal(false); fetchSubjects(activeTypeId); fetchTypes(); bustSubjectCache(activeTypeId);
+      setShowSubjectModal(false); fetchSubjects(activeTypeId); fetchTypes(true); bustSubjectCache(activeTypeId);
     } catch (err) { showToast(err?.message || 'Failed to save', 'error'); }
     finally { setSaving(false); }
   };
@@ -155,11 +164,11 @@ const CatalogPanel = () => {
           await api.delete(`/catalog/types/${showDeleteConfirm.id}`);
           showToast('Exam type and all its subjects deactivated');
         }
-        fetchTypes();
+        fetchTypes(true);
       } else {
         await api.delete(`/catalog/subjects/${showDeleteConfirm.id}`);
         showToast('Subject deactivated');
-        fetchSubjects(activeTypeId); fetchTypes(); bustSubjectCache(activeTypeId);
+        fetchSubjects(activeTypeId); fetchTypes(true); bustSubjectCache(activeTypeId);
       }
     } catch (err) { showToast(err?.message || 'Failed', 'error'); }
     finally { setShowDeleteConfirm(null); }
@@ -170,7 +179,7 @@ const CatalogPanel = () => {
     try {
       await api.post(`/catalog/types/${showReactivateConfirm.id}/reactivate`);
       showToast('Exam type reactivated — re-activate individual subjects as needed');
-      fetchTypes();
+      fetchTypes(true);
     } catch (err) { showToast(err?.message || 'Failed to reactivate', 'error'); }
     finally { setShowReactivateConfirm(null); }
   };
