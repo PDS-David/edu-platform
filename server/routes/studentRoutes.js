@@ -225,8 +225,7 @@ router.get('/my-tests', protect, async (req, res) => {
           ta.id                                                          AS assignment_id,
           ct.id                                                          AS test_id,
           ct.title,
-          ct.description,
-          ct.time_limit_minutes,
+          ct.duration_minutes                                            AS time_limit_minutes,
           ct.created_at,
           ta.assigned_at,
           ta.due_date,
@@ -247,8 +246,18 @@ router.get('/my-tests', protect, async (req, res) => {
     );
     return res.json({ success: true, data: rows });
   } catch (err) {
+    // BUG FIX (assigned-tests-not-appearing): this query used to select
+    // ct.description and ct.time_limit_minutes — neither column exists on
+    // custom_tests (it's ct.duration_minutes, and there is no description
+    // column at all). That meant this query threw a real SQL error on
+    // EVERY call, which this catch block silently converted into an empty
+    // { data: [] } response — a student whose teacher had genuinely
+    // assigned them a test just saw "No tests assigned yet" with no error
+    // anywhere to reveal what was actually wrong. Logging is kept here as a
+    // safety net for any other future schema drift, but the actual fix is
+    // the corrected column list above.
     console.error('[GET /student/my-tests]', err.message);
-    return res.json({ success: true, data: [] });
+    return res.status(500).json({ success: false, error: 'Could not load your assigned tests.' });
   }
 });
 
