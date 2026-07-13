@@ -99,8 +99,17 @@ router.get('/', async (req, res) => {
     );
     return res.json({ success: true, data: rows });
   } catch (err) {
-    logger.error('[GET /api/past-papers]', err.message);
-    return res.status(200).json({ success: true, data: [], message: 'Past papers coming soon' });
+    // BEFORE: any error here (a bad column reference, a broken join, a DB
+    // outage) was swallowed and reported back to the client as a normal
+    // 200 success with an empty list + "coming soon" — indistinguishable
+    // from the deliberate table-not-yet-created case above, and impossible
+    // to notice from the frontend (no error, just silently empty data).
+    // AFTER: only the genuinely-expected "table doesn't exist yet" case
+    // (checked separately above, before this try block's query even runs)
+    // returns that friendly message. A real failure here now surfaces as
+    // an actual error the client and logs can see.
+    logger.error('[GET /api/past-papers] query failed:', err.message);
+    return res.status(500).json({ success: false, error: 'Could not load past papers' });
   }
 });
 
