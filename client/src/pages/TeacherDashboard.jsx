@@ -210,10 +210,20 @@ function ClassesTab() {
     if (!renameVal.trim() || renameVal.trim() === cls.name) { cancelRename(); return; }
     setRenaming(true);
     try {
-      await api.patch(`/teacher/classes/${cls.id}`, { name: renameVal.trim() });
+      const res = await api.patch(`/teacher/classes/${cls.id}`, { name: renameVal.trim() });
       showToast('Class renamed.');
       cancelRename();
-      load();
+      // BUG FIX (classes-tab-full-reload-on-small-edit): this used to call the
+      // full load() here, which sets `loading` back to true and — since this
+      // component does `loading ? <spinner> : classes.map(...)` — replaced
+      // the ENTIRE class list with a blank spinner just to rename one class,
+      // losing scroll position and collapsing any other class's open state.
+      // The PATCH endpoint already returns the updated { id, name }, so just
+      // patch that one class locally instead.
+      const updated = res?.data?.class;
+      setClasses(prev => prev.map(c =>
+        c.id === cls.id ? { ...c, name: updated?.name ?? renameVal.trim() } : c
+      ));
     } catch (err) {
       showToast(err?.message || 'Failed to rename class.', 'error');
     } finally {
@@ -227,8 +237,12 @@ function ClassesTab() {
     try {
       await api.delete(`/teacher/classes/${confirmDel.id}`);
       showToast('Class deleted.');
+      const deletedId = confirmDel.id;
       setConfirmDel(null);
-      load();
+      // Same fix as saveRename/createClass below: no need to reload the whole
+      // list and blank the screen just to remove one row we already know the
+      // id of.
+      setClasses(prev => prev.filter(c => c.id !== deletedId));
     } catch (err) {
       showToast(err?.message || 'Failed to delete class.', 'error');
     } finally {
@@ -240,7 +254,7 @@ function ClassesTab() {
     if (!newName.trim()) return;
     setCreating(true);
     try {
-      await api.post('/teacher/classes', {
+      const res = await api.post('/teacher/classes', {
         name: newName.trim(),
         student_ids: [...newSelected],
       });
@@ -248,7 +262,12 @@ function ClassesTab() {
       setNewSelected(new Set());
       setShowCreate(false);
       showToast(`Class created with ${newSelected.size} student${newSelected.size !== 1 ? 's' : ''}.`);
-      load();
+      // Same fix: POST already returns the created class (id, name,
+      // created_at, student_count) — prepend it locally instead of a full
+      // reload that would blank the entire list mid-creation.
+      if (res?.data) {
+        setClasses(prev => [res.data, ...prev]);
+      }
     } catch (err) {
       showToast(err?.message || 'Failed to create class.', 'error');
     } finally {
