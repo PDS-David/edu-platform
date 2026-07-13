@@ -569,10 +569,9 @@ router.get('/subscription', protect, async (req, res) => {
     const rows = await sequelize.query(
       `SELECT
          us.id, us.status, us.start_date, us.end_date,
-         us.amount_paid, us.auto_renew,
-         sp.plan_code, sp.plan_name, sp.features,
-         sp.has_analytics, sp.has_video_access, sp.has_test_builder,
-         sp.max_exam_boards, sp.max_subjects
+         us.amount_paid,
+         sp.plan_code, sp.plan_name,
+         sp.has_analytics, sp.has_video_access, sp.has_test_builder
        FROM user_subscriptions us
        JOIN subscription_plans sp ON sp.id = us.plan_id
        WHERE us.user_id = :userId
