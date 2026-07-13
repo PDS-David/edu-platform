@@ -1081,7 +1081,15 @@ router.get('/questions', protect, teacherOnly, async (req, res) => {
        LEFT JOIN topics      t ON t.id  = st.topic_id
        LEFT JOIN subjects    s ON s.id  = t.subject_id
        WHERE q.submitted_by = :teacherId AND q.is_active = true
-       ORDER BY q.created_at DESC LIMIT 100`,
+       -- BUG FIX (questions-mixed-up-in-test-builder): this used to be
+       -- ORDER BY q.created_at DESC only, which interleaves every subject
+       -- together purely by upload/creation time. The subject/topic tagging
+       -- itself was never lost (the join above has always correctly linked
+       -- each question back to its subject) — this was a display-ordering
+       -- bug, not a data bug. Sorting by subject first means the Test
+       -- Builder's question picker can group consecutive rows by subject
+       -- instead of showing them interleaved.
+       ORDER BY s.name ASC NULLS LAST, q.created_at DESC LIMIT 100`,
       { replacements: { teacherId: req.user.id }, type: QueryTypes.SELECT }
     );
     return res.json({ success: true, data: rows });
