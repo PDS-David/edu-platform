@@ -234,6 +234,20 @@ exports.register = async (req, res, next) => {
     // AUTH-006: audit
     setImmediate(() => audit.register({ userId: user.id, email: user.email, ipAddress, userAgent }));
 
+    // BUG FIX (verification-email-never-sent): verificationToken was
+    // generated and correctly stored on the user row above, but the actual
+    // email that delivers the link to the user was never sent — sendVerificationEmail
+    // was imported but never called anywhere in this file. That meant no
+    // user who registered ever received a verification email at all, so
+    // even after fixing the link-handling bug on the frontend
+    // (VerifyEmailPage.jsx), there was never anything for them to click.
+    // Fire-and-forget, same pattern as the audit call above — a slow or
+    // failing email provider must never block or fail registration itself.
+    setImmediate(() => {
+      sendVerificationEmail({ email: user.email, first_name: user.first_name, token: verificationToken })
+        .catch(err => console.error('[register] verification email failed:', err.message));
+    });
+
     // AUTH-004: set HttpOnly cookie
     setRefreshCookie(res, refreshToken, false);
 
@@ -356,6 +370,14 @@ exports.registerForEnglishMasterclass = async (req, res, next) => {
     });
 
     setImmediate(() => audit.register({ userId: user.id, email: user.email, ipAddress, userAgent }));
+
+    // Same fix as exports.register — the token was generated and stored
+    // correctly above but was never actually emailed.
+    setImmediate(() => {
+      sendVerificationEmail({ email: user.email, first_name: user.first_name, token: verificationToken })
+        .catch(err => console.error('[registerForEnglishMasterclass] verification email failed:', err.message));
+    });
+
     setRefreshCookie(res, refreshToken, false);
 
     return res.status(201).json({ success: true, token: accessToken, user });
@@ -683,7 +705,7 @@ exports.forgotPassword = async (req, res, next) => {
     if (!email) return res.status(400).json({ success: false, error: 'Email is required' });
 
     const rows = await db.query(
-      `SELECT id FROM users WHERE email = :email LIMIT 1`,
+      `SELECT id, first_name FROM users WHERE email = :email LIMIT 1`,
       { replacements: { email }, type: QueryTypes.SELECT }  // R-04: now uses normalised value
     );
 
@@ -703,6 +725,19 @@ exports.forgotPassword = async (req, res, next) => {
     setImmediate(() => audit.passwordResetRequest({
       userId: rows[0].id, email, ipAddress, userAgent,
     }));
+
+    // BUG FIX (reset-email-never-sent): same class of bug as the missing
+    // verification email above — the token was generated and correctly
+    // stored, and the response below tells the user "a reset link has been
+    // sent", but sendPasswordResetEmail was imported and never actually
+    // called anywhere in this file. That meant the password reset flow was
+    // completely broken end-to-end: no user who requested a reset could
+    // ever receive the email needed to act on it, with nothing anywhere
+    // (including this reassuring success response) revealing that.
+    setImmediate(() => {
+      sendPasswordResetEmail({ email, first_name: rows[0].first_name, token })
+        .catch(err => console.error('[forgotPassword] reset email failed:', err.message));
+    });
 
     return res.status(200).json({ success: true, message: 'If that email exists, a reset link has been sent.' });
   } catch (err) {
