@@ -790,8 +790,13 @@ const TeacherAssignmentPanel = () => {
 
   const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
 
-  const fetchAll = async () => {
-    setLoading(true);
+  // BUG FIX (admin-teacher-assignment-full-reload-on-single-save): same issue as
+  // the exam-types panel above — fetchAll() was called after every single
+  // create/edit/delete below, blanking this entire panel (assignments list +
+  // teachers list) via `if (loading) return <spinner>` for what's usually a
+  // one-row change. Adding the same silent-refresh pattern.
+  const fetchAll = async (silent = false) => {
+    if (!silent) setLoading(true);
     // Use allSettled so a failing assignments query never prevents teachers from loading
     const [aRes, tRes] = await Promise.allSettled([
       api.get('/admin/teacher-assignments'),
@@ -801,7 +806,7 @@ const TeacherAssignmentPanel = () => {
     else if (aRes.status === 'rejected') console.warn('[TeacherAssignment] assignments load failed:', aRes.reason?.error || aRes.reason);
     if (tRes.status === 'fulfilled' && tRes.value?.data)    setTeachers(tRes.value.data || []);
     else if (tRes.status === 'rejected') console.warn('[TeacherAssignment] teachers load failed:', tRes.reason?.error || tRes.reason);
-    setLoading(false);
+    if (!silent) setLoading(false);
   };
   useEffect(() => { fetchAll(); }, []);
 
@@ -831,14 +836,14 @@ const TeacherAssignmentPanel = () => {
     try {
       await Promise.all(selectedSubjectIds.map(subject_id => api.post('/admin/teacher-assignments', { teacher_id: form.teacher_id, subject_id, exam_board_id: form.exam_type_id })));
       showToast(`${selectedSubjectIds.length} assignment${selectedSubjectIds.length > 1 ? 's' : ''} saved`);
-      setShowModal(false); setForm({ teacher_id: '', exam_type_id: '' }); setSelectedSubjectIds([]); setFilteredSubjects([]); fetchAll();
+      setShowModal(false); setForm({ teacher_id: '', exam_type_id: '' }); setSelectedSubjectIds([]); setFilteredSubjects([]); fetchAll(true);
     } catch (err) { showToast(err?.message || 'Failed to save', 'error'); }
     finally { setSaving(false); }
   };
 
   const handleRemove = async (id) => {
     if (!window.confirm('Remove this assignment?')) return;
-    try { await api.delete(`/admin/teacher-assignments/${id}`); showToast('Assignment removed'); fetchAll(); }
+    try { await api.delete(`/admin/teacher-assignments/${id}`); showToast('Assignment removed'); fetchAll(true); }
     catch { showToast('Failed to remove', 'error'); }
   };
 
@@ -886,7 +891,7 @@ const TeacherAssignmentPanel = () => {
       await api.put(`/admin/teacher-assignments/${editingAssignment.id}`, { subject_id: editSubjectId });
       showToast('Assignment updated');
       setEditingAssignment(null);
-      fetchAll();
+      fetchAll(true);
     } catch (err) { showToast(err?.message || 'Failed to update assignment', 'error'); }
     finally { setEditSaving(false); }
   };
@@ -900,7 +905,7 @@ const TeacherAssignmentPanel = () => {
       showToast(`Teacher account created for ${email}`);
       setShowCreateTeacher(false);
       setTeacherForm({ first_name: '', last_name: '', email: '', password: '' });
-      fetchAll();
+      fetchAll(true);
     } catch (err) { showToast(err?.message || 'Failed to create teacher', 'error'); }
     finally { setCreatingTeacher(false); }
   };
@@ -922,7 +927,7 @@ const TeacherAssignmentPanel = () => {
     try {
       await api.delete(`/users/${teacher.id}`);
       showToast(`${teacher.name || teacher.email} deleted`);
-      fetchAll();
+      fetchAll(true);
     } catch (err) { showToast(err?.message || 'Failed to delete teacher', 'error'); }
   };
 
