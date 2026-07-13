@@ -1649,6 +1649,26 @@ async function run() {
     `CREATE INDEX IF NOT EXISTS idx_resources_school_id ON resources(school_id) WHERE school_id IS NOT NULL`
   );
 
+  // schools.enable_aischoolonair / enable_em — lets App Admin register a
+  // tenant for AISchoolonair alone, English Masterclass alone, or both.
+  // Before this, every school implicitly got both (schoolRoutes.js /join
+  // and EM's join_code signup both accepted the same code with no
+  // per-service check at all) — this closes that gap. Default keeps every
+  // EXISTING school's current behaviour unchanged (AISchoolonair on,
+  // EM off) rather than silently granting or revoking access on deploy.
+  await exec('schools: add enable_aischoolonair / enable_em columns', `
+    ALTER TABLE schools
+      ADD COLUMN IF NOT EXISTS enable_aischoolonair BOOLEAN NOT NULL DEFAULT true,
+      ADD COLUMN IF NOT EXISTS enable_em            BOOLEAN NOT NULL DEFAULT false`
+  );
+  await exec('schools: at-least-one-service check constraint', `
+    DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='schools_at_least_one_service')
+      THEN ALTER TABLE schools ADD CONSTRAINT schools_at_least_one_service
+        CHECK (enable_aischoolonair OR enable_em); END IF;
+    EXCEPTION WHEN others THEN NULL; END $$`
+  );
+
   console.log('\n✅ Migration complete.\n');
   await pool.end();
 }

@@ -287,11 +287,21 @@ exports.registerForEnglishMasterclass = async (req, res, next) => {
     const rawJoinCode = (req.body.join_code || '').trim().toUpperCase();
     if (rawJoinCode) {
       const schoolRows = await db.query(
-        `SELECT id FROM schools WHERE join_code = :code AND is_active = true`,
+        `SELECT id, name, enable_em FROM schools WHERE join_code = :code AND is_active = true`,
         { replacements: { code: rawJoinCode }, type: QueryTypes.SELECT }
       );
       if (!schoolRows.length) {
         return res.status(400).json({ success: false, error: 'That school join code was not recognised.' });
+      }
+      // Distinct from "not recognised" on purpose: the code is real, but this
+      // school registered for AISchoolonair only, not English Masterclass.
+      // Telling them their school doesn't offer EM is more useful (and less
+      // confusing) than pretending the code doesn't exist.
+      if (!schoolRows[0].enable_em) {
+        return res.status(400).json({
+          success: false,
+          error: `${schoolRows[0].name} has not been registered for English Masterclass. Contact your school admin or App Admin.`,
+        });
       }
       schoolId = schoolRows[0].id;
     }

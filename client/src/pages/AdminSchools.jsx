@@ -20,11 +20,13 @@ function CreateSchoolModal({ onClose, onCreated }) {
   const [form, setForm] = useState({
     school_name: '', admin_email: '', admin_password: '',
     admin_first_name: '', admin_last_name: '',
+    enable_aischoolonair: true, enable_em: false,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState('');
 
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
+  const toggle = (k) => () => setForm(f => ({ ...f, [k]: !f[k] }));
 
   const submit = async (e) => {
     e.preventDefault();
@@ -40,7 +42,9 @@ function CreateSchoolModal({ onClose, onCreated }) {
     }
   };
 
-  const ready = form.school_name.trim() && form.admin_email.trim() && form.admin_password.trim().length >= 8;
+  const ready = form.school_name.trim() && form.admin_email.trim()
+    && form.admin_password.trim().length >= 8
+    && (form.enable_aischoolonair || form.enable_em);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40">
@@ -95,6 +99,28 @@ function CreateSchoolModal({ onClose, onCreated }) {
               placeholder="At least 8 characters — share this with the school admin"
               className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" />
           </div>
+
+          <div className="pt-1">
+            <label className="block text-xs font-semibold text-gray-600 mb-2">
+              What is this school registering for? *
+            </label>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2.5 px-3 py-2.5 border border-gray-200 rounded-lg cursor-pointer hover:border-indigo-300 transition-colors">
+                <input type="checkbox" checked={form.enable_aischoolonair} onChange={toggle('enable_aischoolonair')}
+                  className="w-4 h-4 accent-indigo-600" />
+                <span className="text-sm text-gray-700">AISchoolonair (exam prep, resources, analytics)</span>
+              </label>
+              <label className="flex items-center gap-2.5 px-3 py-2.5 border border-gray-200 rounded-lg cursor-pointer hover:border-indigo-300 transition-colors">
+                <input type="checkbox" checked={form.enable_em} onChange={toggle('enable_em')}
+                  className="w-4 h-4 accent-indigo-600" />
+                <span className="text-sm text-gray-700">English Masterclass</span>
+              </label>
+            </div>
+            {!form.enable_aischoolonair && !form.enable_em && (
+              <p className="text-xs text-red-500 mt-1.5">Pick at least one.</p>
+            )}
+          </div>
+
           <button type="submit" disabled={!ready || loading}
             className="w-full mt-2 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold disabled:opacity-40 transition-colors flex items-center justify-center gap-2">
             {loading ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
@@ -122,6 +148,14 @@ function JoinCodeReveal({ school, onClose }) {
           Give this join code to the school. Their teachers and students each enter it
           once to link their own account — nothing else changes for them.
         </p>
+        <div className="flex items-center justify-center gap-1.5 mb-4">
+          {school.enable_aischoolonair && (
+            <span className="px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-600 text-xs font-semibold">AISchoolonair</span>
+          )}
+          {school.enable_em && (
+            <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 text-xs font-semibold">English Masterclass</span>
+          )}
+        </div>
         <div className="flex items-center justify-center gap-2 bg-gray-50 border border-gray-200 rounded-xl py-3 px-4 mb-5">
           <span className="text-xl font-mono font-bold tracking-widest text-gray-900">{school.join_code}</span>
           <button onClick={copy} className="text-gray-400 hover:text-indigo-600 transition-colors">
@@ -137,11 +171,15 @@ function JoinCodeReveal({ school, onClose }) {
   );
 }
 
-function SchoolRow({ school }) {
+function SchoolRow({ school, onServicesUpdated }) {
   const [expanded, setExpanded] = useState(false);
   const [roster,   setRoster]   = useState(null);
   const [loading,  setLoading]  = useState(false);
   const [copied,   setCopied]   = useState(false);
+  const [editingServices, setEditingServices] = useState(false);
+  const [svcForm, setSvcForm] = useState({ enable_aischoolonair: school.enable_aischoolonair, enable_em: school.enable_em });
+  const [svcSaving, setSvcSaving] = useState(false);
+  const [svcError, setSvcError] = useState('');
 
   const toggle = async () => {
     if (!expanded && !roster) {
@@ -162,6 +200,24 @@ function SchoolRow({ school }) {
     setTimeout(() => setCopied(false), 1500);
   };
 
+  const saveServices = async () => {
+    setSvcError('');
+    if (!svcForm.enable_aischoolonair && !svcForm.enable_em) {
+      setSvcError('Pick at least one service.');
+      return;
+    }
+    setSvcSaving(true);
+    try {
+      await api.patch(`/schools/${school.id}/services`, svcForm);
+      setEditingServices(false);
+      onServicesUpdated?.();
+    } catch (err) {
+      setSvcError(err?.response?.data?.error || err?.message || 'Could not update services.');
+    } finally {
+      setSvcSaving(false);
+    }
+  };
+
   return (
     <div className="border border-gray-100 rounded-xl overflow-hidden">
       <button onClick={toggle} className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50 transition-colors text-left">
@@ -174,6 +230,14 @@ function SchoolRow({ school }) {
             <p className="text-xs text-gray-400">
               {school.admin_count} admin · {school.teacher_count} teachers · {school.student_count} students
             </p>
+            <div className="flex items-center gap-1 mt-1">
+              {school.enable_aischoolonair && (
+                <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 text-[10px] font-semibold">AISchoolonair</span>
+              )}
+              {school.enable_em && (
+                <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 text-[10px] font-semibold">EM</span>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-4 shrink-0">
@@ -186,6 +250,42 @@ function SchoolRow({ school }) {
       </button>
       {expanded && (
         <div className="border-t border-gray-100 px-4 py-3 bg-gray-50">
+          <div className="flex items-center justify-between mb-3 pb-3 border-b border-gray-200">
+            {!editingServices ? (
+              <button onClick={(e) => { e.stopPropagation(); setEditingServices(true); }}
+                className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors">
+                Edit services this school is registered for
+              </button>
+            ) : (
+              <div className="w-full">
+                {svcError && <p className="text-xs text-red-500 mb-2">{svcError}</p>}
+                <div className="flex items-center gap-4 mb-2">
+                  <label className="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer">
+                    <input type="checkbox" checked={svcForm.enable_aischoolonair}
+                      onChange={() => setSvcForm(f => ({ ...f, enable_aischoolonair: !f.enable_aischoolonair }))}
+                      className="w-3.5 h-3.5 accent-indigo-600" />
+                    AISchoolonair
+                  </label>
+                  <label className="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer">
+                    <input type="checkbox" checked={svcForm.enable_em}
+                      onChange={() => setSvcForm(f => ({ ...f, enable_em: !f.enable_em }))}
+                      className="w-3.5 h-3.5 accent-indigo-600" />
+                    English Masterclass
+                  </label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={saveServices} disabled={svcSaving}
+                    className="text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg disabled:opacity-40">
+                    {svcSaving ? 'Saving…' : 'Save'}
+                  </button>
+                  <button onClick={() => { setEditingServices(false); setSvcForm({ enable_aischoolonair: school.enable_aischoolonair, enable_em: school.enable_em }); setSvcError(''); }}
+                    className="text-xs font-semibold text-gray-500 hover:text-gray-700 px-3 py-1.5">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
           {loading && <Loader2 size={16} className="animate-spin text-gray-400" />}
           {!loading && roster?.length === 0 && (
             <p className="text-xs text-gray-400 py-2">No one has joined this school yet.</p>
@@ -263,7 +363,7 @@ export default function AdminSchools() {
           )}
           {!loading && schools.length > 0 && (
             <div className="space-y-2">
-              {schools.map(s => <SchoolRow key={s.id} school={s} />)}
+              {schools.map(s => <SchoolRow key={s.id} school={s} onServicesUpdated={load} />)}
             </div>
           )}
         </div>
