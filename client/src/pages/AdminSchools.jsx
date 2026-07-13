@@ -13,7 +13,7 @@ import api from '../services/apiClient';
 import TopNav from '../components/TopNav';
 import {
   School, Plus, X, Copy, Check, Loader2, Users, UserCheck,
-  ChevronDown, ChevronUp, AlertCircle, Trash2,
+  ChevronDown, ChevronUp, AlertCircle, Trash2, Image as ImageIcon,
 } from 'lucide-react';
 
 function CreateSchoolModal({ onClose, onCreated }) {
@@ -22,18 +22,51 @@ function CreateSchoolModal({ onClose, onCreated }) {
     admin_first_name: '', admin_last_name: '',
     enable_aischoolonair: true, enable_em: false,
   });
+  const [logoFile, setLogoFile]   = useState(null);
+  const [logoPreview, setLogoPreview] = useState(null);
+  const [logoError, setLogoError] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState('');
 
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
   const toggle = (k) => () => setForm(f => ({ ...f, [k]: !f[k] }));
 
+  const ALLOWED_LOGO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+  const MAX_LOGO_MB = 5;
+
+  const pickLogo = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLogoError('');
+    if (!ALLOWED_LOGO_TYPES.includes(file.type)) {
+      setLogoError('Logo must be a JPG, PNG, or WEBP image.');
+      return;
+    }
+    if (file.size > MAX_LOGO_MB * 1024 * 1024) {
+      setLogoError(`Logo must be under ${MAX_LOGO_MB} MB.`);
+      return;
+    }
+    setLogoFile(file);
+    setLogoPreview(URL.createObjectURL(file));
+  };
+
+  const clearLogo = () => {
+    setLogoFile(null);
+    if (logoPreview) URL.revokeObjectURL(logoPreview);
+    setLogoPreview(null);
+  };
+
   const submit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      const res = await api.post('/schools/register', form);
+      const body = new FormData();
+      Object.entries(form).forEach(([k, v]) => body.append(k, v));
+      if (logoFile) body.append('logo', logoFile);
+      const res = await api.post('/schools/register', body, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
       onCreated(res.data);
     } catch (err) {
       setError(err?.response?.data?.error || err?.message || 'Could not create school.');
@@ -48,7 +81,7 @@ function CreateSchoolModal({ onClose, onCreated }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-6">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-gray-900">Create a School</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
@@ -69,6 +102,29 @@ function CreateSchoolModal({ onClose, onCreated }) {
         )}
 
         <form onSubmit={submit} className="space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">School Logo (optional)</label>
+            <div className="flex items-center gap-3">
+              <div className="w-14 h-14 rounded-xl border border-gray-200 bg-gray-50 flex items-center justify-center overflow-hidden shrink-0">
+                {logoPreview
+                  ? <img src={logoPreview} alt="Logo preview" className="w-full h-full object-cover" />
+                  : <ImageIcon size={20} className="text-gray-300" />}
+              </div>
+              <div className="flex-1">
+                <label className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-800 cursor-pointer transition-colors">
+                  <input type="file" accept="image/jpeg,image/png,image/webp" onChange={pickLogo} className="hidden" />
+                  {logoFile ? 'Choose a different image' : 'Choose an image'}
+                </label>
+                {logoFile && (
+                  <button type="button" onClick={clearLogo} className="ml-3 text-xs text-gray-400 hover:text-red-500">
+                    Remove
+                  </button>
+                )}
+                <p className="text-[11px] text-gray-400 mt-0.5">JPG, PNG, or WEBP · up to {MAX_LOGO_MB} MB</p>
+                {logoError && <p className="text-[11px] text-red-500 mt-0.5">{logoError}</p>}
+              </div>
+            </div>
+          </div>
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">School Name *</label>
             <input value={form.school_name} onChange={set('school_name')} required
@@ -142,7 +198,9 @@ function JoinCodeReveal({ school, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40">
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-6 text-center">
-        <School className="w-10 h-10 text-indigo-500 mx-auto mb-3" />
+        {school.logo_url
+          ? <img src={school.logo_url} alt={`${school.name} logo`} className="w-14 h-14 rounded-xl object-cover mx-auto mb-3" />
+          : <School className="w-10 h-10 text-indigo-500 mx-auto mb-3" />}
         <h2 className="text-lg font-bold text-gray-900 mb-1">{school.name} is set up</h2>
         <p className="text-xs text-gray-500 mb-5">
           Give this join code to the school. Their teachers and students each enter it
@@ -250,6 +308,8 @@ function SchoolRow({ school, onServicesUpdated, onDeleted }) {
   const [svcSaving, setSvcSaving] = useState(false);
   const [svcError, setSvcError] = useState('');
   const [showDelete, setShowDelete] = useState(false);
+  const [logoSaving, setLogoSaving] = useState(false);
+  const [logoError, setLogoError] = useState('');
 
   const toggle = async () => {
     if (!expanded && !roster) {
@@ -288,13 +348,42 @@ function SchoolRow({ school, onServicesUpdated, onDeleted }) {
     }
   };
 
+  const pickLogo = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow picking the same file again later
+    if (!file) return;
+    setLogoError('');
+    setLogoSaving(true);
+    try {
+      const body = new FormData();
+      body.append('logo', file);
+      await api.patch(`/schools/${school.id}/logo`, body, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      onServicesUpdated?.(); // reuses the same "refresh the list" callback
+    } catch (err) {
+      setLogoError(err?.response?.data?.error || err?.message || 'Could not update logo.');
+    } finally {
+      setLogoSaving(false);
+    }
+  };
+
   return (
     <div className="border border-gray-100 rounded-xl overflow-hidden">
       <button onClick={toggle} className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50 transition-colors text-left">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-9 h-9 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0">
-            <School size={16} className="text-indigo-500" />
-          </div>
+          <label className="relative w-9 h-9 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0 overflow-hidden cursor-pointer group">
+            <input type="file" accept="image/jpeg,image/png,image/webp" onChange={pickLogo}
+              onClick={(e) => e.stopPropagation()} className="hidden" />
+            {school.logo_url
+              ? <img src={school.logo_url} alt="" className="w-full h-full object-cover" />
+              : <School size={16} className="text-indigo-500" />}
+            <span className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+              {logoSaving
+                ? <Loader2 size={12} className="text-white animate-spin" />
+                : <ImageIcon size={12} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />}
+            </span>
+          </label>
           <div className="min-w-0">
             <p className="text-sm font-semibold text-gray-900 truncate">{school.name}</p>
             <p className="text-xs text-gray-400">
@@ -320,6 +409,7 @@ function SchoolRow({ school, onServicesUpdated, onDeleted }) {
       </button>
       {expanded && (
         <div className="border-t border-gray-100 px-4 py-3 bg-gray-50">
+          {logoError && <p className="text-xs text-red-500 mb-2">{logoError}</p>}
           <div className="flex items-center justify-between mb-3 pb-3 border-b border-gray-200">
             {!editingServices ? (
               <div className="flex items-center gap-4">

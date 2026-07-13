@@ -29,8 +29,20 @@ const crypto  = require('crypto');
 
 const { protect, authorize } = require('../middleware/auth');
 const { authLimiter, schoolJoinLimiter } = require('../middleware/rateLimiter');
+const { createUploadMiddleware } = require('../middleware/uploadSecurity');
+const { saveSchoolLogo, deleteSchoolLogo } = require('../utils/schoolLogoStorage');
 const User    = require('../models/User');
 const sequelize = require('../config/database');
+
+// Single-file, image-only, small size cap — a logo isn't a document upload.
+// Same validation pipeline (magic-byte check + AV scan) as every other
+// upload in the app; .svg deliberately excluded (can carry embedded script,
+// same reasoning as the rest of the app's upload allowlist).
+const logoUpload = createUploadMiddleware({
+  maxSizeMB:    5,
+  maxFiles:     1,
+  allowedTypes: ['jpg', 'jpeg', 'png', 'webp'],
+});
 
 const q = (sql, params) => sequelize.query(sql, {
   bind: params,
@@ -51,7 +63,7 @@ function generateJoinCode() {
 // to the school directly (see project notes: schools are provisioned by App
 // Admin, not self-service). Previously this was public with no auth at all;
 // locked down per that decision.
-router.post('/register', protect, authorize('admin'), authLimiter, async (req, res) => {
+router.post('/register', protect, authorize('admin'), authLimiter, logoUpload.single('logo'), async (req, res) => {
   const { school_name, admin_email, admin_password, admin_first_name, admin_last_name } = req.body || {};
 
   if (!school_name || !admin_email || !admin_password) {
@@ -65,13 +77,29 @@ router.post('/register', protect, authorize('admin'), authLimiter, async (req, r
   // preserve prior behaviour for anyone calling this before the App Admin
   // UI is updated (AISchoolonair on, EM off) rather than silently changing
   // what an unmodified request would create.
-  const enableAISchoolonair = req.body.enable_aischoolonair !== false;
-  const enableEM            = req.body.enable_em === true;
+  //
+  // Parsed leniently on purpose: this route now accepts multipart/form-data
+  // (to carry an optional logo file alongside it), where every field arrives
+  // as a string ('true'/'false'), not a JSON boolean — a strict `=== true`
+  // check would silently misread every multipart request.
+  const parseBool = (v, fallback) => (v === undefined || v === null || v === '') ? fallback : (v === true || v === 'true');
+  const enableAISchoolonair = parseBool(req.body.enable_aischoolonair, true);
+  const enableEM            = parseBool(req.body.enable_em, false);
   if (!enableAISchoolonair && !enableEM) {
     return res.status(400).json({
       success: false,
       error: 'A school must be registered for at least one of AISchoolonair or English Masterclass',
     });
+  }
+
+  let logoUrl = null;
+  if (req.secureFile) {
+    try {
+      logoUrl = await saveSchoolLogo(req.secureFile);
+    } catch (err) {
+      console.error('[schools] POST /register logo upload failed:', err.message);
+      return res.status(500).json({ success: false, error: 'Could not save school logo' });
+    }
   }
 
   const t = await sequelize.transaction();
@@ -89,10 +117,10 @@ router.post('/register', protect, authorize('admin'), authLimiter, async (req, r
     } while (attempts < 5);
 
     const [school] = await sequelize.query(
-      `INSERT INTO schools (name, join_code, contact_email, enable_aischoolonair, enable_em)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, name, join_code, enable_aischoolonair, enable_em`,
-      { bind: [school_name.trim(), joinCode, admin_email.trim().toLowerCase(), enableAISchoolonair, enableEM],
+      `INSERT INTO schools (name, join_code, contact_email, enable_aischoolonair, enable_em, logo_url)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, name, join_code, enable_aischoolonair, enable_em, logo_url`,
+      { bind: [school_name.trim(), joinCode, admin_email.trim().toLowerCase(), enableAISchoolonair, enableEM, logoUrl],
         type: sequelize.QueryTypes.INSERT, transaction: t }
     );
     const schoolRow = school[0] || school; // pg returns rows directly for RETURNING
@@ -124,12 +152,18 @@ router.post('/register', protect, authorize('admin'), authLimiter, async (req, r
           id: schoolRow.id, name: schoolRow.name, join_code: schoolRow.join_code,
           enable_aischoolonair: schoolRow.enable_aischoolonair,
           enable_em: schoolRow.enable_em,
+          logo_url: schoolRow.logo_url,
         },
         admin:  adminUser.toSafeJSON(),
       },
     });
   } catch (err) {
     await t.rollback();
+    // The logo file (if any) was saved BEFORE this transaction, so a
+    // rollback here would otherwise leave it orphaned with no school row
+    // pointing to it — clean it up rather than leak storage on every
+    // failed registration attempt.
+    if (logoUrl) deleteSchoolLogo(logoUrl).catch(() => {});
     console.error('[schools] POST /register', err.message);
     if (err.name === 'SequelizeUniqueConstraintError') {
       return res.status(409).json({ success: false, error: 'That admin email is already registered' });
@@ -191,7 +225,7 @@ router.get('/', protect, authorize('admin'), async (req, res) => {
   try {
     const rows = await q(
       `SELECT sc.id, sc.name, sc.join_code, sc.address, sc.contact_email,
-              sc.is_active, sc.enable_aischoolonair, sc.enable_em, sc.created_at,
+              sc.is_active, sc.enable_aischoolonair, sc.enable_em, sc.logo_url, sc.created_at,
               COUNT(u.id) FILTER (WHERE u.role = 'school_admin') AS admin_count,
               COUNT(u.id) FILTER (WHERE u.role = 'teacher')      AS teacher_count,
               COUNT(u.id) FILTER (WHERE u.role = 'student')      AS student_count
@@ -215,7 +249,7 @@ router.get('/me', protect, requireSchoolAdmin, async (req, res) => {
   try {
     const rows = await q(
       `SELECT id, name, join_code, address, contact_email,
-              enable_aischoolonair, enable_em, created_at
+              enable_aischoolonair, enable_em, logo_url, created_at
          FROM schools WHERE id = $1`,
       [req.user.school_id]
     );
@@ -308,6 +342,57 @@ router.patch('/:id/services', protect, authorize('admin'), async (req, res) => {
   }
 });
 
+// ─── PATCH /api/schools/:id/logo ────────────────────────────────────────────
+// App Admin only. Sets or replaces any school's logo. Same validated upload
+// pipeline as everywhere else (magic-byte check + AV scan via
+// createUploadMiddleware), 5MB cap, image types only.
+router.patch('/:id/logo', protect, authorize('admin'), logoUpload.single('logo'), async (req, res) => {
+  if (!req.secureFile) {
+    return res.status(400).json({ success: false, error: 'No logo file was provided' });
+  }
+  try {
+    const existing = await q(`SELECT logo_url FROM schools WHERE id = $1`, [req.params.id]);
+    if (!existing.length) return res.status(404).json({ success: false, error: 'School not found' });
+
+    const newLogoUrl = await saveSchoolLogo(req.secureFile);
+    const rows = await q(
+      `UPDATE schools SET logo_url = $1, updated_at = NOW() WHERE id = $2 RETURNING id, name, logo_url`,
+      [newLogoUrl, req.params.id]
+    );
+    // Clean up the old file only AFTER the new one is safely saved and the
+    // DB row updated — never delete the old logo before its replacement is
+    // confirmed in place, or a failure partway through leaves the school
+    // with no logo at all instead of just the old one.
+    if (existing[0].logo_url) deleteSchoolLogo(existing[0].logo_url).catch(() => {});
+    return res.json({ success: true, data: rows[0] });
+  } catch (err) {
+    console.error('[schools] PATCH /:id/logo', err.message);
+    return res.status(500).json({ success: false, error: 'Could not update school logo' });
+  }
+});
+
+// ─── PATCH /api/schools/me/logo ─────────────────────────────────────────────
+// school_admin only, own school. Same pipeline as above, so a school can
+// set/update their own branding without waiting on App Admin.
+router.patch('/me/logo', protect, requireSchoolAdmin, logoUpload.single('logo'), async (req, res) => {
+  if (!req.secureFile) {
+    return res.status(400).json({ success: false, error: 'No logo file was provided' });
+  }
+  try {
+    const existing = await q(`SELECT logo_url FROM schools WHERE id = $1`, [req.user.school_id]);
+    const newLogoUrl = await saveSchoolLogo(req.secureFile);
+    const rows = await q(
+      `UPDATE schools SET logo_url = $1, updated_at = NOW() WHERE id = $2 RETURNING id, name, logo_url`,
+      [newLogoUrl, req.user.school_id]
+    );
+    if (existing[0]?.logo_url) deleteSchoolLogo(existing[0].logo_url).catch(() => {});
+    return res.json({ success: true, data: rows[0] });
+  } catch (err) {
+    console.error('[schools] PATCH /me/logo', err.message);
+    return res.status(500).json({ success: false, error: 'Could not update school logo' });
+  }
+});
+
 // ─── DELETE /api/schools/:id ────────────────────────────────────────────────
 // App Admin only. Hard-deletes a school, its users, and its private
 // resources. IRREVERSIBLE — requires req.body.confirm_name to exactly match
@@ -333,7 +418,7 @@ router.delete('/:id', protect, authorize('admin'), async (req, res) => {
   const t = await sequelize.transaction();
   try {
     const [school] = await sequelize.query(
-      `SELECT id, name FROM schools WHERE id = $1 FOR UPDATE`,
+      `SELECT id, name, logo_url FROM schools WHERE id = $1 FOR UPDATE`,
       { bind: [schoolId], type: sequelize.QueryTypes.SELECT, transaction: t }
     );
     if (!school) {
@@ -399,6 +484,10 @@ router.delete('/:id', protect, authorize('admin'), async (req, res) => {
     }
 
     await t.commit();
+    // Only after commit — deleting the file before the DB change is
+    // confirmed would leave a live school pointing at a missing logo if
+    // the transaction had rolled back instead.
+    if (school.logo_url) deleteSchoolLogo(school.logo_url).catch(() => {});
     return res.json({
       success: true,
       data: {

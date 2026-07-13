@@ -1669,6 +1669,13 @@ async function run() {
     EXCEPTION WHEN others THEN NULL; END $$`
   );
 
+  // schools.logo_url — set at registration (App Admin) or updated later by
+  // either App Admin or the school's own school_admin. NULL until someone
+  // uploads one; the UI falls back to a generic school icon.
+  await exec('schools: add logo_url column',
+    `ALTER TABLE schools ADD COLUMN IF NOT EXISTS logo_url TEXT`
+  );
+
   console.log('\n✅ Migration complete.\n');
   await pool.end();
 }

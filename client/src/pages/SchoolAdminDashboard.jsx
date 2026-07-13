@@ -14,7 +14,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/apiClient';
 import {
   School, Users, GraduationCap, UserCheck, Copy, Check,
-  Loader2, LogOut, AlertCircle, Plus, X,
+  Loader2, LogOut, AlertCircle, Plus, X, Image as ImageIcon,
 } from 'lucide-react';
 
 function InviteModal({ onClose, onCreated }) {
@@ -114,10 +114,18 @@ export default function SchoolAdminDashboard() {
   const [error,   setError]   = useState('');
   const [copied,  setCopied]  = useState(false);
   const [showInvite, setShowInvite] = useState(false);
+  const [logoSaving, setLogoSaving] = useState(false);
+  const [logoError, setLogoError] = useState('');
 
   const loadRoster = () => {
     api.get('/schools/me/roster')
       .then(res => setRoster(res.data || []))
+      .catch(() => {});
+  };
+
+  const loadSchool = () => {
+    api.get('/schools/me')
+      .then(res => setSchool(res.data || null))
       .catch(() => {});
   };
 
@@ -134,6 +142,26 @@ export default function SchoolAdminDashboard() {
       .finally(() => setLoading(false));
   }, []);
 
+  const pickLogo = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setLogoError('');
+    setLogoSaving(true);
+    try {
+      const body = new FormData();
+      body.append('logo', file);
+      await api.patch('/schools/me/logo', body, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      loadSchool();
+    } catch (err) {
+      setLogoError(err?.response?.data?.error || err?.message || 'Could not update logo.');
+    } finally {
+      setLogoSaving(false);
+    }
+  };
+
   const teachers = (roster || []).filter(u => u.role === 'teacher');
   const students = (roster || []).filter(u => u.role === 'student');
   const admins   = (roster || []).filter(u => u.role === 'school_admin');
@@ -149,9 +177,17 @@ export default function SchoolAdminDashboard() {
     <div className="min-h-screen bg-[#f9f7f4] text-[#1a1a1a]">
       <header className="bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center">
-            <School size={18} className="text-indigo-600" />
-          </div>
+          <label className="relative w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center overflow-hidden cursor-pointer group shrink-0">
+            <input type="file" accept="image/jpeg,image/png,image/webp" onChange={pickLogo} className="hidden" />
+            {school?.logo_url
+              ? <img src={school.logo_url} alt="" className="w-full h-full object-cover" />
+              : <School size={18} className="text-indigo-600" />}
+            <span className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+              {logoSaving
+                ? <Loader2 size={12} className="text-white animate-spin" />
+                : <ImageIcon size={12} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />}
+            </span>
+          </label>
           <div>
             <p className="text-sm font-bold text-gray-900 leading-tight">
               {school?.name || 'Your School'}
@@ -181,6 +217,13 @@ export default function SchoolAdminDashboard() {
           Only your own school's teachers and students — this view can't see any other
           school's data, and no other school can see yours.
         </p>
+
+        {logoError && (
+          <div className="mb-5 p-3 rounded-xl bg-red-50 border border-red-200 flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+            <p className="text-sm text-red-700">{logoError}</p>
+          </div>
+        )}
 
         {error && (
           <div className="mb-5 p-4 rounded-xl bg-red-50 border border-red-200 flex items-start gap-2">
