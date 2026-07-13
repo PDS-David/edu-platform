@@ -1,6 +1,6 @@
 // client/src/pages/VerifyEmailPage.jsx
-// Route: /verify-email?token=<token>&id=<userId>
-// Reads token + id from URL, calls POST /api/auth/verify-email on mount.
+// Route: /verify-email?token=<token>
+// Reads token from URL, calls POST /api/auth/verify-email on mount.
 // Shows success or error message with navigation options.
 
 import { useEffect, useState } from 'react';
@@ -18,16 +18,26 @@ export default function VerifyEmailPage() {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    const token  = searchParams.get('token');
-    const userId = searchParams.get('id');
-
-    if (!token || !userId) {
+    const token = searchParams.get('token');
+    // BUG FIX (verify-email-links-always-fail): this used to also require
+    // an `id`/`userId` URL param before even attempting the API call. The
+    // actual verification email (server/services/emailService.js) only
+    // ever builds the link as `${APP_URL}/verify-email?token=${token}` —
+    // it never includes an id param. The backend
+    // (server/controllers/auth.js exports.verifyEmail) looks the user up
+    // solely by token (`WHERE verification_token = :token`) and never reads
+    // req.body.userId at all — same pattern as the reset-password bug
+    // already fixed elsewhere. Requiring `id` here meant every real
+    // verification email link, no matter how valid the token was, hit this
+    // guard and showed "Invalid verification link" without ever calling
+    // the API.
+    if (!token) {
       setStatus('error');
       setMessage('Invalid verification link. Please check your email and try again.');
       return;
     }
 
-    api.post('/auth/verify-email', { token, userId })
+    api.post('/auth/verify-email', { token })
       .then(r => {
         setStatus('success');
         setMessage(r.message || 'Email verified successfully.');
