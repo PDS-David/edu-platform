@@ -307,6 +307,112 @@ router.patch('/:id/services', protect, authorize('admin'), async (req, res) => {
   }
 });
 
+// ─── DELETE /api/schools/:id ────────────────────────────────────────────────
+// App Admin only. Hard-deletes a school, its users, and its private
+// resources. IRREVERSIBLE — requires req.body.confirm_name to exactly match
+// the school's current name as a safety check against fat-fingering the
+// wrong ID.
+//
+// schools.school_id on both `users` and `resources` is ON DELETE SET NULL,
+// not CASCADE (confirmed live via information_schema audit on 2026-07-13) —
+// so deleting the school row alone does nothing to them; both must be
+// deleted explicitly, in this order, before the school row itself.
+//
+// Two tables have ON DELETE NO ACTION back to users (also confirmed live,
+// not assumed from the migration script) and will hard-block a user delete
+// if left alone: enrollments.user_id, and resource_assignments /
+// resource_user_assignments .assigned_by (a teacher who ever assigned a
+// resource — including a global App-Admin one — to anyone). Both are
+// cleared explicitly below before deleting users. Every other table
+// referencing users.id (quiz attempts, class memberships, subscriptions,
+// etc.) is ON DELETE CASCADE and needs no special handling.
+router.delete('/:id', protect, authorize('admin'), async (req, res) => {
+  const { confirm_name } = req.body || {};
+  const schoolId = req.params.id;
+  const t = await sequelize.transaction();
+  try {
+    const [school] = await sequelize.query(
+      `SELECT id, name FROM schools WHERE id = $1 FOR UPDATE`,
+      { bind: [schoolId], type: sequelize.QueryTypes.SELECT, transaction: t }
+    );
+    if (!school) {
+      await t.rollback();
+      return res.status(404).json({ success: false, error: 'School not found' });
+    }
+    if (!confirm_name || confirm_name !== school.name) {
+      await t.rollback();
+      return res.status(400).json({
+        success: false,
+        error: `To confirm this irreversible delete, send confirm_name exactly matching the school's name: "${school.name}"`,
+      });
+    }
+
+    const userRows = await sequelize.query(
+      `SELECT id FROM users WHERE school_id = $1`,
+      { bind: [schoolId], type: sequelize.QueryTypes.SELECT, transaction: t }
+    );
+    const userIds = userRows.map(r => r.id);
+
+    if (userIds.length) {
+      // Clear the two confirmed NO ACTION blockers before deleting users.
+      await sequelize.query(
+        `DELETE FROM enrollments WHERE user_id = ANY($1::uuid[])`,
+        { bind: [userIds], type: sequelize.QueryTypes.DELETE, transaction: t }
+      );
+      await sequelize.query(
+        `DELETE FROM resource_assignments WHERE assigned_by = ANY($1::uuid[])`,
+        { bind: [userIds], type: sequelize.QueryTypes.DELETE, transaction: t }
+      );
+      await sequelize.query(
+        `DELETE FROM resource_user_assignments WHERE assigned_by = ANY($1::uuid[])`,
+        { bind: [userIds], type: sequelize.QueryTypes.DELETE, transaction: t }
+      );
+    }
+
+    const deletedResources = await sequelize.query(
+      `DELETE FROM resources WHERE school_id = $1 RETURNING id`,
+      { bind: [schoolId], type: sequelize.QueryTypes.DELETE, transaction: t }
+    );
+    const deletedUsers = await sequelize.query(
+      `DELETE FROM users WHERE school_id = $1 RETURNING id`,
+      { bind: [schoolId], type: sequelize.QueryTypes.DELETE, transaction: t }
+    );
+    await sequelize.query(
+      `DELETE FROM schools WHERE id = $1`,
+      { bind: [schoolId], type: sequelize.QueryTypes.DELETE, transaction: t }
+    );
+
+    // Sanity check before commit — nothing should still reference this
+    // school_id anywhere, since we deleted the referencing rows directly
+    // rather than relying on the (non-cascading) FK.
+    const [{ remaining_users }] = await sequelize.query(
+      `SELECT COUNT(*)::int AS remaining_users FROM users WHERE school_id = $1`,
+      { bind: [schoolId], type: sequelize.QueryTypes.SELECT, transaction: t }
+    );
+    const [{ remaining_resources }] = await sequelize.query(
+      `SELECT COUNT(*)::int AS remaining_resources FROM resources WHERE school_id = $1`,
+      { bind: [schoolId], type: sequelize.QueryTypes.SELECT, transaction: t }
+    );
+    if (remaining_users > 0 || remaining_resources > 0) {
+      throw new Error(`Sanity check failed post-delete: ${remaining_users} users, ${remaining_resources} resources still reference school_id`);
+    }
+
+    await t.commit();
+    return res.json({
+      success: true,
+      data: {
+        deleted_school: school.name,
+        deleted_users: deletedUsers.length,
+        deleted_resources: deletedResources.length,
+      },
+    });
+  } catch (err) {
+    await t.rollback();
+    console.error('[schools] DELETE /:id', err.message);
+    return res.status(500).json({ success: false, error: 'Could not delete school — no changes were made (transaction rolled back).' });
+  }
+});
+
 // ─── POST /api/schools/me/invite ────────────────────────────────────────────
 // school_admin only. Creates a teacher OR student account directly, already
 // linked to the caller's own school — no separate self-register-then-join

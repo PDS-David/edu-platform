@@ -13,7 +13,7 @@ import api from '../services/apiClient';
 import TopNav from '../components/TopNav';
 import {
   School, Plus, X, Copy, Check, Loader2, Users, UserCheck,
-  ChevronDown, ChevronUp, AlertCircle,
+  ChevronDown, ChevronUp, AlertCircle, Trash2,
 } from 'lucide-react';
 
 function CreateSchoolModal({ onClose, onCreated }) {
@@ -171,7 +171,76 @@ function JoinCodeReveal({ school, onClose }) {
   );
 }
 
-function SchoolRow({ school, onServicesUpdated }) {
+function DeleteSchoolModal({ school, onClose, onDeleted }) {
+  const [typedName, setTypedName] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const matches = typedName === school.name;
+
+  const submit = async () => {
+    if (!matches) return;
+    setError('');
+    setLoading(true);
+    try {
+      const res = await api.delete(`/schools/${school.id}`, { data: { confirm_name: typedName } });
+      onDeleted(res.data);
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Could not delete school.');
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-red-600 flex items-center gap-2">
+            <Trash2 size={18} /> Delete {school.name}
+          </h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200">
+          <p className="text-sm text-red-700 font-semibold mb-1">This cannot be undone.</p>
+          <p className="text-xs text-red-700">
+            This permanently deletes the school, every teacher/student/school-admin account
+            linked to it ({school.admin_count} admin · {school.teacher_count} teachers ·{' '}
+            {school.student_count} students), and every resource this school's own staff
+            uploaded. Resources uploaded by App Admin are shared globally and are not affected.
+          </p>
+        </div>
+
+        {error && (
+          <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        )}
+
+        <label className="block text-xs font-semibold text-gray-600 mb-1">
+          Type <span className="font-mono text-red-600">{school.name}</span> to confirm
+        </label>
+        <input
+          value={typedName}
+          onChange={(e) => setTypedName(e.target.value)}
+          placeholder={school.name}
+          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 mb-4"
+        />
+
+        <button onClick={submit} disabled={!matches || loading}
+          className="w-full py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold disabled:opacity-40 transition-colors flex items-center justify-center gap-2">
+          {loading ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+          {loading ? 'Deleting…' : 'Permanently Delete School'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SchoolRow({ school, onServicesUpdated, onDeleted }) {
   const [expanded, setExpanded] = useState(false);
   const [roster,   setRoster]   = useState(null);
   const [loading,  setLoading]  = useState(false);
@@ -180,6 +249,7 @@ function SchoolRow({ school, onServicesUpdated }) {
   const [svcForm, setSvcForm] = useState({ enable_aischoolonair: school.enable_aischoolonair, enable_em: school.enable_em });
   const [svcSaving, setSvcSaving] = useState(false);
   const [svcError, setSvcError] = useState('');
+  const [showDelete, setShowDelete] = useState(false);
 
   const toggle = async () => {
     if (!expanded && !roster) {
@@ -252,10 +322,16 @@ function SchoolRow({ school, onServicesUpdated }) {
         <div className="border-t border-gray-100 px-4 py-3 bg-gray-50">
           <div className="flex items-center justify-between mb-3 pb-3 border-b border-gray-200">
             {!editingServices ? (
-              <button onClick={(e) => { e.stopPropagation(); setEditingServices(true); }}
-                className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors">
-                Edit services this school is registered for
-              </button>
+              <div className="flex items-center gap-4">
+                <button onClick={(e) => { e.stopPropagation(); setEditingServices(true); }}
+                  className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors">
+                  Edit services this school is registered for
+                </button>
+                <button onClick={(e) => { e.stopPropagation(); setShowDelete(true); }}
+                  className="flex items-center gap-1 text-xs font-semibold text-red-500 hover:text-red-700 transition-colors">
+                  <Trash2 size={12} /> Delete school
+                </button>
+              </div>
             ) : (
               <div className="w-full">
                 {svcError && <p className="text-xs text-red-500 mb-2">{svcError}</p>}
@@ -311,6 +387,13 @@ function SchoolRow({ school, onServicesUpdated }) {
           )}
         </div>
       )}
+      {showDelete && (
+        <DeleteSchoolModal
+          school={school}
+          onClose={() => setShowDelete(false)}
+          onDeleted={() => { setShowDelete(false); onDeleted?.(); }}
+        />
+      )}
     </div>
   );
 }
@@ -363,7 +446,7 @@ export default function AdminSchools() {
           )}
           {!loading && schools.length > 0 && (
             <div className="space-y-2">
-              {schools.map(s => <SchoolRow key={s.id} school={s} onServicesUpdated={load} />)}
+              {schools.map(s => <SchoolRow key={s.id} school={s} onServicesUpdated={load} onDeleted={load} />)}
             </div>
           )}
         </div>
