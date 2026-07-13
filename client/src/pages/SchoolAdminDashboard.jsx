@@ -14,8 +14,97 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/apiClient';
 import {
   School, Users, GraduationCap, UserCheck, Copy, Check,
-  Loader2, LogOut, AlertCircle,
+  Loader2, LogOut, AlertCircle, Plus, X,
 } from 'lucide-react';
+
+function InviteModal({ onClose, onCreated }) {
+  const [form, setForm] = useState({ role: 'teacher', email: '', password: '', first_name: '', last_name: '' });
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState('');
+
+  const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const res = await api.post('/schools/me/invite', form);
+      onCreated(res.data);
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Could not create account.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const ready = form.email.trim() && form.password.trim().length >= 8 && form.first_name.trim();
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-gray-900">Add a Teacher or Student</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X size={20} />
+          </button>
+        </div>
+        <p className="text-xs text-gray-500 mb-5">
+          Creates the account directly, already linked to your school — no join code
+          needed for this person. We'll email them their login details.
+        </p>
+
+        {error && (
+          <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        )}
+
+        <form onSubmit={submit} className="space-y-3">
+          <div className="flex gap-3">
+            <label className="flex-1 flex items-center gap-2 px-3 py-2.5 border border-gray-200 rounded-lg cursor-pointer">
+              <input type="radio" name="role" checked={form.role === 'teacher'} onChange={() => setForm(f => ({ ...f, role: 'teacher' }))} className="accent-indigo-600" />
+              <span className="text-sm text-gray-700">Teacher</span>
+            </label>
+            <label className="flex-1 flex items-center gap-2 px-3 py-2.5 border border-gray-200 rounded-lg cursor-pointer">
+              <input type="radio" name="role" checked={form.role === 'student'} onChange={() => setForm(f => ({ ...f, role: 'student' }))} className="accent-indigo-600" />
+              <span className="text-sm text-gray-700">Student</span>
+            </label>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">First Name *</label>
+              <input value={form.first_name} onChange={set('first_name')} required
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Last Name</label>
+              <input value={form.last_name} onChange={set('last_name')}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Email *</label>
+            <input type="email" value={form.email} onChange={set('email')} required
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Temporary Password *</label>
+            <input type="text" value={form.password} onChange={set('password')} required minLength={8}
+              placeholder="At least 8 characters"
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" />
+          </div>
+          <button type="submit" disabled={!ready || loading}
+            className="w-full mt-2 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold disabled:opacity-40 transition-colors flex items-center justify-center gap-2">
+            {loading ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+            {loading ? 'Creating…' : `Create ${form.role === 'teacher' ? 'Teacher' : 'Student'} Account`}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 export default function SchoolAdminDashboard() {
   const { logout } = useAuth();
@@ -24,6 +113,13 @@ export default function SchoolAdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState('');
   const [copied,  setCopied]  = useState(false);
+  const [showInvite, setShowInvite] = useState(false);
+
+  const loadRoster = () => {
+    api.get('/schools/me/roster')
+      .then(res => setRoster(res.data || []))
+      .catch(() => {});
+  };
 
   useEffect(() => {
     Promise.all([
@@ -60,7 +156,15 @@ export default function SchoolAdminDashboard() {
             <p className="text-sm font-bold text-gray-900 leading-tight">
               {school?.name || 'Your School'}
             </p>
-            <p className="text-xs text-gray-400">School Admin</p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <p className="text-xs text-gray-400">School Admin</p>
+              {school?.enable_aischoolonair && (
+                <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 text-[10px] font-semibold">AISchoolonair</span>
+              )}
+              {school?.enable_em && (
+                <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 text-[10px] font-semibold">EM</span>
+              )}
+            </div>
           </div>
         </div>
         <button
@@ -131,7 +235,13 @@ export default function SchoolAdminDashboard() {
             )}
 
             <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-4">
-              <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-3">Roster</p>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-gray-400">Roster</p>
+                <button onClick={() => setShowInvite(true)}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors">
+                  <Plus size={14} /> Add Teacher or Student
+                </button>
+              </div>
               {(roster || []).length === 0 && (
                 <p className="text-sm text-gray-400 py-6 text-center">
                   No one has joined your school yet. Share your join code above to get started.
@@ -159,6 +269,16 @@ export default function SchoolAdminDashboard() {
           </>
         )}
       </div>
+
+      {showInvite && (
+        <InviteModal
+          onClose={() => setShowInvite(false)}
+          onCreated={() => {
+            setShowInvite(false);
+            loadRoster();
+          }}
+        />
+      )}
     </div>
   );
 }

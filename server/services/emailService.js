@@ -301,10 +301,52 @@ async function sendTeacherWelcomeEmail({ email, first_name, password }) {
   `);
 }
 
+// Used by POST /api/schools/me/invite — same "here's your login, change it
+// after first login" pattern as sendTeacherWelcomeEmail, but role-accurate
+// copy (that one always says "Teacher Account", which would be wrong and
+// confusing for a student invited by their school_admin) and mentions the
+// school by name so the recipient knows who set this account up for them.
+async function sendSchoolMemberWelcomeEmail({ email, first_name, password, role, school_name }) {
+  const name = first_name || (role === 'teacher' ? 'Teacher' : 'Student');
+  const roleLabel = role === 'teacher' ? 'Teacher' : 'Student';
+  await send(email, `Your AISchoolOnair ${roleLabel} Account`, `
+    <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px">
+      <h1 style="color:#0a4a3f;font-size:22px;margin-bottom:8px">Welcome to AISchoolOnair, ${name}!</h1>
+      <p style="color:#555;line-height:1.6">
+        Your ${roleLabel.toLowerCase()} account has been created by ${school_name || 'your school'}'s admin.
+        Here are your login details:
+      </p>
+      <table style="margin:16px 0;border-collapse:collapse;width:100%">
+        <tr>
+          <td style="padding:8px 12px;background:#f0fdf4;font-weight:600;color:#166534;border-radius:4px 0 0 4px;width:100px">Email</td>
+          <td style="padding:8px 12px;background:#f0fdf4;color:#555;border-radius:0 4px 4px 0">${email}</td>
+        </tr>
+        <tr><td colspan="2" style="padding:4px"></td></tr>
+        <tr>
+          <td style="padding:8px 12px;background:#f0fdf4;font-weight:600;color:#166534;border-radius:4px 0 0 4px">Password</td>
+          <td style="padding:8px 12px;background:#f0fdf4;color:#555;border-radius:0 4px 4px 0">${password}</td>
+        </tr>
+      </table>
+      <p style="color:#b45309;font-size:13px;margin-bottom:16px">
+        Please change your password immediately after logging in.
+      </p>
+      <a href="${APP_URL}/login"
+         style="display:inline-block;background:#14b8a6;color:#fff;text-decoration:none;
+                font-weight:600;padding:12px 24px;border-radius:12px;font-size:14px">
+        Log in now →
+      </a>
+      <p style="color:#aaa;font-size:12px;margin-top:32px">
+        AISchoolOnair · Nigeria's AI-powered exam prep platform
+      </p>
+    </div>
+  `);
+}
+
 module.exports = {
   send,
   sendWelcomeEmail,
   sendTeacherWelcomeEmail,
+  sendSchoolMemberWelcomeEmail,
   sendWeeklyDigest,
   sendStreakNudge,
   sendPaymentConfirmation,

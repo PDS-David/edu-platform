@@ -60,6 +60,19 @@ router.post('/register', protect, authorize('admin'), async (req, res) => {
     });
   }
 
+  // Service scope: which product(s) this tenant is registered for. Defaults
+  // preserve prior behaviour for anyone calling this before the App Admin
+  // UI is updated (AISchoolonair on, EM off) rather than silently changing
+  // what an unmodified request would create.
+  const enableAISchoolonair = req.body.enable_aischoolonair !== false;
+  const enableEM            = req.body.enable_em === true;
+  if (!enableAISchoolonair && !enableEM) {
+    return res.status(400).json({
+      success: false,
+      error: 'A school must be registered for at least one of AISchoolonair or English Masterclass',
+    });
+  }
+
   const t = await sequelize.transaction();
   try {
     // Ensure a unique join code (retry a few times on the rare collision)
@@ -75,10 +88,10 @@ router.post('/register', protect, authorize('admin'), async (req, res) => {
     } while (attempts < 5);
 
     const [school] = await sequelize.query(
-      `INSERT INTO schools (name, join_code, contact_email)
-       VALUES ($1, $2, $3)
-       RETURNING id, name, join_code`,
-      { bind: [school_name.trim(), joinCode, admin_email.trim().toLowerCase()],
+      `INSERT INTO schools (name, join_code, contact_email, enable_aischoolonair, enable_em)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, name, join_code, enable_aischoolonair, enable_em`,
+      { bind: [school_name.trim(), joinCode, admin_email.trim().toLowerCase(), enableAISchoolonair, enableEM],
         type: sequelize.QueryTypes.INSERT, transaction: t }
     );
     const schoolRow = school[0] || school; // pg returns rows directly for RETURNING
@@ -106,7 +119,11 @@ router.post('/register', protect, authorize('admin'), async (req, res) => {
     return res.status(201).json({
       success: true,
       data: {
-        school: { id: schoolRow.id, name: schoolRow.name, join_code: schoolRow.join_code },
+        school: {
+          id: schoolRow.id, name: schoolRow.name, join_code: schoolRow.join_code,
+          enable_aischoolonair: schoolRow.enable_aischoolonair,
+          enable_em: schoolRow.enable_em,
+        },
         admin:  adminUser.toSafeJSON(),
       },
     });
@@ -131,13 +148,21 @@ router.post('/join', protect, async (req, res) => {
   }
   try {
     const rows = await q(
-      `SELECT id, name FROM schools WHERE join_code = $1 AND is_active = true`,
+      `SELECT id, name, enable_aischoolonair FROM schools WHERE join_code = $1 AND is_active = true`,
       [join_code.trim().toUpperCase()]
     );
     if (!rows.length) {
       return res.status(404).json({ success: false, error: 'Invalid or inactive join code' });
     }
     const school = rows[0];
+    // Distinct from "invalid code" on purpose: the code is real, but this
+    // school registered for English Masterclass only, not AISchoolonair.
+    if (!school.enable_aischoolonair) {
+      return res.status(400).json({
+        success: false,
+        error: `${school.name} has not been registered for AISchoolonair. Contact your school admin or App Admin.`,
+      });
+    }
     await sequelize.query(
       `UPDATE users SET school_id = $1 WHERE id = $2`,
       { bind: [school.id, req.user.id], type: sequelize.QueryTypes.UPDATE }
@@ -165,7 +190,7 @@ router.get('/', protect, authorize('admin'), async (req, res) => {
   try {
     const rows = await q(
       `SELECT sc.id, sc.name, sc.join_code, sc.address, sc.contact_email,
-              sc.is_active, sc.created_at,
+              sc.is_active, sc.enable_aischoolonair, sc.enable_em, sc.created_at,
               COUNT(u.id) FILTER (WHERE u.role = 'school_admin') AS admin_count,
               COUNT(u.id) FILTER (WHERE u.role = 'teacher')      AS teacher_count,
               COUNT(u.id) FILTER (WHERE u.role = 'student')      AS student_count
@@ -188,7 +213,8 @@ router.get('/', protect, authorize('admin'), async (req, res) => {
 router.get('/me', protect, requireSchoolAdmin, async (req, res) => {
   try {
     const rows = await q(
-      `SELECT id, name, join_code, address, contact_email, created_at
+      `SELECT id, name, join_code, address, contact_email,
+              enable_aischoolonair, enable_em, created_at
          FROM schools WHERE id = $1`,
       [req.user.school_id]
     );
@@ -243,6 +269,124 @@ router.get('/:id/roster', protect, authorize('admin'), async (req, res) => {
   } catch (err) {
     console.error('[schools] GET /:id/roster', err.message);
     return res.status(500).json({ success: false, error: 'Could not load roster' });
+  }
+});
+
+// ─── PATCH /api/schools/:id/services ────────────────────────────────────────
+// App Admin only. Lets a school's service scope be corrected or extended
+// AFTER creation (e.g. a school registered for AISchoolonair only later
+// decides to add English Masterclass) — without this, a mistake or a
+// changed mind at registration time would need a direct DB edit.
+router.patch('/:id/services', protect, authorize('admin'), async (req, res) => {
+  const enableAISchoolonair = req.body.enable_aischoolonair;
+  const enableEM            = req.body.enable_em;
+  if (typeof enableAISchoolonair !== 'boolean' || typeof enableEM !== 'boolean') {
+    return res.status(400).json({
+      success: false,
+      error: 'enable_aischoolonair and enable_em must both be provided as true/false',
+    });
+  }
+  if (!enableAISchoolonair && !enableEM) {
+    return res.status(400).json({
+      success: false,
+      error: 'A school must be registered for at least one of AISchoolonair or English Masterclass',
+    });
+  }
+  try {
+    const rows = await q(
+      `UPDATE schools SET enable_aischoolonair = $1, enable_em = $2, updated_at = NOW()
+        WHERE id = $3
+       RETURNING id, name, enable_aischoolonair, enable_em`,
+      [enableAISchoolonair, enableEM, req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ success: false, error: 'School not found' });
+    return res.json({ success: true, data: rows[0] });
+  } catch (err) {
+    console.error('[schools] PATCH /:id/services', err.message);
+    return res.status(500).json({ success: false, error: 'Could not update school services' });
+  }
+});
+
+// ─── POST /api/schools/me/invite ────────────────────────────────────────────
+// school_admin only. Creates a teacher OR student account directly, already
+// linked to the caller's own school — no separate self-register-then-join
+// round trip required. Closes the gap where a school_admin could only hand
+// out a join_code and wait; this mirrors the existing App-Admin
+// /api/admin/create-teacher pattern (same validation, same "send the
+// plaintext password once via email, never store or log it" approach), but
+// scoped to the school_admin's own school_id and allowing role: student too.
+const bcrypt = require('bcryptjs');
+const crypto2 = require('crypto');
+const { validateEmail, validatePassword, validateName, normaliseEmail, normaliseName } = require('../utils/registrationValidators');
+router.post('/me/invite', protect, requireSchoolAdmin, async (req, res) => {
+  const email      = normaliseEmail(req.body.email);
+  const password   = req.body.password;
+  const first_name = normaliseName(req.body.first_name || '');
+  const last_name  = normaliseName(req.body.last_name || '');
+  const role       = req.body.role;
+
+  if (role !== 'teacher' && role !== 'student') {
+    return res.status(400).json({ success: false, error: "role must be 'teacher' or 'student'" });
+  }
+  const emailCheck = validateEmail(email);
+  if (!emailCheck.valid) return res.status(400).json({ success: false, error: emailCheck.error });
+  const passCheck = validatePassword(password);
+  if (!passCheck.valid) return res.status(400).json({ success: false, error: passCheck.error });
+  const fnCheck = validateName(first_name, 'First name');
+  if (!fnCheck.valid) return res.status(400).json({ success: false, error: fnCheck.error });
+
+  try {
+    const hashed = await bcrypt.hash(password, await bcrypt.genSalt(12));
+    const verificationToken        = crypto2.randomBytes(32).toString('hex');
+    const verificationTokenExpires = new Date(Date.now() + 86400000);
+
+    // ON CONFLICT DO NOTHING — same TOCTOU-safe pattern as /api/admin/create-teacher.
+    // school_id set to the CALLER's school_id directly (from their own verified
+    // JWT via requireSchoolAdmin), never trusted from the request body — a
+    // school_admin can only ever create accounts inside their own school.
+    const rows = await sequelize.query(
+      `INSERT INTO users
+         (email, password, first_name, last_name, role,
+          verification_token, verification_token_expires,
+          is_active, is_verified, subscription_status,
+          subscription_expires_at, pending_exam_board_ids,
+          school_id, created_at, updated_at)
+       VALUES
+         (:email, :password, :first_name, :last_name, :role,
+          :verificationToken, :verificationTokenExpires,
+          true, true, 'free_trial',
+          NOW() + INTERVAL '14 days', '{}',
+          :schoolId, NOW(), NOW())
+       ON CONFLICT (email) DO NOTHING
+       RETURNING id, email, first_name, last_name, role, school_id, created_at`,
+      {
+        replacements: {
+          email, password: hashed, first_name, last_name: last_name || first_name,
+          role, verificationToken, verificationTokenExpires, schoolId: req.user.school_id,
+        },
+        type: sequelize.QueryTypes.SELECT,
+      }
+    );
+
+    if (!rows || rows.length === 0) {
+      return res.status(409).json({ success: false, error: 'An account with that email already exists' });
+    }
+
+    try {
+      const emailSvc = require('../services/emailService');
+      const schoolRows = await q(`SELECT name FROM schools WHERE id = $1`, [req.user.school_id]);
+      await emailSvc.sendSchoolMemberWelcomeEmail({
+        email: rows[0].email, first_name: rows[0].first_name, password, // plaintext, pre-hash, sent once
+        role: rows[0].role, school_name: schoolRows[0]?.name,
+      });
+    } catch (emailErr) {
+      console.warn('[schools] /me/invite welcome email failed:', emailErr.message);
+    }
+
+    return res.status(201).json({ success: true, data: { user: rows[0] } });
+  } catch (err) {
+    console.error('[schools] POST /me/invite', err.message);
+    return res.status(500).json({ success: false, error: 'Could not create account' });
   }
 });
 
