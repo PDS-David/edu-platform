@@ -90,9 +90,26 @@ function isZipMagic(buf) {
   return matchesSignature(buf, 0, [0x50, 0x4B, 0x03, 0x04]);
 }
 
-/** PDF magic bytes: "%PDF-" */
+/**
+ * PDF magic bytes: "%PDF-"
+ *
+ * BUG FIX (past-papers-upload-still-failing): this used to require '%PDF-'
+ * at the exact first byte of the file via matchesSignature(buf, 0, ...).
+ * That's stricter than the actual PDF spec / Adobe Acrobat convention,
+ * which only requires the header to appear somewhere within the first
+ * 1024 bytes — real-world PDFs commonly carry a small preamble before it
+ * (print-ticket data some print-to-PDF pipelines add, MacBinary headers
+ * from certain email/export tools, etc.), and are still completely valid,
+ * normally-openable PDFs. This is the same tolerance already applied to
+ * the '%%EOF' trailer check below (also spec'd as "within the last 1024
+ * bytes", not "at the very end") — the header check was just left
+ * stricter than the file format actually requires, which is why some
+ * genuinely valid PDFs (e.g. a scanned/exported past paper) were still
+ * being rejected after that earlier fix.
+ */
 function isPDFMagic(buf) {
-  return matchesSignature(buf, 0, '%PDF-');
+  const head = buf.slice(0, 1024).toString('binary');
+  return head.includes('%PDF-');
 }
 
 /** JPEG magic bytes: FF D8 FF */
