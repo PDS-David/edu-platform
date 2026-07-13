@@ -28,7 +28,11 @@ router.get('/attempt-count', protect, async (req, res) => {
     const total = rows[0]?.total || 0;
     return res.json({ success: true, data: { total, label: total >= 1000 ? `${Math.floor(total/100)*100}+` : `${total}` } });
   } catch (err) {
-    return res.json({ success: true, data: { total: 0, label: '0' } });
+    // BEFORE: any failure here (bad column, DB blip) silently returned
+    // {success:true, data:{total:0}} with zero logging — indistinguishable
+    // from "nobody has attempted this yet", and invisible in server logs.
+    console.error('[GET /quizzes/attempt-count]', err.message);
+    return res.status(500).json({ success: false, error: 'Could not load attempt count' });
   }
 });
 
@@ -557,8 +561,11 @@ router.get('/all-history', protect, async (req, res) => {
     );
     return res.json({ success: true, data: rows });
   } catch (err) {
+    // BEFORE: logged the error but still returned {success:true, data:[]} —
+    // the client had no way to distinguish "genuinely no history yet" from
+    // "the query just failed".
     console.error('[GET /quizzes/all-history]', err.message);
-    return res.json({ success: true, data: [] });
+    return res.status(500).json({ success: false, error: 'Could not load quiz history' });
   }
 });
 
@@ -582,7 +589,11 @@ router.get('/history/:studentId/:subtopicId', protect, async (req, res) => {
     );
     return res.json({ success: true, data: rows });
   } catch (err) {
-    return res.json({ success: true, data: [] });
+    // BEFORE: no logging at all, and faked a 200 success with an empty
+    // list on any failure — a genuine query error was completely invisible,
+    // both to the client and to anyone reading server logs.
+    console.error('[GET /quizzes/history/:studentId/:subtopicId]', err.message);
+    return res.status(500).json({ success: false, error: 'Could not load quiz history' });
   }
 });
 
@@ -604,7 +615,10 @@ router.get('/history', protect, async (req, res) => {
     );
     return res.json({ success: true, data: rows });
   } catch (err) {
-    return res.json({ success: true, data: [] });
+    // BEFORE: no logging, faked a 200 success with an empty list on any
+    // failure.
+    console.error('[GET /quizzes/history]', err.message);
+    return res.status(500).json({ success: false, error: 'Could not load quiz history' });
   }
 });
 
@@ -641,8 +655,10 @@ router.get('/mock-history', protect, async (req, res) => {
     );
     return res.json({ success: true, data: rows });
   } catch (err) {
+    // BEFORE: logged the error but still returned {success:true, data:[]} —
+    // same masking problem as the other history endpoints in this file.
     console.error('[GET /quizzes/mock-history]', err.message);
-    return res.json({ success: true, data: [] });
+    return res.status(500).json({ success: false, error: 'Could not load mock exam history' });
   }
 });
 
