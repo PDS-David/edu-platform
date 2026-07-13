@@ -737,12 +737,24 @@ function TestBuilderTab() {
       if (isAttached(questionId)) {
         await api.delete(`/teacher/tests/${testId}/questions/${questionId}`);
         setAttached(prev => prev.filter(a => a.id !== questionId));
+        // BUG FIX (question-list-refreshes-on-toggle): this used to call the
+        // full load() here, which sets `loading` back to true and — since
+        // this component does `if (loading) return <spinner>` — replaced the
+        // ENTIRE tab (including the open question bank list a teacher was
+        // scrolling through) with a blank spinner on every single checkbox
+        // click. All that was actually needed was to keep this one test's
+        // "Questions (N)" count in sync, so just update it locally instead.
+        setTests(prev => prev.map(t =>
+          t.id === testId ? { ...t, question_count: Math.max(0, (t.question_count ?? 0) - 1) } : t
+        ));
       } else {
         await api.post(`/teacher/tests/${testId}/questions`, { question_ids: [questionId] });
         const q = bank.find(b => b.id === questionId);
         if (q) setAttached(prev => [...prev, q]);
+        setTests(prev => prev.map(t =>
+          t.id === testId ? { ...t, question_count: (t.question_count ?? 0) + 1 } : t
+        ));
       }
-      load();
     } catch (err) { showToast(err?.message || 'Failed to update test questions.', 'error'); }
     finally { setSavingQ(false); }
   };
@@ -908,20 +920,36 @@ function TestBuilderTab() {
                     </p>
                   ) : (
                     <div className="max-h-64 overflow-y-auto space-y-1.5">
-                      {bank.map(q => {
-                        const on = isAttached(q.id);
-                        return (
-                          <button key={q.id} onClick={() => toggleQuestionOnTest(t.id, q.id)} disabled={savingQ}
-                            className={`w-full text-left text-xs px-3 py-2 rounded-lg border flex items-start gap-2 transition-colors ${
-                              on ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-white border-gray-200 text-gray-600 hover:border-violet-200'
-                            }`}>
-                            <span className={`mt-0.5 shrink-0 w-3.5 h-3.5 rounded border flex items-center justify-center ${on ? 'bg-emerald-500 border-emerald-500' : 'border-gray-300'}`}>
-                              {on && <Check size={10} className="text-white" />}
-                            </span>
-                            <span className="line-clamp-2">{q.question_text}</span>
-                          </button>
-                        );
-                      })}
+                      {/* BUG FIX (questions-mixed-up-in-test-builder): the backend now
+                         sorts by subject, so group consecutive same-subject rows under
+                         a header instead of rendering one flat, mixed-together list. */}
+                      {(() => {
+                        let lastSubject = null;
+                        return bank.map(q => {
+                          const on = isAttached(q.id);
+                          const subjectLabel = q.subject_name || 'No subject';
+                          const showHeader = subjectLabel !== lastSubject;
+                          lastSubject = subjectLabel;
+                          return (
+                            <div key={q.id}>
+                              {showHeader && (
+                                <p className="text-[10px] font-mono font-semibold text-violet-500 uppercase tracking-widest pt-2 pb-1 first:pt-0">
+                                  {subjectLabel}
+                                </p>
+                              )}
+                              <button onClick={() => toggleQuestionOnTest(t.id, q.id)} disabled={savingQ}
+                                className={`w-full text-left text-xs px-3 py-2 rounded-lg border flex items-start gap-2 transition-colors ${
+                                  on ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-white border-gray-200 text-gray-600 hover:border-violet-200'
+                                }`}>
+                                <span className={`mt-0.5 shrink-0 w-3.5 h-3.5 rounded border flex items-center justify-center ${on ? 'bg-emerald-500 border-emerald-500' : 'border-gray-300'}`}>
+                                  {on && <Check size={10} className="text-white" />}
+                                </span>
+                                <span className="line-clamp-2">{q.question_text}</span>
+                              </button>
+                            </div>
+                          );
+                        });
+                      })()}
                     </div>
                   )}
                 </div>
