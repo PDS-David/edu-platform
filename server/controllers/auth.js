@@ -410,7 +410,7 @@ exports.login = async (req, res, next) => {
 
     const rows = await db.query(
       `SELECT
-         id, email, password, first_name, last_name, role,
+         id, email, password, first_name, last_name, role, school_id,
          is_active, is_verified, subscription_status,
          subscription_expires_at, onboarding_complete,
          xp_points, study_streak_days, last_login,
@@ -498,6 +498,71 @@ exports.login = async (req, res, next) => {
       ).catch(() => {})
     );
 
+    // ── Tenant-school "closed door" gate — enforced at the login boundary ──
+    // Credentials being correct is not enough for a tenant-school account:
+    // the specific service being logged into (AISchoolonair vs English
+    // Masterclass) must have been granted to that school at registration
+    // (or since, via PATCH /schools/:id/services). This is checked here,
+    // BEFORE a token is ever issued, so a school that only has one product
+    // sees a clear, immediate rejection right at the login screen — not a
+    // successful login followed by a confusing 403 once they're already
+    // inside the dashboard.
+    //
+    // `portal` tells us which login surface the request came from: the
+    // landing page's two separate entry points (/login -> 'aischoolonair',
+    // /em/login -> 'em') send it explicitly; anything that doesn't send it
+    // (older clients, the mobile app) defaults to 'aischoolonair', today's
+    // existing behaviour, so this stays backward compatible.
+    //
+    // school_admin is exempt from the 'aischoolonair' check specifically:
+    // they need to reach their dashboard to manage their roster/settings
+    // regardless of which content product is toggled on, mirroring the
+    // /api/schools exemption in middleware/auth.js. They ARE still subject
+    // to the 'em' check, since English Masterclass is a distinct product a
+    // school must be granted, same as any other tenant role.
+    const portal = req.body.portal === 'em' ? 'em' : 'aischoolonair';
+    let school = null;
+    if (userRow.school_id) {
+      const schoolRows = await db.query(
+        `SELECT id, is_active, enable_aischoolonair, enable_em FROM schools WHERE id = :id LIMIT 1`,
+        { replacements: { id: userRow.school_id }, type: QueryTypes.SELECT }
+      );
+      school = schoolRows[0] || null;
+
+      if (!school || !school.is_active) {
+        setImmediate(() => audit.loginFailure({
+          userId: userRow.id, email, ipAddress, userAgent,
+          metadata: { reason: 'school_inactive' },
+        }));
+        return res.status(403).json({
+          success: false,
+          error: 'Your school account is currently inactive. Contact your school admin.',
+        });
+      }
+
+      const needsCheck = portal === 'em'
+        ? ['student', 'teacher', 'school_admin'].includes(userRow.role)
+        : ['student', 'teacher'].includes(userRow.role);
+
+      if (needsCheck) {
+        const granted = portal === 'em' ? school.enable_em : school.enable_aischoolonair;
+        if (!granted) {
+          setImmediate(() => audit.loginFailure({
+            userId: userRow.id, email, ipAddress, userAgent,
+            metadata: { reason: 'service_not_enabled', portal },
+          }));
+          const serviceName = portal === 'em' ? 'English Masterclass' : 'AISchoolonair';
+          const otherEnabled = portal === 'em' ? school.enable_aischoolonair : school.enable_em;
+          return res.status(403).json({
+            success: false,
+            error: `Your school has not been registered for ${serviceName}. Contact your school admin or App Admin.`,
+            code: 'SERVICE_NOT_ENABLED_FOR_SCHOOL',
+            other_service_enabled: !!otherEnabled,
+          });
+        }
+      }
+    }
+
     // AUTH-002 + AUTH-003 + AUTH-005: issue server-registered token pair
     const { accessToken, refreshToken, expiresIn } = await tokenService.issueTokenPair({
       userId:     userRow.id,
@@ -518,6 +583,13 @@ exports.login = async (req, res, next) => {
     setRefreshCookie(res, refreshToken, !!rememberMe);
 
     const user = safeUser(userRow);
+    // Surfaced to the client so route guards (e.g. EMPrivateRoute) can show
+    // their own closed door immediately on navigation — not just at the
+    // login form — without a second round trip. Only present for tenant
+    // accounts; omitted (undefined) for standalone users and App Admin.
+    if (school) {
+      user.school = { id: school.id, enable_aischoolonair: school.enable_aischoolonair, enable_em: school.enable_em };
+    }
     return res.status(200).json({ success: true, token: accessToken, user });
 
   } catch (err) {
@@ -631,7 +703,7 @@ exports.refreshToken = async (req, res, next) => {
 exports.getMe = async (req, res, next) => {
   try {
     const rows = await db.query(
-      `SELECT id, email, first_name, last_name, role, avatar_url,
+      `SELECT id, email, first_name, last_name, role, school_id, avatar_url,
               phone, subscription_status, subscription_expires_at,
               is_verified, onboarding_complete, xp_points,
               study_streak_days, daily_goal, last_login,
@@ -640,7 +712,16 @@ exports.getMe = async (req, res, next) => {
       { replacements: { id: req.user.id }, type: QueryTypes.SELECT }
     );
     if (!rows.length) return res.status(404).json({ success: false, error: 'User not found' });
-    return res.status(200).json({ success: true, user: safeUser(rows[0]) });
+    const user = safeUser(rows[0]);
+    // req.school is populated by the `protect` middleware for any
+    // student/teacher/school_admin with a school_id — reuse it here rather
+    // than a second query, same shape as the login response so client route
+    // guards (EMPrivateRoute, etc.) work the same on page refresh as they
+    // do right after login.
+    if (req.school) {
+      user.school = { id: rows[0].school_id, enable_aischoolonair: req.school.enable_aischoolonair, enable_em: req.school.enable_em };
+    }
+    return res.status(200).json({ success: true, user });
   } catch (err) {
     console.error('[getMe]', err.message);
     next(err);
