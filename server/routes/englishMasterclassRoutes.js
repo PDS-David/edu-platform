@@ -130,29 +130,34 @@ router.post('/register', async (req, res) => {
 });
 
 // Gate: students must have completed EM registration before touching any
-// other EM route. Admin/teacher roles pass through untouched — this only
-// applies to the student-facing surface.
+// other EM route. App Admin (role 'admin', global — manages EM content
+// platform-wide, never tied to a school) passes through untouched.
 //
-// Also enforces the tenant boundary live, on every request: if a student's
-// school has since had enable_em turned off (PATCH /schools/:id/services),
-// they lose EM access immediately — not just at their next registration
-// attempt. req.school is set by protect (server/middleware/auth.js) when
-// the user has a school_id; standalone students (no school_id) have
-// req.school undefined and are unaffected, same as before this change.
+// Also enforces the tenant boundary live, on every request, for EVERY role
+// tied to a tenant school — student, teacher, and school_admin — not just
+// students: if a school has since had enable_em turned off
+// (PATCH /schools/:id/services), everyone at that school loses EM access
+// immediately, not just students at their next registration attempt.
+// req.school is set by protect (server/middleware/auth.js) for any
+// student/teacher/school_admin with a school_id; standalone users (no
+// school_id) have req.school undefined and are unaffected.
 function requireEmRegistration(req, res, next) {
+  if (req.school && !req.school.enable_em) {
+    return res.status(403).json({
+      success: false,
+      error: 'Your school has not been registered for English Masterclass. Contact your school admin or App Admin.',
+      code: 'EM_NOT_ENABLED_FOR_SCHOOL',
+    });
+  }
+  // The em_registered_at opt-in gate below is student-specific — teachers
+  // and school_admins never register for EM themselves, they just need the
+  // tenant-boundary check above applied to them too.
   if (req.user.role !== 'student') return next();
   if (!req.user.em_registered_at) {
     return res.status(403).json({
       success: false,
       error: 'You need to register for English Masterclass before you can access it.',
       code: 'EM_REGISTRATION_REQUIRED',
-    });
-  }
-  if (req.school && !req.school.enable_em) {
-    return res.status(403).json({
-      success: false,
-      error: 'Your school has not been registered for English Masterclass. Contact your school admin or App Admin.',
-      code: 'EM_NOT_ENABLED_FOR_SCHOOL',
     });
   }
   next();
