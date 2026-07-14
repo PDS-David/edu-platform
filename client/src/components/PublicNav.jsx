@@ -41,7 +41,7 @@ export default function PublicNav({
         <span className="hidden md:block h-7 w-px shrink-0" style={{background:'rgba(17,22,41,0.10)'}} />
 
         {/* AISchoolonair partner logo */}
-        <img src="/schoolonair.jpg" alt="AISchoolonair" className="hidden md:block h-8 w-8 object-contain shrink-0 rounded" />
+        <img src="/schoolonair.jpg" alt="AISchoolonair" className="hidden md:block h-12 w-12 object-contain shrink-0 rounded-lg" />
       </div>
 
       {right && (
