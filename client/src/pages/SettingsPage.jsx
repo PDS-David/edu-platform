@@ -37,8 +37,9 @@ const Section = ({ title, subtitle, icon: Icon, children, accent = 'teal' }) => 
 };
 
 const RoleBadge = ({ role }) => {
-  const map = { admin: 'bg-red-100 text-red-700', teacher: 'bg-purple-100 text-purple-700', student: 'bg-blue-100 text-blue-700' };
-  return <span className={`text-xs font-semibold px-3 py-1 rounded-full ${map[role] || 'bg-gray-100 text-gray-600'}`}>{role?.charAt(0).toUpperCase() + role?.slice(1)}</span>;
+  const map = { admin: 'bg-red-100 text-red-700', teacher: 'bg-purple-100 text-purple-700', student: 'bg-blue-100 text-blue-700', school_admin: 'bg-indigo-100 text-indigo-700' };
+  const label = role === 'school_admin' ? 'School Admin' : role?.charAt(0).toUpperCase() + role?.slice(1);
+  return <span className={`text-xs font-semibold px-3 py-1 rounded-full ${map[role] || 'bg-gray-100 text-gray-600'}`}>{label}</span>;
 };
 
 const Toggle = ({ value, onChange }) => (

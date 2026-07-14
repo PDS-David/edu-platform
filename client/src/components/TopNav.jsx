@@ -26,19 +26,25 @@ export default function TopNav() {
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   const dashboardPath =
-    role === 'admin'   ? '/admin/dashboard'   :
-    role === 'teacher' ? '/teacher/dashboard' : '/student/dashboard';
+    role === 'admin'        ? '/admin/dashboard'        :
+    role === 'teacher'      ? '/teacher/dashboard'      :
+    role === 'school_admin' ? '/school-admin/dashboard' : '/student/dashboard';
+
+  const settingsPath =
+    role === 'school_admin' ? '/school-admin/settings' : `/${role}/settings`;
 
   const roleColor = {
     admin:   'bg-violet-600',
     teacher: 'bg-emerald-600',
     student: 'bg-blue-600',
+    school_admin: 'bg-indigo-600',
   }[role] || 'bg-gray-600';
 
   const roleBadge = {
     admin:   { label: 'Admin',   cls: 'bg-violet-50 text-violet-700 border-violet-200' },
     teacher: { label: 'Teacher', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
     student: { label: 'Student', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+    school_admin: { label: 'School Admin', cls: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
   }[role] || { label: role, cls: 'bg-gray-50 text-gray-600 border-gray-200' };
 
   useEffect(() => {
@@ -165,7 +171,7 @@ export default function TopNav() {
                 className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors">
                 <LayoutDashboard size={14} /> Dashboard
               </button>
-              <button onClick={() => { navigate(`/${role}/settings`); setDropOpen(false); }}
+              <button onClick={() => { navigate(settingsPath); setDropOpen(false); }}
                 className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors">
                 <Settings size={14} /> Settings
               </button>
