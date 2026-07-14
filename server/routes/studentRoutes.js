@@ -20,6 +20,25 @@ const { ENROLLMENT_SOURCE, ENROLLMENT_STATUS } = require('../constants/enrollmen
 const UUID_REGEX  = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isValidUUID = (v) => UUID_REGEX.test(v);
 
+// Every route below previously had only `protect` (valid JWT, any role) —
+// no role check at all. Confirmed live: a school_admin's own token got a
+// real 200 from GET /my-subjects, and every other route here would have
+// behaved identically for teacher, school_admin, or App Admin tokens alike.
+// That's the exact "closed door" gap this file needs: a tenant school_admin
+// (or a teacher) must never be able to act as a student via these
+// endpoints, even against their own account. `admin` (platform App Admin)
+// is intentionally still allowed, mirroring teacherRoutes.js's teacherOnly
+// pattern, for support/debugging parity across both role-restricted files.
+//
+// NOTE: this is purely a role check. Tenant-school service-scope gating
+// (enable_aischoolonair/enable_em) is handled globally by protect() in
+// middleware/auth.js as of 2e8f923 — not duplicated here.
+const studentOnly = (req, res, next) => {
+  if (!['student', 'admin'].includes(req.user?.role))
+    return res.status(403).json({ success: false, error: 'Student access required' });
+  next();
+};
+
 // Bug 1 fix: run_complete_migration.js's CREATE TABLE IF NOT EXISTS for
 // student_subjects never defines status/enrollment_source (see
 // database/patch_enrollment_status_columns.sql, which documents this gap
@@ -70,7 +89,7 @@ const ensureEnrollmentColumns = async () => {
 
 // ── GET /api/students/performance ─────────────────────────────────────────────
 // Returns performance data for a student's subject (for My Performance tab)
-router.get('/performance', protect, async (req, res) => {
+router.get('/performance', protect, studentOnly, async (req, res) => {
   const { subject_id } = req.query;
   const studentId = req.user.id;
 
@@ -154,7 +173,7 @@ router.get('/performance', protect, async (req, res) => {
 // return question_text/options/explanation, since that would hand the
 // student unreviewed AI content directly in the response body regardless of
 // what status was written to the DB.
-router.post('/remediation', protect, async (req, res) => {
+router.post('/remediation', protect, studentOnly, async (req, res) => {
   try {
     const { generateRemediationSet } = require('../services/remediationService');
     const result = await generateRemediationSet(req.user.id);
@@ -195,7 +214,7 @@ router.post('/remediation', protect, async (req, res) => {
 
 // ── GET /api/students/remediation/status ─────────────────────────────────────
 // Returns whether student has weak concepts without generating questions.
-router.get('/remediation/status', protect, async (req, res) => {
+router.get('/remediation/status', protect, studentOnly, async (req, res) => {
   try {
     const { getWeakConcepts } = require('../services/weakConceptService');
     const weakConcepts = await getWeakConcepts(req.user.id);
@@ -217,7 +236,7 @@ router.get('/remediation/status', protect, async (req, res) => {
 
 // ── GET /api/students/my-tests ───────────────────────────────────────────────
 // Lists all tests assigned to the current student (direct or via class).
-router.get('/my-tests', protect, async (req, res) => {
+router.get('/my-tests', protect, studentOnly, async (req, res) => {
   const studentId = req.user.id;
   try {
     const rows = await sequelize.query(
@@ -263,7 +282,7 @@ router.get('/my-tests', protect, async (req, res) => {
 
 // ── GET /api/students/test/:testId ───────────────────────────────────────────
 // Returns test details + questions for StudentTestPage.jsx
-router.get('/test/:testId', protect, async (req, res) => {
+router.get('/test/:testId', protect, studentOnly, async (req, res) => {
   const { testId } = req.params;
   if (!isValidUUID(testId)) {
     return res.status(400).json({ success: false, error: 'Invalid test ID' });
@@ -325,7 +344,7 @@ router.get('/test/:testId', protect, async (req, res) => {
 // ── POST /api/students/test/:testId/submit ───────────────────────────────────
 // Submits a student's test answers.
 // Body: { answers: [{ question_id, selected_option_id }], total_time_ms }
-router.post('/test/:testId/submit', protect, async (req, res) => {
+router.post('/test/:testId/submit', protect, studentOnly, async (req, res) => {
   const { testId } = req.params;
   if (!isValidUUID(testId)) {
     return res.status(400).json({ success: false, error: 'Invalid test ID' });
@@ -417,7 +436,7 @@ module.exports.ensureEnrollmentColumns = ensureEnrollmentColumns;
 // board (e.g. Cambridge) without first picking a specific subject under it.
 // Reuses the exact same student_exam_types upsert as POST /subjects so both
 // paths produce identical board-membership state.
-router.post('/exam-types/:examTypeId/join', protect, async (req, res) => {
+router.post('/exam-types/:examTypeId/join', protect, studentOnly, async (req, res) => {
   const studentId  = req.user.id;
   const examTypeId = parseInt(req.params.examTypeId);
   if (!examTypeId) {
@@ -453,7 +472,7 @@ router.post('/exam-types/:examTypeId/join', protect, async (req, res) => {
 // ── GET /api/students/my-boards ───────────────────────────────────────────────
 // Returns the exam boards the student selected during registration/onboarding.
 // Used by StudentDashboard to show only relevant boards in the dropdown.
-router.get('/my-boards', protect, async (req, res) => {
+router.get('/my-boards', protect, studentOnly, async (req, res) => {
   try {
     // First try student_exam_types (set during onboarding/payment)
     let boards = await sequelize.query(
@@ -485,7 +504,7 @@ router.get('/my-boards', protect, async (req, res) => {
 
 // ── GET /api/students/my-subjects ─────────────────────────────────────────────
 // Returns all subjects the student has selected (own selections + class-assigned).
-router.get('/my-subjects', protect, async (req, res) => {
+router.get('/my-subjects', protect, studentOnly, async (req, res) => {
   const studentId = req.user.id;
   try {
     // 1. Student's own selected subjects
@@ -559,7 +578,7 @@ router.get('/my-subjects', protect, async (req, res) => {
 // ── POST /api/students/subjects ───────────────────────────────────────────────
 // Add a subject to the student's selected subjects.
 // Body: { subject_id: <integer> }
-router.post('/subjects', protect, async (req, res) => {
+router.post('/subjects', protect, studentOnly, async (req, res) => {
   const studentId = req.user.id;
   const { subject_id } = req.body;
   if (!subject_id) {
@@ -665,7 +684,7 @@ router.post('/subjects', protect, async (req, res) => {
 
 // ── DELETE /api/students/subjects/:subjectId ──────────────────────────────────
 // Remove a subject from the student's selected subjects.
-router.delete('/subjects/:subjectId', protect, async (req, res) => {
+router.delete('/subjects/:subjectId', protect, studentOnly, async (req, res) => {
   const studentId = req.user.id;
   const subjectId = parseInt(req.params.subjectId);
   if (!subjectId) {
