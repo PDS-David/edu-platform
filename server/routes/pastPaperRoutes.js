@@ -122,6 +122,14 @@ router.post('/', protect, teacherOrAdmin, upload.single('file'), async (req, res
 
   const { subject_id, exam_board, year, paper_type, title } = req.body;
   if (!title) return res.status(400).json({ success: false, error: 'title is required' });
+  // CONFIRMED LIVE BUG: past_papers.subject_id is NOT NULL, but this route
+  // used to pass subject_id || null straight through, so any caller that
+  // omitted it (e.g. the upload form when subjectId was still unselected —
+  // fixed separately in UploadPastPaperForm.jsx) got a raw, unhelpful
+  // Postgres constraint-violation message as a generic 500. Checked here
+  // too, not just client-side, since this is a public API route any caller
+  // could hit directly.
+  if (!subject_id) return res.status(400).json({ success: false, error: 'subject_id is required' });
 
   const f = req.secureFile;
   let fileUrl;
@@ -147,13 +155,17 @@ router.post('/', protect, teacherOrAdmin, upload.single('file'), async (req, res
   }
 
   try {
+    // CONFIRMED LIVE BUG: past_papers.updated_at is NOT NULL with no
+    // DB-level default. This INSERT never set it, so every upload that got
+    // past the subject_id check above would have failed one layer deeper
+    // with the same class of raw constraint-violation 500.
     const result = await sequelize.query(
       `INSERT INTO past_papers
          (subject_id, exam_board, year, paper_type, title,
-          file_url, file_size_bytes, created_by, created_at)
+          file_url, file_size_bytes, created_by, created_at, updated_at)
        VALUES
          (:subject_id, :exam_board, :year, :paper_type, :title,
-          :file_url, :file_size_bytes, :created_by, NOW())
+          :file_url, :file_size_bytes, :created_by, NOW(), NOW())
        RETURNING id`,
       {
         replacements: {

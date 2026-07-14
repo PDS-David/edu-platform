@@ -135,6 +135,13 @@ async function run() {
       ADD COLUMN IF NOT EXISTS file_size_bytes  BIGINT,
       ADD COLUMN IF NOT EXISTS created_by       UUID`);
 
+  // past_papers.updated_at is NOT NULL with no DB-level default — confirmed
+  // live that this broke every upload via POST /past-papers, whose INSERT
+  // never set it. Fixed at the call site too; a DB-level default closes
+  // this off for any other/future writer of this table.
+  await exec('past_papers: updated_at gets a DB-level default',
+    `ALTER TABLE past_papers ALTER COLUMN updated_at SET DEFAULT NOW()`);
+
   // student_answers: create if missing (needed by admin platform-stats)
   await exec('student_answers: create table if missing', `
     CREATE TABLE IF NOT EXISTS student_answers (
