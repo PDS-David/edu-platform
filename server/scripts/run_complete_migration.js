@@ -1381,6 +1381,26 @@ async function run() {
   await exec('em_practice_sessions: add pronunciation_score column',
     `ALTER TABLE em_practice_sessions ADD COLUMN IF NOT EXISTS pronunciation_score NUMERIC(5,2)`
   );
+  // Freeze the category's difficulty onto the session row at save-time,
+  // rather than looking it up live via em_categories on every level-progress
+  // query. Confirmed live (2026-07-14): em_practice_sessions.category_id is
+  // ON DELETE SET NULL, so deleting a category used to silently drop every
+  // session that played it out of the level-unlock totals (INNER JOIN on a
+  // now-NULL category_id excludes the row) — a student could lose an
+  // already-earned level unlock the moment an admin deleted an old category.
+  // difficulty column removes that dependency entirely: once a session is
+  // saved, its contribution to level-unlock math no longer depends on the
+  // category continuing to exist.
+  await exec('em_practice_sessions: add difficulty column',
+    `ALTER TABLE em_practice_sessions ADD COLUMN IF NOT EXISTS difficulty TEXT`
+  );
+  await exec('em_practice_sessions: backfill difficulty from em_categories',
+    `UPDATE em_practice_sessions ps
+        SET difficulty = c.difficulty
+       FROM em_categories c
+      WHERE ps.category_id = c.id
+        AND ps.difficulty IS NULL`
+  );
   await exec('em_user_stats: create table',
     `CREATE TABLE IF NOT EXISTS em_user_stats (
       user_id             UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
