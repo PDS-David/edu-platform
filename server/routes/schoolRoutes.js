@@ -386,6 +386,38 @@ router.patch('/:id', protect, authorize('admin'), async (req, res) => {
 });
 
 
+// ─── PATCH /api/schools/me/logo ─────────────────────────────────────────────
+// school_admin only, own school. Same pipeline as the App-Admin route
+// below, so a school can set/update their own branding without waiting on
+// App Admin.
+//
+// NOTE: this must be declared before PATCH /:id/logo below — Express
+// matches routes in declaration order, and /:id/logo would otherwise
+// swallow this request with id="me" (hitting authorize('admin') instead of
+// requireSchoolAdmin, so every school_admin's own-logo upload 403'd with
+// "requires role: admin" — confirmed live, same class of bug the /me/roster
+// vs /:id/roster pair above was already declared in the correct order to
+// avoid, but this pair wasn't).
+router.patch('/me/logo', protect, requireSchoolAdmin, logoUpload.single('logo'), async (req, res) => {
+  if (!req.secureFile) {
+    return res.status(400).json({ success: false, error: 'No logo file was provided' });
+  }
+  try {
+    const existing = await q(`SELECT logo_url FROM schools WHERE id = $1`, [req.user.school_id]);
+    const newLogoUrl = await saveSchoolLogo(req.secureFile);
+    const rows = await q(
+      `UPDATE schools SET logo_url = $1, updated_at = NOW() WHERE id = $2 RETURNING id, name, logo_url`,
+      [newLogoUrl, req.user.school_id]
+    );
+    if (existing[0]?.logo_url) deleteSchoolLogo(existing[0].logo_url).catch(() => {});
+    return res.json({ success: true, data: rows[0] });
+  } catch (err) {
+    console.error('[schools] PATCH /me/logo', err.message);
+    return res.status(500).json({ success: false, error: 'Could not update school logo' });
+  }
+});
+
+// ─── PATCH /api/schools/:id/logo ────────────────────────────────────────────
 // App Admin only. Sets or replaces any school's logo. Same validated upload
 // pipeline as everywhere else (magic-byte check + AV scan via
 // createUploadMiddleware), 5MB cap, image types only.
@@ -410,28 +442,6 @@ router.patch('/:id/logo', protect, authorize('admin'), logoUpload.single('logo')
     return res.json({ success: true, data: rows[0] });
   } catch (err) {
     console.error('[schools] PATCH /:id/logo', err.message);
-    return res.status(500).json({ success: false, error: 'Could not update school logo' });
-  }
-});
-
-// ─── PATCH /api/schools/me/logo ─────────────────────────────────────────────
-// school_admin only, own school. Same pipeline as above, so a school can
-// set/update their own branding without waiting on App Admin.
-router.patch('/me/logo', protect, requireSchoolAdmin, logoUpload.single('logo'), async (req, res) => {
-  if (!req.secureFile) {
-    return res.status(400).json({ success: false, error: 'No logo file was provided' });
-  }
-  try {
-    const existing = await q(`SELECT logo_url FROM schools WHERE id = $1`, [req.user.school_id]);
-    const newLogoUrl = await saveSchoolLogo(req.secureFile);
-    const rows = await q(
-      `UPDATE schools SET logo_url = $1, updated_at = NOW() WHERE id = $2 RETURNING id, name, logo_url`,
-      [newLogoUrl, req.user.school_id]
-    );
-    if (existing[0]?.logo_url) deleteSchoolLogo(existing[0].logo_url).catch(() => {});
-    return res.json({ success: true, data: rows[0] });
-  } catch (err) {
-    console.error('[schools] PATCH /me/logo', err.message);
     return res.status(500).json({ success: false, error: 'Could not update school logo' });
   }
 });
