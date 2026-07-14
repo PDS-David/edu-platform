@@ -409,12 +409,28 @@ router.post('/classes', protect, teacherOnly, async (req, res) => {
 // NOT YET in any of the teacher's classes is the entire point. That scope
 // would break the feature outright.
 //
-// Scoped instead to "students enrolled in any subject this teacher is
-// assigned to" via teacher_subjects -- a real, bounded boundary (every
-// other teacher's unrelated students are still excluded) that preserves the
-// legitimate "search my subject's students to add to a new class" workflow.
-// Matches the existing teacher_subjects + student_subjects join pattern
-// already established in GET /teacher/students (T4 fix) in this same file.
+// Scoped to "students enrolled in any subject this teacher is assigned to"
+// via teacher_subjects -- a real, bounded boundary (every other teacher's
+// unrelated students are still excluded) that preserves the legitimate
+// "search my subject's students to add to a new class" workflow. Matches
+// the existing teacher_subjects + student_subjects join pattern already
+// established in GET /teacher/students (T4 fix) in this same file.
+//
+// BUG FIX (tenant teachers see zero students): school multi-tenancy
+// (schoolRoutes.js) deliberately does not scope subjects/classes by
+// school_id yet -- see that file's header. Consequence: a teacher who
+// joined a school via school_id has classes but is never assigned
+// teacher_subjects (the school_admin flow doesn't do that), so the
+// subject-based clause above alone excludes ALL of that teacher's own
+// school's students. Confirmed via req.user.school_id / users.school_id
+// (added in schoolRoutes.js) rather than assumed.
+//
+// Fix: OR in a second, equally bounded boundary -- "students in my own
+// school" (u.school_id = req.user.school_id) -- only when the requesting
+// teacher actually belongs to a school. This does not touch teachers
+// without a school_id (existing subject-only scope is untouched for them)
+// and does not let a school teacher see any OTHER school's students or
+// any standalone student outside their subjects.
 router.get('/students-directory', protect, teacherOnly, async (req, res) => {
   const q = String(req.query.q || '').trim();
   const replacements = { teacherId: req.user.id };
@@ -428,17 +444,30 @@ router.get('/students-directory', protect, teacherOnly, async (req, res) => {
     )`;
     replacements.q = `%${q.toLowerCase()}%`;
   }
+
+  let schoolClause = '';
+  if (req.user.school_id) {
+    schoolClause = 'OR u.school_id = :schoolId';
+    replacements.schoolId = req.user.school_id;
+  }
+
   try {
     const rows = await safeQuery(
       `SELECT DISTINCT u.id, u.first_name, u.last_name, u.email
-         FROM teacher_subjects ts
-         JOIN student_subjects ss ON ss.subject_id = ts.subject_id
-         JOIN users u ON u.id = ss.student_id
-        WHERE ts.teacher_id = :teacherId
-          AND ts.is_active  = true
-          AND ss.is_active  = true
-          AND u.is_active   = true
-          AND u.role        = 'student'
+         FROM users u
+        WHERE u.is_active = true
+          AND u.role      = 'student'
+          AND (
+            u.id IN (
+              SELECT ss.student_id
+                FROM teacher_subjects ts
+                JOIN student_subjects ss ON ss.subject_id = ts.subject_id
+               WHERE ts.teacher_id = :teacherId
+                 AND ts.is_active  = true
+                 AND ss.is_active  = true
+            )
+            ${schoolClause}
+          )
           ${searchClause}
         ORDER BY u.first_name, u.last_name
         LIMIT 500`,
