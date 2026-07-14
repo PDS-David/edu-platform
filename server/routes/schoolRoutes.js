@@ -342,7 +342,50 @@ router.patch('/:id/services', protect, authorize('admin'), async (req, res) => {
   }
 });
 
-// ─── PATCH /api/schools/:id/logo ────────────────────────────────────────────
+// ─── PATCH /api/schools/:id ──────────────────────────────────────────────────
+// App Admin only. Edits a school's own identity fields — name, address,
+// contact_email. Nothing else in this codebase can change these after
+// registration (services and logo have their own dedicated endpoints below/
+// above; this one deliberately does not touch either, so a partial edit here
+// can never accidentally clear a school's enabled services or logo).
+router.patch('/:id', protect, authorize('admin'), async (req, res) => {
+  const name          = typeof req.body.name === 'string' ? req.body.name.trim() : undefined;
+  const address        = typeof req.body.address === 'string' ? req.body.address.trim() : undefined;
+  const contact_email  = typeof req.body.contact_email === 'string' ? req.body.contact_email.trim().toLowerCase() : undefined;
+
+  if (name !== undefined && !name) {
+    return res.status(400).json({ success: false, error: 'School name cannot be empty' });
+  }
+  if (contact_email !== undefined && contact_email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(contact_email)) {
+      return res.status(400).json({ success: false, error: 'Invalid contact email format' });
+    }
+  }
+  if (name === undefined && address === undefined && contact_email === undefined) {
+    return res.status(400).json({ success: false, error: 'Nothing to update — provide name, address, and/or contact_email' });
+  }
+
+  try {
+    const rows = await q(
+      `UPDATE schools SET
+         name          = COALESCE($1, name),
+         address       = COALESCE($2, address),
+         contact_email = COALESCE($3, contact_email),
+         updated_at    = NOW()
+       WHERE id = $4
+       RETURNING id, name, address, contact_email, join_code, enable_aischoolonair, enable_em, logo_url`,
+      [name, address, contact_email, req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ success: false, error: 'School not found' });
+    return res.json({ success: true, data: rows[0] });
+  } catch (err) {
+    console.error('[schools] PATCH /:id', err.message);
+    return res.status(500).json({ success: false, error: 'Could not update school details' });
+  }
+});
+
+
 // App Admin only. Sets or replaces any school's logo. Same validated upload
 // pipeline as everywhere else (magic-byte check + AV scan via
 // createUploadMiddleware), 5MB cap, image types only.

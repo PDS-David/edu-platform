@@ -298,7 +298,7 @@ function DeleteSchoolModal({ school, onClose, onDeleted }) {
   );
 }
 
-function SchoolRow({ school, onServicesUpdated, onDeleted }) {
+function SchoolRow({ school, onServicesUpdated, onDetailsUpdated, onDeleted }) {
   const [expanded, setExpanded] = useState(false);
   const [roster,   setRoster]   = useState(null);
   const [loading,  setLoading]  = useState(false);
@@ -307,6 +307,14 @@ function SchoolRow({ school, onServicesUpdated, onDeleted }) {
   const [svcForm, setSvcForm] = useState({ enable_aischoolonair: school.enable_aischoolonair, enable_em: school.enable_em });
   const [svcSaving, setSvcSaving] = useState(false);
   const [svcError, setSvcError] = useState('');
+  const [editingDetails, setEditingDetails] = useState(false);
+  const [detailsForm, setDetailsForm] = useState({
+    name: school.name || '',
+    address: school.address || '',
+    contact_email: school.contact_email || '',
+  });
+  const [detailsSaving, setDetailsSaving] = useState(false);
+  const [detailsError, setDetailsError] = useState('');
   const [showDelete, setShowDelete] = useState(false);
   const [logoSaving, setLogoSaving] = useState(false);
   const [logoError, setLogoError] = useState('');
@@ -345,6 +353,38 @@ function SchoolRow({ school, onServicesUpdated, onDeleted }) {
       setSvcError(err?.response?.data?.error || err?.message || 'Could not update services.');
     } finally {
       setSvcSaving(false);
+    }
+  };
+
+  const saveDetails = async () => {
+    setDetailsError('');
+    if (!detailsForm.name.trim()) {
+      setDetailsError('School name cannot be empty.');
+      return;
+    }
+    if (detailsForm.contact_email.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(detailsForm.contact_email.trim())) {
+        setDetailsError('Invalid contact email format.');
+        return;
+      }
+    }
+    setDetailsSaving(true);
+    try {
+      const res = await api.patch(`/schools/${school.id}`, {
+        name: detailsForm.name.trim(),
+        address: detailsForm.address.trim(),
+        contact_email: detailsForm.contact_email.trim(),
+      });
+      setEditingDetails(false);
+      // Deliberately NOT reusing onServicesUpdated (which reloads the whole
+      // school list) — the PATCH response already returns the updated row,
+      // so the parent can just patch this one school locally.
+      onDetailsUpdated?.(res?.data);
+    } catch (err) {
+      setDetailsError(err?.response?.data?.error || err?.message || 'Could not update school details.');
+    } finally {
+      setDetailsSaving(false);
     }
   };
 
@@ -411,8 +451,12 @@ function SchoolRow({ school, onServicesUpdated, onDeleted }) {
         <div className="border-t border-gray-100 px-4 py-3 bg-gray-50">
           {logoError && <p className="text-xs text-red-500 mb-2">{logoError}</p>}
           <div className="flex items-center justify-between mb-3 pb-3 border-b border-gray-200">
-            {!editingServices ? (
+            {!editingServices && !editingDetails ? (
               <div className="flex items-center gap-4">
+                <button onClick={(e) => { e.stopPropagation(); setEditingDetails(true); }}
+                  className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors">
+                  Edit school details
+                </button>
                 <button onClick={(e) => { e.stopPropagation(); setEditingServices(true); }}
                   className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors">
                   Edit services this school is registered for
@@ -421,6 +465,48 @@ function SchoolRow({ school, onServicesUpdated, onDeleted }) {
                   className="flex items-center gap-1 text-xs font-semibold text-red-500 hover:text-red-700 transition-colors">
                   <Trash2 size={12} /> Delete school
                 </button>
+              </div>
+            ) : editingDetails ? (
+              <div className="w-full">
+                {detailsError && <p className="text-xs text-red-500 mb-2">{detailsError}</p>}
+                <div className="grid grid-cols-1 gap-2 mb-2">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-gray-500 mb-0.5">School name</label>
+                    <input type="text" value={detailsForm.name}
+                      onChange={e => setDetailsForm(f => ({ ...f, name: e.target.value }))}
+                      onClick={e => e.stopPropagation()}
+                      className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-gray-500 mb-0.5">Address</label>
+                    <input type="text" value={detailsForm.address}
+                      onChange={e => setDetailsForm(f => ({ ...f, address: e.target.value }))}
+                      onClick={e => e.stopPropagation()}
+                      className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-gray-500 mb-0.5">Contact email</label>
+                    <input type="email" value={detailsForm.contact_email}
+                      onChange={e => setDetailsForm(f => ({ ...f, contact_email: e.target.value }))}
+                      onClick={e => e.stopPropagation()}
+                      className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={(e) => { e.stopPropagation(); saveDetails(); }} disabled={detailsSaving}
+                    className="text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg disabled:opacity-40">
+                    {detailsSaving ? 'Saving…' : 'Save'}
+                  </button>
+                  <button onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingDetails(false);
+                      setDetailsForm({ name: school.name || '', address: school.address || '', contact_email: school.contact_email || '' });
+                      setDetailsError('');
+                    }}
+                    className="text-xs font-semibold text-gray-500 hover:text-gray-700 px-3 py-1.5">
+                    Cancel
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="w-full">
@@ -536,7 +622,18 @@ export default function AdminSchools() {
           )}
           {!loading && schools.length > 0 && (
             <div className="space-y-2">
-              {schools.map(s => <SchoolRow key={s.id} school={s} onServicesUpdated={load} onDeleted={load} />)}
+              {schools.map(s => (
+                <SchoolRow
+                  key={s.id}
+                  school={s}
+                  onServicesUpdated={load}
+                  onDetailsUpdated={(updated) => {
+                    if (!updated) return;
+                    setSchools(prev => prev.map(row => row.id === s.id ? { ...row, ...updated } : row));
+                  }}
+                  onDeleted={load}
+                />
+              ))}
             </div>
           )}
         </div>
