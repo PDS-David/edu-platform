@@ -70,6 +70,16 @@ export default function UploadPastPaperForm({ subjects = [], onUploaded, showToa
       showToast?.('Exam type is required', 'error');
       return;
     }
+    // CONFIRMED LIVE BUG: past_papers.subject_id is NOT NULL in the DB, but
+    // nothing here previously required a subject to be picked before
+    // submitting. Reproduced directly against the real endpoint with valid
+    // PDFs and no subject_id: every file in the batch failed with a raw
+    // Postgres NOT NULL violation and a generic "Upload failed for all
+    // files" toast with no indication why.
+    if (!subjectId) {
+      showToast?.('Subject is required — please select one before uploading', 'error');
+      return;
+    }
 
     setUploading(true);
     let successCount = 0;
@@ -140,7 +150,7 @@ export default function UploadPastPaperForm({ subjects = [], onUploaded, showToa
           {EXAM_BOARDS.map(b => <option key={b} value={b}>{b}</option>)}
         </select>
         <select value={subjectId} onChange={e => setSubjectId(e.target.value)} className={inputCls}>
-          <option value="">Subject (optional)</option>
+          <option value="">Subject (required)</option>
           {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
         <input
