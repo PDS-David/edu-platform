@@ -45,15 +45,24 @@ const QUESTIONS_PER_LEVEL     = 30;
 const LEVEL_UNLOCK_ACCURACY   = 70;
 
 // Cumulative { totalWords, correctWords } per difficulty for a user.
+//
+// Deliberately reads ps.difficulty (frozen on the session row at save-time)
+// rather than joining live to em_categories.difficulty. A category can be
+// hard-deleted by an admin at any time (em_practice_sessions.category_id is
+// ON DELETE SET NULL, not CASCADE) — an INNER JOIN here would silently drop
+// every session that ever used that category out of a student's totals,
+// potentially re-locking a level they'd already legitimately earned. Once a
+// session is saved, its contribution to level math must never depend on the
+// category continuing to exist.
 async function getLevelTotals(userId) {
   const rows = await q(`
-    SELECT c.difficulty,
+    SELECT ps.difficulty,
            COALESCE(SUM(ps.total_words), 0)::int   AS total_words,
            COALESCE(SUM(ps.correct_words), 0)::int AS correct_words
       FROM em_practice_sessions ps
-      JOIN em_categories c ON c.id = ps.category_id
      WHERE ps.user_id = $1
-     GROUP BY c.difficulty
+       AND ps.difficulty IS NOT NULL
+     GROUP BY ps.difficulty
   `, [userId]);
   const byDiff = {};
   rows.forEach(r => { byDiff[r.difficulty] = { totalWords: r.total_words, correctWords: r.correct_words }; });
@@ -502,11 +511,25 @@ router.post('/sessions', async (req, res) => {
     // saving it just pushed the student over the line into a new level.
     const beforeUnlocked = computeUnlocked(await getLevelTotals(userId));
 
+    // Freeze the category's difficulty onto the session row now, while the
+    // category still (probably) exists — see getLevelTotals for why this
+    // must not be looked up live at read-time. If the category has already
+    // been deleted out from under an in-flight session (category_id sent by
+    // the client no longer resolves), difficulty stays NULL and this
+    // session simply won't count toward any level's totals, which is the
+    // same as today's behaviour for a session with no category at all —
+    // never a crash, never a silent regression of past progress.
+    let difficulty = null;
+    if (category_id) {
+      const cat = await q1(`SELECT difficulty FROM em_categories WHERE id = $1`, [category_id]);
+      difficulty = cat?.difficulty || null;
+    }
+
     // 1. Save session
     await db.query(`
-      INSERT INTO em_practice_sessions (user_id, category_id, category_name, total_words, correct_words, accuracy, duration_secs, pronunciation_score, writing_score)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-    `, [userId, category_id || null, category_name, total_words, correct_words, accuracy, duration_secs || 0, avgPronunciation, avgWriting]);
+      INSERT INTO em_practice_sessions (user_id, category_id, category_name, total_words, correct_words, accuracy, duration_secs, pronunciation_score, writing_score, difficulty)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+    `, [userId, category_id || null, category_name, total_words, correct_words, accuracy, duration_secs || 0, avgPronunciation, avgWriting, difficulty]);
 
     // 2. Update per-word progress
     if (Array.isArray(answers)) {
@@ -612,12 +635,12 @@ router.get('/progress', async (req, res) => {
 
 // GET /api/english-masterclass/level-progress
 // Returns which difficulty tiers are unlocked for the current student.
-// Rules:
-//   Beginner    — always unlocked
-//   Intermediate — unlocked after student completes at least 1 Beginner session
-//                  with accuracy >= 60%
-//   Advanced    — unlocked after student completes at least 1 Intermediate session
-//                  with accuracy >= 60%
+// Rules (see QUESTIONS_PER_LEVEL / LEVEL_UNLOCK_ACCURACY at top of file):
+//   Beginner     — always unlocked
+//   Intermediate — unlocked once the student has answered at least 30
+//                  questions total across any Beginner-difficulty sessions
+//                  (cumulative, any number of sessions) at >= 70% accuracy
+//   Advanced     — same rule, applied to Intermediate-difficulty sessions
 // Also returns per-category best accuracy so the UI can show a mini progress bar.
 router.get('/level-progress', async (req, res) => {
   const userId = req.user.id;
