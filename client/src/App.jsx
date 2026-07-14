@@ -192,6 +192,7 @@ export default function App() {
             and GET /api/schools/me* for how isolation is enforced. */}
         <Route element={<PrivateRoute allowedRoles={["school_admin"]} />}>
           <Route path="/school-admin/dashboard" element={<SchoolAdminDashboard />} />
+          <Route path="/school-admin/settings" element={<SettingsPage />} />
         </Route>
 
         {/* JOIN A SCHOOL — role-agnostic, any teacher or student. Was missing
