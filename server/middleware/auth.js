@@ -47,20 +47,20 @@ const protect = async (req, res, next) => {
     req.user = users[0];
 
     // ── Tenant-school service gating ──────────────────────────────────────
-    // "A student registered with a tenant school should ONLY have access to
-    // what was provided for that school" — enforced live, on every request,
-    // not just at registration. A school admin can toggle enable_em /
-    // enable_aischoolonair at any time (PATCH /schools/:id/services); a
-    // student's access must reflect that immediately, not just what was true
-    // when they signed up.
+    // "A tenant school — its students, teachers, AND school_admin — should
+    // ONLY have access to what was provided for that school at registration
+    // (or subsequently edited by App Admin). No more." Enforced live, on
+    // every request, not just at signup: a school admin can toggle enable_em
+    // / enable_aischoolonair at any time (PATCH /schools/:id/services), and
+    // App Admin can edit a school's service scope after the fact — access
+    // must reflect that immediately, not just what was true at registration.
     //
-    // Zero impact on the overwhelming majority of accounts: school_id is
-    // null for anyone not part of a tenant school, and this whole block is
-    // skipped for non-student roles (teachers/school_admins/admins need full
-    // access to manage or teach within their school regardless of a
-    // temporary content toggle — same scoping decision requireEmRegistration
-    // already makes in englishMasterclassRoutes.js).
-    if (req.user.school_id && req.user.role === 'student') {
+    // Applies to every role tied to a school (student, teacher,
+    // school_admin). Zero impact on accounts outside a tenant: school_id is
+    // null for standalone users, and App Admin (role 'admin') never has a
+    // school_id, so this block is skipped for both — App Admin manages every
+    // school and must never be scoped to one.
+    if (req.user.school_id && ['student', 'teacher', 'school_admin'].includes(req.user.role)) {
       try {
         const schoolRows = await db.query(
           `SELECT is_active, enable_aischoolonair, enable_em FROM schools WHERE id = :id LIMIT 1`,
@@ -82,8 +82,9 @@ const protect = async (req, res, next) => {
         // enable_aischoolonair gates every route EXCEPT the ones below, which
         // have their own more specific gating (EM: enable_em, checked in
         // requireEmRegistration) or must stay reachable regardless of content
-        // toggles (schools: membership/management actions; users: a
-        // student's own profile/account self-service).
+        // toggles (schools: membership/management actions — including a
+        // school_admin managing their own roster/settings; users: a user's
+        // own profile/account self-service).
         const url = req.originalUrl || req.url || '';
         const isExempt =
           url.startsWith('/api/english-masterclass') ||
