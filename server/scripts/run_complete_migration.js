@@ -714,7 +714,28 @@ async function run() {
       updated_at            TIMESTAMPTZ  NOT NULL DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS idx_pt_uid ON payment_transactions(user_id);
-    CREATE INDEX IF NOT EXISTS idx_pt_ref ON payment_transactions(transaction_reference)`],
+    CREATE INDEX IF NOT EXISTS idx_pt_ref ON payment_transactions(transaction_reference);
+    -- BUGFIX (2026-07-13): GET /payments/verify (server/routes/paymentRoutes.js)
+    -- has always written completed_at/subscription_id/payment_method on the
+    -- final "mark transaction successful" UPDATE, and completed_at again on
+    -- the "mark failed" branch — but none of these 3 columns were ever
+    -- actually added to this table, in this file or the original
+    -- migration_002.sql definition. Verified against a live Postgres instance
+    -- built from this exact schema: after a successful Paystack payment, the
+    -- user_subscriptions row IS created and users.subscription_status IS set
+    -- to 'active' correctly (both those statements only touch real columns),
+    -- but the very next statement — marking payment_transactions successful —
+    -- throws "column subscription_id does not exist", which propagates to the
+    -- route's catch block and returns an error to the student. Net effect:
+    -- the student is charged and access is actually granted, but they see a
+    -- failure message. Adding the columns (not stripping them from the
+    -- code) since they're clearly-intended, valuable audit-trail fields, not
+    -- unused/speculative ones. FK to user_subscriptions added separately
+    -- below, after that table exists (it's defined in the next tuple).
+    ALTER TABLE payment_transactions
+      ADD COLUMN IF NOT EXISTS completed_at    TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS payment_method  VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS subscription_id UUID`],
 
     ['user_subscriptions', `CREATE TABLE IF NOT EXISTS user_subscriptions (
       id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -730,6 +751,21 @@ async function run() {
     );
     CREATE INDEX IF NOT EXISTS idx_us_uid ON user_subscriptions(user_id);
     CREATE INDEX IF NOT EXISTS idx_us_status ON user_subscriptions(status)`],
+
+    // FK for payment_transactions.subscription_id — added here (not in the
+    // payment_transactions tuple above) because user_subscriptions must
+    // exist first. See the BUGFIX comment on the payment_transactions
+    // ALTER TABLE above for the full story.
+    ['payment_transactions: subscription_id FK', `
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'payment_transactions_subscription_id_fkey'
+        ) THEN
+          ALTER TABLE payment_transactions
+            ADD CONSTRAINT payment_transactions_subscription_id_fkey
+            FOREIGN KEY (subscription_id) REFERENCES user_subscriptions(id) ON DELETE SET NULL;
+        END IF;
+      EXCEPTION WHEN others THEN NULL; END $$`],
 
     ['resource_assignments', `CREATE TABLE IF NOT EXISTS resource_assignments (
       id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
