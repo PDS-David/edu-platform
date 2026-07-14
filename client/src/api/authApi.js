@@ -1,7 +1,7 @@
 import apiClient from '../services/apiClient';
 
-export const login = async (email, password, rememberMe = false) => {
-  const res = await apiClient.post('/auth/login', { email, password, rememberMe });
+export const login = async (email, password, rememberMe = false, portal = 'aischoolonair') => {
+  const res = await apiClient.post('/auth/login', { email, password, rememberMe, portal });
   return res.data ?? res;
 };
 

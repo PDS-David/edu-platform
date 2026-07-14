@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Eye, EyeOff, AlertCircle } from 'lucide-react';
 import PublicNav from '../components/PublicNav';
@@ -10,23 +10,50 @@ const LoginPage = () => {
   const [password,    setPassword]    = useState('');
   const [showPass,    setShowPass]    = useState(false);
   const [error,       setError]       = useState('');
+  const [closedDoor,  setClosedDoor]  = useState(null); // { message, otherServiceEnabled }
   const [loading,     setLoading]     = useState(false);
   const [rememberMe,   setRememberMe]   = useState(false);
 
   const { login }  = useAuth();
   const navigate   = useNavigate();
+  const location   = useLocation();
+
+  // PrivateRoute redirects here (rather than rendering the dashboard) when
+  // an already-authenticated tenant user's school doesn't have AISchoolonair
+  // enabled — e.g. they followed a bookmarked link straight to a dashboard
+  // page. Surface the same closed-door messaging immediately, without
+  // making them submit the form again.
+  useEffect(() => {
+    const reason = location.state?.closedDoor;
+    if (reason?.service === 'aischoolonair') {
+      setClosedDoor({
+        message: 'Your school has not been registered for AISchoolonair. Contact your school admin or App Admin.',
+        otherServiceEnabled: !!reason.otherServiceEnabled,
+      });
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setClosedDoor(null);
     setLoading(true);
     try {
-      const user = await login(email, password, rememberMe);
+      const user = await login(email, password, rememberMe, 'aischoolonair');
       navigate(getPostAuthRedirect(user));
     } catch (err) {
-      // Defensively extract string — err.error may be an object if server sends {error: {message:...}}
-      const raw = err?.message ?? '';
-      setError(typeof raw === 'string' ? raw : (raw?.message || 'Invalid email or password'));
+      const code = err?.raw?.response?.data?.code;
+      if (code === 'SERVICE_NOT_ENABLED_FOR_SCHOOL') {
+        setClosedDoor({
+          message: err?.raw?.response?.data?.error || 'Your school has not been registered for AISchoolonair.',
+          otherServiceEnabled: !!err?.raw?.response?.data?.other_service_enabled,
+        });
+      } else {
+        // Defensively extract string — err.error may be an object if server sends {error: {message:...}}
+        const raw = err?.message ?? '';
+        setError(typeof raw === 'string' ? raw : (raw?.message || 'Invalid email or password'));
+      }
     } finally {
       setLoading(false);
     }
@@ -118,6 +145,29 @@ const LoginPage = () => {
                 <div className="mb-5 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
                   <p className="text-sm text-red-600">{error}</p>
+                </div>
+              )}
+
+              {/* Closed door: credentials were correct, but this school
+                  hasn't been granted access to AISchoolonair. Distinct from
+                  a plain login error — this isn't "try again", it's "this
+                  isn't for you", so it gets its own explanation and, if
+                  relevant, a way to the door that IS open for them. */}
+              {closedDoor && (
+                <div className="mb-5 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-semibold text-amber-800 mb-0.5">Access not available</p>
+                      <p className="text-sm text-amber-700">{closedDoor.message}</p>
+                    </div>
+                  </div>
+                  {closedDoor.otherServiceEnabled && (
+                    <p className="text-sm text-amber-700 mt-2 ml-6">
+                      Your school does have English Masterclass — try{' '}
+                      <Link to="/em/login" className="font-semibold underline">signing in there</Link> instead.
+                    </p>
+                  )}
                 </div>
               )}
 

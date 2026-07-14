@@ -2,7 +2,12 @@
 // Auth guard for the /em/* route group.
 // Unauthenticated users go to /em/login (not /login).
 // All authenticated roles are permitted — EM is open to students,
-// teachers and admins (the content is role-agnostic vocabulary training).
+// teachers and admins (the content is role-agnostic vocabulary training) —
+// EXCEPT a tenant-school account whose school was never granted English
+// Masterclass. That's not a "wait for the API to 403" situation; it's a
+// closed door, so it's caught here, before any /em/* page or API call ever
+// fires, and sent back through /em/login where the same closed-door
+// messaging as a fresh login attempt applies.
 
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -22,6 +27,21 @@ export default function EMPrivateRoute() {
   if (!user) {
     // Preserve the intended destination so we can restore it after login if needed
     return <Navigate to="/em/login" state={{ from: location }} replace />;
+  }
+
+  // Tenant boundary: a student/teacher/school_admin whose school hasn't
+  // been granted English Masterclass gets sent back to /em/login, which
+  // will re-derive and display the same closed-door message a fresh login
+  // attempt would show (user.school is only present for tenant accounts —
+  // standalone users and App Admin are unaffected).
+  if (user.school && !user.school.enable_em) {
+    return (
+      <Navigate
+        to="/em/login"
+        state={{ closedDoor: { service: 'em', otherServiceEnabled: !!user.school.enable_aischoolonair } }}
+        replace
+      />
+    );
   }
 
   // AISchoolOnAir login alone doesn't grant EM access — students must also

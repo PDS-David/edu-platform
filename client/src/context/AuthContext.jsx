@@ -38,8 +38,11 @@ export default function AuthProvider({ children }) {
   }, []);
 
   // AUTH-003: rememberMe drives token lifetime on the server
-  const login = async (email, password, rememberMe = false) => {
-    const res = await authApi.login(email, password, rememberMe);
+  // portal tells the server which login surface this is ('aischoolonair' or
+  // 'em') so it can enforce the tenant-school "closed door" check for the
+  // right service — see server/controllers/auth.js.
+  const login = async (email, password, rememberMe = false, portal = 'aischoolonair') => {
+    const res = await authApi.login(email, password, rememberMe, portal);
     if (res.token) setToken(res.token, rememberMe);
     setUser(res.user);
     return res.user;

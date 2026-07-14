@@ -13,8 +13,8 @@
 //
 // Business logic / API calls / auth: UNTOUCHED.
 
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { SOVEREIGN, CRIMSON } from './constants';
@@ -25,18 +25,39 @@ export default function EMLoginPage() {
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [error,    setError]    = useState('');
+  const [closedDoor, setClosedDoor] = useState(null); // { message, otherServiceEnabled }
   const [loading,  setLoading]  = useState(false);
 
   const { login }  = useAuth();
   const navigate   = useNavigate();
+  const location   = useLocation();
 
-  // ── Unchanged login logic ─────────────────────────────────────────────────
+  // EMPrivateRoute redirects here (rather than rendering a bare login form)
+  // when an already-authenticated tenant user's school doesn't have EM
+  // enabled — e.g. they followed a link straight to /em/dashboard. Surface
+  // the same closed-door messaging immediately, without making them submit
+  // the form again.
+  useEffect(() => {
+    const reason = location.state?.closedDoor;
+    if (reason?.service === 'em') {
+      setClosedDoor({
+        message: 'Your school has not been registered for English Masterclass. Contact your school admin or App Admin.',
+        otherServiceEnabled: !!reason.otherServiceEnabled,
+      });
+      // Clear the state so a manual refresh of /em/login doesn't keep
+      // re-showing this after the user has moved past it (e.g. logged out
+      // and logged into a different account in the same tab).
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setClosedDoor(null);
     setLoading(true);
     try {
-      const user = await login(email, password, false);
+      const user = await login(email, password, false, 'em');
       // AISchoolOnAir login succeeding is not enough — English Masterclass
       // requires its own one-time registration step on top of that account.
       if (user?.role === 'student' && !user?.em_registered_at) {
@@ -45,8 +66,16 @@ export default function EMLoginPage() {
         navigate('/em/dashboard', { replace: true });
       }
     } catch (err) {
-      const raw = err?.message ?? '';
-      setError(typeof raw === 'string' ? raw : (raw?.message || 'Invalid email or password'));
+      const code = err?.raw?.response?.data?.code;
+      if (code === 'SERVICE_NOT_ENABLED_FOR_SCHOOL') {
+        setClosedDoor({
+          message: err?.raw?.response?.data?.error || 'Your school has not been registered for English Masterclass.',
+          otherServiceEnabled: !!err?.raw?.response?.data?.other_service_enabled,
+        });
+      } else {
+        const raw = err?.message ?? '';
+        setError(typeof raw === 'string' ? raw : (raw?.message || 'Invalid email or password'));
+      }
     } finally {
       setLoading(false);
     }
@@ -219,6 +248,30 @@ export default function EMLoginPage() {
                 >
                   <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" aria-hidden="true" />
                   <p className="text-sm text-red-700">{error}</p>
+                </div>
+              )}
+
+              {/* Closed door: credentials were correct, but this school
+                  hasn't been granted access to English Masterclass. */}
+              {closedDoor && (
+                <div
+                  className="mb-5 p-4 rounded-xl border"
+                  role="alert"
+                  style={{ background: '#FEF3C7', borderColor: '#FDE68A' }}
+                >
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" aria-hidden="true" />
+                    <div>
+                      <p className="text-sm font-semibold text-amber-800 mb-0.5">Access not available</p>
+                      <p className="text-sm text-amber-700">{closedDoor.message}</p>
+                    </div>
+                  </div>
+                  {closedDoor.otherServiceEnabled && (
+                    <p className="text-sm text-amber-700 mt-2 ml-6">
+                      Your school does have AISchoolonair — try{' '}
+                      <Link to="/login" className="font-semibold underline">signing in there</Link> instead.
+                    </p>
+                  )}
                 </div>
               )}
 
