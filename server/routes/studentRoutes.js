@@ -308,7 +308,7 @@ router.get('/test/:testId', protect, studentOnly, async (req, res) => {
     }
 
     const tests = await sequelize.query(
-      `SELECT ct.id, ct.title, ct.duration_minutes, ct.total_marks,
+      `SELECT ct.id, ct.title, ct.duration_minutes AS time_limit_minutes, ct.total_marks,
               u.first_name || ' ' || u.last_name AS teacher_name
        FROM custom_tests ct
        JOIN users u ON u.id = ct.teacher_id

@@ -18,6 +18,7 @@ import TopNav from '../components/TopNav';
 const EXAM_BOARDS = [
   { code: 'JAMB',    name: ' JAMB/UTME' },
   { code: 'WAEC',    name: ' WAEC' },
+  { code: 'BECE',    name: ' BECE (Junior WAEC)' },
   { code: 'OLEVEL',  name: ' O-Levels' },
   { code: 'NECO',    name: ' NECO' },
   { code: 'IELTS',   name: ' IELTS' },

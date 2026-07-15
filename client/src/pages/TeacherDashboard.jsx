@@ -691,6 +691,24 @@ function TestBuilderTab() {
     finally { setPublishing(null); }
   };
 
+  const [confirmCancel, setConfirmCancel] = useState(null); // test object pending cancel confirmation
+  const [cancelling,    setCancelling]    = useState(null);
+
+  const unpublishTest = async () => {
+    if (!confirmCancel) return;
+    setCancelling(confirmCancel.id);
+    try {
+      await api.put(`/teacher/tests/${confirmCancel.id}/unpublish`);
+      showToast('Test cancelled.');
+      setConfirmCancel(null);
+      load();
+    } catch (err) {
+      showToast(err?.message || 'Failed to cancel test.', 'error');
+    } finally {
+      setCancelling(null);
+    }
+  };
+
   const [confirmDel, setConfirmDel] = useState(null);
   const [deleting,   setDeleting]   = useState(null);
   const [editingTest, setEditingTest] = useState(null);  // test object being edited
@@ -850,6 +868,13 @@ function TestBuilderTab() {
                       {publishing === t.id ? <Loader2 size={12} className="animate-spin" /> : 'Publish'}
                     </button>
                   )}
+                  {t.is_published && (
+                    <button onClick={() => setConfirmCancel(t)} disabled={cancelling === t.id}
+                      title="Unpublish this test — students will no longer be able to open or resume it"
+                      className="text-xs px-3 py-1.5 bg-amber-50 text-amber-600 hover:bg-amber-100 font-semibold rounded-lg border border-amber-200 disabled:opacity-40">
+                      {cancelling === t.id ? <Loader2 size={12} className="animate-spin" /> : 'Cancel'}
+                    </button>
+                  )}
                   {/* D3: edit button — pencil icon opens inline edit form */}
                   <button onClick={() => editingTest === t.id ? setEditingTest(null) : startEdit(t)}
                     title="Edit test"
@@ -1001,6 +1026,34 @@ function TestBuilderTab() {
                 className="px-4 py-2 text-sm font-semibold text-white bg-red-500 hover:bg-red-600 rounded-xl disabled:opacity-40 flex items-center gap-2">
                 {deleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
                 Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Cancel (unpublish) confirmation dialog ─────────────────────── */}
+      {confirmCancel && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
+            <h3 className="font-bold text-gray-900 mb-1">Cancel test?</h3>
+            <p className="text-sm text-gray-500 mb-1">
+              <span className="font-semibold text-gray-800">"{confirmCancel.title}"</span> will be taken down —
+              any student who hasn't finished it yet will no longer be able to open or resume it.
+            </p>
+            <p className="text-xs text-gray-400 mb-5">Answers already submitted are kept, and you can republish this test later.</p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setConfirmCancel(null)}
+                className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 border border-gray-200 rounded-xl">
+                Keep it live
+              </button>
+              <button
+                onClick={unpublishTest}
+                disabled={!!cancelling}
+                className="px-4 py-2 text-sm font-semibold text-white bg-amber-500 hover:bg-amber-600 rounded-xl disabled:opacity-40 flex items-center gap-2">
+                {cancelling ? <Loader2 size={13} className="animate-spin" /> : null}
+                Cancel test
               </button>
             </div>
           </div>

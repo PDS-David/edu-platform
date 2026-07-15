@@ -212,10 +212,35 @@ router.get('/:id/download', protect, async (req, res) => {
 
     const { file_url, title } = rows[0];
 
-    // If stored on R2 (or any https URL), redirect directly — the browser
-    // follows the redirect and the Content-Disposition header on the file
-    // makes it a save-as download.
+    // If stored on R2 (or any https URL), stream it through the server with
+    // an explicit attachment header — a 302 redirect straight to R2 does NOT
+    // work here: uploadBuffer() stores every object with
+    // ContentDisposition: 'inline', and a Content-Disposition header set on
+    // a redirect response is discarded by the browser when it follows the
+    // redirect (the header only applies to the response it's attached to,
+    // not to whatever the Location points at). The browser was opening the
+    // PDF inline instead of downloading it — this is the actual fix for
+    // "students can preview but can't download."
     if (/^https?:\/\//i.test(file_url)) {
+      const key = r2.keyFromUrl(file_url);
+      if (key) {
+        try {
+          const obj = await r2.getObjectByKey(key);
+          res.setHeader('Content-Type', obj.contentType || 'application/pdf');
+          res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(title || 'paper')}.pdf"`);
+          if (obj.contentLength) res.setHeader('Content-Length', obj.contentLength);
+          obj.body.on('error', (streamErr) => {
+            logger.error('[GET /api/past-papers/:id/download] R2 stream error:', streamErr.message);
+            if (!res.headersSent) res.status(500).end();
+            else res.end();
+          });
+          return obj.body.pipe(res);
+        } catch (err) {
+          logger.error('[GET /api/past-papers/:id/download] R2 fetch failed, falling back to redirect:', err.message);
+          // fall through to the redirect below as a last resort
+        }
+      }
+      // Not one of our own R2 keys (or the R2 fetch failed) — best-effort redirect.
       res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(title || 'paper')}.pdf"`);
       return res.redirect(302, file_url);
     }
