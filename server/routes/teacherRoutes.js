@@ -781,6 +781,29 @@ router.put('/tests/:id/publish', protect, teacherOnly, async (req, res) => {
   }
 });
 
+// ── PUT /api/teacher/tests/:id/unpublish ──────────────────────────────────────
+// The other half of publish — this never existed before, so a teacher had no
+// way to cancel a live test once published: no button on the dashboard called
+// it, and the DELETE /tests/:id route below even referenced "unpublish it
+// first" in its own error message despite there being no endpoint to do that.
+// Setting is_published back to false immediately hides the test from
+// GET /api/students/test/:testId (which filters WHERE is_published = true),
+// so already-assigned students can no longer open or resume it. It does not
+// delete test_assignments or any answers already submitted — a teacher can
+// re-publish the same test later without having to reassign it, and nothing
+// a student already turned in is lost.
+router.put('/tests/:id/unpublish', protect, teacherOnly, async (req, res) => {
+  try {
+    await sequelize.query(
+      `UPDATE custom_tests SET is_published = false WHERE id = :id AND teacher_id = :teacherId`,
+      { replacements: { id: req.params.id, teacherId: req.user.id }, type: QueryTypes.UPDATE }
+    );
+    return res.json({ success: true, message: 'Test cancelled.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ── POST /api/teacher/tests/:id/assign ───────────────────────────────────────
 // Assigns a test to a class OR individual students (D4: individual support added).
 // Body: { class_id: UUID } — assigns all members of a class

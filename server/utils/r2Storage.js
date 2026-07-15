@@ -108,26 +108,31 @@ async function getObjectByKey(key) {
   };
 }
 
+function keyFromUrl(fileUrl) {
+  if (!fileUrl) return null;
+  const base = (process.env.R2_PUBLIC_BASE_URL || '').replace(/\/+$/, '');
+  if (base && fileUrl.startsWith(base + '/')) {
+    return fileUrl.slice(base.length + 1);
+  }
+  if (fileUrl.startsWith('/api/resources/r2/')) {
+    try {
+      return decodeURIComponent(fileUrl.slice('/api/resources/r2/'.length));
+    } catch {
+      return fileUrl.slice('/api/resources/r2/'.length);
+    }
+  }
+  if (/^https?:\/\/.+\/resources\//.test(fileUrl)) {
+    const m = fileUrl.match(/\/(resources\/[^?#]+)/);
+    if (m) return m[1];
+  }
+  return null;
+}
+
 async function deleteByUrl(fileUrl) {
   if (!isR2Enabled() || !fileUrl) return false;
   _S3 = _S3 || require('@aws-sdk/client-s3');
 
-  const base = (process.env.R2_PUBLIC_BASE_URL || '').replace(/\/+$/, '');
-  let key = null;
-  if (base && fileUrl.startsWith(base + '/')) {
-    key = fileUrl.slice(base.length + 1);
-  } else if (fileUrl.startsWith('/api/resources/r2/')) {
-    try {
-      key = decodeURIComponent(fileUrl.slice('/api/resources/r2/'.length));
-    } catch {
-      key = fileUrl.slice('/api/resources/r2/'.length);
-    }
-  } else if (/^https?:\/\/.+\/resources\//.test(fileUrl)) {
-    // Best-effort: take everything after the last "resources/"
-    const m = fileUrl.match(/\/(resources\/[^?#]+)/);
-    if (m) key = m[1];
-  }
-
+  const key = keyFromUrl(fileUrl);
   if (!key) return false;
 
   try {
@@ -156,4 +161,4 @@ async function getSignedDownloadUrl(key, expiresIn = 60) {
   return getSignedUrl(getClient(), command, { expiresIn });
 }
 
-module.exports = { isR2Enabled, uploadBuffer, getObjectByKey, deleteByUrl, getSignedDownloadUrl };
+module.exports = { isR2Enabled, uploadBuffer, getObjectByKey, deleteByUrl, getSignedDownloadUrl, keyFromUrl };
