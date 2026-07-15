@@ -17,7 +17,7 @@ import { useState, useRef } from 'react';
 import api from '../services/apiClient';
 import { Upload, FileText, X, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
 
-const EXAM_BOARDS = ['JAMB', 'WAEC', 'NECO', 'GCE_OL', 'GCE_AL', 'IELTS', 'TOEFL', 'SAT', 'JUPEB'];
+const EXAM_BOARDS = ['JAMB', 'WAEC', 'NECO', 'BECE', 'GCE_OL', 'GCE_AL', 'IELTS', 'TOEFL', 'SAT', 'JUPEB'];
 const PAPER_TYPES = ['Objective', 'Theory', 'Practical', 'Listening', 'Speaking'];
 
 export default function UploadPastPaperForm({ subjects = [], onUploaded, showToast }) {
