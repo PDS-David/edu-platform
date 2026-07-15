@@ -311,43 +311,56 @@ Total length: under 300 words. Plain text only — no markdown, no headers with 
 
 router.post('/mark-image', protect, (req, res) => {
   imageUpload(req, res, async (uploadErr) => {
-    // ── Multer error (wrong type, too large, etc.)
-    if (uploadErr) {
-      console.error('[POST /ai/mark-image] Multer error:', uploadErr.message);
-      return res.status(400).json({
-        success: false,
-        error: uploadErr.code === 'LIMIT_FILE_SIZE'
-          ? 'Image must be under 10 MB.'
-          : 'Invalid image file. Please upload a JPEG, PNG, WEBP or HEIC image.',
-      });
-    }
-
-    if (!req.file) {
-      return res.status(400).json({ success: false, error: 'No image uploaded. Send as multipart/form-data with field name "image".' });
-    }
-
-    const questionText = (req.body.question_text || '').trim();
-    const subject      = (req.body.subject       || 'General').trim();
-    const examBoard    = (req.body.exam_board     || 'WAEC').trim();
-    const totalMarks   = Math.min(Math.max(parseInt(req.body.total_marks) || 10, 1), 100);
-    const markScheme   = (req.body.mark_scheme    || '').trim() || null;
-
-    if (!questionText) {
-      return res.status(400).json({ success: false, error: 'question_text is required.' });
-    }
-
-    if (!process.env.GEMINI_API_KEY) {
-      console.error('[POST /ai/mark-image] GEMINI_API_KEY not set');
-      return res.status(503).json({ success: false, error: 'AI marking is not configured.' });
-    }
-
-    // Convert binary buffer → base64 (strip any existing data-URI prefix)
-    const imageBase64 = req.file.buffer.toString('base64');
-    const mimeType    = req.file.mimetype || 'image/jpeg';
-
-    console.log(`[POST /ai/mark-image] user=${req.user?.id} subject=${subject} board=${examBoard} marks=${totalMarks} size=${req.file.size}B mime=${mimeType}`);
-
+    // BUG FIX (AI marking showing generic "Server error"): everything below
+    // used to run outside any try/catch until the Gemini call itself further
+    // down. Anything that threw in between — a malformed req.body from an
+    // edge-case multipart payload, a corrupt file buffer, etc. — became an
+    // unhandled rejection that never reached this route's own error handling
+    // at all. It fell through to server.js's global fallback instead, which
+    // deliberately shows just the generic "Server error" (masking details is
+    // correct there, for anything truly unexpected) — but that meant a wide
+    // range of legitimate, specific failures in this one endpoint all looked
+    // identical and gave the student no useful signal. Wrapping the entire
+    // callback, not just the AI call, closes that gap for good — every
+    // failure path in this handler now returns a specific, actionable
+    // message instead of ever reaching the generic fallback.
     try {
+      // ── Multer error (wrong type, too large, etc.)
+      if (uploadErr) {
+        console.error('[POST /ai/mark-image] Multer error:', uploadErr.message);
+        return res.status(400).json({
+          success: false,
+          error: uploadErr.code === 'LIMIT_FILE_SIZE'
+            ? 'Image must be under 10 MB.'
+            : 'Invalid image file. Please upload a JPEG, PNG, WEBP or HEIC image.',
+        });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ success: false, error: 'No image uploaded. Send as multipart/form-data with field name "image".' });
+      }
+
+      const questionText = (req.body.question_text || '').trim();
+      const subject      = (req.body.subject       || 'General').trim();
+      const examBoard    = (req.body.exam_board     || 'WAEC').trim();
+      const totalMarks   = Math.min(Math.max(parseInt(req.body.total_marks) || 10, 1), 100);
+      const markScheme   = (req.body.mark_scheme    || '').trim() || null;
+
+      if (!questionText) {
+        return res.status(400).json({ success: false, error: 'question_text is required.' });
+      }
+
+      if (!process.env.GEMINI_API_KEY) {
+        console.error('[POST /ai/mark-image] GEMINI_API_KEY not set');
+        return res.status(503).json({ success: false, error: 'AI marking is not configured.' });
+      }
+
+      // Convert binary buffer → base64 (strip any existing data-URI prefix)
+      const imageBase64 = req.file.buffer.toString('base64');
+      const mimeType    = req.file.mimetype || 'image/jpeg';
+
+      console.log(`[POST /ai/mark-image] user=${req.user?.id} subject=${subject} board=${examBoard} marks=${totalMarks} size=${req.file.size}B mime=${mimeType}`);
+
       const marking = await markImage({
         imageBase64,
         mimeType,
@@ -385,7 +398,7 @@ router.post('/mark-image', protect, (req, res) => {
       return res.json({ success: true, data: payload });
 
     } catch (err) {
-      console.error('[POST /ai/mark-image] Gemini error:', err.message);
+      console.error('[POST /ai/mark-image] error:', err.message);
       const status = err.statusCode === 503 ? 503 : 500;
       return res.status(status).json({
         success: false,
