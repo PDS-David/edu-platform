@@ -7,7 +7,7 @@ import { Link } from 'react-router-dom';
 import api from '../services/apiClient';
 import TopNav from '../components/TopNav';
 import {
-  CheckCircle, Loader2, BookOpen, Plus, Clock, XCircle,
+  CheckCircle, Loader2, BookOpen, Plus, Clock, XCircle, Trash2,
 } from 'lucide-react';
 
 const STATUS_META = {
@@ -45,6 +45,7 @@ export default function TeacherPendingQuestions() {
   const [questions, setQuestions] = useState([]);
   const [loading,   setLoading]   = useState(true);
   const [tab,       setTab]       = useState('all');
+  const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => {
     // T2: fetch ALL questions (no status filter) so teacher can see every outcome
@@ -53,6 +54,19 @@ export default function TeacherPendingQuestions() {
       .catch(() => setQuestions([]))
       .finally(() => setLoading(false));
   }, []);
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Remove this question from your bank? It stays intact on any test it's already attached to — this only stops it from being picked for new tests.")) return;
+    setDeletingId(id);
+    try {
+      await api.delete(`/teacher/questions/${id}`);
+      setQuestions(prev => prev.filter(q => q.id !== id));
+    } catch (err) {
+      alert(err?.message || 'Failed to delete question.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const counts = useMemo(() => {
     const c = { all: questions.length, pending: 0, approved: 0, rejected: 0 };
@@ -195,6 +209,17 @@ export default function TeacherPendingQuestions() {
                       </div>
                     </div>
                   )}
+
+                  <div className="px-5 py-2.5 border-t border-gray-50 flex justify-end">
+                    <button
+                      onClick={() => handleDelete(q.id)}
+                      disabled={deletingId === q.id}
+                      className="flex items-center gap-1.5 text-xs font-medium text-gray-400 hover:text-red-500 disabled:opacity-40 transition-colors"
+                    >
+                      {deletingId === q.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                      Delete
+                    </button>
+                  </div>
                 </div>
               );
             })}

@@ -915,6 +915,40 @@ function QuestionsTab({ showToast }) {
     ],
   });
 
+  // Question bank list — this tab could previously only add questions, with
+  // no way to see or delete any of them (same gap as TeacherAddQuestionPage.jsx,
+  // which is a completely separate component/route — fixing that one didn't
+  // touch this one, since a teacher can reach question submission from either
+  // this Resources > Add Question tab or the standalone /teacher/questions/add
+  // page).
+  const [bank,       setBank]       = useState([]);
+  const [bankLoading, setBankLoading] = useState(true);
+  const [deletingId,  setDeletingId]  = useState(null);
+
+  const loadBank = useCallback(() => {
+    setBankLoading(true);
+    api.get('/teacher/questions')
+      .then(r => setBank(extractList(r)))
+      .catch(() => setBank([]))
+      .finally(() => setBankLoading(false));
+  }, []);
+
+  useEffect(() => { loadBank(); }, [loadBank]);
+
+  const handleDeleteQuestion = async (id) => {
+    if (!window.confirm("Remove this question from your bank? It stays intact on any test it's already attached to — this only stops it from being picked for new tests.")) return;
+    setDeletingId(id);
+    try {
+      await api.delete(`/teacher/questions/${id}`);
+      setBank(prev => prev.filter(q => q.id !== id));
+      showToast('Question removed from your bank.');
+    } catch (err) {
+      showToast(err?.message || 'Failed to delete question.', 'error');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   // Load assigned subjects
   useEffect(() => {
     api.get('/teacher/my-subjects')
@@ -986,6 +1020,7 @@ function QuestionsTab({ showToast }) {
           { text: '', is_correct: false },
         ],
       }));
+      loadBank();
     } catch (err) {
       showToast(err?.message || 'Failed to submit question.', 'error');
     } finally {
@@ -1139,6 +1174,47 @@ function QuestionsTab({ showToast }) {
           ? <><Loader2 size={15} className="animate-spin" /> Submitting…</>
           : <><Plus size={15} /> Submit Question</>}
       </button>
+
+      {/* Question Bank — list existing questions with a way to delete them.
+          Previously this tab could only ever add questions; there was no
+          listing and no delete affordance here (or anywhere else in the app
+          before the standalone Add Question page was fixed separately). */}
+      <div className="pt-2">
+        <h3 className="text-sm font-bold text-gray-700 mb-3">Your Question Bank {!bankLoading && `(${bank.length})`}</h3>
+        {bankLoading ? (
+          <div className="flex justify-center py-8"><Loader2 size={18} className="animate-spin text-blue-300" /></div>
+        ) : bank.length === 0 ? (
+          <p className="text-sm text-gray-400 py-4">No questions yet — anything you submit above will show up here.</p>
+        ) : (
+          <div className="space-y-2">
+            {bank.map(q => (
+              <div key={q.id} className="flex items-start gap-3 bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-gray-800 line-clamp-2">{q.question_text}</p>
+                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                    {q.subject_name && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">{q.subject_name}</span>
+                    )}
+                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full capitalize ${
+                      q.difficulty === 'easy'   ? 'bg-green-50 text-green-600'
+                      : q.difficulty === 'hard' ? 'bg-red-50 text-red-600'
+                      :                            'bg-amber-50 text-amber-600'
+                    }`}>{q.difficulty}</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleDeleteQuestion(q.id)}
+                  disabled={deletingId === q.id}
+                  title="Remove from question bank"
+                  className="shrink-0 text-gray-300 hover:text-red-500 disabled:opacity-40 mt-1"
+                >
+                  {deletingId === q.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
