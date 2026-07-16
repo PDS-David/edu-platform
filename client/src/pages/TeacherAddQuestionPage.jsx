@@ -56,6 +56,37 @@ export default function TeacherAddQuestionPage() {
   const [success,    setSuccess]    = useState(false);
   const [error,      setError]      = useState("");
 
+  // Question bank list — there was previously no way to see or delete a
+  // question once submitted, only add new ones.
+  const [bank,        setBank]        = useState([]);
+  const [bankLoading,  setBankLoading]  = useState(true);
+  const [deletingId,   setDeletingId]   = useState(null);
+  const [bankError,    setBankError]    = useState("");
+
+  const loadBank = useCallback(() => {
+    setBankLoading(true);
+    api.get("/teacher/questions")
+      .then(r => setBank(r.data || []))
+      .catch(() => setBank([]))
+      .finally(() => setBankLoading(false));
+  }, []);
+
+  useEffect(() => { loadBank(); }, [loadBank]);
+
+  const handleDeleteQuestion = async (id) => {
+    if (!window.confirm("Remove this question from your bank? It stays intact on any test it's already attached to — this only stops it from being picked for new tests.")) return;
+    setDeletingId(id);
+    setBankError("");
+    try {
+      await api.delete(`/teacher/questions/${id}`);
+      setBank(prev => prev.filter(q => q.id !== id));
+    } catch (err) {
+      setBankError(err.message || "Failed to delete question.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   // Load subjects on mount
   useEffect(() => {
     api.get("/teacher/my-subjects")
@@ -206,6 +237,7 @@ export default function TeacherAddQuestionPage() {
       setDifficulty("medium"); setExplanation("");
       setSubjectId(""); setTopicId(""); setSubtopicId("");
       setTimeout(() => setSuccess(false), 4000);
+      loadBank();
     } catch (err) {
       setError(err.message || "Failed to submit question.");
     } finally {
@@ -519,6 +551,56 @@ export default function TeacherAddQuestionPage() {
           </button>
 
         </form>
+
+        {/* Question Bank — list existing questions with a way to delete them.
+            Previously this page could only ever add questions; there was no
+            listing and no delete affordance anywhere in the app. */}
+        <div className="mt-8">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-bold text-gray-700">Your Question Bank {!bankLoading && `(${bank.length})`}</h2>
+          </div>
+
+          {bankError && (
+            <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-2.5 mb-3 text-sm">
+              <AlertCircle size={16} /> {bankError}
+            </div>
+          )}
+
+          {bankLoading ? (
+            <div className="flex justify-center py-8"><Loader2 size={18} className="animate-spin text-indigo-300" /></div>
+          ) : bank.length === 0 ? (
+            <p className="text-sm text-gray-400 py-4">No questions yet — anything you add above will show up here.</p>
+          ) : (
+            <div className="space-y-2">
+              {bank.map(q => (
+                <div key={q.id} className="flex items-start gap-3 bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-800 line-clamp-2">{q.question_text}</p>
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                      {q.subject_name && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600">{q.subject_name}</span>
+                      )}
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full capitalize ${
+                        q.difficulty === 'easy'   ? 'bg-green-50 text-green-600'
+                        : q.difficulty === 'hard' ? 'bg-red-50 text-red-600'
+                        :                            'bg-amber-50 text-amber-600'
+                      }`}>{q.difficulty}</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteQuestion(q.id)}
+                    disabled={deletingId === q.id}
+                    title="Remove from question bank"
+                    className="shrink-0 text-gray-300 hover:text-red-500 disabled:opacity-40 mt-1"
+                  >
+                    {deletingId === q.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
     </>
