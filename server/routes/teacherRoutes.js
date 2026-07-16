@@ -1210,5 +1210,34 @@ router.post('/questions', protect, teacherOnly, async (req, res) => {
   }
 });
 
+// ── DELETE /api/teacher/questions/:id ─────────────────────────────────────────
+// There was previously no way to remove a question from the bank at all —
+// only GET (list) and POST (create) existed. Soft-deletes via is_active =
+// false rather than a hard DELETE, matching the WHERE q.is_active = true
+// filter GET /questions above already relies on (and that GET /questions/random
+// in questionsRoutes.js also uses when serving students). This is
+// deliberately non-destructive: GET /tests/:id/questions joins test_questions
+// straight to questions with no is_active filter, so a question that's
+// already attached to a test (published or draft) keeps appearing there and
+// keeps working for any student mid-test — this only removes it from
+// showing up as available for *new* tests going forward.
+router.delete('/questions/:id', protect, teacherOnly, async (req, res) => {
+  try {
+    const result = await sequelize.query(
+      `UPDATE questions SET is_active = false, updated_at = NOW()
+       WHERE id = :id AND submitted_by = :teacherId AND is_active = true
+       RETURNING id`,
+      { replacements: { id: req.params.id, teacherId: req.user.id }, type: QueryTypes.SELECT }
+    );
+    if (!result.length) {
+      return res.status(404).json({ success: false, error: 'Question not found, already removed, or not yours to delete.' });
+    }
+    return res.json({ success: true, message: 'Question removed from your bank.' });
+  } catch (err) {
+    console.error('[DELETE /teacher/questions/:id]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ── GET /api/teacher/students ─────────────────────────────────────────────────
 module.exports = router;

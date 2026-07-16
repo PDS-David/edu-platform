@@ -807,7 +807,7 @@ function TestBuilderTab() {
         <p className="text-xs font-mono text-violet-500 uppercase tracking-widest">What is Test Builder?</p>
         <p className="text-sm text-gray-700">Create custom assessments from your subject's question bank. Set duration and marks, then push to a class or individual student.</p>
         <div className="flex gap-2 mt-2 flex-wrap">
-          <button onClick={() => navigate('/teacher/content')}
+          <button onClick={() => setShowCreate(true)}
             className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">
             <PenTool size={12} /> Open Full Test Builder
           </button>

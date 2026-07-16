@@ -25,6 +25,20 @@ const { GoogleGenAI }        = require('@google/genai');
 const { markImage }          = require('../services/aiService');
 
 // multer: memory storage for AI image uploads (no disk write needed)
+//
+// BUG FIX (AI marking always showing generic "Server error"): multer(options)
+// returns a Multer *instance* (an object with .single()/.array()/etc. methods)
+// — it is not itself a callable (req, res, next) middleware function. The
+// route below calls `imageUpload(req, res, callback)` directly, which
+// requires imageUpload to already BE that middleware. Without .single('image')
+// here, that call threw "imageUpload is not a function" synchronously, on
+// every single request, before the route handler's own try/catch (added in
+// an earlier fix, see the comment on POST /mark-image below) ever ran —
+// Express's default handling of a synchronous throw inside a route handler
+// forwards straight to server.js's generic app.use((err,...)) fallback,
+// which deliberately shows just "Server error" for anything unhandled. That
+// earlier fix was correct as far as it went; this was the actual reason it
+// never took effect.
 const imageUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
@@ -35,7 +49,7 @@ const imageUpload = multer({
     }
     cb(null, true);
   },
-});
+}).single('image');
 
 // ── Grade calculator (WAEC A1–F9 scale) ──────────────────────────────────────
 function calcGrade(pct) {
