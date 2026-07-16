@@ -14,6 +14,7 @@ import useAuth from '../hooks/useAuth';
 import { FileText, Download, Filter, Loader2, BookOpen, Lock } from 'lucide-react';
 import PublicNav from '../components/PublicNav';
 import TopNav from '../components/TopNav';
+import { downloadPastPaper } from '../utils/authenticatedDownload';
 
 const EXAM_BOARDS = [
   { code: 'JAMB',    name: ' JAMB/UTME' },
@@ -51,6 +52,7 @@ export default function PastPapersPage() {
   const [yearTo,    setYearTo]    = useState(YEAR_MAX);
 
   const [examTypes, setExamTypes] = useState([]); // full catalog/types list for id lookup
+  const [downloadingId, setDownloadingId] = useState(null);
 
   // Load exam board catalog once (for id→code mapping)
   useEffect(() => {
@@ -227,14 +229,28 @@ export default function PastPapersPage() {
 
                 {/* Model B download gate:
                     - Logged-in users  → authenticated /api/past-papers/:id/download
-                    - Guests           → prompt to login (paper is still viewable inline) */}
+                    - Guests           → prompt to login (paper is still viewable inline)
+                    A plain <a href> here can never work: protect
+                    (server/middleware/auth.js) only reads the Authorization
+                    header, and a browser navigation can't attach one. This
+                    button fetches with the Bearer token instead and saves
+                    the response as a blob — see downloadPastPaper(). */}
                 {user ? (
-                  <a
-                    href={`/api/past-papers/${p.id}/download`}
-                    className="flex items-center justify-center gap-2 w-full bg-gray-900 hover:bg-gray-800 text-white text-xs font-semibold py-2 rounded-xl transition-colors"
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setDownloadingId(p.id);
+                      try { await downloadPastPaper(p.id, p.title); }
+                      finally { setDownloadingId(null); }
+                    }}
+                    disabled={downloadingId === p.id}
+                    className="flex items-center justify-center gap-2 w-full bg-gray-900 hover:bg-gray-800 text-white text-xs font-semibold py-2 rounded-xl transition-colors disabled:opacity-60"
                   >
-                    <Download size={13} /> Download PDF
-                  </a>
+                    {downloadingId === p.id
+                      ? <Loader2 size={13} className="animate-spin" />
+                      : <Download size={13} />}
+                    {downloadingId === p.id ? 'Downloading…' : 'Download PDF'}
+                  </button>
                 ) : (
                   <Link
                     to={`/login?next=${encodeURIComponent('/past-papers')}`}
