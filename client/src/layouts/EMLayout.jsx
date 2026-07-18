@@ -94,7 +94,7 @@ export default function EMLayout() {
                 className="text-[10px] tracking-widest mt-0.5"
                 style={{ color: SOVEREIGN[300] }}
               >
-                ENGLISH FLUENCY TRAINING
+                {user?.school?.name ? `🏫 ${user.school.name}` : 'ENGLISH FLUENCY TRAINING'}
               </p>
             </div>
           </NavLink>
@@ -210,7 +210,9 @@ export default function EMLayout() {
             </div>
             <div>
               <p className="text-sm font-semibold text-white">{firstName}</p>
-              <p className="text-xs" style={{ color: SOVEREIGN[300] }}>English Masterclass</p>
+              <p className="text-xs" style={{ color: SOVEREIGN[300] }}>
+                {user?.school?.name || 'English Masterclass'}
+              </p>
             </div>
           </div>
           <button

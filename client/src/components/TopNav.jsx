@@ -166,6 +166,9 @@ export default function TopNav() {
               <div className="px-4 py-3 border-b border-gray-100">
                 <p className="text-sm font-semibold text-gray-900 truncate">{fullName}</p>
                 <p className="text-xs text-gray-400 truncate mt-0.5">{user?.email}</p>
+                {user?.school?.name && (
+                  <p className="text-xs text-blue-600 truncate mt-1 font-medium">🏫 {user.school.name}</p>
+                )}
               </div>
               <button onClick={() => { navigate(dashboardPath); setDropOpen(false); }}
                 className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors">

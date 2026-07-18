@@ -737,6 +737,9 @@ export default function StudentDashboard() {
                   Good {greeting}
                 </p>
                 <h1 className="text-xl font-bold text-gray-900">{firstName}</h1>
+                {user?.school?.name && (
+                  <p className="text-xs text-gray-400 mt-0.5">🏫 {user.school.name}</p>
+                )}
               </div>
             </div>
           </div>

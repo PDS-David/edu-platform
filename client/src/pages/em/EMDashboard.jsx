@@ -181,6 +181,96 @@ function WelcomeBanner({ onStart }) {
   );
 }
 
+// ── How It Works modal — always reachable (unlike WelcomeBanner, which only
+// ever shows once). Explains the mechanics everyone needs, plus a distinct
+// section for tenant-school students naming their school and spelling out
+// what's expected of them, since they may have been placed here by their
+// school rather than having chosen to sign up themselves. ───────────────────
+function HowItWorksModal({ school, onClose }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(10,15,30,0.55)' }}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="how-it-works-heading"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-3xl max-w-lg w-full max-h-[85vh] overflow-y-auto"
+        style={{ boxShadow: SHADOW.tier2 }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="p-6 sm:p-7">
+          <div className="flex items-start justify-between mb-4">
+            <h2 id="how-it-works-heading" className="text-lg font-bold text-gray-900">
+              How English Masterclass works
+            </h2>
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              className="shrink-0 p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+
+          {school?.name && (
+            <div
+              className="rounded-2xl px-4 py-3 mb-5 text-sm"
+              style={{ background: `${SOVEREIGN[500]}0d`, border: `1px solid ${SOVEREIGN[500]}33` }}
+            >
+              <p className="font-bold" style={{ color: SOVEREIGN[700] }}>
+                🏫 You're enrolled through {school.name}
+              </p>
+              <p className="text-gray-600 mt-1.5 leading-relaxed">
+                What's expected of you:
+              </p>
+              <ul className="text-gray-600 mt-1 space-y-1 list-disc pl-4 leading-relaxed">
+                <li>Practise categories regularly — your school can see your progress and streak.</li>
+                <li>Score at least 60% in a session to count it as passed for that category.</li>
+                <li>Work through levels in order: Beginner → Intermediate → Advanced.</li>
+              </ul>
+            </div>
+          )}
+
+          <ol className="space-y-4 text-sm text-gray-600">
+            <li className="flex gap-3">
+              <span className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ background: SOVEREIGN[500] }}>1</span>
+              <div>
+                <p className="font-semibold text-gray-900">Pick a category</p>
+                <p>Choose any unlocked category from Beginner, Intermediate, or Advanced.</p>
+              </div>
+            </li>
+            <li className="flex gap-3">
+              <span className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ background: SOVEREIGN[500] }}>2</span>
+              <div>
+                <p className="font-semibold text-gray-900">Practise the words</p>
+                <p>Listen to real pronunciation audio, answer questions, and get AI explanations when you're unsure.</p>
+              </div>
+            </li>
+            <li className="flex gap-3">
+              <span className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ background: SOVEREIGN[500] }}>3</span>
+              <div>
+                <p className="font-semibold text-gray-900">Score 60%+ to unlock the next level</p>
+                <p>Beginner unlocks Intermediate; Intermediate unlocks Advanced. Keep a daily streak to stay sharp.</p>
+              </div>
+            </li>
+          </ol>
+
+          <button
+            onClick={onClose}
+            className="mt-6 w-full py-3 rounded-xl text-sm font-bold text-white transition-all hover:scale-[1.01]"
+            style={{ background: SOVEREIGN[500] }}
+          >
+            Got it
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Continue learning — hero card for the last-practiced category ────────────
 function ContinueLearningCard({ cat, onContinue }) {
   const best = cat._best;
@@ -302,6 +392,7 @@ export default function EMDashboard() {
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState(null);
+  const [showHowItWorks, setShowHowItWorks] = useState(false);
 
   // ── Fetch categories + level-progress + stats in parallel ────────────────
   const fetchData = () => {
@@ -425,6 +516,11 @@ export default function EMDashboard() {
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 leading-tight">
             {greeting}, {firstName}!
           </h1>
+          {user?.school?.name && (
+            <p className="text-xs font-medium mt-0.5" style={{ color: SOVEREIGN[500] }}>
+              🏫 {user.school.name}
+            </p>
+          )}
           {!isFirstTimer && (
             <p className="text-sm text-gray-500 mt-1">
               {stats.total_sessions
@@ -434,9 +530,28 @@ export default function EMDashboard() {
           )}
         </div>
 
-        {/* Streak badge — Gold-400, only when streak ≥ 1 */}
-        {streak >= 1 && <StreakBadge count={streak} />}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Always-accessible instructions — the WelcomeBanner below only
+              ever shows once, for a first-timer with zero sessions; after
+              that a student (especially one placed here by their school,
+              who may not have chosen to sign up themselves) had no way to
+              re-check what's expected of them. */}
+          <button
+            onClick={() => setShowHowItWorks(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold
+                       border transition-colors focus:outline-none focus-visible:ring-2"
+            style={{ borderColor: `${SOVEREIGN[500]}44`, color: SOVEREIGN[700], '--tw-ring-color': SOVEREIGN[500] }}
+          >
+            ℹ️ How this works
+          </button>
+          {/* Streak badge — Gold-400, only when streak ≥ 1 */}
+          {streak >= 1 && <StreakBadge count={streak} />}
+        </div>
       </div>
+
+      {showHowItWorks && (
+        <HowItWorksModal school={user?.school} onClose={() => setShowHowItWorks(false)} />
+      )}
 
       {/* ── First-time welcome banner ─────────────────────────────────────── */}
       {isFirstTimer && (
