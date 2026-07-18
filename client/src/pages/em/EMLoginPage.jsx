@@ -19,6 +19,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { SOVEREIGN, CRIMSON } from './constants';
 import branding from '../../config/branding';
+import { getPostAuthRedirect } from '../../utils/postAuthRedirect';
 
 export default function EMLoginPage() {
   const [email,    setEmail]    = useState('');
@@ -60,10 +61,26 @@ export default function EMLoginPage() {
       const user = await login(email, password, false, 'em');
       // AISchoolOnAir login succeeding is not enough — English Masterclass
       // requires its own one-time registration step on top of that account.
-      if (user?.role === 'student' && !user?.em_registered_at) {
-        navigate('/em/register', { replace: true });
+      //
+      // BUGFIX: this used to send EVERY successful login here straight to
+      // /em/dashboard except unregistered students — including school_admin.
+      // The backend deliberately allows a school_admin to authenticate
+      // through this portal (they're exempt from the aischoolonair gate and
+      // still subject to the em one — see server/controllers/auth.js), but
+      // that was never meant to land them on a student-facing EM page. A
+      // school_admin (and, for the same reason, a teacher or App Admin, if
+      // either ever reaches this form) must always land on their own real
+      // dashboard, never in the student/study view — getPostAuthRedirect is
+      // the single shared source of truth for that mapping, already used by
+      // the main /login page.
+      if (user?.role === 'student') {
+        if (!user?.em_registered_at) {
+          navigate('/em/register', { replace: true });
+        } else {
+          navigate('/em/dashboard', { replace: true });
+        }
       } else {
-        navigate('/em/dashboard', { replace: true });
+        navigate(getPostAuthRedirect(user), { replace: true });
       }
     } catch (err) {
       const code = err?.raw?.response?.data?.code;

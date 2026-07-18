@@ -10,11 +10,12 @@
 // GET /api/schools/me/roster, which is hard-scoped to req.user.school_id.
 
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/apiClient';
 import {
   School, Users, GraduationCap, UserCheck, Copy, Check,
-  Loader2, LogOut, AlertCircle, Plus, X, Image as ImageIcon,
+  Loader2, LogOut, AlertCircle, Plus, X, Image as ImageIcon, FileText,
 } from 'lucide-react';
 
 function InviteModal({ onClose, onCreated }) {
@@ -304,6 +305,12 @@ export default function SchoolAdminDashboard() {
                       <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
                         {u.role.replace('_', ' ')}
                       </span>
+                      {u.role === 'student' && (
+                        <Link to={`/school-admin/students/${u.id}`} state={{ student: u }}
+                          className="flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors shrink-0">
+                          <FileText size={12} /> Report
+                        </Link>
+                      )}
                     </div>
                   </div>
                 ))}

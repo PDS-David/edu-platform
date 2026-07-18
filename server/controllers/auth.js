@@ -302,7 +302,7 @@ exports.registerForEnglishMasterclass = async (req, res, next) => {
     const rawJoinCode = (req.body.join_code || '').trim().toUpperCase();
     if (rawJoinCode) {
       const schoolRows = await db.query(
-        `SELECT id, name, enable_em, enable_aischoolonair FROM schools WHERE join_code = :code AND is_active = true`,
+        `SELECT id, name, logo_url, enable_em, enable_aischoolonair FROM schools WHERE join_code = :code AND is_active = true`,
         { replacements: { code: rawJoinCode }, type: QueryTypes.SELECT }
       );
       if (!schoolRows.length) {
@@ -364,7 +364,7 @@ exports.registerForEnglishMasterclass = async (req, res, next) => {
 
     const user = safeUser(rows[0]);
     if (resolvedSchool) {
-      user.school = { id: resolvedSchool.id, name: resolvedSchool.name, enable_aischoolonair: resolvedSchool.enable_aischoolonair, enable_em: resolvedSchool.enable_em };
+      user.school = { id: resolvedSchool.id, name: resolvedSchool.name, logo_url: resolvedSchool.logo_url, enable_aischoolonair: resolvedSchool.enable_aischoolonair, enable_em: resolvedSchool.enable_em };
     }
     const { ipAddress, userAgent } = clientMeta(req);
 
@@ -529,7 +529,7 @@ exports.login = async (req, res, next) => {
     let school = null;
     if (userRow.school_id) {
       const schoolRows = await db.query(
-        `SELECT id, name, is_active, enable_aischoolonair, enable_em FROM schools WHERE id = :id LIMIT 1`,
+        `SELECT id, name, logo_url, is_active, enable_aischoolonair, enable_em FROM schools WHERE id = :id LIMIT 1`,
         { replacements: { id: userRow.school_id }, type: QueryTypes.SELECT }
       );
       school = schoolRows[0] || null;
@@ -593,7 +593,7 @@ exports.login = async (req, res, next) => {
     // login form — without a second round trip. Only present for tenant
     // accounts; omitted (undefined) for standalone users and App Admin.
     if (school) {
-      user.school = { id: school.id, name: school.name, enable_aischoolonair: school.enable_aischoolonair, enable_em: school.enable_em };
+      user.school = { id: school.id, name: school.name, logo_url: school.logo_url, enable_aischoolonair: school.enable_aischoolonair, enable_em: school.enable_em };
     }
     return res.status(200).json({ success: true, token: accessToken, user });
 
@@ -724,7 +724,7 @@ exports.getMe = async (req, res, next) => {
     // guards (EMPrivateRoute, etc.) work the same on page refresh as they
     // do right after login.
     if (req.school) {
-      user.school = { id: rows[0].school_id, name: req.school.name, enable_aischoolonair: req.school.enable_aischoolonair, enable_em: req.school.enable_em };
+      user.school = { id: rows[0].school_id, name: req.school.name, logo_url: req.school.logo_url, enable_aischoolonair: req.school.enable_aischoolonair, enable_em: req.school.enable_em };
     }
     return res.status(200).json({ success: true, user });
   } catch (err) {

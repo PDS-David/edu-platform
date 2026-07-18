@@ -61,17 +61,35 @@ async function studentInTeacherScope(teacherId, studentId) {
   return !!classHit;
 }
 
+/**
+ * Returns true if the given studentId belongs to the school_admin's own
+ * school. Scope = student.school_id === school_admin.school_id — a school
+ * boundary, not a class/subject one (school_admin doesn't teach specific
+ * subjects/classes the way a teacher does; their scope is "every student at
+ * my school", matching how GET /api/schools/me/roster already works).
+ */
+async function studentInSchoolAdminScope(schoolAdminSchoolId, studentId) {
+  if (!schoolAdminSchoolId) return false;
+  const [hit] = await db.query(
+    `SELECT 1 FROM users
+      WHERE id = :studentId AND role = 'student' AND school_id = :schoolId
+      LIMIT 1`,
+    { replacements: { studentId, schoolId: schoolAdminSchoolId }, type: QueryTypes.SELECT }
+  ).catch(() => []);
+  return !!hit;
+}
+
 // ── middleware factories ───────────────────────────────────────────────────────
 
 /**
- * Gate: req.params.studentId must belong to the requesting teacher's scope.
- * Admins always pass through.
+ * Gate: req.params.studentId must belong to the requesting teacher's scope,
+ * or (for school_admin) to their own school. Admins always pass through.
  */
 const requireTeacherStudentScope = async (req, res, next) => {
   const role = req.user?.role;
   if (role === 'admin') return next();
 
-  if (role !== 'teacher') {
+  if (role !== 'teacher' && role !== 'school_admin') {
     return res.status(403).json({ success: false, error: 'Access denied' });
   }
 
@@ -81,10 +99,12 @@ const requireTeacherStudentScope = async (req, res, next) => {
   }
 
   try {
-    const inScope = await studentInTeacherScope(req.user.id, studentId);
+    const inScope = role === 'school_admin'
+      ? await studentInSchoolAdminScope(req.user.school_id, studentId)
+      : await studentInTeacherScope(req.user.id, studentId);
     if (!inScope) {
       await audit.blockIdor(req, res,
-        `Teacher ${req.user.id} attempted to access out-of-scope student ${studentId}`);
+        `${role} ${req.user.id} attempted to access out-of-scope student ${studentId}`);
       return; // blockIdor sends the response
     }
     next();
@@ -97,7 +117,8 @@ const requireTeacherStudentScope = async (req, res, next) => {
 /**
  * Gate for analytics routes that accept ?student_id= query param.
  * If no student_id is provided (teacher viewing cohort data), pass through.
- * If student_id is present, verify it is in scope.
+ * If student_id is present, verify it is in scope (teacher's own
+ * class/subject scope, or — for school_admin — the student's own school).
  * Admins always pass through.
  */
 const requireTeacherAnalyticsScope = async (req, res, next) => {
@@ -105,10 +126,10 @@ const requireTeacherAnalyticsScope = async (req, res, next) => {
   if (role === 'admin') return next();
 
   // Students can only see their own data — enforced by the route handler itself;
-  // this middleware is for teacher-level scope only.
+  // this middleware is for teacher/school_admin-level scope only.
   if (role === 'student') return next();
 
-  if (role !== 'teacher') {
+  if (role !== 'teacher' && role !== 'school_admin') {
     return res.status(403).json({ success: false, error: 'Access denied' });
   }
 
@@ -116,10 +137,12 @@ const requireTeacherAnalyticsScope = async (req, res, next) => {
   if (!studentId) return next(); // cohort-level request — no student scope needed
 
   try {
-    const inScope = await studentInTeacherScope(req.user.id, studentId);
+    const inScope = role === 'school_admin'
+      ? await studentInSchoolAdminScope(req.user.school_id, studentId)
+      : await studentInTeacherScope(req.user.id, studentId);
     if (!inScope) {
       await audit.blockIdor(req, res,
-        `Teacher ${req.user.id} attempted analytics on out-of-scope student ${studentId}`);
+        `${role} ${req.user.id} attempted analytics on out-of-scope student ${studentId}`);
       return;
     }
     next();
@@ -167,5 +190,6 @@ module.exports = {
   requireTeacherStudentScope,
   requireTeacherAnalyticsScope,
   requireTeacherClassOwnership,
-  studentInTeacherScope,   // exported for use in route handlers
+  studentInTeacherScope,        // exported for use in route handlers
+  studentInSchoolAdminScope,    // exported for use in route handlers
 };

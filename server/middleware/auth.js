@@ -63,7 +63,7 @@ const protect = async (req, res, next) => {
     if (req.user.school_id && ['student', 'teacher', 'school_admin'].includes(req.user.role)) {
       try {
         const schoolRows = await db.query(
-          `SELECT name, is_active, enable_aischoolonair, enable_em FROM schools WHERE id = :id LIMIT 1`,
+          `SELECT name, logo_url, is_active, enable_aischoolonair, enable_em FROM schools WHERE id = :id LIMIT 1`,
           { replacements: { id: req.user.school_id }, type: QueryTypes.SELECT }
         );
         const school = schoolRows[0];
