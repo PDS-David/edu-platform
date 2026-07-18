@@ -70,6 +70,7 @@ import TeacherAddQuestionPage from "./pages/TeacherAddQuestionPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminSchools from "./pages/AdminSchools";
 import SchoolAdminDashboard from "./pages/SchoolAdminDashboard";
+import SchoolAdminStudentReport from "./pages/SchoolAdminStudentReport";
 import JoinSchoolPage from "./pages/JoinSchoolPage";
 
 // Global floating widget
@@ -193,6 +194,7 @@ export default function App() {
         <Route element={<PrivateRoute allowedRoles={["school_admin"]} />}>
           <Route path="/school-admin/dashboard" element={<SchoolAdminDashboard />} />
           <Route path="/school-admin/settings" element={<SettingsPage />} />
+          <Route path="/school-admin/students/:studentId" element={<SchoolAdminStudentReport />} />
         </Route>
 
         {/* JOIN A SCHOOL — role-agnostic, any teacher or student. Was missing

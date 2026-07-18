@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/apiClient';
 import branding from '../config/branding';
-import { Bell, ChevronDown, Settings, LogOut, LayoutDashboard } from 'lucide-react';
+import { Bell, ChevronDown, Settings, LogOut, LayoutDashboard, School } from 'lucide-react';
 import GlobalSearch from './GlobalSearch';
 
 export default function TopNav() {
@@ -108,6 +108,24 @@ export default function TopNav() {
         <span className={`hidden md:inline-flex text-xs font-semibold px-2.5 py-1 rounded-full border ${roleBadge.cls}`}>
           {roleBadge.label}
         </span>
+
+        {/* Tenant school badge — same logo+name treatment as the school_admin
+            dashboard's own header, so a student sees their school in the
+            one persistent bar every page already has, instead of buried in
+            the profile dropdown or repeated on the dashboard greeting only. */}
+        {role === 'student' && user?.school?.name && (
+          <>
+            <div className="hidden md:block h-6 w-px bg-gray-200 mx-0.5" />
+            <div className="hidden md:flex items-center gap-2 min-w-0">
+              <div className="w-6 h-6 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0 overflow-hidden">
+                {user.school.logo_url
+                  ? <img src={user.school.logo_url} alt="" className="w-full h-full object-cover" />
+                  : <School size={12} className="text-indigo-500" />}
+              </div>
+              <span className="text-xs font-semibold text-gray-700 truncate max-w-[120px]">{user.school.name}</span>
+            </div>
+          </>
+        )}
       </div>
 
       {/* RIGHT */}
@@ -166,9 +184,6 @@ export default function TopNav() {
               <div className="px-4 py-3 border-b border-gray-100">
                 <p className="text-sm font-semibold text-gray-900 truncate">{fullName}</p>
                 <p className="text-xs text-gray-400 truncate mt-0.5">{user?.email}</p>
-                {user?.school?.name && (
-                  <p className="text-xs text-blue-600 truncate mt-1 font-medium">🏫 {user.school.name}</p>
-                )}
               </div>
               <button onClick={() => { navigate(dashboardPath); setDropOpen(false); }}
                 className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors">
