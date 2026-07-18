@@ -75,13 +75,19 @@ export default function EMLayout() {
             className="flex items-center gap-2.5 shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 rounded-lg"
             aria-label="English Masterclass — go to dashboard"
           >
-            {/* Crown icon — CRIMSON[500] per spec (British accent, not gold) */}
+            {/* Crown icon (default), or the tenant school's own logo when
+                one has been uploaded — same logo+name treatment as the
+                school_admin/App Admin dashboards, rather than a text-only
+                subtitle here while every other dashboard shows the actual
+                logo image. */}
             <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0"
-              style={{ background: CRIMSON[500] }}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0 overflow-hidden"
+              style={{ background: user?.school?.logo_url ? 'transparent' : CRIMSON[500] }}
               aria-hidden="true"
             >
-              👑
+              {user?.school?.logo_url
+                ? <img src={user.school.logo_url} alt="" className="w-full h-full object-cover" />
+                : '👑'}
             </div>
             <div className="hidden sm:block leading-none">
               <p
@@ -94,7 +100,7 @@ export default function EMLayout() {
                 className="text-[10px] tracking-widest mt-0.5"
                 style={{ color: SOVEREIGN[300] }}
               >
-                {user?.school?.name ? `🏫 ${user.school.name}` : 'ENGLISH FLUENCY TRAINING'}
+                {user?.school?.name || 'ENGLISH FLUENCY TRAINING'}
               </p>
             </div>
           </NavLink>

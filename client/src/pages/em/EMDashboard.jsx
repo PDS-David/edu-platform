@@ -516,11 +516,6 @@ export default function EMDashboard() {
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 leading-tight">
             {greeting}, {firstName}!
           </h1>
-          {user?.school?.name && (
-            <p className="text-xs font-medium mt-0.5" style={{ color: SOVEREIGN[500] }}>
-              🏫 {user.school.name}
-            </p>
-          )}
           {!isFirstTimer && (
             <p className="text-sm text-gray-500 mt-1">
               {stats.total_sessions
