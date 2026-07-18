@@ -91,7 +91,12 @@ export default function TopNav() {
 
   return (
     <nav className="w-full bg-white border-b border-gray-200 sticky top-0 z-50 h-14 flex items-center px-4 md:px-6 shadow-sm">
-      {/* LEFT — logos: AISchoolonair | LessonTeacher */}
+      {/* LEFT — logos: AISchoolonair | EAC | AISchoolonair partner logo.
+          Matches PublicNav.jsx (the landing page header) exactly, same
+          order and same visibility rules — this bar previously showed
+          "LessonTeacher" instead of EAC + the partner logo, which doesn't
+          appear on the landing page at all, so a logged-in user saw a
+          different set of logos than the one every public page shows. */}
       <div className="flex items-center gap-3 shrink-0">
         <Link to={dashboardPath} className="flex items-center gap-2 group">
           <img src="/logo.svg" alt="AISchoolonair" className="w-7 h-7 shrink-0" />
@@ -101,8 +106,12 @@ export default function TopNav() {
         {/* Divider */}
         <div className="h-6 w-px bg-gray-200 shrink-0" />
 
-        {/* LessonTeacher logo — hidden on very small screens */}
-        <img src="/lessonteacher_logo.jpg" alt="LessonTeacher" className="hidden sm:block h-6 w-auto object-contain shrink-0" style={{maxWidth:'88px'}} />
+        {/* EAC logo — always visible, matching PublicNav */}
+        <img src="/eac_logo.png" alt="EAC" className="h-6 w-auto object-contain shrink-0" style={{maxWidth:'56px'}} />
+
+        {/* AISchoolonair partner logo — hidden below md, matching PublicNav */}
+        <div className="hidden md:block h-6 w-px bg-gray-200 shrink-0" />
+        <img src="/schoolonair.jpg" alt="AISchoolonair" className="hidden md:block h-9 w-9 object-contain shrink-0 rounded-lg" />
 
         <div className="hidden md:block h-6 w-px bg-gray-200 mx-0.5" />
         <span className={`hidden md:inline-flex text-xs font-semibold px-2.5 py-1 rounded-full border ${roleBadge.cls}`}>
@@ -122,12 +131,13 @@ export default function TopNav() {
                   ? <img src={user.school.logo_url} alt="" className="w-full h-full object-cover" />
                   : <School size={12} className="text-indigo-500" />}
               </div>
-              <span className="text-xs font-semibold text-gray-700 truncate max-w-[120px]">{user.school.name}</span>
+              <span className="text-xs font-semibold text-gray-700">{user.school.name}</span>
             </div>
           </>
         )}
       </div>
 
+      
       {/* RIGHT */}
       {/* X17 — global search, students only */}
       {role === 'student' && (

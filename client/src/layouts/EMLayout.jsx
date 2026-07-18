@@ -97,7 +97,7 @@ export default function EMLayout() {
                   school's own students. Role + product badges take the
                   secondary line, same as the admin view. */}
               <p
-                className="font-bold text-sm tracking-wide text-white truncate max-w-[10rem]"
+                className="font-bold text-sm tracking-wide text-white leading-tight"
                 style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
               >
                 {user?.school?.name || 'English Masterclass'}
