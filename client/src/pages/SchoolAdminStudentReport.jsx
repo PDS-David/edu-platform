@@ -58,7 +58,23 @@ export default function SchoolAdminStudentReport() {
         setSummary(summaryRes.data || null);
         setTopics(Array.isArray(topicsRes.data) ? topicsRes.data : []);
       })
-      .catch(err => setError(err?.response?.data?.error || 'Could not load this student\'s report.'))
+      .catch(err => {
+        const status = err?.response?.status;
+        const apiMsg = err?.response?.data?.error;
+        // Distinguishing the status matters here: a 403 almost always means
+        // the backend server is still running older code that hasn't
+        // learned about school_admin's access yet (a deploy/restart problem,
+        // not a data problem), whereas a 500 is a genuine server-side error
+        // worth investigating on its own. Showing which one happened turns
+        // "could not load" from a dead end into an actionable clue.
+        if (status === 403) {
+          setError('Access denied (403) loading this report. If this report feature was recently added, the backend server may need to be restarted with the latest code — this is a deployment step, not a data problem.');
+        } else if (apiMsg) {
+          setError(`${apiMsg}${status ? ` (${status})` : ''}`);
+        } else {
+          setError(`Could not load this student's report${status ? ` (HTTP ${status})` : ' (network error — check your connection or that the server is reachable)'}.`);
+        }
+      })
       .finally(() => setLoading(false));
   }, [studentId]);
 
