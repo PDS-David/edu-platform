@@ -90,18 +90,29 @@ export default function EMLayout() {
                 : '👑'}
             </div>
             <div className="hidden sm:block leading-none">
+              {/* Same hierarchy as SchoolAdminDashboard.jsx's header: school
+                  name is the primary bold line, not "English Masterclass" —
+                  that was competing with the school's own name/logo for
+                  prominence, which is exactly backwards for a tenant
+                  school's own students. Role + product badges take the
+                  secondary line, same as the admin view. */}
               <p
-                className="font-bold text-sm tracking-wide text-white"
+                className="font-bold text-sm tracking-wide text-white truncate max-w-[10rem]"
                 style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
               >
-                English Masterclass
+                {user?.school?.name || 'English Masterclass'}
               </p>
-              <p
-                className="text-[10px] tracking-widest mt-0.5"
-                style={{ color: SOVEREIGN[300] }}
-              >
-                {user?.school?.name || 'ENGLISH FLUENCY TRAINING'}
-              </p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <p className="text-[10px] capitalize" style={{ color: SOVEREIGN[300] }}>
+                  {user?.role || 'Student'}
+                </p>
+                {user?.school?.enable_aischoolonair && (
+                  <span className="px-1.5 py-0.5 rounded bg-white/10 text-white text-[9px] font-semibold">AISchoolonair</span>
+                )}
+                {user?.school?.enable_em && (
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold" style={{ background: `${SOVEREIGN[500]}55`, color: '#fff' }}>EM</span>
+                )}
+              </div>
             </div>
           </NavLink>
 
