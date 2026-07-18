@@ -585,9 +585,10 @@ router.get('/student/:studentId/summary', protect, requireTeacherAnalyticsScope,
   try {
     // userRows and attemptRows run in parallel — neither depends on
     // subtopic_progress, so they are not penalised if that table is absent.
-    const [userRows, attemptRows] = await Promise.all([
+    const [userRows, attemptRows, emRows] = await Promise.all([
       safeQuery(
-        `SELECT COALESCE(xp_points,0) AS xp_points, COALESCE(study_streak_days,0) AS study_streak_days
+        `SELECT COALESCE(xp_points,0) AS xp_points, COALESCE(study_streak_days,0) AS study_streak_days,
+                em_registered_at
          FROM users WHERE id = :studentId`,
         { studentId }, [{}]
       ),
@@ -597,6 +598,25 @@ router.get('/student/:studentId/summary', protect, requireTeacherAnalyticsScope,
            COALESCE(ROUND(AVG(CASE WHEN is_correct THEN 100 ELSE 0 END))::INTEGER,0) AS accuracy_pct,
            COALESCE(SUM(time_taken_seconds),0)::BIGINT AS total_time_seconds
          FROM practice_attempts WHERE student_id = :studentId`,
+        { studentId }, [{}]
+      ),
+      // AISchoolonair (practice_attempts, above) and English Masterclass
+      // (em_user_stats/em_practice_sessions) are entirely separate product
+      // surfaces with their own tracking tables — a student who only uses
+      // EM will legitimately show zeros above even while actively
+      // practicing. Pulled here so the report reflects both, instead of
+      // silently only covering one and reading as "no activity at all".
+      safeQuery(
+        `SELECT
+           COALESCE(words_learned,0)       AS words_learned,
+           COALESCE(words_mastered,0)      AS words_mastered,
+           COALESCE(practice_streak,0)     AS practice_streak,
+           COALESCE(longest_streak,0)      AS longest_streak,
+           COALESCE(total_sessions,0)      AS total_sessions,
+           COALESCE(total_practice_secs,0) AS total_practice_secs,
+           COALESCE(overall_accuracy,0)    AS overall_accuracy,
+           last_practice_date
+         FROM em_user_stats WHERE user_id = :studentId`,
         { studentId }, [{}]
       ),
     ]);
@@ -611,9 +631,10 @@ router.get('/student/:studentId/summary', protect, requireTeacherAnalyticsScope,
       { studentId }, [{ quizzes_completed: 0 }]
     );
 
-    const u = userRows[0]   || {};
-    const a = attemptRows[0] || {};
-    const p = progressRows[0] || {};
+    const u  = userRows[0]     || {};
+    const a  = attemptRows[0]  || {};
+    const p  = progressRows[0] || {};
+    const em = emRows[0]       || {};
     const totalSecs = parseInt(a.total_time_seconds) || 0;
     return res.json({ success: true, data: {
       total_attempts:     a.total_attempts    || 0,
@@ -623,6 +644,20 @@ router.get('/student/:studentId/summary', protect, requireTeacherAnalyticsScope,
       quizzes_completed:  p.quizzes_completed || 0,
       time_spent_minutes: Math.floor(totalSecs / 60),
       time_spent_seconds: totalSecs % 60,
+      // Only present when the student has registered for EM — mirrors the
+      // roster's "EM" badge (users.em_registered_at IS NOT NULL) so the
+      // report doesn't show an empty EM section for a student who was
+      // never granted/opted into the product.
+      english_masterclass: u.em_registered_at ? {
+        words_learned:        em.words_learned        || 0,
+        words_mastered:       em.words_mastered        || 0,
+        practice_streak_days: em.practice_streak        || 0,
+        longest_streak_days:  em.longest_streak         || 0,
+        total_sessions:       em.total_sessions         || 0,
+        accuracy_pct:         Math.round(parseFloat(em.overall_accuracy) || 0),
+        time_spent_minutes:   Math.floor((parseInt(em.total_practice_secs) || 0) / 60),
+        last_practice_date:   em.last_practice_date || null,
+      } : null,
     }});
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
