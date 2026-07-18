@@ -128,6 +128,7 @@ export default function SchoolAdminStudentReport() {
 
         {!loading && !error && summary && (
           <>
+            <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-3">AISchoolonair</p>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
               <div className="border rounded-2xl p-4 bg-white border-gray-100">
                 <div className="flex items-center justify-between mb-2">
@@ -176,11 +177,57 @@ export default function SchoolAdminStudentReport() {
               </div>
             </div>
 
+            {/* English Masterclass tracks its own separate activity — a
+                student who mainly uses EM will legitimately show zeros
+                above (those numbers only ever come from AISchoolonair
+                quiz/practice data). Only rendered when the student is
+                actually EM-registered, matching the roster's "EM" badge,
+                so this section doesn't show up empty for students who
+                were never enrolled in it. */}
+            {summary.english_masterclass && (
+              <>
+                <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-3">English Masterclass</p>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
+                  <div className="border rounded-2xl p-4 bg-white border-gray-100">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-gray-500 font-medium">Accuracy</span>
+                      <Target size={14} className="text-gray-300" />
+                    </div>
+                    <p className={`text-2xl font-bold ${accColor(summary.english_masterclass.accuracy_pct)}`}>{summary.english_masterclass.accuracy_pct}%</p>
+                  </div>
+                  <div className="border rounded-2xl p-4 bg-white border-gray-100">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-gray-500 font-medium">Words Mastered</span>
+                      <BookOpen size={14} className="text-gray-300" />
+                    </div>
+                    <p className="text-2xl font-bold text-gray-800">{summary.english_masterclass.words_mastered} / {summary.english_masterclass.words_learned}</p>
+                  </div>
+                  <div className="border rounded-2xl p-4 bg-white border-gray-100">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-gray-500 font-medium">Practice Streak</span>
+                      <Flame size={14} className="text-gray-300" />
+                    </div>
+                    <p className="text-2xl font-bold text-gray-800">{summary.english_masterclass.practice_streak_days} days</p>
+                  </div>
+                  <div className="border rounded-2xl p-4 bg-white border-gray-100">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-gray-500 font-medium">Sessions</span>
+                      <Trophy size={14} className="text-gray-300" />
+                    </div>
+                    <p className="text-2xl font-bold text-gray-800">{summary.english_masterclass.total_sessions}</p>
+                  </div>
+                </div>
+              </>
+            )}
+
             <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
               <div className="p-6">
-                <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-4">Topic-by-Topic Breakdown</p>
+                <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-4">AISchoolonair — Topic-by-Topic Breakdown</p>
                 {topics.length === 0 && (
-                  <p className="text-sm text-gray-400 py-4 text-center">No practice attempts recorded yet.</p>
+                  <p className="text-sm text-gray-400 py-4 text-center">
+                    No AISchoolonair practice attempts recorded yet.
+                    {summary.english_masterclass && ' (English Masterclass activity is shown separately above.)'}
+                  </p>
                 )}
                 <div className="divide-y divide-gray-50">
                   {topics.map(t => (
