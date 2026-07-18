@@ -82,14 +82,25 @@ const protect = async (req, res, next) => {
         // enable_aischoolonair gates every route EXCEPT the ones below, which
         // have their own more specific gating (EM: enable_em, checked in
         // requireEmRegistration) or must stay reachable regardless of content
-        // toggles (schools: membership/management actions — including a
-        // school_admin managing their own roster/settings; users: a user's
-        // own profile/account self-service).
+        // toggles.
         const url = req.originalUrl || req.url || '';
-        const isExempt =
+        const alwaysExempt =
           url.startsWith('/api/english-masterclass') ||
-          url.startsWith('/api/schools') ||
-          url.startsWith('/api/users');
+          url.startsWith('/api/schools') ||   // membership/management — incl. school_admin's own roster/settings
+          url.startsWith('/api/users') ||     // a user's own profile/account self-service
+          url.startsWith('/api/auth') ||      // session self-service (me/logout/refresh) — never content-gated
+          url.startsWith('/api/notifications'); // account notifications — not product content
+
+        // A teacher/school_admin pulling a student's progress report is a
+        // management action on their own school's roster, not "consuming
+        // AISchoolonair" as a product — it must keep working even if the
+        // school's content toggle is off (e.g. to print historical
+        // records). A student viewing their OWN analytics dashboard IS
+        // core product content, so that stays gated like everything else.
+        const analyticsExempt =
+          url.startsWith('/api/analytics') && ['teacher', 'school_admin'].includes(req.user.role);
+
+        const isExempt = alwaysExempt || analyticsExempt;
 
         if (!isExempt && !school.enable_aischoolonair) {
           return res.status(403).json({
