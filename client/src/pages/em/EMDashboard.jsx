@@ -505,7 +505,7 @@ export default function EMDashboard() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-8">
+    <div className="max-w-5xl mx-auto space-y-8">
 
       {/* ── Greeting row ─────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center justify-between gap-3">

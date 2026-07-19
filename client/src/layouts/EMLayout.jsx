@@ -116,34 +116,10 @@ export default function EMLayout() {
             </div>
           </NavLink>
 
-          {/* ── Desktop nav links ────────────────────────────────────────────── */}
-          <nav
-            className="hidden md:flex items-center gap-1"
-            aria-label="English Masterclass navigation"
-          >
-            {NAV_LINKS.map(({ to, label, Icon }) => (
-              <NavLink
-                key={to}
-                to={to}
-                className={({ isActive }) =>
-                  // Active: white text + 2px Sovereign-500 bottom border (per spec).
-                  // Inactive: Sovereign-200 text, hover white. No background fills.
-                  `flex items-center gap-1.5 px-4 py-2 text-sm font-semibold transition-colors rounded-t-lg
-                  focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60
-                  ${isActive
-                    ? 'text-white border-b-2'
-                    : 'text-white/60 hover:text-white border-b-2 border-transparent'
-                  }`
-                }
-                style={({ isActive }) =>
-                  isActive ? { borderBottomColor: SOVEREIGN[500] } : {}
-                }
-              >
-                <Icon size={14} aria-hidden="true" />
-                <span>{label}</span>
-              </NavLink>
-            ))}
-          </nav>
+          {/* Desktop nav moved into a persistent left sidebar below — same
+              spot every EM page now shares, replacing these top tabs so
+              there's exactly one place switching between Dashboard/
+              Practice/Progress happens, not two doing the same job. */}
 
           {/* ── Right controls ───────────────────────────────────────────────── */}
           <div className="flex items-center gap-2 shrink-0">
@@ -280,7 +256,50 @@ export default function EMLayout() {
 
       {/* ── Page content ────────────────────────────────────────────────────── */}
       <main className="flex-1">
-        <Outlet />
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 flex flex-col sm:flex-row gap-5 items-start">
+          {/* Left sidebar — same visual language as PracticeSession.jsx's
+              "Exercises" panel (cream box, small-caps label, icon+label rows,
+              active state), just one level up: this switches between the
+              three EM sections instead of between the three exercise types
+              within a practice session. Every /em/* page renders through
+              this single shared layout, so this one panel covers all of
+              them — Dashboard, Practice, and Progress — automatically. */}
+          <nav
+            className="sm:w-56 shrink-0 bg-[#f0ede8] border border-[#e8e4dd] rounded-2xl p-3 space-y-1 h-fit w-full"
+            aria-label="English Masterclass navigation"
+          >
+            <p className="px-2 pt-1 pb-2 text-[10px] font-bold uppercase tracking-widest text-[#b5a99a]">
+              English Masterclass
+            </p>
+            {NAV_LINKS.map(({ to, label, Icon }) => (
+              <NavLink
+                key={to}
+                to={to}
+                className={({ isActive }) =>
+                  `w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-left transition-all ${
+                    isActive
+                      ? 'bg-white text-[#1a1a1a] font-semibold shadow-sm border border-[#e8e4dd]'
+                      : 'text-[#6b6259] hover:text-[#1a1a1a] hover:bg-white/60'
+                  }`
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    <Icon size={15} className={isActive ? 'text-indigo-500' : 'text-[#b5a99a]'} aria-hidden="true" />
+                    <span className="flex-1">{label}</span>
+                  </>
+                )}
+              </NavLink>
+            ))}
+          </nav>
+
+          {/* Whichever EM page is active renders here, to the right of the
+              sidebar above — unchanged internally, just no longer full-width
+              alone at the top of the page. */}
+          <div className="flex-1 min-w-0 w-full">
+            <Outlet />
+          </div>
+        </div>
       </main>
 
       {/* ── Footer ──────────────────────────────────────────────────────────── */}
