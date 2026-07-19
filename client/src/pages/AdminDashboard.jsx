@@ -2278,6 +2278,7 @@ const AdminDashboard = () => {
     { key: 'bulkupload',          icon: Upload,     label: 'Bulk Upload'        },
     { key: 'pastpapers',          icon: BookOpen,   label: 'Past Papers'        },
     { key: 'schools',             icon: School,     label: 'Schools', href: '/admin/schools' },
+    { key: 'students',            icon: GraduationCap, label: 'Students', href: '/admin/students' },
     { key: 'settings',            icon: Settings,   label: 'Quick Links'        },
   ];
 

@@ -71,6 +71,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import AdminSchools from "./pages/AdminSchools";
 import SchoolAdminDashboard from "./pages/SchoolAdminDashboard";
 import SchoolAdminStudentReport from "./pages/SchoolAdminStudentReport";
+import AdminStudents from "./pages/AdminStudents";
 import JoinSchoolPage from "./pages/JoinSchoolPage";
 
 // Global floating widget
@@ -182,6 +183,8 @@ export default function App() {
             <Route index element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="dashboard" element={<AdminDashboard />} />
             <Route path="schools" element={<AdminSchools />} />
+            <Route path="students" element={<AdminStudents />} />
+            <Route path="students/:studentId" element={<SchoolAdminStudentReport />} />
             <Route path="questions/review" element={<QuestionReview />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="english-masterclass" element={<AdminEnglishMasterclass />} />

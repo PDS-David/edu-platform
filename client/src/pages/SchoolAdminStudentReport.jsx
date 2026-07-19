@@ -1,14 +1,16 @@
 // client/src/pages/SchoolAdminStudentReport.jsx
-// Route: /school-admin/students/:studentId (school_admin only)
-//
-// Individual student progress report for a school_admin. Reuses the existing
-// GET /api/analytics/student/:studentId/summary and .../topics endpoints —
-// both already existed for teacher use, they just rejected school_admin
-// outright (403) until requireTeacherAnalyticsScope in
-// server/middleware/teacherScope.js was extended with a school-based scope
-// check (student.school_id === school_admin.school_id) alongside the
-// existing teacher class/subject-based one. No new backend endpoints were
-// needed — only that authorization gap.
+// Routes: /school-admin/students/:studentId (school_admin — their own
+//         school's students) AND /admin/students/:studentId (App Admin —
+//         standalone students not registered with any tenant school).
+// Same component, same report content, same print button — the only
+// role-specific bit is the back-link destination/label just below. Reuses
+// the existing GET /api/analytics/student/:studentId/summary and .../topics
+// endpoints, which already worked unconditionally for admin (no scope
+// restriction at all — see server/middleware/teacherScope.js, every check
+// there starts with `if (role === 'admin') return next();`) and were
+// separately extended for school_admin with a school-based scope check.
+// No backend changes were needed to add the admin side of this — only the
+// admin-facing student list (GET /api/admin/students) and this route/link.
 //
 // Includes a print button (window.print() + @media print rules below) since
 // there's no PDF-generation library anywhere in this codebase — the
@@ -17,6 +19,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, Link, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import api from '../services/apiClient';
 import TopNav from '../components/TopNav';
 import {
@@ -38,6 +41,10 @@ const accColor = (pct) => {
 export default function SchoolAdminStudentReport() {
   const { studentId } = useParams();
   const location = useLocation();
+  const { user } = useAuth();
+  const isAppAdmin = user?.role === 'admin';
+  const backTo = isAppAdmin ? '/admin/students' : '/school-admin/dashboard';
+  const backLabel = isAppAdmin ? 'Back to students' : 'Back to dashboard';
   // Passed via <Link state={...}> from the roster list — avoids a second
   // round trip just to show a name/email at the top of the report. Falls
   // back gracefully to just showing the ID if opened directly (e.g. a
@@ -90,8 +97,8 @@ export default function SchoolAdminStudentReport() {
 
       <div className="max-w-3xl mx-auto px-6 py-8">
         <div className="flex items-center justify-between mb-6 print:hidden">
-          <Link to="/school-admin/dashboard" className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 transition-colors">
-            <ArrowLeft size={14} /> Back to dashboard
+          <Link to={backTo} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 transition-colors">
+            <ArrowLeft size={14} /> {backLabel}
           </Link>
           <button onClick={() => window.print()}
             className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors">

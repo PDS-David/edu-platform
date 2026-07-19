@@ -344,6 +344,43 @@ router.get('/platform-stats', protect, adminOnly, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────
+// GET /api/admin/students
+// Lists STANDALONE students only — role='student' AND school_id IS NULL,
+// i.e. people using the app directly rather than through a tenant school.
+// Tenant students already have an equivalent view (a school_admin's own
+// roster, GET /api/schools/me/roster) — this is the App Admin's
+// equivalent for the population that has no school_admin looking after
+// them at all. Optional ?search= filters by name/email (simple ILIKE,
+// matching the scale expected here — this is not meant to paginate
+// millions of rows, just make a reasonably-sized standalone-student list
+// findable).
+// ─────────────────────────────────────────────
+router.get('/students', protect, adminOnly, async (req, res) => {
+  try {
+    const search = (req.query.search || '').trim();
+    const params = {};
+    let searchClause = '';
+    if (search) {
+      searchClause = `AND (first_name ILIKE :search OR last_name ILIKE :search OR email ILIKE :search)`;
+      params.search = `%${search}%`;
+    }
+    const rows = await sequelize.query(
+      `SELECT id, first_name, last_name, email, created_at, last_login
+         FROM users
+        WHERE role::text = 'student' AND school_id IS NULL
+        ${searchClause}
+        ORDER BY created_at DESC
+        LIMIT 200`,
+      { replacements: params, type: QueryTypes.SELECT }
+    );
+    return res.json({ success: true, data: rows });
+  } catch (err) {
+    console.error('[GET /admin/students]', err.message);
+    return res.status(500).json({ success: false, error: 'Could not load students' });
+  }
+});
+
+// ─────────────────────────────────────────────
 // GET /api/admin/subjects
 // Flat list for the AI question generator subject dropdown.
 // ─────────────────────────────────────────────
