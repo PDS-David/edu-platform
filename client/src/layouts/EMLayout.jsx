@@ -10,14 +10,22 @@
 //   • Footer bg:       SOVEREIGN[950] #0A0F1E
 //   • Gold is NOT used here — reserved for rewards/achievements only.
 //
+// Navigation: the left sidebar below (same visual language as
+// PracticeSession.jsx's "Exercises" panel) is the ONE way to move between
+// Dashboard/Practice/Progress, on every screen size — it has no "hidden"
+// breakpoint classes, so it's the same UI on mobile as on desktop. There
+// used to also be a separate mobile hamburger + bottom-sheet menu with the
+// same 3 links; removed on request, since having two different UI patterns
+// reach the same destinations was exactly the "second way" that wasn't
+// wanted. Sign-out remains reachable via the icon button in the header on
+// every screen size (it never depended on the removed menu).
+//
 // Logic / auth / API calls: untouched.
 
-import { useState, useEffect, useRef } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, BookOpen, TrendingUp, LogOut,
-  Menu, X,
 } from 'lucide-react';
 import { SOVEREIGN, CRIMSON } from '../pages/em/constants';
 
@@ -30,26 +38,11 @@ const NAV_LINKS = [
 export default function EMLayout() {
   const { user, logout } = useAuth();
   const navigate         = useNavigate();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const sheetRef = useRef(null);
 
   const handleLogout = async () => {
     await logout();
     navigate('/em/login', { replace: true });
   };
-
-  // Close mobile sheet on Escape
-  useEffect(() => {
-    if (!menuOpen) return;
-    const handler = (e) => { if (e.key === 'Escape') setMenuOpen(false); };
-    document.addEventListener('keydown', handler);
-    // Prevent body scroll while sheet is open
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.removeEventListener('keydown', handler);
-      document.body.style.overflow = '';
-    };
-  }, [menuOpen]);
 
   const firstName = user?.first_name || user?.name?.split(' ')[0] || 'Student';
   const initials  = firstName[0]?.toUpperCase() || 'S';
@@ -116,10 +109,9 @@ export default function EMLayout() {
             </div>
           </NavLink>
 
-          {/* Desktop nav moved into a persistent left sidebar below — same
-              spot every EM page now shares, replacing these top tabs so
-              there's exactly one place switching between Dashboard/
-              Practice/Progress happens, not two doing the same job. */}
+          {/* Navigation lives in the persistent left sidebar below — the
+              one and only place Dashboard/Practice/Progress switching
+              happens, on every screen size. */}
 
           {/* ── Right controls ───────────────────────────────────────────────── */}
           <div className="flex items-center gap-2 shrink-0">
@@ -134,7 +126,8 @@ export default function EMLayout() {
               {initials}
             </div>
 
-            {/* Sign out */}
+            {/* Sign out — icon-only on narrow screens, icon+label from sm up.
+                Reachable on every screen size regardless of the sidebar. */}
             <button
               onClick={handleLogout}
               className="flex items-center gap-1 text-xs font-medium transition-colors rounded px-2 py-1
@@ -147,112 +140,9 @@ export default function EMLayout() {
               <LogOut size={14} aria-hidden="true" />
               <span className="hidden sm:inline">Sign out</span>
             </button>
-
-            {/* Mobile hamburger */}
-            <button
-              onClick={() => setMenuOpen(true)}
-              className="md:hidden p-1.5 rounded-lg transition-colors text-white/60 hover:text-white hover:bg-white/10
-                         focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
-              aria-label="Open navigation menu"
-              aria-expanded={menuOpen}
-              aria-controls="em-mobile-nav"
-            >
-              <Menu size={20} aria-hidden="true" />
-            </button>
           </div>
         </div>
       </header>
-
-      {/* ── Mobile bottom sheet ──────────────────────────────────────────────── */}
-      {/* Backdrop */}
-      {menuOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/50 md:hidden"
-          onClick={() => setMenuOpen(false)}
-          aria-hidden="true"
-        />
-      )}
-      {/* Sheet */}
-      <div
-        id="em-mobile-nav"
-        ref={sheetRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Navigation menu"
-        className={`
-          fixed bottom-0 left-0 right-0 z-50 md:hidden
-          rounded-t-3xl transition-transform duration-300 ease-out
-          ${menuOpen ? 'translate-y-0' : 'translate-y-full'}
-        `}
-        style={{ background: SOVEREIGN[800], maxHeight: '80vh' }}
-      >
-        {/* Handle */}
-        <div className="flex justify-center pt-3 pb-1">
-          <div className="w-10 h-1 rounded-full bg-white/20" aria-hidden="true" />
-        </div>
-
-        {/* Close button */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-white/10">
-          <div className="flex items-center gap-2">
-            <div
-              className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white"
-              style={{ background: SOVEREIGN[500] }}
-              aria-hidden="true"
-            >
-              {initials}
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-white">{firstName}</p>
-              <p className="text-xs" style={{ color: SOVEREIGN[300] }}>
-                {user?.school?.name || 'English Masterclass'}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => setMenuOpen(false)}
-            className="p-1.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors
-                       focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
-            aria-label="Close navigation menu"
-          >
-            <X size={18} aria-hidden="true" />
-          </button>
-        </div>
-
-        {/* Nav items — 56px min-height touch targets */}
-        <nav className="px-3 py-2 overflow-y-auto" aria-label="Mobile navigation">
-          {NAV_LINKS.map(({ to, label, Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              onClick={() => setMenuOpen(false)}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-4 py-4 rounded-xl text-sm font-semibold transition-colors mb-1
-                 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60
-                 ${isActive
-                   ? 'bg-white/15 text-white'
-                   : 'text-white/60 hover:text-white hover:bg-white/10'
-                 }`
-              }
-            >
-              <Icon size={18} aria-hidden="true" />
-              <span>{label}</span>
-            </NavLink>
-          ))}
-        </nav>
-
-        {/* Divider + Sign out */}
-        <div className="border-t border-white/10 px-3 py-3">
-          <button
-            onClick={() => { setMenuOpen(false); handleLogout(); }}
-            className="flex items-center gap-3 px-4 py-4 rounded-xl text-sm font-semibold w-full text-left
-                       text-white/60 hover:text-white hover:bg-white/10 transition-colors
-                       focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
-          >
-            <LogOut size={18} aria-hidden="true" />
-            <span>Sign out</span>
-          </button>
-        </div>
-      </div>
 
       {/* ── Page content ────────────────────────────────────────────────────── */}
       <main className="flex-1">
@@ -263,7 +153,10 @@ export default function EMLayout() {
               three EM sections instead of between the three exercise types
               within a practice session. Every /em/* page renders through
               this single shared layout, so this one panel covers all of
-              them — Dashboard, Practice, and Progress — automatically. */}
+              them — Dashboard, Practice, and Progress — automatically.
+              No "hidden" breakpoint classes: this is the only nav, on every
+              screen size, mobile included (stacked full-width above the
+              page content via flex-col on narrow screens). */}
           <nav
             className="sm:w-56 shrink-0 bg-[#f0ede8] border border-[#e8e4dd] rounded-2xl p-3 space-y-1 h-fit w-full"
             aria-label="English Masterclass navigation"
