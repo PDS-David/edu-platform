@@ -13,7 +13,7 @@ import { useState, useRef } from 'react';
 import api from '../../services/apiClient';
 import {
   Volume2, CheckCircle2, XCircle, Loader2, SkipForward,
-  Info, BookOpen, Star, Sparkles,
+  Info, BookOpen, Star, Sparkles, Headphones, Mic, PenLine,
 } from 'lucide-react';
 import DiffBadge from './DiffBadge';
 import useAudio from './useAudio';
@@ -40,15 +40,22 @@ export default function PracticeSession({ cat, words, onComplete }) {
   const [sessionStart]                      = useState(Date.now());
   const { playing, play }                   = useAudio();
   const inputRef                            = useRef(null);
+  // Which of the three exercises is currently shown. They were previously
+  // all stacked in one card, always visible together, forcing a student
+  // through all three at once for every word — separated here so each is
+  // its own independent section a student can move between freely.
+  const [activeExercise, setActiveExercise] = useState('listening'); // listening | pronunciation | composition
   // word_id -> latest pronunciation score (0-100). Speaking practice is
   // optional per word, so words the student never records for simply have
   // no entry here — see the pronunciation_score fallback below.
   const pronScoresRef                       = useRef({});
   // Session-wide soft cap bookkeeping (see PRON_SESSION_BUDGET above).
   const [pronAttemptsUsed, setPronAttemptsUsed] = useState(0);
+  const [pronDone, setPronDone]             = useState(false);
   // Same pattern for the writing exercise (see WRITING_SESSION_BUDGET above).
   const writingScoresRef                        = useRef({});
   const [writingAttemptsUsed, setWritingAttemptsUsed] = useState(0);
+  const [writingDone, setWritingDone]                 = useState(false);
 
   const currentWord = words[currentIdx];
   const progress    = (currentIdx / words.length) * 100;
@@ -76,6 +83,9 @@ export default function PracticeSession({ cat, words, onComplete }) {
     setShowExplain(false);
     setExplanation(null);
     setInput('');
+    setActiveExercise('listening');
+    setPronDone(false);
+    setWritingDone(false);
     if (currentIdx < words.length - 1) {
       setCurrentIdx(i => i + 1);
       setTimeout(() => inputRef.current?.focus(), 50);
@@ -111,8 +121,21 @@ export default function PracticeSession({ cat, words, onComplete }) {
     advance(newAttempts);
   };
 
+  // Left-panel exercise definitions — each is fully independent: a student
+  // can complete them in any order, skip one entirely, or revisit one after
+  // finishing another, none of them gate each other. Only "Listening
+  // Comprehension" advances the word (via Submit/Skip below); the other two
+  // are optional enrichment that attach a score to the same attempt record
+  // whenever Submit is eventually pressed — unchanged from before, just no
+  // longer visually forced into one crowded card.
+  const exercises = [
+    { id: 'listening',     label: 'Listening Comprehension',   icon: Headphones, done: !!feedback },
+    { id: 'pronunciation', label: 'Pronunciation Assessment',  icon: Mic,        done: pronDone },
+    { id: 'composition',   label: 'Written Composition',       icon: PenLine,    done: writingDone },
+  ];
+
   return (
-    <div className="max-w-xl mx-auto">
+    <div className="max-w-4xl mx-auto">
       {/* Category context (no back link — parent shell owns navigation) */}
       <div className="flex items-center gap-3 mb-4">
         <span className="text-sm font-medium text-gray-700">{cat?.name}</span>
@@ -130,153 +153,203 @@ export default function PracticeSession({ cat, words, onComplete }) {
         </div>
       </div>
 
-      {/* Practice card */}
-      <div className={`bg-white rounded-2xl border-2 shadow-sm p-6 transition-all duration-300 ${
-        feedback === 'correct' ? 'border-green-400 bg-green-50'
-        : feedback === 'wrong'   ? 'border-red-400 bg-red-50'
-        : 'border-gray-100'
-      }`}>
-        <p className="text-center text-sm font-semibold text-gray-500 mb-6 uppercase tracking-wider">
-          🎧 Listen and type what you hear
-        </p>
+      <div className="flex flex-col sm:flex-row gap-5">
+        {/* ── Left panel: the three independent exercises ─────────────────── */}
+        <nav className="sm:w-56 shrink-0 bg-[#f0ede8] border border-[#e8e4dd] rounded-2xl p-3 space-y-1 h-fit">
+          <p className="px-2 pt-1 pb-2 text-[10px] font-bold uppercase tracking-widest text-[#b5a99a]">
+            Exercises
+          </p>
+          {exercises.map(ex => {
+            const Icon = ex.icon;
+            const active = activeExercise === ex.id;
+            return (
+              <button
+                key={ex.id}
+                type="button"
+                onClick={() => setActiveExercise(ex.id)}
+                aria-current={active ? 'true' : undefined}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-left transition-all ${
+                  active
+                    ? 'bg-white text-[#1a1a1a] font-semibold shadow-sm border border-[#e8e4dd]'
+                    : 'text-[#6b6259] hover:text-[#1a1a1a] hover:bg-white/60'
+                }`}
+              >
+                <Icon size={15} className={active ? 'text-indigo-500' : 'text-[#b5a99a]'} aria-hidden="true" />
+                <span className="flex-1">{ex.label}</span>
+                {ex.done && <CheckCircle2 size={14} className="text-green-500 shrink-0" aria-hidden="true" />}
+              </button>
+            );
+          })}
+        </nav>
 
-        <div className="flex justify-center mb-8">
-          <button onClick={() => play(currentWord.word)} disabled={playing}
-            aria-label="Listen to pronunciation"
-            className={`w-28 h-28 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg flex flex-col items-center justify-center gap-1 transition-all duration-200 ${
-              playing ? 'scale-95 opacity-80' : 'hover:scale-105 hover:shadow-xl'
-            }`}>
-            <Volume2 size={32} className={playing ? 'animate-pulse' : ''} aria-hidden="true" />
-            <span className="text-[10px] font-semibold opacity-80">{playing ? 'Playing…' : 'Listen'}</span>
-          </button>
-        </div>
-
-        {currentWord.phonetic && (
-          <p className="text-center text-sm text-gray-400 italic mb-1">{currentWord.phonetic}</p>
-        )}
-
-        {/* Speaking practice — the mic-based pronunciation exercise. Kept in
-           this same card (not a separate card/page) with its own reset key
-           per word so it doesn't carry state across words. */}
-        <PronunciationCheck
-          key={`pron-${currentWord.id}`}
-          word={currentWord.word}
-          wordId={currentWord.id}
-          attemptsUsed={pronAttemptsUsed}
-          budget={PRON_SESSION_BUDGET}
-          onAttempt={() => setPronAttemptsUsed(n => n + 1)}
-          onResult={(score) => { pronScoresRef.current[currentWord.id] = score; }}
-        />
-
-        <div className="mt-2" />
-
-        {feedback && (
-          <div className={`flex items-center justify-center gap-2 py-3 rounded-xl mb-4 ${
-            feedback === 'correct' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+        {/* ── Main panel: only the selected exercise ───────────────────────── */}
+        <div className="flex-1 min-w-0">
+          <div className={`bg-white rounded-2xl border-2 shadow-sm p-6 transition-all duration-300 ${
+            feedback === 'correct' ? 'border-green-400 bg-green-50'
+            : feedback === 'wrong'   ? 'border-red-400 bg-red-50'
+            : 'border-gray-100'
           }`}>
-            {feedback === 'correct'
-              ? <><CheckCircle2 size={18} aria-hidden="true" /> <span className="font-bold">Correct!</span></>
-              : <><XCircle size={18} aria-hidden="true" /> <span className="font-bold">The word was: {currentWord.word}</span></>}
-          </div>
-        )}
 
-        <form onSubmit={handleSubmit}>
-          <label htmlFor="practice-input" className="sr-only">Type the word you heard</label>
-          <input ref={inputRef} id="practice-input" type="text" value={input}
-            onChange={e => setInput(e.target.value)}
-            placeholder="Type what you heard…"
-            disabled={!!feedback}
-            autoFocus
-            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all mb-4"
-          />
-          <div className="flex gap-3">
-            <button type="submit" disabled={!input.trim() || !!feedback}
-              className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 rounded-xl font-semibold text-sm disabled:opacity-40 hover:from-indigo-700 hover:to-purple-700 transition-all shadow-sm">
-              Submit
-            </button>
-            <button type="button" onClick={handleSkip} disabled={!!feedback}
-              className="flex items-center gap-1 px-4 py-3 bg-gray-100 text-gray-600 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-all disabled:opacity-40">
-              <SkipForward size={14} aria-hidden="true" /> Skip
+            {/* Word + phonetic + Listen control are shared context for all
+                three exercises (you need to hear the word regardless of
+                which one you're doing), so they stay visible above whichever
+                section is active rather than being duplicated in each. */}
+            <div className="flex justify-center mb-6">
+              <button onClick={() => play(currentWord.word)} disabled={playing}
+                aria-label="Listen to pronunciation"
+                className={`w-20 h-20 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg flex flex-col items-center justify-center gap-1 transition-all duration-200 ${
+                  playing ? 'scale-95 opacity-80' : 'hover:scale-105 hover:shadow-xl'
+                }`}>
+                <Volume2 size={24} className={playing ? 'animate-pulse' : ''} aria-hidden="true" />
+                <span className="text-[9px] font-semibold opacity-80">{playing ? 'Playing…' : 'Listen'}</span>
+              </button>
+            </div>
+
+            {currentWord.phonetic && (
+              <p className="text-center text-sm text-gray-400 italic mb-4">{currentWord.phonetic}</p>
+            )}
+
+            {/* ── Listening Comprehension ─────────────────────────────────── */}
+            {activeExercise === 'listening' && (
+              <div>
+                <p className="text-center text-sm font-semibold text-gray-500 mb-6 uppercase tracking-wider">
+                  Listening Comprehension
+                </p>
+
+                {feedback && (
+                  <div className={`flex items-center justify-center gap-2 py-3 rounded-xl mb-4 ${
+                    feedback === 'correct' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                  }`}>
+                    {feedback === 'correct'
+                      ? <><CheckCircle2 size={18} aria-hidden="true" /> <span className="font-bold">Correct!</span></>
+                      : <><XCircle size={18} aria-hidden="true" /> <span className="font-bold">The word was: {currentWord.word}</span></>}
+                  </div>
+                )}
+
+                <form onSubmit={handleSubmit}>
+                  <label htmlFor="practice-input" className="sr-only">Type the word you heard</label>
+                  <input ref={inputRef} id="practice-input" type="text" value={input}
+                    onChange={e => setInput(e.target.value)}
+                    placeholder="Type what you heard…"
+                    disabled={!!feedback}
+                    autoFocus
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all mb-4"
+                  />
+                  <div className="flex gap-3">
+                    <button type="submit" disabled={!input.trim() || !!feedback}
+                      className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 rounded-xl font-semibold text-sm disabled:opacity-40 hover:from-indigo-700 hover:to-purple-700 transition-all shadow-sm">
+                      Submit
+                    </button>
+                    <button type="button" onClick={handleSkip} disabled={!!feedback}
+                      className="flex items-center gap-1 px-4 py-3 bg-gray-100 text-gray-600 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-all disabled:opacity-40">
+                      <SkipForward size={14} aria-hidden="true" /> Skip
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {/* ── Pronunciation Assessment ────────────────────────────────── */}
+            {activeExercise === 'pronunciation' && (
+              <div>
+                <p className="text-center text-sm font-semibold text-gray-500 mb-2 uppercase tracking-wider">
+                  Pronunciation Assessment
+                </p>
+                <p className="text-center text-xs text-gray-400 mb-2">Optional — record yourself saying the word for AI feedback.</p>
+                <PronunciationCheck
+                  key={`pron-${currentWord.id}`}
+                  word={currentWord.word}
+                  wordId={currentWord.id}
+                  attemptsUsed={pronAttemptsUsed}
+                  budget={PRON_SESSION_BUDGET}
+                  onAttempt={() => setPronAttemptsUsed(n => n + 1)}
+                  onResult={(score) => { pronScoresRef.current[currentWord.id] = score; setPronDone(true); }}
+                />
+              </div>
+            )}
+
+            {/* ── Written Composition ─────────────────────────────────────── */}
+            {activeExercise === 'composition' && (
+              <div>
+                <p className="text-center text-sm font-semibold text-gray-500 mb-2 uppercase tracking-wider">
+                  Written Composition
+                </p>
+                <p className="text-center text-xs text-gray-400 mb-2">Optional — write your own sentences using the word for AI feedback.</p>
+                <WritingCheck
+                  key={`write-${currentWord.id}`}
+                  word={currentWord.word}
+                  wordId={currentWord.id}
+                  attemptsUsed={writingAttemptsUsed}
+                  budget={WRITING_SESSION_BUDGET}
+                  onAttempt={() => setWritingAttemptsUsed(n => n + 1)}
+                  onResult={(score) => { writingScoresRef.current[currentWord.id] = score; setWritingDone(true); }}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* AI Explain */}
+          <div className="mt-4 flex justify-center">
+            <button onClick={() => fetchExplanation(currentWord.word)}
+              className="flex items-center gap-1.5 text-xs text-indigo-600 font-semibold hover:text-indigo-800 transition-colors">
+              <Sparkles size={12} aria-hidden="true" /> Ask AI to explain this word
             </button>
           </div>
-        </form>
 
-        {/* Writing practice — same card, same per-word reset pattern. Shown
-           after the listen/say-it/type-it steps, since writing your own
-           sentences with the word comes last in the learning sequence. */}
-        <div className="mt-6 pt-6 border-t border-gray-100">
-          <WritingCheck
-            key={`write-${currentWord.id}`}
-            word={currentWord.word}
-            wordId={currentWord.id}
-            attemptsUsed={writingAttemptsUsed}
-            budget={WRITING_SESSION_BUDGET}
-            onAttempt={() => setWritingAttemptsUsed(n => n + 1)}
-            onResult={(score) => { writingScoresRef.current[currentWord.id] = score; }}
-          />
+          {showExplain && (
+            <div className="mt-4 bg-indigo-50 border border-indigo-100 rounded-2xl p-4">
+              {loadingExplain ? (
+                <div className="flex items-center gap-2 text-sm text-indigo-600">
+                  <Loader2 size={14} className="animate-spin" aria-hidden="true" /> Asking AI…
+                </div>
+              ) : explanation?.error ? (
+                <p className="text-sm text-red-500">Could not load explanation. Please try again.</p>
+              ) : explanation ? (
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-start gap-2">
+                    <Info size={14} className="text-indigo-400 shrink-0 mt-0.5" aria-hidden="true" />
+                    <p className="text-gray-700"><span className="font-semibold">Definition:</span> {explanation.definition}</p>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <BookOpen size={14} className="text-indigo-400 shrink-0 mt-0.5" aria-hidden="true" />
+                    <p className="text-gray-700"><span className="font-semibold">Example:</span> <em>{explanation.example_sentence}</em></p>
+                  </div>
+                  {explanation.usage_tip && (
+                    <div className="flex items-start gap-2">
+                      <Star size={14} className="text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
+                      <p className="text-gray-700"><span className="font-semibold">Tip:</span> {explanation.usage_tip}</p>
+                    </div>
+                  )}
+                  {explanation.regional_note && explanation.regional_note !== 'null' && (
+                    <div className="flex items-start gap-2">
+                      <span className="text-sm shrink-0" aria-hidden="true">🌍</span>
+                      <p className="text-gray-600 text-xs">{explanation.regional_note}</p>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          )}
+
+          {/* Recent attempts mini log */}
+          {attempts.length > 0 && (
+            <div className="mt-5">
+              <p className="text-xs text-gray-400 mb-2 font-medium">Recent attempts</p>
+              <div className="space-y-1.5">
+                {attempts.slice(-3).map((a, i) => (
+                  <div key={i} className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium ${
+                    a.correct ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+                  }`}>
+                    {a.correct ? <CheckCircle2 size={12} aria-hidden="true" /> : <XCircle size={12} aria-hidden="true" />}
+                    <span>{a.word}</span>
+                    {!a.correct && a.userAnswer && <span className="text-gray-400 ml-auto">you typed: {a.userAnswer}</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
-
-      {/* AI Explain */}
-      <div className="mt-4 flex justify-center">
-        <button onClick={() => fetchExplanation(currentWord.word)}
-          className="flex items-center gap-1.5 text-xs text-indigo-600 font-semibold hover:text-indigo-800 transition-colors">
-          <Sparkles size={12} aria-hidden="true" /> Ask AI to explain this word
-        </button>
-      </div>
-
-      {showExplain && (
-        <div className="mt-4 bg-indigo-50 border border-indigo-100 rounded-2xl p-4">
-          {loadingExplain ? (
-            <div className="flex items-center gap-2 text-sm text-indigo-600">
-              <Loader2 size={14} className="animate-spin" aria-hidden="true" /> Asking AI…
-            </div>
-          ) : explanation?.error ? (
-            <p className="text-sm text-red-500">Could not load explanation. Please try again.</p>
-          ) : explanation ? (
-            <div className="space-y-2 text-sm">
-              <div className="flex items-start gap-2">
-                <Info size={14} className="text-indigo-400 shrink-0 mt-0.5" aria-hidden="true" />
-                <p className="text-gray-700"><span className="font-semibold">Definition:</span> {explanation.definition}</p>
-              </div>
-              <div className="flex items-start gap-2">
-                <BookOpen size={14} className="text-indigo-400 shrink-0 mt-0.5" aria-hidden="true" />
-                <p className="text-gray-700"><span className="font-semibold">Example:</span> <em>{explanation.example_sentence}</em></p>
-              </div>
-              {explanation.usage_tip && (
-                <div className="flex items-start gap-2">
-                  <Star size={14} className="text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
-                  <p className="text-gray-700"><span className="font-semibold">Tip:</span> {explanation.usage_tip}</p>
-                </div>
-              )}
-              {explanation.regional_note && explanation.regional_note !== 'null' && (
-                <div className="flex items-start gap-2">
-                  <span className="text-sm shrink-0" aria-hidden="true">🌍</span>
-                  <p className="text-gray-600 text-xs">{explanation.regional_note}</p>
-                </div>
-              )}
-            </div>
-          ) : null}
-        </div>
-      )}
-
-      {/* Recent attempts mini log */}
-      {attempts.length > 0 && (
-        <div className="mt-5">
-          <p className="text-xs text-gray-400 mb-2 font-medium">Recent attempts</p>
-          <div className="space-y-1.5">
-            {attempts.slice(-3).map((a, i) => (
-              <div key={i} className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium ${
-                a.correct ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
-              }`}>
-                {a.correct ? <CheckCircle2 size={12} aria-hidden="true" /> : <XCircle size={12} aria-hidden="true" />}
-                <span>{a.word}</span>
-                {!a.correct && a.userAnswer && <span className="text-gray-400 ml-auto">you typed: {a.userAnswer}</span>}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
