@@ -51,7 +51,7 @@ export default function SessionSummary({ cat, attempts, onPracticeAgain, onBackT
           </p>
         </div>
 
-        <div className={`grid gap-3 mb-6 ${stats.length === 4 ? 'grid-cols-4' : 'grid-cols-3'}`}>
+        <div className={`grid gap-3 mb-6 ${stats.length === 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
           {stats.map(s => {
             const cls = COLOR_CLASSES[s.color] || COLOR_CLASSES.blue;
             return (
@@ -65,15 +65,15 @@ export default function SessionSummary({ cat, attempts, onPracticeAgain, onBackT
 
         <div className="space-y-2 mb-6">
           {attempts.map((a, i) => (
-            <div key={i} className={`flex items-center justify-between px-4 py-2.5 rounded-xl border-2 ${
+            <div key={i} className={`flex items-center justify-between gap-2 px-4 py-2.5 rounded-xl border-2 ${
               a.correct ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
             }`}>
-              <div className="flex items-center gap-2 text-sm font-semibold text-gray-800">
-                {a.correct ? <CheckCircle2 size={15} className="text-green-500" aria-hidden="true" /> : <XCircle size={15} className="text-red-500" aria-hidden="true" />}
+              <div className="flex items-center gap-2 text-sm font-semibold text-gray-800 min-w-0 shrink-0">
+                {a.correct ? <CheckCircle2 size={15} className="text-green-500 shrink-0" aria-hidden="true" /> : <XCircle size={15} className="text-red-500 shrink-0" aria-hidden="true" />}
                 {a.word}
               </div>
               {!a.correct && (
-                <span className="text-xs text-gray-500">{a.userAnswer ? `you: "${a.userAnswer}"` : 'skipped'}</span>
+                <span className="text-xs text-gray-500 min-w-0 truncate">{a.userAnswer ? `you: "${a.userAnswer}"` : 'skipped'}</span>
               )}
             </div>
           ))}

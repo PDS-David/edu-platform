@@ -448,12 +448,12 @@ export default function PracticeSession({ cat, words, onComplete }) {
               <p className="text-xs text-gray-400 mb-2 font-medium">Recent attempts</p>
               <div className="space-y-1.5">
                 {attempts.slice(-3).map((a, i) => (
-                  <div key={i} className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium ${
+                  <div key={i} className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium flex-wrap ${
                     a.correct ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
                   }`}>
-                    {a.correct ? <CheckCircle2 size={12} aria-hidden="true" /> : <XCircle size={12} aria-hidden="true" />}
-                    <span>{a.word}</span>
-                    {!a.correct && a.userAnswer && <span className="text-gray-400 ml-auto">you typed: {a.userAnswer}</span>}
+                    {a.correct ? <CheckCircle2 size={12} className="shrink-0" aria-hidden="true" /> : <XCircle size={12} className="shrink-0" aria-hidden="true" />}
+                    <span className="shrink-0">{a.word}</span>
+                    {!a.correct && a.userAnswer && <span className="text-gray-400 ml-auto min-w-0 truncate max-w-full">you typed: {a.userAnswer}</span>}
                   </div>
                 ))}
               </div>
