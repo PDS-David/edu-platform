@@ -73,6 +73,7 @@ import SchoolAdminDashboard from "./pages/SchoolAdminDashboard";
 import SchoolAdminStudentReport from "./pages/SchoolAdminStudentReport";
 import AdminStudents from "./pages/AdminStudents";
 import JoinSchoolPage from "./pages/JoinSchoolPage";
+import ChooseAppPage from "./pages/ChooseAppPage";
 
 // Global floating widget
 import WhatsAppButton from "./components/WhatsAppButton";
@@ -198,6 +199,18 @@ export default function App() {
           <Route path="/school-admin/dashboard" element={<SchoolAdminDashboard />} />
           <Route path="/school-admin/settings" element={<SettingsPage />} />
           <Route path="/school-admin/students/:studentId" element={<SchoolAdminStudentReport />} />
+        </Route>
+
+        {/* CHOOSE APP — shown after login only when the account has access to
+            BOTH AISchoolonair and English Masterclass (see
+            getProductAccess() in utils/postAuthRedirect.js). skipOnboardingCheck
+            for the same reason /onboarding has it: a dual-product student who
+            hasn't finished onboarding must still see this choice first, not
+            get bounced straight to /onboarding before ever being asked. If
+            they pick AISchoolonair, /student/dashboard's own guard applies
+            the onboarding check from there as normal. */}
+        <Route element={<PrivateRoute allowedRoles={["student", "teacher"]} skipOnboardingCheck />}>
+          <Route path="/choose-app" element={<ChooseAppPage />} />
         </Route>
 
         {/* JOIN A SCHOOL — role-agnostic, any teacher or student. Was missing
