@@ -101,22 +101,25 @@ export default function EMLoginPage() {
       }}
     >
       {/* ── Minimal EM top bar ────────────────────────────────────────────── */}
-      <header className="flex items-center justify-between px-6 py-4">
-        <div className="flex items-center gap-3">
+      <header className="flex items-center justify-between flex-wrap gap-y-2 px-4 sm:px-6 py-4">
+        <div className="flex items-center gap-3 min-w-0">
           {/* Crown icon — CRIMSON[500] (EM accent colour, per design system) */}
           <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-base shadow-sm"
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-base shadow-sm shrink-0"
             style={{ background: CRIMSON[500] }}
             aria-hidden="true"
           >
             👑
           </div>
-          <div>
-            <p className="text-white font-bold text-sm leading-tight tracking-wide">
+          <div className="min-w-0">
+            <p className="text-white font-bold text-sm leading-tight tracking-wide truncate">
               English Masterclass
             </p>
+            {/* Subtitle is decorative context, not essential — dropped below
+                sm so the logo block can't force the back-link off-screen or
+                onto its own line on a narrow phone. */}
             <p
-              className="text-[10px] tracking-widest mt-0.5"
+              className="hidden sm:block text-[10px] tracking-widest mt-0.5"
               style={{ color: SOVEREIGN[200] }}
             >
               ENGLISH FLUENCY TRAINING
@@ -126,12 +129,13 @@ export default function EMLoginPage() {
 
         <Link
           to="/"
-          className="text-xs font-medium transition-colors hover:underline"
+          className="text-xs font-medium transition-colors hover:underline shrink-0"
           style={{ color: SOVEREIGN[200] }}
           onMouseEnter={e => (e.currentTarget.style.color = '#ffffff')}
           onMouseLeave={e => (e.currentTarget.style.color = SOVEREIGN[200])}
         >
-          ← Back to Home Page
+          <span className="sm:hidden">← Back</span>
+          <span className="hidden sm:inline">← Back to Home Page</span>
         </Link>
       </header>
 

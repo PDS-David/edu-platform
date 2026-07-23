@@ -683,10 +683,10 @@ export default function EMDashboard() {
                 key={i}
                 className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0"
               >
-                <div className="flex items-center gap-3">
-                  <span className="text-xl" aria-hidden="true">{s.icon_emoji || '📚'}</span>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-800">{s.category_name}</p>
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <span className="text-xl shrink-0" aria-hidden="true">{s.icon_emoji || '📚'}</span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-800 truncate">{s.category_name}</p>
                     <p className="text-xs text-gray-400">
                       {new Date(s.created_at).toLocaleDateString('en-GB', {
                         day: 'numeric', month: 'short',
@@ -694,7 +694,7 @@ export default function EMDashboard() {
                     </p>
                   </div>
                 </div>
-                <div className="text-right">
+                <div className="text-right shrink-0 ml-3">
                   <p className={`text-sm font-bold ${
                     s.accuracy >= 80
                       ? 'text-emerald-600'

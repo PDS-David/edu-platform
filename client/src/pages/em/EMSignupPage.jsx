@@ -55,30 +55,33 @@ export default function EMSignupPage() {
       className="min-h-screen flex flex-col"
       style={{ background: `linear-gradient(160deg, ${SOVEREIGN[950]} 0%, ${SOVEREIGN[900]} 100%)` }}
     >
-      <header className="flex items-center justify-between px-6 py-4">
-        <div className="flex items-center gap-3">
+      <header className="flex items-center justify-between flex-wrap gap-y-2 px-4 sm:px-6 py-4">
+        <div className="flex items-center gap-3 min-w-0">
           <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-base shadow-sm"
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-base shadow-sm shrink-0"
             style={{ background: CRIMSON[500] }}
             aria-hidden="true"
           >
             👑
           </div>
-          <div>
-            <p className="text-white font-bold text-sm leading-tight tracking-wide">
+          <div className="min-w-0">
+            <p className="text-white font-bold text-sm leading-tight tracking-wide truncate">
               English Masterclass
             </p>
-            <p className="text-[10px] tracking-widest mt-0.5" style={{ color: SOVEREIGN[200] }}>
+            {/* Dropped below sm — see EMLoginPage.jsx for why (keeps this
+                header from overflowing on a narrow phone). */}
+            <p className="hidden sm:block text-[10px] tracking-widest mt-0.5" style={{ color: SOVEREIGN[200] }}>
               ENGLISH FLUENCY TRAINING
             </p>
           </div>
         </div>
         <Link
           to="/"
-          className="text-xs font-medium transition-colors hover:underline"
+          className="text-xs font-medium transition-colors hover:underline shrink-0"
           style={{ color: SOVEREIGN[200] }}
         >
-          ← Back to Home Page
+          <span className="sm:hidden">← Back</span>
+          <span className="hidden sm:inline">← Back to Home Page</span>
         </Link>
       </header>
 

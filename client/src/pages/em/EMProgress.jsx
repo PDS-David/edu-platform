@@ -73,10 +73,10 @@ function SessionRow({ session }) {
       className="flex items-center justify-between py-3 border-b border-gray-50 last:border-0 pl-3"
       style={{ borderLeft: `3px solid ${borderColor}` }}
     >
-      <div className="flex items-center gap-3">
-        <span className="text-xl" aria-hidden="true">{icon_emoji || '📚'}</span>
-        <div>
-          <p className="text-sm font-semibold text-gray-800">{category_name}</p>
+      <div className="flex items-center gap-3 min-w-0 flex-1">
+        <span className="text-xl shrink-0" aria-hidden="true">{icon_emoji || '📚'}</span>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-gray-800 truncate">{category_name}</p>
           <p className="text-xs text-gray-400">
             {new Date(created_at).toLocaleDateString('en-GB', {
               day: 'numeric', month: 'short', year: 'numeric',

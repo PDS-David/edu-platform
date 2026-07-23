@@ -43,19 +43,19 @@ export default function EMRegisterPage() {
       className="min-h-screen flex flex-col"
       style={{ background: `linear-gradient(160deg, ${SOVEREIGN[950]} 0%, ${SOVEREIGN[900]} 100%)` }}
     >
-      <header className="flex items-center gap-3 px-6 py-4">
+      <header className="flex items-center gap-3 px-4 sm:px-6 py-4 min-w-0">
         <div
-          className="w-9 h-9 rounded-xl flex items-center justify-center text-base shadow-sm"
+          className="w-9 h-9 rounded-xl flex items-center justify-center text-base shadow-sm shrink-0"
           style={{ background: CRIMSON[500] }}
           aria-hidden="true"
         >
           👑
         </div>
-        <div>
-          <p className="text-white font-bold text-sm leading-tight tracking-wide">
+        <div className="min-w-0">
+          <p className="text-white font-bold text-sm leading-tight tracking-wide truncate">
             English Masterclass
           </p>
-          <p className="text-[10px] tracking-widest mt-0.5" style={{ color: SOVEREIGN[200] }}>
+          <p className="hidden sm:block text-[10px] tracking-widest mt-0.5" style={{ color: SOVEREIGN[200] }}>
             ENGLISH FLUENCY TRAINING
           </p>
         </div>
