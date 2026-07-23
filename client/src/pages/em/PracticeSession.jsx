@@ -13,7 +13,7 @@ import { useState, useRef } from 'react';
 import api from '../../services/apiClient';
 import {
   Volume2, CheckCircle2, XCircle, Loader2, SkipForward,
-  Info, BookOpen, Star, Sparkles, Headphones, Mic, PenLine,
+  Info, BookOpen, Star, Sparkles, Headphones, Mic, PenLine, ArrowRight, Lock,
 } from 'lucide-react';
 import DiffBadge from './DiffBadge';
 import useAudio from './useAudio';
@@ -22,17 +22,22 @@ import WritingCheck from './WritingCheck';
 
 // Soft, session-wide cap on scored speaking attempts. Each one is a Gemini
 // call, so this bounds the cost of a single practice session regardless of
-// how many times a student re-records a given word. "Soft" — once used up,
-// the mic exercise just stops offering new scored attempts; typing answers,
-// skipping, and everything else keeps working normally.
-const PRON_SESSION_BUDGET = 15;
-// Same idea for the writing exercise — separate budget, separate Gemini call.
-const WRITING_SESSION_BUDGET = 15;
+// how many times a student re-records a given word.
+//
+// IMPORTANT: pronunciation and writing are now REQUIRED for every word (see
+// allExercisesDone below) — a flat cap that could be smaller than the
+// number of words in the session would leave a student permanently unable
+// to finish once exhausted, with no way to advance past whichever word
+// they were on. The budget scales with the actual session length instead,
+// with headroom for a couple of retries per word, rather than an arbitrary
+// fixed number that assumed these were optional.
+const ATTEMPTS_PER_WORD_ALLOWANCE = 3;
 
 export default function PracticeSession({ cat, words, onComplete }) {
   const [currentIdx, setCurrentIdx]         = useState(0);
   const [input, setInput]                   = useState('');
   const [attempts, setAttempts]             = useState([]);
+  const [pendingAttempts, setPendingAttempts] = useState(null);
   const [feedback, setFeedback]             = useState(null);
   const [explanation, setExplanation]       = useState(null);
   const [loadingExplain, setLoadingExplain] = useState(false);
@@ -49,15 +54,19 @@ export default function PracticeSession({ cat, words, onComplete }) {
   // optional per word, so words the student never records for simply have
   // no entry here — see the pronunciation_score fallback below.
   const pronScoresRef                       = useRef({});
-  // Session-wide soft cap bookkeeping (see PRON_SESSION_BUDGET above).
+  // Session-wide soft cap bookkeeping (see ATTEMPTS_PER_WORD_ALLOWANCE / pronBudget above).
   const [pronAttemptsUsed, setPronAttemptsUsed] = useState(0);
   const [pronDone, setPronDone]             = useState(false);
-  // Same pattern for the writing exercise (see WRITING_SESSION_BUDGET above).
+  // Same pattern for the writing exercise (see writingBudget above).
   const writingScoresRef                        = useRef({});
   const [writingAttemptsUsed, setWritingAttemptsUsed] = useState(0);
   const [writingDone, setWritingDone]                 = useState(false);
 
   const currentWord = words[currentIdx];
+  // Scales with the actual session length — see ATTEMPTS_PER_WORD_ALLOWANCE
+  // above for why this can no longer be a flat number.
+  const pronBudget    = words.length * ATTEMPTS_PER_WORD_ALLOWANCE;
+  const writingBudget = words.length * ATTEMPTS_PER_WORD_ALLOWANCE;
   const progress    = (currentIdx / words.length) * 100;
 
   const fetchExplanation = async (word) => {
@@ -86,6 +95,7 @@ export default function PracticeSession({ cat, words, onComplete }) {
     setActiveExercise('listening');
     setPronDone(false);
     setWritingDone(false);
+    setPendingAttempts(null);
     if (currentIdx < words.length - 1) {
       setCurrentIdx(i => i + 1);
       setTimeout(() => inputRef.current?.focus(), 50);
@@ -105,29 +115,56 @@ export default function PracticeSession({ cat, words, onComplete }) {
       writing_score: writingScoresRef.current[currentWord.id] ?? null,
     }];
     setAttempts(newAttempts);
-    setTimeout(() => advance(newAttempts), 900);
+    // Does NOT advance on its own anymore — the word isn't done until
+    // pronunciation and writing are graded too. See the "Next Word" button
+    // below, which is disabled until all three are complete.
+    setPendingAttempts(newAttempts);
   };
 
   const handleSkip = () => {
+    // "Skip" still records the listening exercise as attempted-and-wrong
+    // (blank answer) rather than leaving it ungraded entirely — but, same
+    // as Submit above, it no longer jumps ahead to the next word by itself.
+    // Pronunciation and writing still have to be completed first.
     const newAttempts = [...attempts, {
       word_id: currentWord.id, word: currentWord.word, correct: false, userAnswer: '',
       pronunciation_score: pronScoresRef.current[currentWord.id] ?? null,
       writing_score: writingScoresRef.current[currentWord.id] ?? null,
     }];
     setAttempts(newAttempts);
+    setFeedback('wrong');
     setShowExplain(false);
     setExplanation(null);
     setInput('');
-    advance(newAttempts);
+    setPendingAttempts(newAttempts);
   };
 
-  // Left-panel exercise definitions — each is fully independent: a student
-  // can complete them in any order, skip one entirely, or revisit one after
-  // finishing another, none of them gate each other. Only "Listening
-  // Comprehension" advances the word (via Submit/Skip below); the other two
-  // are optional enrichment that attach a score to the same attempt record
-  // whenever Submit is eventually pressed — unchanged from before, just no
-  // longer visually forced into one crowded card.
+  // A word is only "done" once all three exercises have been graded — no
+  // more moving on after just the listening exercise. Pronunciation and
+  // writing scores get attached to the attempt record retroactively (via
+  // pendingAttempts) since their scores can land after Submit/Skip already
+  // recorded the listening result.
+  const allExercisesDone = !!feedback && pronDone && writingDone;
+
+  const handleNextWord = () => {
+    if (!allExercisesDone || !pendingAttempts) return;
+    // Attach the final pronunciation/writing scores in case either came in
+    // after the listening submission was already recorded.
+    const finalAttempts = pendingAttempts.map((a, i) =>
+      i === pendingAttempts.length - 1
+        ? { ...a, pronunciation_score: pronScoresRef.current[currentWord.id] ?? null,
+                  writing_score: writingScoresRef.current[currentWord.id] ?? null }
+        : a
+    );
+    advance(finalAttempts);
+  };
+
+  // Left-panel exercise definitions. All three are now REQUIRED for every
+  // word — a student must be graded on listening (typed spelling),
+  // pronunciation (spoken), and composition (used in a sentence) before
+  // moving to the next word. This reverses an earlier change that made
+  // pronunciation/composition optional and let listening alone advance the
+  // word — see handleSubmit/handleSkip/allExercisesDone above.
   const exercises = [
     { id: 'listening',     label: 'Listening Comprehension',   icon: Headphones, done: !!feedback },
     { id: 'pronunciation', label: 'Pronunciation Assessment',  icon: Mic,        done: pronDone },
@@ -255,13 +292,13 @@ export default function PracticeSession({ cat, words, onComplete }) {
                 <p className="text-center text-sm font-semibold text-gray-500 mb-2 uppercase tracking-wider">
                   Pronunciation Assessment
                 </p>
-                <p className="text-center text-xs text-gray-400 mb-2">Optional — record yourself saying the word for AI feedback.</p>
+                <p className="text-center text-xs text-gray-400 mb-2">Record yourself saying the word for AI feedback — required before you can move on.</p>
                 <PronunciationCheck
                   key={`pron-${currentWord.id}`}
                   word={currentWord.word}
                   wordId={currentWord.id}
                   attemptsUsed={pronAttemptsUsed}
-                  budget={PRON_SESSION_BUDGET}
+                  budget={pronBudget}
                   onAttempt={() => setPronAttemptsUsed(n => n + 1)}
                   onResult={(score) => { pronScoresRef.current[currentWord.id] = score; setPronDone(true); }}
                 />
@@ -274,19 +311,67 @@ export default function PracticeSession({ cat, words, onComplete }) {
                 <p className="text-center text-sm font-semibold text-gray-500 mb-2 uppercase tracking-wider">
                   Written Composition
                 </p>
-                <p className="text-center text-xs text-gray-400 mb-2">Optional — write your own sentences using the word for AI feedback.</p>
+                <p className="text-center text-xs text-gray-400 mb-2">Write your own sentence using the word for AI feedback — required before you can move on.</p>
                 <WritingCheck
                   key={`write-${currentWord.id}`}
                   word={currentWord.word}
                   wordId={currentWord.id}
                   attemptsUsed={writingAttemptsUsed}
-                  budget={WRITING_SESSION_BUDGET}
+                  budget={writingBudget}
                   onAttempt={() => setWritingAttemptsUsed(n => n + 1)}
                   onResult={(score) => { writingScoresRef.current[currentWord.id] = score; setWritingDone(true); }}
                 />
               </div>
             )}
           </div>
+
+          {/* ── Word mastery summary + gate to the next word ─────────────────
+              Only appears once all three exercises are graded. Shows the
+              correct spelling plus both scores in one place, and is the
+              ONLY way to move on — there's no other path to the next word,
+              matching the requirement that a word must be fully assessed
+              before another one is used. */}
+          {allExercisesDone ? (
+            <div className="mt-5 bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 rounded-2xl p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <CheckCircle2 size={18} className="text-emerald-500" aria-hidden="true" />
+                <p className="text-sm font-bold text-emerald-800">Word complete — here's how you did</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                <div className="bg-white/70 rounded-xl p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1">Correct Spelling</p>
+                  <p className="text-sm font-bold text-gray-800">{currentWord.word}</p>
+                  <p className={`text-xs mt-0.5 ${feedback === 'correct' ? 'text-emerald-600' : 'text-red-500'}`}>
+                    {feedback === 'correct' ? 'You got it right' : 'Review this one'}
+                  </p>
+                </div>
+                <div className="bg-white/70 rounded-xl p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1">Pronunciation</p>
+                  <p className="text-sm font-bold text-gray-800">
+                    {pronScoresRef.current[currentWord.id] != null ? `${pronScoresRef.current[currentWord.id]}%` : '—'}
+                  </p>
+                </div>
+                <div className="bg-white/70 rounded-xl p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1">Sentence Use</p>
+                  <p className="text-sm font-bold text-gray-800">
+                    {writingScoresRef.current[currentWord.id] != null ? `${writingScoresRef.current[currentWord.id]}%` : '—'}
+                  </p>
+                </div>
+              </div>
+              <button onClick={handleNextWord}
+                className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white py-3 rounded-xl font-semibold text-sm hover:from-emerald-700 hover:to-teal-700 transition-all shadow-sm">
+                {currentIdx < words.length - 1 ? 'Next Word' : 'Finish Session'}
+                <ArrowRight size={14} aria-hidden="true" />
+              </button>
+            </div>
+          ) : (feedback || pronDone || writingDone) ? (
+            <div className="mt-5 flex items-center gap-2 justify-center text-xs text-gray-400">
+              <Lock size={12} aria-hidden="true" />
+              <span>
+                Complete{!feedback && ' listening,'}{!pronDone && ' pronunciation,'}{!writingDone && ' composition,'} to move on
+              </span>
+            </div>
+          ) : null}
 
           {/* AI Explain */}
           <div className="mt-4 flex justify-center">
