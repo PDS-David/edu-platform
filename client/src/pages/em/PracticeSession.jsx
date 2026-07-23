@@ -20,17 +20,18 @@ import useAudio from './useAudio';
 import PronunciationCheck from './PronunciationCheck';
 import WritingCheck from './WritingCheck';
 
-// Soft, session-wide cap on scored speaking attempts. Each one is a Gemini
-// call, so this bounds the cost of a single practice session regardless of
-// how many times a student re-records a given word.
+// Soft cap on scored speaking/writing attempts PER WORD. Each scored
+// attempt is a Gemini call, so this still bounds cost — but it resets for
+// every word (see advance() below) instead of being a session-wide pool.
 //
-// IMPORTANT: pronunciation and writing are now REQUIRED for every word (see
-// allExercisesDone below) — a flat cap that could be smaller than the
-// number of words in the session would leave a student permanently unable
-// to finish once exhausted, with no way to advance past whichever word
-// they were on. The budget scales with the actual session length instead,
-// with headroom for a couple of retries per word, rather than an arbitrary
-// fixed number that assumed these were optional.
+// IMPORTANT: pronunciation and writing are REQUIRED for every word (see
+// allExercisesDone below), so this can never be a shared pool — a shared
+// pool means a student who spends heavily on retries for word 2 could
+// arrive at word 9 with no budget left and no way to ever complete it,
+// permanently stuck on a now-mandatory exercise. A per-word budget that
+// resets on every transition guarantees every word gets its own full
+// allowance regardless of how any other word went, closing that off
+// entirely rather than just making it less likely.
 const ATTEMPTS_PER_WORD_ALLOWANCE = 3;
 
 export default function PracticeSession({ cat, words, onComplete }) {
@@ -54,19 +55,21 @@ export default function PracticeSession({ cat, words, onComplete }) {
   // optional per word, so words the student never records for simply have
   // no entry here — see the pronunciation_score fallback below.
   const pronScoresRef                       = useRef({});
-  // Session-wide soft cap bookkeeping (see ATTEMPTS_PER_WORD_ALLOWANCE / pronBudget above).
+  // Per-word budget bookkeeping (see ATTEMPTS_PER_WORD_ALLOWANCE above) —
+  // both reset to 0 in advance() on every word transition, so budgetLeft in
+  // PronunciationCheck/WritingCheck always starts fresh per word.
   const [pronAttemptsUsed, setPronAttemptsUsed] = useState(0);
   const [pronDone, setPronDone]             = useState(false);
-  // Same pattern for the writing exercise (see writingBudget above).
+  // Same pattern for the writing exercise.
   const writingScoresRef                        = useRef({});
   const [writingAttemptsUsed, setWritingAttemptsUsed] = useState(0);
   const [writingDone, setWritingDone]                 = useState(false);
 
   const currentWord = words[currentIdx];
-  // Scales with the actual session length — see ATTEMPTS_PER_WORD_ALLOWANCE
-  // above for why this can no longer be a flat number.
-  const pronBudget    = words.length * ATTEMPTS_PER_WORD_ALLOWANCE;
-  const writingBudget = words.length * ATTEMPTS_PER_WORD_ALLOWANCE;
+  // Flat per-word allowance now that the budget resets every word instead
+  // of being shared across the whole session — see comment above.
+  const pronBudget    = ATTEMPTS_PER_WORD_ALLOWANCE;
+  const writingBudget = ATTEMPTS_PER_WORD_ALLOWANCE;
   const progress    = (currentIdx / words.length) * 100;
 
   const fetchExplanation = async (word) => {
@@ -95,6 +98,11 @@ export default function PracticeSession({ cat, words, onComplete }) {
     setActiveExercise('listening');
     setPronDone(false);
     setWritingDone(false);
+    // Budgets are per-word (see ATTEMPTS_PER_WORD_ALLOWANCE above) — reset
+    // the counters here so the next word starts with its own full
+    // allowance instead of inheriting whatever was left over.
+    setPronAttemptsUsed(0);
+    setWritingAttemptsUsed(0);
     setPendingAttempts(null);
     if (currentIdx < words.length - 1) {
       setCurrentIdx(i => i + 1);
