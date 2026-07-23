@@ -43,7 +43,7 @@ function InviteModal({ onClose, onCreated }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-6">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-gray-900">Add a Teacher or Student</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
