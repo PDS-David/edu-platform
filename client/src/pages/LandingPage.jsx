@@ -536,8 +536,8 @@ export default function LandingPage() {
             How We Compare
           </h2>
 
-          <div className="rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <table className="w-full text-sm">
+          <div className="rounded-2xl border border-gray-100 shadow-sm overflow-x-auto">
+            <table className="w-full min-w-[480px] text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
                   <th className="text-left px-5 py-4 text-xs font-semibold text-gray-500 w-1/2">Feature</th>
