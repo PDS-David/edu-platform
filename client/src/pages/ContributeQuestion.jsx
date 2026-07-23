@@ -331,7 +331,7 @@ export default function ContributeQuestion() {
           </div>
 
           {/* Year + Topic + Difficulty */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className={labelClass}>Year</label>
               <select value={form.year} onChange={e => handleField('year', e.target.value)} className={inputClass()}>
