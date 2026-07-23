@@ -2341,6 +2341,31 @@ const AdminDashboard = () => {
             <h1 className="text-xl font-bold text-gray-900">Good {greeting}, {firstName}</h1>
           </div>
 
+          {/* Mobile nav — the sidebar above is `hidden md:block`, so below that
+              breakpoint this is the ONLY way to reach any section. Reuses
+              navItems directly (no separate list to keep in sync), same
+              horizontal-scroll pattern already proven in TeacherDashboard.jsx. */}
+          <div className="border-b border-gray-100 md:hidden sticky top-12 bg-white z-10 overflow-x-auto">
+            <div className="flex min-w-max px-2">
+              {navItems.map(({ key, icon: Icon, label, href }) => {
+                const active = !href && activePanel === key;
+                return href ? (
+                  <a key={key} href={href}
+                    className="flex items-center gap-1.5 px-3 py-3 text-xs font-medium border-b-2 border-transparent text-gray-400 hover:text-gray-600 whitespace-nowrap">
+                    {Icon && <Icon size={13} />} {label}
+                  </a>
+                ) : (
+                  <button key={key} onClick={() => setActivePanel(active ? null : key)}
+                    className={`flex items-center gap-1.5 px-3 py-3 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
+                      active ? 'border-violet-600 text-violet-600' : 'border-transparent text-gray-400 hover:text-gray-600'
+                    }`}>
+                    {Icon && <Icon size={13} />} {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="px-6 md:px-8 py-6">
             {/* Stat cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
