@@ -43,17 +43,9 @@ const LoginPage = () => {
       const user = await login(email, password, rememberMe, 'aischoolonair');
       navigate(getPostAuthRedirect(user));
     } catch (err) {
-      const code = err?.raw?.response?.data?.code;
-      if (code === 'SERVICE_NOT_ENABLED_FOR_SCHOOL') {
-        setClosedDoor({
-          message: err?.raw?.response?.data?.error || 'Your school has not been registered for AISchoolonair.',
-          otherServiceEnabled: !!err?.raw?.response?.data?.other_service_enabled,
-        });
-      } else {
-        // Defensively extract string — err.error may be an object if server sends {error: {message:...}}
-        const raw = err?.message ?? '';
-        setError(typeof raw === 'string' ? raw : (raw?.message || 'Invalid email or password'));
-      }
+      // Defensively extract string — err.error may be an object if server sends {error: {message:...}}
+      const raw = err?.message ?? '';
+      setError(typeof raw === 'string' ? raw : (raw?.message || 'Invalid email or password'));
     } finally {
       setLoading(false);
     }

@@ -2,12 +2,12 @@
 // Full marketing landing page — no auth required.
 // 8 sections: Hero, Stats, Challenges, Features, Subjects, Pricing Preview, Comparison, Footer
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/apiClient';
 import {
   Lightbulb, BookOpen, TrendingUp, BarChart3, PenTool,
-  FileText, Check, X, Menu, ChevronRight, ChevronDown,
+  FileText, Check, X, Menu, ChevronRight,
   Mail, Phone, MapPin, Twitter, Facebook, Linkedin, Instagram,
   Volume2, Layers, Flame, Crown,
 } from 'lucide-react';
@@ -93,23 +93,7 @@ const CellIcon = ({ val }) => {
 // ══════════════════════════════════════════════════════════════════════════════
 export default function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [startFreeMenuOpen, setStartFreeMenuOpen] = useState(false);       // desktop "Start Free" dropdown
-  const [mobileStartFreeOpen, setMobileStartFreeOpen] = useState(false);   // mobile "Start Free" submenu
   const [stats, setStats] = useState(STATS_FALLBACK);
-  const startFreeMenuRef = useRef(null);
-
-  // Same click-to-open / click-outside-to-close pattern for the nav
-  // "Start Free" dropdown (see below for why this became a dropdown).
-  useEffect(() => {
-    if (!startFreeMenuOpen) return;
-    const handleClickOutside = (e) => {
-      if (startFreeMenuRef.current && !startFreeMenuRef.current.contains(e.target)) {
-        setStartFreeMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [startFreeMenuOpen]);
 
   // X5 fix: replace the two genuinely-numeric placeholder entries with real
   // counts once available. Intentionally fails silently — a landing page's
@@ -142,53 +126,25 @@ export default function LandingPage() {
         right={
           <>
             {/* Desktop nav links */}
-            <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-gray-600">
-              {/* AISchoolonair / English Masterclass — promoted from the old
-                  "Login" dropdown to direct top-level links, replacing the
-                  Features/Subjects anchor links. Since both destinations
-                  are now visible directly in the nav, a separate "Login"
-                  item is no longer needed. */}
+            <nav className="hidden md:flex items-center gap-4 text-sm font-medium text-gray-600">
+              {/* Just "Login" — there is one login now (getPostAuthRedirect
+                  decides where an authenticated account goes, including a
+                  chooser if it has both products). Previously this nav
+                  named both AISchoolonair and English Masterclass directly,
+                  and "Start Free" was a dropdown asking a visitor to pick a
+                  product before they'd even logged in — exposing both
+                  products to every visitor regardless of which one (if
+                  either) they actually have reason to use. */}
               <Link to="/login" className="hover:text-blue-600 transition-colors">
-                AISchoolonair
+                Login
               </Link>
-              <Link to="/em/login" className="hover:text-blue-600 transition-colors">
-                English Masterclass
+              <Link to="/register"
+                className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-xl transition-colors text-sm">
+                Start Free
               </Link>
-
-              {/* Start Free — was a plain Link to /register, which silently sent
-                  every visitor (including ones interested in English
-                  Masterclass) into AISchoolOnAir's signup. Now a dropdown,
-                  mirroring the Login picker above, so EM-interested visitors
-                  land on /em/login (their real entry point — see EMPrivateRoute)
-                  instead of the wrong product's signup form. */}
-              <div className="relative" ref={startFreeMenuRef}>
-                <button
-                  type="button"
-                  onClick={() => setStartFreeMenuOpen(o => !o)}
-                  aria-expanded={startFreeMenuOpen}
-                  className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-xl transition-colors text-sm"
-                >
-                  Start Free
-                  <ChevronDown size={14} className={`transition-transform ${startFreeMenuOpen ? 'rotate-180' : ''}`} />
-                </button>
-                {startFreeMenuOpen && (
-                  <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-50">
-                    <Link to="/register" onClick={() => setStartFreeMenuOpen(false)}
-                      className="block px-4 py-2.5 hover:bg-gray-50 transition-colors">
-                      <p className="font-semibold text-gray-900 text-sm">AISchoolonair</p>
-                      <p className="text-xs text-gray-400">Exam practice &amp; AI tutoring</p>
-                    </Link>
-                    <Link to="/em/signup" onClick={() => setStartFreeMenuOpen(false)}
-                      className="block px-4 py-2.5 hover:bg-gray-50 transition-colors">
-                      <p className="font-semibold text-gray-900 text-sm">English Masterclass</p>
-                      <p className="text-xs text-gray-400">English fluency training</p>
-                    </Link>
-                  </div>
-                )}
-              </div>
             </nav>
             {/* Mobile hamburger */}
-            <button onClick={() => { setMenuOpen(o => !o); setMobileStartFreeOpen(false); }} className="md:hidden p-2 text-gray-500 hover:text-gray-700">
+            <button onClick={() => setMenuOpen(o => !o)} className="md:hidden p-2 text-gray-500 hover:text-gray-700">
               {menuOpen ? <X size={22} /> : <Menu size={22} />}
             </button>
           </>
@@ -200,46 +156,13 @@ export default function LandingPage() {
       {/* Mobile dropdown menu */}
       {menuOpen && (
         <div className="md:hidden bg-white border-b border-gray-100 px-4 py-4 space-y-3 sticky top-14 z-40">
-          {/* AISchoolonair / English Masterclass — direct links, mirroring the
-              desktop nav change above. Previously this mobile menu still had
-              Features/Subjects anchor links AND a separate expandable "Login"
-              submenu, left over from before the desktop nav was updated — so
-              mobile visitors still saw the old "Login" picker even though
-              desktop had already removed it. Bringing mobile in line: no
-              anchor links, no separate Login item, just direct links. */}
-          <Link to="/login" onClick={() => setMenuOpen(false)} className="block py-1">
-            <p className="text-sm font-medium text-gray-700">AISchoolonair</p>
-            <p className="text-xs text-gray-400">Exam practice &amp; AI tutoring</p>
+          <Link to="/login" onClick={() => setMenuOpen(false)} className="block py-1 text-sm font-medium text-gray-700">
+            Login
           </Link>
-          <Link to="/em/login" onClick={() => setMenuOpen(false)} className="block py-1">
-            <p className="text-sm font-medium text-gray-700">English Masterclass</p>
-            <p className="text-xs text-gray-400">English fluency training</p>
+          <Link to="/register" onClick={() => setMenuOpen(false)}
+            className="block text-center bg-blue-600 text-white font-semibold px-4 py-2.5 rounded-xl text-sm">
+            Start Free
           </Link>
-
-          {/* Start Free — expandable submenu, mirrors the desktop dropdown */}
-          <div>
-            <button
-              type="button"
-              onClick={() => setMobileStartFreeOpen(o => !o)}
-              aria-expanded={mobileStartFreeOpen}
-              className="flex items-center justify-between w-full text-center bg-blue-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm"
-            >
-              <span className="mx-auto">Start Free</span>
-              <ChevronDown size={16} className={`transition-transform shrink-0 ${mobileStartFreeOpen ? 'rotate-180' : ''}`} />
-            </button>
-            {mobileStartFreeOpen && (
-              <div className="pl-3 mt-2 space-y-2 border-l-2 border-gray-100">
-                <Link to="/register" onClick={() => setMenuOpen(false)} className="block py-1">
-                  <p className="text-sm font-medium text-gray-700">AISchoolonair</p>
-                  <p className="text-xs text-gray-400">Exam practice &amp; AI tutoring</p>
-                </Link>
-                <Link to="/em/signup" onClick={() => setMenuOpen(false)} className="block py-1">
-                  <p className="text-sm font-medium text-gray-700">English Masterclass</p>
-                  <p className="text-xs text-gray-400">English fluency training</p>
-                </Link>
-              </div>
-            )}
-          </div>
         </div>
       )}
 

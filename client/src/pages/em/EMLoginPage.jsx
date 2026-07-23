@@ -73,26 +73,19 @@ export default function EMLoginPage() {
       // dashboard, never in the student/study view — getPostAuthRedirect is
       // the single shared source of truth for that mapping, already used by
       // the main /login page.
-      if (user?.role === 'student') {
-        if (!user?.em_registered_at) {
-          navigate('/em/register', { replace: true });
-        } else {
-          navigate('/em/dashboard', { replace: true });
-        }
+      if (user?.role === 'student' && !user?.em_registered_at) {
+        navigate('/em/register', { replace: true });
       } else {
+        // getPostAuthRedirect handles every other case, including an
+        // already-EM-registered student who also has AISchoolonair access
+        // (-> /choose-app) — using it here too, rather than hardcoding
+        // /em/dashboard, so the destination is the same regardless of
+        // which of the two login pages was used to get here.
         navigate(getPostAuthRedirect(user), { replace: true });
       }
     } catch (err) {
-      const code = err?.raw?.response?.data?.code;
-      if (code === 'SERVICE_NOT_ENABLED_FOR_SCHOOL') {
-        setClosedDoor({
-          message: err?.raw?.response?.data?.error || 'Your school has not been registered for English Masterclass.',
-          otherServiceEnabled: !!err?.raw?.response?.data?.other_service_enabled,
-        });
-      } else {
-        const raw = err?.message ?? '';
-        setError(typeof raw === 'string' ? raw : (raw?.message || 'Invalid email or password'));
-      }
+      const raw = err?.message ?? '';
+      setError(typeof raw === 'string' ? raw : (raw?.message || 'Invalid email or password'));
     } finally {
       setLoading(false);
     }
