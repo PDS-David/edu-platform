@@ -1,29 +1,33 @@
 'use strict';
 // server/routes/languageMasterclassRoutes.js
-// Routes for the French/German Masterclass proof-of-concept.
+// Generalized Language Masterclass routes — now covers all 8 supported
+// languages (english, french, german, mandarin, arabic, spanish, swahili,
+// yoruba), not just the original French/German POC.
 // Mounted at /api/language-masterclass with protect middleware already applied.
 //
 // ═══════════════════════════════════════════════════════════════════════════
-// THIS IS DELIBERATELY INCOMPLETE — read before "finishing" anything here
-// ═══════════════════════════════════════════════════════════════════════════
-// Per Da's decision, this exists to demo to a prospective client, not as a
-// finished product: enough to show the shape of the thing (levels, real
-// Gemini-scored pronunciation) without it being a fully usable course until
-// a concrete agreement is in place. On purpose, right now:
-//   - Only Beginner has any words in it (~8 per language) — nowhere near a
-//     complete tier. Intermediate/Advanced categories exist (so the level
-//     structure is visible) but are empty on purpose.
-//   - There is NO listening-dictation-check route and NO writing-score
-//     route here at all. Those two exercise types are front-end-only
-//     "yet to be completed" placeholders (see client/src/pages/lang/) —
-//     nothing to call on the backend for them yet.
+// WHAT'S REAL vs PLACEHOLDER, per language — check languages.supports_* before
+// assuming a route will do anything: pronunciation-score and writing-score
+// both check the languages table and return 501 EXERCISE_NOT_SUPPORTED
+// rather than silently pretending to grade something that isn't backed by
+// verified content/prompting for that language yet.
+//   - English: pronunciation, listening (client-side only, no backend route
+//     needed beyond /audio), and writing all supported.
+//   - French/German: pronunciation only (per commits b76c41a/3131f3d) —
+//     Beginner-only content (~8 words), Intermediate/Advanced empty on
+//     purpose. Writing/listening not yet validated for these languages.
+//   - Mandarin/Arabic/Spanish/Swahili/Yoruba: same Beginner-only seed shape,
+//     pronunciation/listening/writing NOT yet marked supported — see
+//     languages table. Flip supports_* on per-language only once that
+//     language's real backend work lands and has been verified, not as part
+//     of "generalizing" this file.
 //   - No admin CMS routes for managing categories/words (unlike English
-//     Masterclass's /admin/* routes) — content was seeded directly via
-//     the migration for this pass. Add an admin CMS here before relying on
+//     Masterclass's /admin/* routes) — content seeded directly via
+//     migrations for this pass. Add an admin CMS here before relying on
 //     non-technical staff to maintain this content long-term.
-//   - Every school defaults to enable_french = false, enable_german =
-//     false (see requireLanguageRegistration below) — nobody gets this
-//     without it being deliberately turned on for their account.
+//   - Registration/enablement now reads user_language_registrations /
+//     school_enabled_languages (join tables) instead of one column per
+//     language — see requireLanguageRegistration below.
 // ═══════════════════════════════════════════════════════════════════════════
 
 const express  = require('express');
@@ -51,8 +55,11 @@ async function q1(sql, params = []) {
   return r.rows[0] || null;
 }
 
-const LANGUAGES = ['french', 'german'];
-const LANGUAGE_LABEL = { french: 'French', german: 'German' };
+const LANGUAGES = ['english', 'french', 'german', 'mandarin', 'arabic', 'spanish', 'swahili', 'yoruba'];
+const LANGUAGE_LABEL = {
+  english: 'English', french: 'French', german: 'German', mandarin: 'Mandarin',
+  arabic: 'Arabic', spanish: 'Spanish', swahili: 'Swahili', yoruba: 'Yoruba',
+};
 
 // Validates :language on every route below and rejects anything else with a
 // clear 400 rather than silently matching nothing.
@@ -109,9 +116,8 @@ function computeUnlocked(byDiff) {
 router.post('/:language/register', async (req, res) => {
   const { language } = req.params;
   const userId = req.user.id;
-  const enableCol = `enable_${language}`;
 
-  if (req.school && !req.school[enableCol]) {
+  if (req.school && Array.isArray(req.school.enabledLanguages) && !req.school.enabledLanguages.includes(language)) {
     return res.status(403).json({
       success: false,
       error: `Your school has not been registered for ${LANGUAGE_LABEL[language]} Masterclass yet. Contact your school admin or App Admin.`,
@@ -120,27 +126,34 @@ router.post('/:language/register', async (req, res) => {
   }
 
   try {
-    const col = `${language}_registered_at`;
     const row = await q1(
-      `UPDATE users SET ${col} = COALESCE(${col}, NOW()) WHERE id = $1 RETURNING ${col}`,
-      [userId]
+      `INSERT INTO user_language_registrations (user_id, language)
+       VALUES ($1, $2)
+       ON CONFLICT (user_id, language) DO NOTHING
+       RETURNING registered_at`,
+      [userId, language]
     );
-    if (!row) return res.status(404).json({ success: false, error: 'User not found' });
-    res.json({ success: true, registered_at: row[col] });
+    const registeredAt = row?.registered_at || (await q1(
+      `SELECT registered_at FROM user_language_registrations WHERE user_id = $1 AND language = $2`,
+      [userId, language]
+    ))?.registered_at;
+    res.json({ success: true, registered_at: registeredAt });
   } catch (err) {
     console.error(`[LangMasterclass] POST /${language}/register`, err.message);
     res.status(500).json({ success: false, error: `Could not complete ${LANGUAGE_LABEL[language]} Masterclass registration.` });
   }
 });
 
-// Gate: mirrors requireEmRegistration in englishMasterclassRoutes.js exactly —
-// tenant boundary first (live on every request, for every role tied to a
-// school), then the student-specific one-time opt-in.
+// Gate: mirrors requireEmRegistration in englishMasterclassRoutes.js in intent
+// (tenant boundary first, then the student-specific one-time opt-in), but
+// reads the user_language_registrations / school_enabled_languages join
+// tables instead of one column per language -- the column-per-language
+// pattern (enable_french, french_registered_at, ...) does not scale to 8
+// languages, let alone more later.
 function requireLanguageRegistration(req, res, next) {
   const { language } = req.params;
-  const enableCol = `enable_${language}`;
 
-  if (req.school && !req.school[enableCol]) {
+  if (req.school && Array.isArray(req.school.enabledLanguages) && !req.school.enabledLanguages.includes(language)) {
     return res.status(403).json({
       success: false,
       error: `Your school has not been registered for ${LANGUAGE_LABEL[language]} Masterclass yet. Contact your school admin or App Admin.`,
@@ -149,8 +162,8 @@ function requireLanguageRegistration(req, res, next) {
   }
   if (req.user.role !== 'student') return next();
 
-  const col = `${language}_registered_at`;
-  if (!req.user[col]) {
+  const registered = Array.isArray(req.user.registeredLanguages) && req.user.registeredLanguages.includes(language);
+  if (!registered) {
     return res.status(403).json({
       success: false,
       error: `You need to register for ${LANGUAGE_LABEL[language]} Masterclass before you can access it.`,
@@ -344,11 +357,105 @@ Respond in this exact JSON format, no markdown, no extra text:
   }
 });
 
+// POST /api/language-masterclass/:language/writing-score
+// Ported from englishMasterclassRoutes.js's /writing-score, generalized by
+// language. Gated by languages.supports_writing (seeded true for English
+// only, per what actually exists in code today -- French/German and the
+// 5 new languages don't have real writing content/grading validated yet,
+// so this returns a clear 501 rather than silently pretending to grade).
+router.post('/:language/writing-score', pronunciationLimiter, async (req, res) => {
+  const { language } = req.params;
+  const label = LANGUAGE_LABEL[language];
+
+  const support = await q1(`SELECT supports_writing FROM languages WHERE code = $1`, [language]);
+  if (!support?.supports_writing) {
+    return res.status(501).json({
+      success: false,
+      error: `Written composition scoring isn't available for ${label} yet.`,
+      code: 'EXERCISE_NOT_SUPPORTED',
+    });
+  }
+
+  const { word, word_id, prompt, text, sentence_count } = req.body;
+  const userId = req.user.id;
+  if (!word)  return res.status(400).json({ success: false, error: 'word is required' });
+  if (!text || !text.trim()) return res.status(400).json({ success: false, error: 'text is required' });
+  if (text.length > 4000) {
+    return res.status(413).json({ success: false, error: 'That response is too long. Please shorten it a little.' });
+  }
+
+  const requiredCount = Number.isInteger(sentence_count) && sentence_count > 0 ? sentence_count : 1;
+  const effectivePrompt = prompt || (requiredCount === 1
+    ? `Write one sentence using the word "${word}" correctly.`
+    : `Write ${requiredCount} different sentences using the word "${word}" correctly.`);
+
+  try {
+    const gradingPrompt = `You are a supportive ${label} writing coach for learners around the world. Do NOT penalise regional vocabulary or spelling choices that are correct in different varieties of ${label} -- only genuine grammar errors or misuse of the target word.
+
+The student was asked to: "${effectivePrompt}"
+They needed to write exactly ${requiredCount} distinct sentence(s), each correctly using the target word, in ${label}.
+Target word: "${word}"
+Student's response: "${text.trim()}"
+
+First, count how many separate sentences the student actually wrote (lines/sentences separated by line breaks, full stops, or similar). Then evaluate whether the target word was used correctly (right meaning, right grammatical form) in each sentence, and whether each sentence is grammatically sound in ${label}.
+
+Respond in this exact JSON format, no markdown, no extra text:
+{
+  "score": <integer 0-100, reflecting BOTH correct usage/grammar AND whether they wrote the required number of sentences>,
+  "sentences_written": <integer, how many distinct sentences you counted>,
+  "sentence_count_met": <true if sentences_written >= ${requiredCount}, false otherwise>,
+  "used_word_correctly": <true if the word was used correctly in all or nearly all sentences, false otherwise>,
+  "grammar_notes": "one short note on any grammar issue, or empty string if none",
+  "feedback": "one short, encouraging sentence (max 20 words). If they wrote fewer than ${requiredCount} sentences, gently say so."
+}`;
+
+    const raw = await generate(gradingPrompt, 'writing-score');
+    const cleaned = raw.replace(/```json|```/g, '').trim();
+
+    let data;
+    try { data = JSON.parse(cleaned); } catch { data = null; }
+
+    if (!data || typeof data.score !== 'number') {
+      return res.json({ success: false, error: 'Could not evaluate that response. Please try again.' });
+    }
+
+    const score = Math.max(0, Math.min(100, Math.round(data.score)));
+    const sentencesWritten = Number.isInteger(data.sentences_written) ? data.sentences_written : null;
+    const sentenceCountMet = typeof data.sentence_count_met === 'boolean'
+      ? data.sentence_count_met
+      : (sentencesWritten !== null ? sentencesWritten >= requiredCount : null);
+
+    try {
+      await db.query(`
+        INSERT INTO lang_writing_submissions
+          (user_id, language, word_id, word_text, prompt, submission_text, score, used_word_correctly, grammar_notes, feedback,
+           sentence_count_required, sentence_count_written, sentence_count_met)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+      `, [userId, language, word_id || null, word, effectivePrompt, text.trim(), score, !!data.used_word_correctly, data.grammar_notes || null, data.feedback || null,
+          requiredCount, sentencesWritten, sentenceCountMet]);
+    } catch (persistErr) {
+      console.warn(`[LangMasterclass] ${language} writing-score persistence failed:`, persistErr.message);
+    }
+
+    return res.json({
+      success: true,
+      score,
+      used_word_correctly: !!data.used_word_correctly,
+      sentence_count_required: requiredCount,
+      sentences_written: sentencesWritten,
+      sentence_count_met: sentenceCountMet,
+      grammar_notes: data.grammar_notes || '',
+      feedback: data.feedback || '',
+    });
+  } catch (err) {
+    console.error(`[LangMasterclass] POST /${language}/writing-score`, err.message);
+    res.status(500).json({ success: false, error: 'Writing check is temporarily unavailable. Please try again shortly.' });
+  }
+});
+
 // POST /api/language-masterclass/:language/sessions
 // Saves one practice session's tally so level-progress math (below) has
-// something to read. Only pronunciation attempts contribute to
-// correct_words/total_words right now — there is no listening or writing
-// scoring to fold in yet (see the file-level note at the top).
+// something to read.
 router.post('/:language/sessions', async (req, res) => {
   const { language } = req.params;
   const { category_id, difficulty, total_words, correct_words } = req.body;
