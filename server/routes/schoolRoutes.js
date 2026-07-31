@@ -312,14 +312,31 @@ router.get('/:id/roster', protect, authorize('admin'), async (req, res) => {
 // AFTER creation (e.g. a school registered for AISchoolonair only later
 // decides to add English Masterclass) — without this, a mistake or a
 // changed mind at registration time would need a direct DB edit.
+//
+// enable_french / enable_german are optional on this endpoint, unlike the
+// two required fields below: a school must always have at least one of
+// AISchoolonair or English Masterclass, but French/German Masterclass are
+// pure add-ons on top (deliberately incomplete proof-of-concept products —
+// see server/routes/languageMasterclassRoutes.js) that a school can have
+// zero, one, or both of. Omitting them from the request body leaves
+// whatever they're currently set to unchanged, rather than resetting them
+// to false on every unrelated services update.
 router.patch('/:id/services', protect, authorize('admin'), async (req, res) => {
   const enableAISchoolonair = req.body.enable_aischoolonair;
   const enableEM            = req.body.enable_em;
+  const enableFrench        = req.body.enable_french;
+  const enableGerman        = req.body.enable_german;
   if (typeof enableAISchoolonair !== 'boolean' || typeof enableEM !== 'boolean') {
     return res.status(400).json({
       success: false,
       error: 'enable_aischoolonair and enable_em must both be provided as true/false',
     });
+  }
+  if (enableFrench !== undefined && typeof enableFrench !== 'boolean') {
+    return res.status(400).json({ success: false, error: 'enable_french must be true/false if provided' });
+  }
+  if (enableGerman !== undefined && typeof enableGerman !== 'boolean') {
+    return res.status(400).json({ success: false, error: 'enable_german must be true/false if provided' });
   }
   if (!enableAISchoolonair && !enableEM) {
     return res.status(400).json({
@@ -329,10 +346,15 @@ router.patch('/:id/services', protect, authorize('admin'), async (req, res) => {
   }
   try {
     const rows = await q(
-      `UPDATE schools SET enable_aischoolonair = $1, enable_em = $2, updated_at = NOW()
-        WHERE id = $3
-       RETURNING id, name, enable_aischoolonair, enable_em`,
-      [enableAISchoolonair, enableEM, req.params.id]
+      `UPDATE schools
+          SET enable_aischoolonair = $1,
+              enable_em            = $2,
+              enable_french        = COALESCE($3, enable_french),
+              enable_german        = COALESCE($4, enable_german),
+              updated_at           = NOW()
+        WHERE id = $5
+       RETURNING id, name, enable_aischoolonair, enable_em, enable_french, enable_german`,
+      [enableAISchoolonair, enableEM, enableFrench ?? null, enableGerman ?? null, req.params.id]
     );
     if (!rows.length) return res.status(404).json({ success: false, error: 'School not found' });
     return res.json({ success: true, data: rows[0] });
