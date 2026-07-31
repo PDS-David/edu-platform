@@ -73,6 +73,8 @@ import SchoolAdminDashboard from "./pages/SchoolAdminDashboard";
 import SchoolAdminStudentReport from "./pages/SchoolAdminStudentReport";
 import AdminStudents from "./pages/AdminStudents";
 import JoinSchoolPage from "./pages/JoinSchoolPage";
+import FrenchMasterclass from "./pages/FrenchMasterclass";
+import GermanMasterclass from "./pages/GermanMasterclass";
 import ChooseAppPage from "./pages/ChooseAppPage";
 
 // Global floating widget
@@ -217,6 +219,17 @@ export default function App() {
             entirely before: POST /api/schools/join existed but had no UI. */}
         <Route element={<PrivateRoute allowedRoles={["student", "teacher"]} />}>
           <Route path="/join-school" element={<JoinSchoolPage />} />
+        </Route>
+
+        {/* FRENCH / GERMAN MASTERCLASS — deliberately incomplete proof-of-concept,
+            not wired into the ChooseAppPage/getPostAuthRedirect login unification
+            on purpose (see LanguageMasterclass.jsx header comment). Own
+            registration gate (POST /language-masterclass/:language/register),
+            skipOnboardingCheck since this is independent of AISchoolonair's
+            subject-selection onboarding. */}
+        <Route element={<PrivateRoute allowedRoles={["student", "teacher"]} skipOnboardingCheck />}>
+          <Route path="/french" element={<FrenchMasterclass />} />
+          <Route path="/german" element={<GermanMasterclass />} />
         </Route>
 
         {/* FALLBACK */}
