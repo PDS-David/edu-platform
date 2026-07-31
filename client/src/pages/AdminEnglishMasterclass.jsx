@@ -1,5 +1,5 @@
 // client/src/pages/AdminEnglishMasterclass.jsx
-// Admin panel for managing English Masterclass content:
+// Admin panel for managing Language Masterclass content (English, currently):
 // categories, words, and AI word-list generation.
 
 import { useState, useEffect, useCallback, useRef, useId } from 'react';
@@ -551,7 +551,7 @@ export default function AdminEnglishMasterclass() {
             <span className="text-lg">🎓</span>
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">English Masterclass</h1>
+            <h1 className="text-xl font-bold text-gray-900">Language Masterclass</h1>
             <p className="text-xs text-gray-500">Manage vocabulary categories and words</p>
           </div>
         </div>

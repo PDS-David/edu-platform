@@ -26,7 +26,7 @@ export default function LevelsView({ levelProgress, byDiff, onStart, loadingCatI
     <div>
       {levelProgress && !hasAnyProgress && (
         <div className="mb-8 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-6 text-white">
-          <h2 className="text-xl font-bold mb-1">Welcome to English Masterclass 🎓</h2>
+          <h2 className="text-xl font-bold mb-1">Welcome to Language Masterclass 🎓</h2>
           <p className="text-sm text-indigo-100 leading-relaxed">
             Master English vocabulary step by step. Start with <span className="font-semibold">Beginner</span> categories below.
             Answer 30 questions at 70% accuracy or higher to unlock the next level!

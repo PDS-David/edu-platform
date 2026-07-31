@@ -156,7 +156,7 @@ const LoginPage = () => {
                   </div>
                   {closedDoor.otherServiceEnabled && (
                     <p className="text-sm text-amber-700 mt-2 ml-6">
-                      Your school does have English Masterclass — try{' '}
+                      Your school does have Language Masterclass — try{' '}
                       <Link to="/em/login" className="font-semibold underline">signing in there</Link> instead.
                     </p>
                   )}

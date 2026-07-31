@@ -109,7 +109,7 @@ function WelcomeBanner({ onStart }) {
       className="rounded-3xl p-6 sm:p-8 relative overflow-hidden"
       style={{ background: SOVEREIGN[800], boxShadow: SHADOW.tier2 }}
       role="region"
-      aria-label="Welcome to English Masterclass"
+      aria-label="Welcome to Language Masterclass"
     >
       {/* Decorative sovereign glow */}
       <div
@@ -130,7 +130,7 @@ function WelcomeBanner({ onStart }) {
             👑
           </div>
           <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: SOVEREIGN[300] }}>
-            Welcome to English Masterclass
+            Welcome to Language Masterclass
           </p>
         </div>
 
@@ -204,7 +204,7 @@ function HowItWorksModal({ school, onClose }) {
         <div className="p-6 sm:p-7">
           <div className="flex items-start justify-between mb-4">
             <h2 id="how-it-works-heading" className="text-lg font-bold text-gray-900">
-              How English Masterclass works
+              How Language Masterclass works
             </h2>
             <button
               onClick={onClose}
@@ -511,7 +511,7 @@ export default function EMDashboard() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-0.5">
-            🎓 English Masterclass
+            🎓 Language Masterclass
           </p>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 leading-tight">
             {greeting}, {firstName}!

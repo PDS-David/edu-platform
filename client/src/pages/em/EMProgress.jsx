@@ -198,7 +198,7 @@ export function ProgressContent() {
 
       <div className="flex items-start justify-between gap-3 mb-2">
         <PrintableReportHeader
-          title="English Masterclass Progress Report"
+          title="Language Masterclass Progress Report"
           subtitle={studentName}
         />
         <PrintReportButton className="no-print shrink-0 mt-1" />
@@ -306,7 +306,7 @@ export default function EMProgress() {
           className="text-xs font-semibold uppercase tracking-widest mb-1"
           style={{ color: SOVEREIGN[500] }}
         >
-          English Masterclass
+          Language Masterclass
         </p>
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">My Progress</h1>
       </div>
