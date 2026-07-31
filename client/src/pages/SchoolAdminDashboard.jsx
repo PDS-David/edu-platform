@@ -260,7 +260,7 @@ export default function SchoolAdminDashboard() {
               <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
                 <span className="text-[11px] font-bold text-indigo-500 mb-2 block">EM</span>
                 <p className="text-xl font-bold text-gray-900">{(roster || []).filter(u => u.uses_english_masterclass).length}</p>
-                <p className="text-xs text-gray-400">Use English Masterclass</p>
+                <p className="text-xs text-gray-400">Use Language Masterclass</p>
               </div>
             </div>
 
@@ -298,7 +298,7 @@ export default function SchoolAdminDashboard() {
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-gray-400">{u.email}</span>
                       {u.uses_english_masterclass && (
-                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600" title="Also uses English Masterclass">
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600" title="Also uses Language Masterclass">
                           EM
                         </span>
                       )}

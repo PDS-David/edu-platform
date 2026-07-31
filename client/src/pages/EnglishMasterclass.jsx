@@ -1,5 +1,5 @@
 // client/src/pages/EnglishMasterclass.jsx
-// English Masterclass practice orchestrator. Progressive difficulty:
+// Language Masterclass practice orchestrator (English instance). Progressive difficulty:
 // Beginner always open, Intermediate/Advanced unlock after answering 30+
 // questions cumulatively in the prior tier at ≥70% accuracy.
 //
@@ -54,7 +54,7 @@ export default function EnglishMasterclass({ initialCategory = null }) {
         // If EMDashboard navigated here with a pre-selected category, start immediately
         if (initialCategory) startPractice(initialCategory);
       })
-      .catch(e => setInitError(e.message || 'Failed to load English Masterclass'))
+      .catch(e => setInitError(e.message || 'Failed to load Language Masterclass'))
       .finally(() => setLoadingInit(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -119,7 +119,7 @@ export default function EnglishMasterclass({ initialCategory = null }) {
         {loadingInit && (
           <div className="flex items-center justify-center py-24" role="status">
             <Loader2 size={24} className="animate-spin text-indigo-500 mr-3" aria-hidden="true" />
-            <span className="text-gray-500 text-sm">Loading English Masterclass…</span>
+            <span className="text-gray-500 text-sm">Loading Language Masterclass…</span>
           </div>
         )}
 

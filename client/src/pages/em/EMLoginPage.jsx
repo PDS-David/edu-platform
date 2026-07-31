@@ -42,7 +42,7 @@ export default function EMLoginPage() {
     const reason = location.state?.closedDoor;
     if (reason?.service === 'em') {
       setClosedDoor({
-        message: 'Your school has not been registered for English Masterclass. Contact your school admin or App Admin.',
+        message: 'Your school has not been registered for Language Masterclass. Contact your school admin or App Admin.',
         otherServiceEnabled: !!reason.otherServiceEnabled,
       });
       // Clear the state so a manual refresh of /em/login doesn't keep
@@ -113,7 +113,7 @@ export default function EMLoginPage() {
           </div>
           <div className="min-w-0">
             <p className="text-white font-bold text-sm leading-tight tracking-wide truncate">
-              English Masterclass
+              Language Masterclass
             </p>
             {/* Subtitle is decorative context, not essential — dropped below
                 sm so the logo block can't force the back-link off-screen or
@@ -233,7 +233,7 @@ export default function EMLoginPage() {
                 </div>
                 <div>
                   <p className="font-bold text-gray-900 text-sm leading-tight">
-                    English Masterclass
+                    Language Masterclass
                   </p>
                   <p className="text-[10px] tracking-widest text-gray-400 uppercase">
                     English Learning Platform
@@ -250,7 +250,7 @@ export default function EMLoginPage() {
 
               <h2 className="text-2xl font-bold text-gray-900 mb-1">Sign In</h2>
               <p className="text-sm text-gray-500 mb-7">
-                Access your English Masterclass account.
+                Access your Language Masterclass account.
               </p>
 
               {/* Error banner */}
@@ -266,7 +266,7 @@ export default function EMLoginPage() {
               )}
 
               {/* Closed door: credentials were correct, but this school
-                  hasn't been granted access to English Masterclass. */}
+                  hasn't been granted access to Language Masterclass. */}
               {closedDoor && (
                 <div
                   className="mb-5 p-4 rounded-xl border"
@@ -408,7 +408,7 @@ export default function EMLoginPage() {
                       </svg>
                       Signing in…
                     </span>
-                  ) : 'Sign In to English Masterclass'}
+                  ) : 'Sign In to Language Masterclass'}
                 </button>
 
               </form>
@@ -421,7 +421,7 @@ export default function EMLoginPage() {
               </div>
 
               <p className="text-center text-xs text-gray-500">
-                New to English Masterclass?{' '}
+                New to Language Masterclass?{' '}
                 <Link
                   to="/em/signup"
                   className="font-semibold hover:underline"
@@ -442,7 +442,7 @@ export default function EMLoginPage() {
         className="text-center text-[11px] pb-4"
         style={{ color: `${SOVEREIGN[300]}66` }}
       >
-        English Masterclass is powered by{' '}
+        Language Masterclass is powered by{' '}
         <span style={{ color: `${SOVEREIGN[300]}99` }}>{branding.poweredByFull}</span>
       </p>
     </div>

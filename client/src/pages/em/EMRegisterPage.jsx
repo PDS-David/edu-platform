@@ -53,7 +53,7 @@ export default function EMRegisterPage() {
         </div>
         <div className="min-w-0">
           <p className="text-white font-bold text-sm leading-tight tracking-wide truncate">
-            English Masterclass
+            Language Masterclass
           </p>
           <p className="hidden sm:block text-[10px] tracking-widest mt-0.5" style={{ color: SOVEREIGN[200] }}>
             ENGLISH FLUENCY TRAINING
@@ -71,7 +71,7 @@ export default function EMRegisterPage() {
           </h1>
           <p className="text-sm text-gray-600 mb-6 leading-relaxed">
             You're signed in with your AISchoolOnAir account, {user?.first_name || 'there'} —
-            but English Masterclass needs its own quick registration before you
+            but Language Masterclass needs its own quick registration before you
             can start practising. This only takes a second and only needs to
             be done once.
           </p>
@@ -91,7 +91,7 @@ export default function EMRegisterPage() {
             className="w-full rounded-xl py-3 text-sm font-semibold text-white transition-opacity disabled:opacity-60"
             style={{ background: SOVEREIGN[700] }}
           >
-            {loading ? 'Registering…' : 'Register for English Masterclass'}
+            {loading ? 'Registering…' : 'Register for Language Masterclass'}
           </button>
 
           <button

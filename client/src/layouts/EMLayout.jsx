@@ -66,7 +66,7 @@ export default function EMLayout() {
           <NavLink
             to="/em/dashboard"
             className="flex items-center gap-2.5 shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 rounded-lg"
-            aria-label="English Masterclass — go to dashboard"
+            aria-label="Language Masterclass — go to dashboard"
           >
             {/* Crown icon (default), or the tenant school's own logo when
                 one has been uploaded — same logo+name treatment as the
@@ -84,7 +84,7 @@ export default function EMLayout() {
             </div>
             <div className="hidden sm:block leading-none">
               {/* Same hierarchy as SchoolAdminDashboard.jsx's header: school
-                  name is the primary bold line, not "English Masterclass" —
+                  name is the primary bold line, not "Language Masterclass" —
                   that was competing with the school's own name/logo for
                   prominence, which is exactly backwards for a tenant
                   school's own students. Role + product badges take the
@@ -93,7 +93,7 @@ export default function EMLayout() {
                 className="font-bold text-sm tracking-wide text-white leading-tight"
                 style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
               >
-                {user?.school?.name || 'English Masterclass'}
+                {user?.school?.name || 'Language Masterclass'}
               </p>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <p className="text-[10px] capitalize" style={{ color: SOVEREIGN[300] }}>
@@ -135,7 +135,7 @@ export default function EMLayout() {
               style={{ color: SOVEREIGN[300] }}
               onMouseEnter={e => (e.currentTarget.style.color = '#ffffff')}
               onMouseLeave={e => (e.currentTarget.style.color = SOVEREIGN[300])}
-              aria-label="Sign out of English Masterclass"
+              aria-label="Sign out of Language Masterclass"
             >
               <LogOut size={14} aria-hidden="true" />
               <span className="hidden sm:inline">Sign out</span>
@@ -159,10 +159,10 @@ export default function EMLayout() {
               page content via flex-col on narrow screens). */}
           <nav
             className="sm:w-56 shrink-0 bg-[#f0ede8] border border-[#e8e4dd] rounded-2xl p-3 space-y-1 h-fit w-full"
-            aria-label="English Masterclass navigation"
+            aria-label="Language Masterclass navigation"
           >
             <p className="px-2 pt-1 pb-2 text-[10px] font-bold uppercase tracking-widest text-[#b5a99a]">
-              English Masterclass
+              Language Masterclass
             </p>
             {NAV_LINKS.map(({ to, label, Icon }) => (
               <NavLink
@@ -200,7 +200,7 @@ export default function EMLayout() {
         className="py-4 text-center text-[11px]"
         style={{ background: SOVEREIGN[950], color: `${SOVEREIGN[300]}88` }}
       >
-        English Masterclass &nbsp;·&nbsp; Educational Advancement Centre &nbsp;·&nbsp;
+        Language Masterclass &nbsp;·&nbsp; Educational Advancement Centre &nbsp;·&nbsp;
         Pronoia Digital Services &nbsp;·&nbsp; +234 810 755 1000
       </footer>
     </div>

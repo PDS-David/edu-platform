@@ -86,7 +86,7 @@ export default function ChooseAppPage() {
             <div className="w-11 h-11 rounded-xl bg-indigo-50 flex items-center justify-center mb-4">
               <Volume2 size={22} className="text-indigo-600" aria-hidden="true" />
             </div>
-            <h2 className="font-bold text-gray-900 mb-1">English Masterclass</h2>
+            <h2 className="font-bold text-gray-900 mb-1">Language Masterclass</h2>
             <p className="text-sm text-gray-500 mb-4">Vocabulary, pronunciation, and written English practice.</p>
             <span className="inline-flex items-center gap-1 text-sm font-semibold text-indigo-600">
               Continue <ChevronRight size={15} className="group-hover:translate-x-0.5 transition-transform" />

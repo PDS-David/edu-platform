@@ -178,7 +178,7 @@ export default function LanguageMasterclass({ language }) {
             <AlertCircle size={28} className="text-red-400 mx-auto mb-3" />
             <p className="text-sm text-gray-600 mb-4">{error}</p>
             <Link to="/em/dashboard" className="text-sm font-semibold" style={{ color: meta.accent }}>
-              ← Back to English Masterclass
+              ← Back to Language Masterclass
             </Link>
           </div>
         )}

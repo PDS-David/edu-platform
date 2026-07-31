@@ -66,7 +66,7 @@ export default function EMSignupPage() {
           </div>
           <div className="min-w-0">
             <p className="text-white font-bold text-sm leading-tight tracking-wide truncate">
-              English Masterclass
+              Language Masterclass
             </p>
             {/* Dropped below sm — see EMLoginPage.jsx for why (keeps this
                 header from overflowing on a narrow phone). */}
@@ -242,7 +242,7 @@ export default function EMSignupPage() {
           </div>
 
           <p className="text-center text-xs text-gray-500">
-            Already have an English Masterclass account?{' '}
+            Already have a Language Masterclass account?{' '}
             <Link to="/em/login" className="font-semibold hover:underline" style={{ color: SOVEREIGN[700] }}>
               Sign in
             </Link>
@@ -251,7 +251,7 @@ export default function EMSignupPage() {
       </div>
 
       <p className="text-center text-[11px] pb-4" style={{ color: `${SOVEREIGN[300]}66` }}>
-        English Masterclass is powered by{' '}
+        Language Masterclass is powered by{' '}
         <span style={{ color: `${SOVEREIGN[300]}99` }}>{branding.poweredByFull}</span>
       </p>
     </div>

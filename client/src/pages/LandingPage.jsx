@@ -396,7 +396,7 @@ export default function LandingPage() {
               <Crown size={12} /> New · English Fluency Training
             </span>
             <h2 className="text-2xl sm:text-3xl font-extrabold leading-tight">
-              Master English with English Masterclass
+              Master Languages with Language Masterclass
             </h2>
             <p className="text-sm sm:text-base leading-relaxed max-w-lg" style={{ color: SOVEREIGN[200] }}>
               A standalone vocabulary and pronunciation trainer built for non-native English
@@ -425,7 +425,7 @@ export default function LandingPage() {
               className="inline-flex items-center gap-2 font-bold px-6 py-3 rounded-xl transition-colors shadow-lg text-sm"
               style={{ background: CRIMSON[500], color: '#ffffff' }}
             >
-              Explore English Masterclass <ChevronRight size={16} />
+              Explore Language Masterclass <ChevronRight size={16} />
             </Link>
             <p className="text-xs" style={{ color: SOVEREIGN[300] }}>
               Its own account, its own registration — no AISchoolonair account needed.
@@ -606,7 +606,7 @@ export default function LandingPage() {
           <div>
             <p className="text-white text-xs font-bold uppercase tracking-wider mb-3">Platform</p>
             <ul className="space-y-2">
-              {[['English Masterclass', '/english-masterclass'], ['Subjects', '/subjects'], ['Register', '/register'], ['Login', '/login']].map(([l, h]) => (
+              {[['Language Masterclass', '/english-masterclass'], ['Subjects', '/subjects'], ['Register', '/register'], ['Login', '/login']].map(([l, h]) => (
                 <li key={l}><Link to={h} className="text-xs hover:text-white transition-colors">{l}</Link></li>
               ))}
             </ul>
