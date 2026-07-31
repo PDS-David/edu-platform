@@ -1739,6 +1739,178 @@ async function run() {
     `ALTER TABLE schools ADD COLUMN IF NOT EXISTS logo_url TEXT`
   );
 
+  // ═══════════════════════════════════════════════════════════════════════
+  // FRENCH / GERMAN MASTERCLASS — proof-of-concept, deliberately incomplete
+  // ═══════════════════════════════════════════════════════════════════════
+  // Per Da's decision: this is presales/demo collateral, not a finished
+  // product — enough to show a prospective client the shape of the thing
+  // (levels, categories, real Gemini-scored pronunciation practice) without
+  // it being a fully usable course yet. Specifically, on purpose:
+  //   - enable_french / enable_german both DEFAULT false, same pattern as
+  //     enable_em above — no existing school gets this without someone
+  //     deliberately turning it on for a specific demo/client account.
+  //   - Only ONE category is seeded per language (Beginner), with a small
+  //     handful of words — nowhere near a complete Beginner tier. This is
+  //     intentional, not a content-authoring gap to "finish later" blindly;
+  //     see TODO.md / the handoff note for what's still deliberately absent
+  //     (Intermediate, Advanced, Listening Comprehension, Writing
+  //     Composition) before building any of it out.
+  //   - No lang_writing_submissions / no writing-score route, and no
+  //     listening-dictation check route, at all — those two exercise types
+  //     are UI-only "yet to be completed" placeholders on the frontend,
+  //     nothing to migrate for them yet.
+
+  await exec('schools: add enable_french / enable_german columns', `
+    ALTER TABLE schools
+      ADD COLUMN IF NOT EXISTS enable_french BOOLEAN NOT NULL DEFAULT false,
+      ADD COLUMN IF NOT EXISTS enable_german BOOLEAN NOT NULL DEFAULT false`
+  );
+
+  await exec('users: add french_registered_at / german_registered_at', `
+    ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS french_registered_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS german_registered_at TIMESTAMPTZ`
+  );
+
+  await exec('lang_categories: create table', `
+    CREATE TABLE IF NOT EXISTS lang_categories (
+      id           SERIAL PRIMARY KEY,
+      language     VARCHAR(10)  NOT NULL CHECK (language IN ('french','german')),
+      name         VARCHAR(100) NOT NULL,
+      description  TEXT,
+      difficulty   VARCHAR(20)  NOT NULL DEFAULT 'Beginner'
+                     CHECK (difficulty IN ('Beginner','Intermediate','Advanced')),
+      icon_emoji   VARCHAR(10),
+      order_index  INT NOT NULL DEFAULT 0,
+      is_active    BOOLEAN NOT NULL DEFAULT true,
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`
+  );
+  await exec('lang_categories: unique (language, name)',
+    `CREATE UNIQUE INDEX IF NOT EXISTS lang_categories_language_name_unique
+       ON lang_categories(language, name)`
+  );
+
+  await exec('lang_words: create table', `
+    CREATE TABLE IF NOT EXISTS lang_words (
+      id                SERIAL PRIMARY KEY,
+      category_id       INT NOT NULL REFERENCES lang_categories(id) ON DELETE CASCADE,
+      word              VARCHAR(150) NOT NULL,
+      phonetic          VARCHAR(150),
+      definition        TEXT,
+      example_sentence  TEXT,
+      icon_emoji        VARCHAR(10),
+      is_active         BOOLEAN NOT NULL DEFAULT true,
+      created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`
+  );
+  await exec('lang_words: index on category_id',
+    `CREATE INDEX IF NOT EXISTS idx_lang_words_category ON lang_words(category_id)`
+  );
+
+  // One row per practice session (mirrors em_practice_sessions' level-math
+  // shape exactly, so /level-progress can reuse the same cumulative-
+  // across-sessions logic already proven there). difficulty is frozen at
+  // save-time for the same reason em_practice_sessions.difficulty is: a
+  // category can later be deleted (ON DELETE CASCADE on lang_words, but
+  // category_id here is ON DELETE SET NULL) without silently erasing a
+  // student's already-earned level progress.
+  await exec('lang_practice_sessions: create table', `
+    CREATE TABLE IF NOT EXISTS lang_practice_sessions (
+      id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id        UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      language       VARCHAR(10)  NOT NULL CHECK (language IN ('french','german')),
+      category_id    INT REFERENCES lang_categories(id) ON DELETE SET NULL,
+      difficulty     VARCHAR(20),
+      total_words    INT NOT NULL DEFAULT 0,
+      correct_words  INT NOT NULL DEFAULT 0,
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`
+  );
+  await exec('lang_practice_sessions: index on (user_id, language)',
+    `CREATE INDEX IF NOT EXISTS idx_lang_sessions_user_lang ON lang_practice_sessions(user_id, language)`
+  );
+
+  await exec('lang_pronunciation_attempts: create table', `
+    CREATE TABLE IF NOT EXISTS lang_pronunciation_attempts (
+      id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      language    VARCHAR(10) NOT NULL CHECK (language IN ('french','german')),
+      word_id     INT REFERENCES lang_words(id) ON DELETE SET NULL,
+      word_text   VARCHAR(150) NOT NULL,
+      audio_url   TEXT,
+      heard       TEXT,
+      score       INT,
+      matched     BOOLEAN,
+      feedback    TEXT,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`
+  );
+  await exec('lang_pronunciation_attempts: index on (user_id, language)',
+    `CREATE INDEX IF NOT EXISTS idx_lang_pron_user_lang ON lang_pronunciation_attempts(user_id, language)`
+  );
+
+  // ── Seed content — deliberately ONE category, a handful of words, per
+  // language. This is the entire Beginner tier for now; Intermediate and
+  // Advanced categories are seeded as empty placeholders below so the
+  // level structure is visible (proves the "levels" concept) without any
+  // content existing to practice yet.
+  await exec('lang_categories: seed French Beginner category', `
+    INSERT INTO lang_categories (language, name, description, difficulty, icon_emoji, order_index)
+    VALUES ('french', 'Everyday French', 'Common everyday French words and greetings', 'Beginner', '🇫🇷', 1)
+    ON CONFLICT (language, name) DO NOTHING`
+  );
+  await exec('lang_categories: seed German Beginner category', `
+    INSERT INTO lang_categories (language, name, description, difficulty, icon_emoji, order_index)
+    VALUES ('german', 'Everyday German', 'Common everyday German words and greetings', 'Beginner', '🇩🇪', 1)
+    ON CONFLICT (language, name) DO NOTHING`
+  );
+  // Intermediate/Advanced placeholders — deliberately no words seeded under
+  // these; they exist only so the level structure itself is visible.
+  await exec('lang_categories: seed empty Intermediate/Advanced placeholders', `
+    INSERT INTO lang_categories (language, name, description, difficulty, icon_emoji, order_index)
+    VALUES
+      ('french', 'French Conversation', 'Coming soon', 'Intermediate', '🇫🇷', 2),
+      ('french', 'Advanced French',     'Coming soon', 'Advanced',     '🇫🇷', 3),
+      ('german', 'German Conversation', 'Coming soon', 'Intermediate', '🇩🇪', 2),
+      ('german', 'Advanced German',     'Coming soon', 'Advanced',     '🇩🇪', 3)
+    ON CONFLICT (language, name) DO NOTHING`
+  );
+
+  await exec('lang_words: seed French Beginner words', `
+    INSERT INTO lang_words (category_id, word, phonetic, definition, example_sentence, icon_emoji)
+    SELECT c.id, w.word, w.phonetic, w.definition, w.example_sentence, w.icon_emoji
+    FROM (VALUES
+      ('Bonjour',  '/bɔ̃.ʒuʁ/',   'Hello / Good morning',        'Bonjour, comment allez-vous ?',        '👋'),
+      ('Merci',    '/mɛʁ.si/',    'Thank you',                    'Merci beaucoup pour votre aide.',       '🙏'),
+      ('Oui',      '/wi/',        'Yes',                          'Oui, je comprends.',                    '✅'),
+      ('Non',      '/nɔ̃/',        'No',                           'Non, merci.',                           '❌'),
+      ('S''il vous plaît', '/sil vu plɛ/', 'Please',              'Un café, s''il vous plaît.',            '🙂'),
+      ('Au revoir','/o ʁə.vwaʁ/', 'Goodbye',                      'Au revoir, à demain !',                 '👋'),
+      ('Eau',      '/o/',         'Water',                        'Je voudrais un verre d''eau.',          '💧'),
+      ('Pain',     '/pɛ̃/',        'Bread',                        'Le pain est frais ce matin.',           '🥖')
+    ) AS w(word, phonetic, definition, example_sentence, icon_emoji)
+    CROSS JOIN (SELECT id FROM lang_categories WHERE language='french' AND name='Everyday French') c
+    WHERE NOT EXISTS (SELECT 1 FROM lang_words lw WHERE lw.category_id = c.id AND lw.word = w.word)`
+  );
+
+  await exec('lang_words: seed German Beginner words', `
+    INSERT INTO lang_words (category_id, word, phonetic, definition, example_sentence, icon_emoji)
+    SELECT c.id, w.word, w.phonetic, w.definition, w.example_sentence, w.icon_emoji
+    FROM (VALUES
+      ('Hallo',        '/ˈhalo/',        'Hello',                  'Hallo, wie geht es dir?',              '👋'),
+      ('Danke',        '/ˈdaŋkə/',       'Thank you',              'Danke schön für deine Hilfe.',         '🙏'),
+      ('Ja',           '/jaː/',          'Yes',                    'Ja, das stimmt.',                       '✅'),
+      ('Nein',         '/naɪn/',         'No',                     'Nein, danke.',                          '❌'),
+      ('Bitte',        '/ˈbɪtə/',        'Please / You''re welcome','Ein Kaffee, bitte.',                   '🙂'),
+      ('Auf Wiedersehen','/aʊf ˈviːdɐzeːən/','Goodbye',            'Auf Wiedersehen, bis morgen!',          '👋'),
+      ('Wasser',       '/ˈvasɐ/',        'Water',                  'Ich hätte gern ein Glas Wasser.',       '💧'),
+      ('Brot',         '/broːt/',        'Bread',                  'Das Brot ist heute frisch.',            '🍞')
+    ) AS w(word, phonetic, definition, example_sentence, icon_emoji)
+    CROSS JOIN (SELECT id FROM lang_categories WHERE language='german' AND name='Everyday German') c
+    WHERE NOT EXISTS (SELECT 1 FROM lang_words lw WHERE lw.category_id = c.id AND lw.word = w.word)`
+  );
+
   console.log('\n✅ Migration complete.\n');
   await pool.end();
 }

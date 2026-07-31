@@ -33,7 +33,7 @@ const protect = async (req, res, next) => {
     const users = await db.query(
       `SELECT id, email, first_name, last_name, role, school_id,
               is_active, subscription_status, subscription_expires_at,
-              daily_goal, em_registered_at
+              daily_goal, em_registered_at, french_registered_at, german_registered_at
        FROM users
        WHERE id = :id AND is_active = true
        LIMIT 1`,
@@ -63,7 +63,7 @@ const protect = async (req, res, next) => {
     if (req.user.school_id && ['student', 'teacher', 'school_admin'].includes(req.user.role)) {
       try {
         const schoolRows = await db.query(
-          `SELECT name, logo_url, is_active, enable_aischoolonair, enable_em FROM schools WHERE id = :id LIMIT 1`,
+          `SELECT name, logo_url, is_active, enable_aischoolonair, enable_em, enable_french, enable_german FROM schools WHERE id = :id LIMIT 1`,
           { replacements: { id: req.user.school_id }, type: QueryTypes.SELECT }
         );
         const school = schoolRows[0];
@@ -86,6 +86,7 @@ const protect = async (req, res, next) => {
         const url = req.originalUrl || req.url || '';
         const alwaysExempt =
           url.startsWith('/api/english-masterclass') ||
+          url.startsWith('/api/language-masterclass') ||
           url.startsWith('/api/schools') ||   // membership/management — incl. school_admin's own roster/settings
           url.startsWith('/api/users') ||     // a user's own profile/account self-service
           url.startsWith('/api/auth') ||      // session self-service (me/logout/refresh) — never content-gated
