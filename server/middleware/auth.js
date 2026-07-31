@@ -46,6 +46,25 @@ const protect = async (req, res, next) => {
 
     req.user = users[0];
 
+    // ── Additive: registeredLanguages from the new join table ──────────────
+    // Does not replace em_registered_at/french_registered_at/german_registered_at
+    // (still selected above, still read by existing English/French/German
+    // gating) -- this is purely additive so new 8-language routes/features
+    // can read req.user.registeredLanguages without every existing gate
+    // needing to change at the same time. Fails open (empty array) on error,
+    // same fail-open philosophy as the school-gating block below -- this
+    // must never take down authentication.
+    try {
+      const regRows = await db.query(
+        `SELECT language FROM user_language_registrations WHERE user_id = :id`,
+        { replacements: { id: req.user.id }, type: QueryTypes.SELECT }
+      );
+      req.user.registeredLanguages = regRows.map((r) => r.language);
+    } catch (regErr) {
+      req.user.registeredLanguages = [];
+    }
+
+
     // ── Tenant-school service gating ──────────────────────────────────────
     // "A tenant school — its students, teachers, AND school_admin — should
     // ONLY have access to what was provided for that school at registration
@@ -78,6 +97,21 @@ const protect = async (req, res, next) => {
         // Made available to requireEmRegistration (englishMasterclassRoutes.js)
         // so it doesn't need a second query to check enable_em.
         req.school = school;
+
+        // Additive: enabledLanguages from the new join table -- same
+        // fail-open handling as the rest of this try block, and does not
+        // replace enable_em/enable_french/enable_german above (existing
+        // gates keep reading those columns unchanged).
+        try {
+          const langRows = await db.query(
+            `SELECT language FROM school_enabled_languages WHERE school_id = :id`,
+            { replacements: { id: req.user.school_id }, type: QueryTypes.SELECT }
+          );
+          req.school.enabledLanguages = langRows.map((r) => r.language);
+        } catch (langErr) {
+          req.school.enabledLanguages = [];
+        }
+
 
         // enable_aischoolonair gates every route EXCEPT the ones below, which
         // have their own more specific gating (EM: enable_em, checked in

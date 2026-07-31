@@ -321,11 +321,24 @@ router.get('/:id/roster', protect, authorize('admin'), async (req, res) => {
 // zero, one, or both of. Omitting them from the request body leaves
 // whatever they're currently set to unchanged, rather than resetting them
 // to false on every unrelated services update.
+//
+// UNIFICATION NOTE: enable_em/enable_french/enable_german columns are kept
+// exactly as before (existing admin UI still works unchanged) but are now
+// also mirrored into school_enabled_languages (english/french/german) after
+// every update, since that join table is the scalable source of truth going
+// forward for the language dropdown / requireLanguageRegistration. An
+// optional `enable_languages` object in the body (e.g.
+// { mandarin: true, arabic: false }) additionally lets any of the 5 new
+// languages be toggled through this same endpoint without needing 5 more
+// dedicated boolean columns.
 router.patch('/:id/services', protect, authorize('admin'), async (req, res) => {
   const enableAISchoolonair = req.body.enable_aischoolonair;
   const enableEM            = req.body.enable_em;
   const enableFrench        = req.body.enable_french;
   const enableGerman        = req.body.enable_german;
+  const enableLanguages     = req.body.enable_languages; // optional { code: boolean, ... }
+  const NEW_LANGUAGE_CODES  = ['mandarin', 'arabic', 'spanish', 'swahili', 'yoruba'];
+
   if (typeof enableAISchoolonair !== 'boolean' || typeof enableEM !== 'boolean') {
     return res.status(400).json({
       success: false,
@@ -337,6 +350,19 @@ router.patch('/:id/services', protect, authorize('admin'), async (req, res) => {
   }
   if (enableGerman !== undefined && typeof enableGerman !== 'boolean') {
     return res.status(400).json({ success: false, error: 'enable_german must be true/false if provided' });
+  }
+  if (enableLanguages !== undefined) {
+    if (typeof enableLanguages !== 'object' || enableLanguages === null || Array.isArray(enableLanguages)) {
+      return res.status(400).json({ success: false, error: 'enable_languages must be an object of { languageCode: boolean }' });
+    }
+    for (const [code, val] of Object.entries(enableLanguages)) {
+      if (!NEW_LANGUAGE_CODES.includes(code)) {
+        return res.status(400).json({ success: false, error: `enable_languages contains an unsupported code: ${code}` });
+      }
+      if (typeof val !== 'boolean') {
+        return res.status(400).json({ success: false, error: `enable_languages.${code} must be true/false` });
+      }
+    }
   }
   if (!enableAISchoolonair && !enableEM) {
     return res.status(400).json({
@@ -357,7 +383,33 @@ router.patch('/:id/services', protect, authorize('admin'), async (req, res) => {
       [enableAISchoolonair, enableEM, enableFrench ?? null, enableGerman ?? null, req.params.id]
     );
     if (!rows.length) return res.status(404).json({ success: false, error: 'School not found' });
-    return res.json({ success: true, data: rows[0] });
+    const school = rows[0];
+
+    // Mirror into school_enabled_languages. Best-effort: a failure here must
+    // not fail the response, since the columns above (the pre-existing
+    // contract every current caller relies on) already updated successfully.
+    try {
+      const syncLanguageFlag = async (code, enabled) => {
+        if (enabled) {
+          await q(`INSERT INTO school_enabled_languages (school_id, language) VALUES ($1,$2)
+                    ON CONFLICT (school_id, language) DO NOTHING`, [school.id, code]);
+        } else {
+          await q(`DELETE FROM school_enabled_languages WHERE school_id = $1 AND language = $2`, [school.id, code]);
+        }
+      };
+      await syncLanguageFlag('english', school.enable_em);
+      await syncLanguageFlag('french', school.enable_french);
+      await syncLanguageFlag('german', school.enable_german);
+      if (enableLanguages) {
+        for (const [code, val] of Object.entries(enableLanguages)) {
+          await syncLanguageFlag(code, val);
+        }
+      }
+    } catch (syncErr) {
+      console.error('[schools] PATCH /:id/services — school_enabled_languages sync failed:', syncErr.message);
+    }
+
+    return res.json({ success: true, data: school });
   } catch (err) {
     console.error('[schools] PATCH /:id/services', err.message);
     return res.status(500).json({ success: false, error: 'Could not update school services' });
