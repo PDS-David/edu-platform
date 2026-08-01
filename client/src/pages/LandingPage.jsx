@@ -127,14 +127,9 @@ export default function LandingPage() {
           <>
             {/* Desktop nav links */}
             <nav className="hidden md:flex items-center gap-4 text-sm font-medium text-gray-600">
-              {/* Just "Login" — there is one login now (getPostAuthRedirect
-                  decides where an authenticated account goes, including a
-                  chooser if it has both products). Previously this nav
-                  named both AISchoolonair and Language Masterclass directly,
-                  and "Start Free" was a dropdown asking a visitor to pick a
-                  product before they'd even logged in — exposing both
-                  products to every visitor regardless of which one (if
-                  either) they actually have reason to use. */}
+              <Link to="/english-masterclass" className="hover:text-blue-600 transition-colors">
+                English Masterclass
+              </Link>
               <Link to="/login" className="hover:text-blue-600 transition-colors">
                 Login
               </Link>
@@ -156,6 +151,9 @@ export default function LandingPage() {
       {/* Mobile dropdown menu */}
       {menuOpen && (
         <div className="md:hidden bg-white border-b border-gray-100 px-4 py-4 space-y-3 sticky top-14 z-40">
+          <Link to="/english-masterclass" onClick={() => setMenuOpen(false)} className="block py-1 text-sm font-medium text-gray-700">
+            English Masterclass
+          </Link>
           <Link to="/login" onClick={() => setMenuOpen(false)} className="block py-1 text-sm font-medium text-gray-700">
             Login
           </Link>
