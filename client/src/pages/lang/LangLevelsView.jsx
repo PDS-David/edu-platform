@@ -21,17 +21,17 @@ export default function LangLevelsView({ language, categories, unlocked, onStart
 
         return (
           <div key={diff}>
-            <div className="flex items-center gap-2 mb-3">
+            <div className="flex flex-wrap items-center gap-2 mb-3">
               <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${diffStyle.badge}`}>{diffStyle.label}</span>
               {!isUnlocked && (
                 <span className="flex items-center gap-1 text-xs text-gray-400">
-                  <Lock size={12} aria-hidden="true" />
+                  <Lock size={12} className="shrink-0" aria-hidden="true" />
                   Unlocks after {QUESTIONS_PER_LEVEL} questions at {UNLOCK_ACCURACY}%+ in the level below
                 </span>
               )}
             </div>
 
-            <div className="grid sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {cats.map(cat => {
                 const hasWords = Number(cat.word_count) > 0;
                 const disabled = !isUnlocked || !hasWords;

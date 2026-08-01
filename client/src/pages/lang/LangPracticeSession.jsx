@@ -107,8 +107,12 @@ export default function LangPracticeSession({ language, category, words, onCompl
   };
 
   return (
-    <div className="max-w-4xl mx-auto grid md:grid-cols-[220px_1fr] gap-4">
-      {/* Left panel — exercise list, same structure as English Masterclass */}
+    <div className="max-w-4xl mx-auto grid md:grid-cols-[220px_1fr] gap-3 md:gap-4">
+      {/* Left panel — exercise list, same structure as English Masterclass.
+          Stacks above the main panel on mobile (default single-column
+          grid, no md: prefix needed) as a full-width vertical list rather
+          than a horizontal scroller — three large, thumb-friendly tap
+          targets read better on a phone than a cramped scrollable tab bar. */}
       <div className="bg-white rounded-2xl border border-gray-100 p-3 h-fit">
         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2 mb-2">
           Word {idx + 1} of {words.length}
@@ -123,7 +127,7 @@ export default function LangPracticeSession({ language, category, words, onCompl
             <button
               key={ex.key}
               onClick={() => setActiveExercise(ex.key)}
-              className={`w-full flex items-center gap-2 text-left px-3 py-2.5 rounded-xl text-sm font-medium transition-colors mb-1 ${
+              className={`w-full flex items-center gap-2 text-left px-3 py-3 md:py-2.5 rounded-xl text-sm font-medium transition-colors mb-1 ${
                 isActive ? 'text-white' : 'text-gray-600 hover:bg-gray-50'
               }`}
               style={isActive ? { background: meta.accent } : undefined}
@@ -137,17 +141,17 @@ export default function LangPracticeSession({ language, category, words, onCompl
       </div>
 
       {/* Main panel */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-6">
+      <div className="bg-white rounded-2xl border border-gray-100 p-4 sm:p-6">
         {activeExercise === 'pronunciation' && (
           <>
             <div className="text-center mb-4" dir={meta.isRtl ? 'rtl' : 'ltr'}>
-              <p className="text-3xl font-bold text-gray-900 mb-1">{currentWord.word}</p>
+              <p className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 break-words">{currentWord.word}</p>
               {currentWord.phonetic && <p className="text-sm text-gray-400 mb-2" dir="ltr">{currentWord.phonetic}</p>}
               <button
                 type="button"
                 onClick={() => play(currentWord.word)}
                 disabled={playing}
-                className="inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl border-2 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2.5 rounded-xl border-2 hover:bg-gray-50 transition-colors disabled:opacity-50"
                 style={{ color: meta.accent, borderColor: meta.accentSoft }}
               >
                 {playing ? <Loader2 size={15} className="animate-spin" /> : <Volume2 size={15} />}
@@ -174,7 +178,7 @@ export default function LangPracticeSession({ language, category, words, onCompl
                 type="button"
                 onClick={handleNext}
                 disabled={!pronDone}
-                className="flex items-center gap-1.5 text-white font-semibold text-sm px-6 py-2.5 rounded-xl transition-opacity disabled:opacity-40"
+                className="w-full sm:w-auto flex items-center justify-center gap-1.5 text-white font-semibold text-sm px-6 py-3 sm:py-2.5 rounded-xl transition-opacity disabled:opacity-40"
                 style={{ background: meta.accent }}
               >
                 {idx + 1 < words.length ? 'Next word' : 'Finish session'} <ChevronRight size={15} />
@@ -188,7 +192,7 @@ export default function LangPracticeSession({ language, category, words, onCompl
             <p className="text-center text-sm font-semibold text-gray-500 mb-1 uppercase tracking-wider">
               Listening Comprehension
             </p>
-            <p className="text-center text-xs text-gray-400 mb-4">
+            <p className="text-center text-xs text-gray-400 mb-4 px-2">
               Listen, then type the {meta.short} word you heard.
             </p>
 
@@ -197,7 +201,7 @@ export default function LangPracticeSession({ language, category, words, onCompl
                 type="button"
                 onClick={() => play(currentWord.word)}
                 disabled={playing}
-                className="inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl border-2 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2.5 rounded-xl border-2 hover:bg-gray-50 transition-colors disabled:opacity-50"
                 style={{ color: meta.accent, borderColor: meta.accentSoft }}
               >
                 {playing ? <Loader2 size={15} className="animate-spin" /> : <Volume2 size={15} />}
@@ -206,11 +210,11 @@ export default function LangPracticeSession({ language, category, words, onCompl
             </div>
 
             {listeningFeedback && (
-              <div className={`flex items-center justify-center gap-2 py-3 rounded-xl mb-4 ${
+              <div className={`flex items-center justify-center gap-2 py-3 rounded-xl mb-4 text-center ${
                 listeningFeedback === 'correct' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
               }`}>
                 {listeningFeedback === 'correct'
-                  ? <><Check size={16} aria-hidden="true" /> <span className="font-bold">Correct!</span></>
+                  ? <><Check size={16} aria-hidden="true" className="shrink-0" /> <span className="font-bold">Correct!</span></>
                   : <span className="font-bold">The word was: {currentWord.word}</span>}
               </div>
             )}
@@ -222,11 +226,13 @@ export default function LangPracticeSession({ language, category, words, onCompl
               <input
                 id={`listening-input-${currentWord.id}`}
                 type="text"
+                inputMode="text"
                 value={listeningInput}
                 onChange={e => setListeningInput(e.target.value)}
                 placeholder="Type what you heard…"
                 disabled={!!listeningFeedback}
                 autoComplete="off"
+                autoCapitalize="off"
                 dir={meta.isRtl ? 'rtl' : 'ltr'}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-base text-center focus:outline-none focus:ring-2 focus:ring-offset-1 transition-all mb-4 disabled:bg-gray-50"
               />
@@ -234,7 +240,7 @@ export default function LangPracticeSession({ language, category, words, onCompl
                 <button
                   type="submit"
                   disabled={!listeningInput.trim() || !!listeningFeedback}
-                  className="flex-1 text-white py-2.5 rounded-xl font-semibold text-sm disabled:opacity-40 transition-opacity"
+                  className="flex-1 text-white py-3 rounded-xl font-semibold text-sm disabled:opacity-40 transition-opacity"
                   style={{ background: meta.accent }}
                 >
                   Submit
@@ -243,7 +249,7 @@ export default function LangPracticeSession({ language, category, words, onCompl
                   type="button"
                   onClick={handleListeningSkip}
                   disabled={!!listeningFeedback}
-                  className="flex items-center gap-1 px-4 py-2.5 bg-gray-100 text-gray-600 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-all disabled:opacity-40"
+                  className="flex items-center gap-1 px-4 py-3 bg-gray-100 text-gray-600 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-all disabled:opacity-40 shrink-0"
                 >
                   Skip
                 </button>
