@@ -21,6 +21,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
 import api from '../services/apiClient';
 import TopNav from '../components/TopNav';
+import LanguageDropdown from '../components/LanguageDropdown';
 import LangLevelsView from './lang/LangLevelsView';
 import LangPracticeSession from './lang/LangPracticeSession';
 import LangSessionSummary from './lang/LangSessionSummary';
@@ -155,6 +156,26 @@ export default function LanguageMasterclass({ language: languageProp }) {
       {/* Header */}
       <div className="text-white" style={{ background: meta.accent }}>
         <div className="max-w-4xl mx-auto px-4 py-6">
+          {/* Persistent escape hatch + language switcher — every language
+              routed through this component previously had no way back to
+              the Language Masterclass hub (/em/dashboard) or across to
+              another language once inside, short of the browser's own back
+              button. LanguageDropdown is the same "one way to navigate
+              between languages" component EMLayout uses for /em/* and
+              English; it's self-contained (own auth check, own click-away
+              handling) so it's safe to drop in here without adopting
+              EMLayout's sidebar shell, which is shaped for English's
+              separate Dashboard/Practice/Progress pages rather than this
+              single orchestrated page. */}
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <Link
+              to="/em/dashboard"
+              className="flex items-center gap-1 text-sm text-white/80 hover:text-white transition-colors"
+            >
+              <ArrowLeft size={14} /> Language Masterclass
+            </Link>
+            <LanguageDropdown />
+          </div>
           {view === 'practice' && (
             <button
               onClick={() => setView('levels')}

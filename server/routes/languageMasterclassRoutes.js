@@ -13,9 +13,11 @@
 // verified content/prompting for that language yet.
 //   - English: pronunciation, listening (client-side only, no backend route
 //     needed beyond /audio), and writing all supported.
-//   - French/German: pronunciation only (per commits b76c41a/3131f3d) —
-//     Beginner-only content (~8 words), Intermediate/Advanced empty on
-//     purpose. Writing/listening not yet validated for these languages.
+//   - French/German: pronunciation and listening (listening enabled
+//     client-side in LangPracticeSession.jsx — same client-side-only shape
+//     as English's listening step above, no backend route needed beyond
+//     /audio). Beginner-only content (~8 words), Intermediate/Advanced
+//     empty on purpose. Writing not yet validated for these languages.
 //   - Mandarin/Arabic/Spanish/Swahili/Yoruba: same Beginner-only seed shape,
 //     pronunciation/listening/writing NOT yet marked supported — see
 //     languages table. Flip supports_* on per-language only once that

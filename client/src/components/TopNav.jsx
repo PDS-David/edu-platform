@@ -31,10 +31,18 @@ export default function TopNav() {
   // into the AISchoolonair student area on logo/settings click. Keep them
   // inside Language Masterclass instead, same principle as EM's own
   // dedicated EMLayout never linking back into AISchoolonair either.
+  //
+  // Previously this resolved to `/language/:code` — i.e. the page the
+  // student was already on, so clicking the logo from inside French/German
+  // Masterclass just reloaded the same screen instead of going anywhere.
+  // /em/dashboard is the actual shared Language Masterclass hub (it's what
+  // LanguageDropdown's English entry redirects to, and what every
+  // language's own error/not-enabled state already links back to), so
+  // that's the correct destination for every language, not just English.
   const inLanguageMasterclass = location.pathname.startsWith('/language/');
 
   const dashboardPath = inLanguageMasterclass
-    ? location.pathname.split('/').slice(0, 3).join('/') // /language/:code
+    ? '/em/dashboard'
     : role === 'admin'        ? '/admin/dashboard'        :
       role === 'teacher'      ? '/teacher/dashboard'      :
       role === 'school_admin' ? '/school-admin/dashboard' : '/student/dashboard';
