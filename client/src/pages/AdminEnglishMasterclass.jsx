@@ -224,7 +224,7 @@ function GenerateWordsPanel({ category, onGenerated, toast }) {
         difficulty:    category.difficulty,
         count,
       });
-      toast(`✅ Generated ${r.data.inserted} words (${r.data.skipped} already existed)`, 'success');
+      toast(`✅ Generated ${r.inserted ?? r.data?.length ?? 0} words (${Math.max(0, count - (r.inserted ?? r.data?.length ?? 0))} already existed)`, 'success');
       onGenerated();
     } catch (e) {
       toast(e.message || 'Generation failed', 'error');
