@@ -64,6 +64,17 @@ const protect = async (req, res, next) => {
       req.user.registeredLanguages = [];
     }
 
+    // Single access gate for standalone (non-tenant) users, symmetric with
+    // req.school.hasLanguageMasterclass below: per Da's explicit
+    // confirmation, registering for any ONE language as a standalone user
+    // unlocks all 8, rather than requiring separate registration per
+    // language. A single row in user_language_registrations (regardless of
+    // which language it's for) is therefore treated as "this user has
+    // Language Masterclass access." registeredLanguages above is left in
+    // place for anything still reading it (e.g. which language they
+    // originally registered under, for analytics/display purposes).
+    req.user.hasLanguageMasterclass = req.user.registeredLanguages.length > 0;
+
 
     // ── Tenant-school service gating ──────────────────────────────────────
     // "A tenant school — its students, teachers, AND school_admin — should
@@ -111,6 +122,20 @@ const protect = async (req, res, next) => {
         } catch (langErr) {
           req.school.enabledLanguages = [];
         }
+
+        // Single access gate for Language Masterclass, per Da's explicit
+        // correction: "Once the app admin registers a school for Language
+        // Masterclass, the school and her students should have unrestricted
+        // access to ALL languages" -- no per-language enablement, no
+        // per-student registration. enable_em is reused as this single flag
+        // (every school that ever had it turned on already has an 'english'
+        // row in school_enabled_languages from the unification migration,
+        // so this is non-destructive and doesn't require a data migration
+        // of its own). req.school.enabledLanguages above is left in place
+        // for anything else still reading it, but new gating logic
+        // (requireLanguageRegistration below) should read this flag
+        // instead of checking per-language membership.
+        req.school.hasLanguageMasterclass = !!school.enable_em;
 
 
         // enable_aischoolonair gates every route EXCEPT the ones below, which

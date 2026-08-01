@@ -111,18 +111,28 @@ function computeUnlocked(byDiff) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// REGISTRATION — same one-time opt-in shape as English Masterclass
+// REGISTRATION
+// ─────────────────────────────────────────────────────────────────────────────
+// Per Da's explicit correction after live review: a tenant (school) student
+// needs NO registration step at all -- school enablement alone grants access
+// to all 8 languages (see requireLanguageRegistration below). This route is
+// now only meaningful for standalone (non-tenant) users, where registering
+// for any ONE language unlocks all 8 (req.user.hasLanguageMasterclass,
+// computed in middleware/auth.js from "has at least one row in
+// user_language_registrations"). For a tenant student this route is a
+// harmless no-op success -- kept rather than removed/404'd in case anything
+// still calls it during the Prompt 2 frontend cleanup, so nothing breaks
+// mid-rollout.
 // ═══════════════════════════════════════════════════════════════════════════
 router.post('/:language/register', async (req, res) => {
   const { language } = req.params;
   const userId = req.user.id;
 
-  if (req.school && Array.isArray(req.school.enabledLanguages) && !req.school.enabledLanguages.includes(language)) {
-    return res.status(403).json({
-      success: false,
-      error: `Your school has not been registered for ${LANGUAGE_LABEL[language]} Masterclass yet. Contact your school admin or App Admin.`,
-      code: 'LANGUAGE_NOT_ENABLED_FOR_SCHOOL',
-    });
+  // Tenant student: access is already fully determined by
+  // req.school.hasLanguageMasterclass, nothing to register. Report success
+  // without writing anything, so a lingering frontend call doesn't error.
+  if (req.school) {
+    return res.json({ success: true, note: 'No registration needed -- access is granted at the school level.' });
   }
 
   try {
@@ -137,37 +147,50 @@ router.post('/:language/register', async (req, res) => {
       `SELECT registered_at FROM user_language_registrations WHERE user_id = $1 AND language = $2`,
       [userId, language]
     ))?.registered_at;
-    res.json({ success: true, registered_at: registeredAt });
+    // This single registration event unlocks all 8 languages for this user
+    // (req.user.hasLanguageMasterclass on the NEXT request will be true --
+    // it's computed once per-request in middleware/auth.js from whether any
+    // row exists at all, not specifically this language).
+    res.json({ success: true, registered_at: registeredAt, unlocked_all_languages: true });
   } catch (err) {
     console.error(`[LangMasterclass] POST /${language}/register`, err.message);
-    res.status(500).json({ success: false, error: `Could not complete ${LANGUAGE_LABEL[language]} Masterclass registration.` });
+    res.status(500).json({ success: false, error: `Could not complete Language Masterclass registration.` });
   }
 });
 
-// Gate: mirrors requireEmRegistration in englishMasterclassRoutes.js in intent
-// (tenant boundary first, then the student-specific one-time opt-in), but
-// reads the user_language_registrations / school_enabled_languages join
-// tables instead of one column per language -- the column-per-language
-// pattern (enable_french, french_registered_at, ...) does not scale to 8
-// languages, let alone more later.
+// Gate: single access check, not per-language. Per Da's explicit
+// instruction -- "once the app admin registers a school for Language
+// Masterclass, the school and her students should have unrestricted access
+// to ALL languages" -- a tenant student/teacher/school_admin's access
+// depends only on whether their school has Language Masterclass enabled at
+// all (req.school.hasLanguageMasterclass, computed in middleware/auth.js
+// from schools.enable_em). A standalone user's access depends only on
+// whether they've ever registered for any one language
+// (req.user.hasLanguageMasterclass). Neither checks which specific language
+// is being requested anymore -- the old per-language membership checks
+// (school.enabledLanguages.includes(language), user.registeredLanguages.
+// includes(language)) are gone; enabledLanguages/registeredLanguages arrays
+// are left computed in auth.js for anything else still reading them, but
+// this gate no longer uses them.
 function requireLanguageRegistration(req, res, next) {
-  const { language } = req.params;
-
-  if (req.school && Array.isArray(req.school.enabledLanguages) && !req.school.enabledLanguages.includes(language)) {
-    return res.status(403).json({
-      success: false,
-      error: `Your school has not been registered for ${LANGUAGE_LABEL[language]} Masterclass yet. Contact your school admin or App Admin.`,
-      code: 'LANGUAGE_NOT_ENABLED_FOR_SCHOOL',
-    });
+  if (req.school) {
+    if (!req.school.hasLanguageMasterclass) {
+      return res.status(403).json({
+        success: false,
+        error: `Your school has not been registered for Language Masterclass yet. Contact your school admin or App Admin.`,
+        code: 'LANGUAGE_MASTERCLASS_NOT_ENABLED_FOR_SCHOOL',
+      });
+    }
+    return next();
   }
+
   if (req.user.role !== 'student') return next();
 
-  const registered = Array.isArray(req.user.registeredLanguages) && req.user.registeredLanguages.includes(language);
-  if (!registered) {
+  if (!req.user.hasLanguageMasterclass) {
     return res.status(403).json({
       success: false,
-      error: `You need to register for ${LANGUAGE_LABEL[language]} Masterclass before you can access it.`,
-      code: 'LANGUAGE_REGISTRATION_REQUIRED',
+      error: `You need to register for Language Masterclass before you can access it.`,
+      code: 'LANGUAGE_MASTERCLASS_REGISTRATION_REQUIRED',
     });
   }
   next();
