@@ -347,6 +347,15 @@ router.post('/:language/pronunciation-score', pronunciationLimiter, async (req, 
   const userId = req.user.id;
   const label = LANGUAGE_LABEL[language];
 
+  const support = await q1(`SELECT supports_pronunciation FROM languages WHERE code = $1`, [language]);
+  if (!support?.supports_pronunciation) {
+    return res.status(501).json({
+      success: false,
+      error: `Pronunciation scoring isn't available for ${label} yet.`,
+      code: 'EXERCISE_NOT_SUPPORTED',
+    });
+  }
+
   if (!word)  return res.status(400).json({ success: false, error: 'word is required' });
   if (!audio) return res.status(400).json({ success: false, error: 'audio is required' });
   if (audio.length > 4_000_000) {
