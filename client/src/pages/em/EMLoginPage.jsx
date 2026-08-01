@@ -73,7 +73,7 @@ export default function EMLoginPage() {
       // dashboard, never in the student/study view — getPostAuthRedirect is
       // the single shared source of truth for that mapping, already used by
       // the main /login page.
-      if (user?.role === 'student' && !user?.em_registered_at) {
+      if (user?.role === 'student' && !user?.school && !user?.em_registered_at) {
         navigate('/em/register', { replace: true });
       } else {
         // getPostAuthRedirect handles every other case, including an

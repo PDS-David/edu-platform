@@ -113,6 +113,16 @@ router.post('/register', async (req, res) => {
     });
   }
 
+  // Tenant students: nothing to register — access is already fully
+  // determined by the school gate above (see requireEmRegistration's
+  // updated comment for why). Harmless no-op success rather than an
+  // error, matching languageMasterclassRoutes.js's identical Prompt-1
+  // pattern for the other 7 languages, in case a stale bookmark or the
+  // pre-pivot frontend still calls this.
+  if (req.school) {
+    return res.json({ success: true, em_registered_at: req.user.em_registered_at || new Date().toISOString() });
+  }
+
   try {
     const row = await q1(
       `UPDATE users
@@ -149,9 +159,24 @@ function requireEmRegistration(req, res, next) {
       code: 'EM_NOT_ENABLED_FOR_SCHOOL',
     });
   }
-  // The em_registered_at opt-in gate below is student-specific — teachers
-  // and school_admins never register for EM themselves, they just need the
-  // tenant-boundary check above applied to them too.
+  // Tenant students: access is fully determined by the school gate above.
+  // This mirrors Prompt 1's collapse of the per-language access model
+  // (languageMasterclassRoutes.js's requireLanguageRegistration) — that
+  // change never touched THIS file, so tenant students at a fully-enabled
+  // school were still being blocked here until a manual one-time click,
+  // contradicting Da's explicit "no other registration needed... ALL
+  // LANGUAGES" instruction. English is one of the 8 languages; it should
+  // not have been the one exception.
+  //
+  // Standalone (non-tenant) users are deliberately left requiring
+  // em_registered_at — English Masterclass's standalone path is its own
+  // parallel signup flow (registerForEnglishMasterclass in auth.js,
+  // EMSignupPage.jsx) with its own account-creation semantics, separate
+  // from the 8-language user_language_registrations system Prompt 1's
+  // standalone-user symmetric-unlock decision applies to. Unifying those
+  // two standalone paths is a real, separate decision — flagged to Da
+  // rather than silently folded in here.
+  if (req.school) return next();
   if (req.user.role !== 'student') return next();
   if (!req.user.em_registered_at) {
     return res.status(403).json({

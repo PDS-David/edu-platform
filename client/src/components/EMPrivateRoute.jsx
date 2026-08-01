@@ -59,11 +59,16 @@ export default function EMPrivateRoute() {
     );
   }
 
-  // AISchoolOnAir login alone doesn't grant EM access — students must also
-  // complete the separate one-time EM registration step. Non-students
-  // (teachers/admins) skip this, matching the backend gate.
+  // AISchoolOnAir login alone doesn't grant EM access for a STANDALONE
+  // student — they must also complete the separate one-time EM
+  // registration step. A TENANT student's access is already fully
+  // determined by the school gate above (user.school.enable_em) —
+  // requiring this too was a real gap left over from the access-model
+  // pivot: Prompt 1 collapsed this exact requirement for the other 7
+  // languages but never touched English's own gate. Non-students
+  // (teachers/admins) skip this either way, matching the backend gate.
   const needsEmRegistration =
-    user.role === 'student' && !user.em_registered_at && location.pathname !== '/em/register';
+    user.role === 'student' && !user.school && !user.em_registered_at && location.pathname !== '/em/register';
   if (needsEmRegistration) {
     return <Navigate to="/em/register" replace />;
   }
