@@ -28,6 +28,7 @@ import {
   LayoutDashboard, BookOpen, TrendingUp, LogOut,
 } from 'lucide-react';
 import { SOVEREIGN, CRIMSON } from '../pages/em/constants';
+import LanguageDropdown from '../components/LanguageDropdown';
 
 const NAV_LINKS = [
   { to: '/em/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
@@ -112,6 +113,18 @@ export default function EMLayout() {
           {/* Navigation lives in the persistent left sidebar below — the
               one and only place Dashboard/Practice/Progress switching
               happens, on every screen size. */}
+
+          {/* ── Language switcher ────────────────────────────────────────────── */}
+          {/* Da's explicit correction after live review: this is the ONE way
+              to navigate between languages -- not buried on the AISchoolonair
+              exam-prep dashboard, and not via the old per-language promo
+              cards (removed from EMDashboard.jsx). Visible on every screen
+              size (it collapses its own label text down to icon+chevron on
+              narrow screens internally) since "conspicuous" was the explicit
+              ask. Renders null for non-students (teacher/school_admin/admin
+              viewing this shell), same as it did on StudentDashboard.jsx
+              before. */}
+          <LanguageDropdown />
 
           {/* ── Right controls ───────────────────────────────────────────────── */}
           <div className="flex items-center gap-2 shrink-0">

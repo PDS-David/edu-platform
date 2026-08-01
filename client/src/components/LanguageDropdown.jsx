@@ -1,18 +1,21 @@
 // client/src/components/LanguageDropdown.jsx
-// Conspicuous language selector on the main AISchoolonair student
-// dashboard (StudentDashboard.jsx) — not buried inside a sub-portal.
-// Lists all 8 Language Masterclass languages. A language is enabled/
-// highlighted when either the student's school has turned it on
-// (school.enabledLanguages, from school_enabled_languages) or the student
-// has personally self-registered for it as a standalone user
-// (user.registeredLanguages, from user_language_registrations). Locked
-// languages still appear — greyed out with a short explanation — rather
-// than being hidden entirely, matching LangLevelsView.jsx's existing
-// pattern for locked Intermediate/Advanced tiers.
+// Conspicuous language selector for the Language Masterclass experience.
+// Lives inside EMLayout.jsx's header (not the AISchoolonair exam-prep
+// dashboard — Da was explicit that this belongs on the Language
+// Masterclass side, not buried in nor attached to the exam-focused
+// product). Lists all 8 Language Masterclass languages.
 //
-// For a standalone user (no school_id at all), there's no school gate to
-// respect, so nothing is greyed out here — any language is one click away
-// from its own registration screen.
+// ACCESS MODEL (single gate, not per-language — see middleware/auth.js /
+// controllers/auth.js for the backend side of this): a tenant student's
+// access is all-or-nothing, driven by user.school.hasLanguageMasterclass
+// (true the moment the school is enabled for Language Masterclass at all —
+// no per-language toggle, no per-student registration). A standalone
+// (non-tenant) user's access is driven by user.hasLanguageMasterclass
+// (true once they've registered for any ONE language — that single
+// registration unlocks all 8). Locked languages still appear — greyed out
+// with a short explanation — rather than being hidden entirely, matching
+// LangLevelsView.jsx's existing pattern for locked Intermediate/Advanced
+// tiers.
 
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -43,14 +46,14 @@ export default function LanguageDropdown() {
   if (!user || user.role !== 'student') return null;
 
   const isTenant = !!user.school;
-  const available = new Set([
-    ...(user.school?.enabledLanguages || []),
-    ...(user.registeredLanguages || []),
-  ]);
-  const isLocked = (code) => isTenant && !available.has(code);
+  // Single gate, not per-language: a tenant student either has Language
+  // Masterclass entirely (all 8 unlocked) or not at all (all 8 locked). A
+  // standalone user is symmetric: any one registration unlocks all 8.
+  const hasAccess = isTenant ? !!user.school?.hasLanguageMasterclass : !!user.hasLanguageMasterclass;
+  const isLocked = () => isTenant && !hasAccess;
 
   const handleSelect = (code) => {
-    if (isLocked(code)) return;
+    if (isLocked()) return;
     setOpen(false);
     navigate(routeFor(code));
   };
@@ -60,13 +63,13 @@ export default function LanguageDropdown() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 px-3 py-2 rounded-xl border-2 border-gray-200 bg-white hover:border-gray-300 transition-colors text-sm font-semibold text-gray-700"
+        className="flex items-center gap-2 px-3 py-2 rounded-xl border-2 border-white/20 bg-white/10 hover:border-white/30 transition-colors text-sm font-semibold text-white"
         aria-haspopup="listbox"
         aria-expanded={open}
       >
         <span className="text-base leading-none">🌐</span>
         <span className="hidden sm:inline">Language Masterclass</span>
-        <ChevronDown size={14} className={`text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown size={14} className={`text-white/70 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
@@ -76,7 +79,7 @@ export default function LanguageDropdown() {
         >
           {LANGUAGE_ORDER.map((code) => {
             const meta = LANGUAGE_META[code];
-            const locked = isLocked(code);
+            const locked = isLocked();
             return (
               <button
                 key={code}
@@ -97,7 +100,7 @@ export default function LanguageDropdown() {
                   {locked && (
                     <p className="flex items-center gap-1 text-[11px] text-gray-400 mt-0.5">
                       <Lock size={10} aria-hidden="true" />
-                      Ask your school to enable this
+                      Ask your school to enable Language Masterclass
                     </p>
                   )}
                 </div>
