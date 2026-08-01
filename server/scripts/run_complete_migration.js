@@ -1960,16 +1960,114 @@ async function run() {
     VALUES ('german', 'Everyday German', 'Common everyday German words and greetings', 'Beginner', '🇩🇪', 1)
     ON CONFLICT (language, name) DO NOTHING`
   );
-  // Intermediate/Advanced placeholders — deliberately no words seeded under
-  // these; they exist only so the level structure itself is visible.
-  await exec('lang_categories: seed empty Intermediate/Advanced placeholders', `
+  // Intermediate/Advanced categories for French/German — previously empty
+  // "Coming soon" placeholders; now seeded with real vocabulary below, to
+  // bring French/German up toward English Masterclass's level of content
+  // completeness. Descriptions updated via UPDATE (not just the INSERT's
+  // ON CONFLICT DO NOTHING) so an already-deployed placeholder row picks up
+  // the real copy too, not just newly-created databases.
+  await exec('lang_categories: seed Intermediate/Advanced categories', `
     INSERT INTO lang_categories (language, name, description, difficulty, icon_emoji, order_index)
     VALUES
-      ('french', 'French Conversation', 'Coming soon', 'Intermediate', '🇫🇷', 2),
-      ('french', 'Advanced French',     'Coming soon', 'Advanced',     '🇫🇷', 3),
-      ('german', 'German Conversation', 'Coming soon', 'Intermediate', '🇩🇪', 2),
-      ('german', 'Advanced German',     'Coming soon', 'Advanced',     '🇩🇪', 3)
+      ('french', 'French Conversation', 'Everyday conversational French — questions, time words, and common connectors', 'Intermediate', '🇫🇷', 2),
+      ('french', 'Advanced French',     'Higher-register French — connectors and verbs for nuanced, formal speech and writing', 'Advanced',     '🇫🇷', 3),
+      ('german', 'German Conversation', 'Everyday conversational German — questions, time words, and common connectors', 'Intermediate', '🇩🇪', 2),
+      ('german', 'Advanced German',     'Higher-register German — connectors and verbs for nuanced, formal speech and writing', 'Advanced',     '🇩🇪', 3)
     ON CONFLICT (language, name) DO NOTHING`
+  );
+  await exec('lang_categories: update stale "Coming soon" descriptions', `
+    UPDATE lang_categories SET description = CASE
+      WHEN language = 'french' AND name = 'French Conversation' THEN 'Everyday conversational French — questions, time words, and common connectors'
+      WHEN language = 'french' AND name = 'Advanced French'     THEN 'Higher-register French — connectors and verbs for nuanced, formal speech and writing'
+      WHEN language = 'german' AND name = 'German Conversation' THEN 'Everyday conversational German — questions, time words, and common connectors'
+      WHEN language = 'german' AND name = 'Advanced German'     THEN 'Higher-register German — connectors and verbs for nuanced, formal speech and writing'
+      ELSE description
+    END
+    WHERE description = 'Coming soon'`
+  );
+
+  await exec('lang_words: seed French Intermediate words', `
+    INSERT INTO lang_words (category_id, word, phonetic, definition, example_sentence, icon_emoji)
+    SELECT c.id, w.word, w.phonetic, w.definition, w.example_sentence, w.icon_emoji
+    FROM (VALUES
+      ('Comment',       '/kɔ.mɑ̃/',       'How',            'Comment allez-vous aujourd''hui ?',            '❓'),
+      ('Pourquoi',      '/puʁ.kwa/',      'Why',            'Pourquoi est-ce que tu pleures ?',              '❓'),
+      ('Beaucoup',      '/bo.ku/',        'A lot / very much', 'Merci beaucoup pour ton aide.',              '📈'),
+      ('Aujourd''hui',  '/o.ʒuʁ.dɥi/',    'Today',          'Aujourd''hui, il fait beau.',                   '📅'),
+      ('Demain',        '/də.mɛ̃/',        'Tomorrow',       'Nous partons demain matin.',                    '📅'),
+      ('Toujours',      '/tu.ʒuʁ/',       'Always',         'Il arrive toujours en retard.',                 '♾️'),
+      ('Ensemble',      '/ɑ̃.sɑ̃bl/',      'Together',       'Travaillons ensemble sur ce projet.',            '🤝'),
+      ('Peut-être',     '/pø.tɛtʁ/',      'Maybe',          'Peut-être qu''il viendra ce soir.',              '🤔'),
+      ('Vraiment',      '/vʁɛ.mɑ̃/',       'Really',         'C''est vraiment une bonne idée.',                '💯'),
+      ('Rapidement',    '/ʁa.pid.mɑ̃/',   'Quickly',        'Elle a fini son travail rapidement.',            '⚡'),
+      ('Difficile',     '/di.fi.sil/',    'Difficult',      'Cet examen était très difficile.',               '😓'),
+      ('Facile',        '/fa.sil/',       'Easy',           'Ce jeu est facile à apprendre.',                 '😊')
+    ) AS w(word, phonetic, definition, example_sentence, icon_emoji)
+    CROSS JOIN (SELECT id FROM lang_categories WHERE language='french' AND name='French Conversation') c
+    WHERE NOT EXISTS (SELECT 1 FROM lang_words lw WHERE lw.category_id = c.id AND lw.word = w.word)`
+  );
+
+  await exec('lang_words: seed French Advanced words', `
+    INSERT INTO lang_words (category_id, word, phonetic, definition, example_sentence, icon_emoji)
+    SELECT c.id, w.word, w.phonetic, w.definition, w.example_sentence, w.icon_emoji
+    FROM (VALUES
+      ('Néanmoins',      '/ne.ɑ̃.mwɛ̃/',        'Nevertheless',            'Il pleuvait ; néanmoins, nous sommes sortis.',        '⚖️'),
+      ('Cependant',       '/sə.pɑ̃.dɑ̃/',        'However',                 'Cependant, je ne suis pas d''accord.',                 '⚖️'),
+      ('Davantage',       '/da.vɑ̃.taʒ/',       'Further / more',          'Il faudrait étudier davantage ce dossier.',            '📊'),
+      ('Éventuellement',  '/e.vɑ̃.tɥ.ɛl.mɑ̃/',   'Possibly / eventually',   'Éventuellement, nous pourrions changer de plan.',       '🔮'),
+      ('Malgré',          '/mal.ɡʁe/',          'Despite',                 'Malgré la pluie, le match a eu lieu.',                 '☔'),
+      ('Autrement',       '/o.tʁə.mɑ̃/',        'Otherwise',               'Dépêche-toi, autrement tu vas rater le train.',        '↪️'),
+      ('Désormais',       '/de.zɔʁ.mɛ/',        'From now on',             'Désormais, les bureaux ouvrent à neuf heures.',        '🕘'),
+      ('Quoique',         '/kwak/',             'Although',                'Quoique fatigué, il a terminé le travail.',            '🔀'),
+      ('Approfondir',     '/a.pʁɔ.fɔ̃.diʁ/',    'To explore in depth',     'Nous devons approfondir cette question demain.',       '🔍'),
+      ('Envisager',       '/ɑ̃.vi.za.ʒe/',      'To consider',             'Elle envisage de changer de carrière.',                '🤔'),
+      ('Souligner',       '/su.li.ɲe/',         'To emphasize',            'Le rapport souligne l''importance du projet.',         '✏️'),
+      ('Constater',       '/kɔ̃s.ta.te/',       'To note / observe',       'On peut constater une nette amélioration.',            '👀')
+    ) AS w(word, phonetic, definition, example_sentence, icon_emoji)
+    CROSS JOIN (SELECT id FROM lang_categories WHERE language='french' AND name='Advanced French') c
+    WHERE NOT EXISTS (SELECT 1 FROM lang_words lw WHERE lw.category_id = c.id AND lw.word = w.word)`
+  );
+
+  await exec('lang_words: seed German Intermediate words', `
+    INSERT INTO lang_words (category_id, word, phonetic, definition, example_sentence, icon_emoji)
+    SELECT c.id, w.word, w.phonetic, w.definition, w.example_sentence, w.icon_emoji
+    FROM (VALUES
+      ('Wie',        '/viː/',          'How',              'Wie geht es dir heute?',                     '❓'),
+      ('Warum',      '/vaˈʁuːm/',      'Why',              'Warum bist du so spät?',                     '❓'),
+      ('Heute',      '/ˈhɔʏtə/',       'Today',            'Heute ist ein schöner Tag.',                 '📅'),
+      ('Morgen',     '/ˈmɔʁɡn̩/',      'Tomorrow',         'Wir fahren morgen früh los.',                '📅'),
+      ('Immer',      '/ˈɪmɐ/',         'Always',           'Er kommt immer zu spät.',                    '♾️'),
+      ('Zusammen',   '/tsuˈzamən/',    'Together',         'Lass uns zusammen arbeiten.',                '🤝'),
+      ('Vielleicht', '/fiˈlaɪçt/',     'Maybe',            'Vielleicht kommt sie heute Abend.',          '🤔'),
+      ('Wirklich',   '/ˈvɪʁklɪç/',     'Really',           'Das ist wirklich eine gute Idee.',           '💯'),
+      ('Schnell',    '/ʃnɛl/',         'Fast / quickly',   'Sie hat die Arbeit schnell erledigt.',       '⚡'),
+      ('Schwierig',  '/ˈʃviːʁɪç/',     'Difficult',        'Die Prüfung war sehr schwierig.',            '😓'),
+      ('Einfach',    '/ˈaɪnfax/',      'Easy / simple',    'Dieses Spiel ist einfach zu lernen.',        '😊'),
+      ('Viel',       '/fiːl/',         'A lot / much',     'Ich habe heute viel zu tun.',                 '📈')
+    ) AS w(word, phonetic, definition, example_sentence, icon_emoji)
+    CROSS JOIN (SELECT id FROM lang_categories WHERE language='german' AND name='German Conversation') c
+    WHERE NOT EXISTS (SELECT 1 FROM lang_words lw WHERE lw.category_id = c.id AND lw.word = w.word)`
+  );
+
+  await exec('lang_words: seed German Advanced words', `
+    INSERT INTO lang_words (category_id, word, phonetic, definition, example_sentence, icon_emoji)
+    SELECT c.id, w.word, w.phonetic, w.definition, w.example_sentence, w.icon_emoji
+    FROM (VALUES
+      ('Dennoch',           '/ˈdɛnɔx/',                  'Nevertheless',             'Es regnete; dennoch gingen wir spazieren.',            '⚖️'),
+      ('Allerdings',        '/ˌalɐˈdɪŋs/',               'However',                  'Allerdings bin ich anderer Meinung.',                   '⚖️'),
+      ('Außerdem',          '/ˈaʊsɐdeːm/',               'Besides / moreover',       'Außerdem müssen wir den Bericht fertigstellen.',        '➕'),
+      ('Möglicherweise',    '/ˈmøːklɪçɐˌvaɪzə/',         'Possibly',                 'Möglicherweise ändern wir den Plan noch.',              '🔮'),
+      ('Obwohl',            '/ɔpˈvoːl/',                 'Although',                 'Obwohl er müde war, arbeitete er weiter.',              '🔀'),
+      ('Inzwischen',        '/ɪnˈtsvɪʃn̩/',              'Meanwhile',                'Inzwischen können wir die Unterlagen prüfen.',          '⏳'),
+      ('Grundsätzlich',     '/ˈɡʁʊntˌzɛtslɪç/',          'Fundamentally / basically','Grundsätzlich stimme ich dir zu.',                       '🧱'),
+      ('Berücksichtigen',   '/bəˈʁʏkzɪçtɪɡn̩/',           'To take into account',     'Wir müssen alle Faktoren berücksichtigen.',             '🧮'),
+      ('Betonen',           '/bəˈtoːnən/',               'To emphasize',             'Der Lehrer betonte die Bedeutung der Übung.',            '✏️'),
+      ('Voraussichtlich',   '/foˈʁaʊsˌzɪçtlɪç/',         'Presumably / expected',    'Das Projekt wird voraussichtlich pünktlich fertig.',    '📆'),
+      ('Zusammenhang',      '/tsuˈzamənˌhaŋ/',           'Context / connection',     'Das ergibt im Zusammenhang mehr Sinn.',                 '🔗'),
+      ('Vermeiden',         '/fɛɐ̯ˈmaɪdn̩/',              'To avoid',                 'Wir sollten unnötige Fehler vermeiden.',                '🚫')
+    ) AS w(word, phonetic, definition, example_sentence, icon_emoji)
+    CROSS JOIN (SELECT id FROM lang_categories WHERE language='german' AND name='Advanced German') c
+    WHERE NOT EXISTS (SELECT 1 FROM lang_words lw WHERE lw.category_id = c.id AND lw.word = w.word)`
   );
 
   await exec('lang_words: seed French Beginner words', `
@@ -2173,6 +2271,39 @@ async function run() {
       ('swahili',  'Swahili',  false, false, false, false, 7),
       ('yoruba',   'Yoruba',   false, false, false, false, 8)
     ON CONFLICT (code) DO NOTHING`);
+
+  // French/German writing (Written Composition) is now built and wired to
+  // real grading (see languageMasterclassRoutes.js's /writing-score) — flip
+  // the flag so it stops showing ComingSoon. Needs an explicit UPDATE, not
+  // just the seed INSERT above, because ON CONFLICT DO NOTHING means the
+  // insert never touches an already-existing row in a deployed DB.
+  await exec('languages: enable writing for french/german', `
+    UPDATE languages SET supports_writing = true WHERE code IN ('french', 'german')`);
+
+  // Admin CMS support columns (mirrors em_categories/em_words) — needed so
+  // the new /:language/admin/* routes can track who created what and when
+  // something was last edited, and so a duplicate word can't silently
+  // overwrite/duplicate under concurrent admin edits.
+  await exec('lang_categories: admin CMS columns', `
+    ALTER TABLE lang_categories
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id) ON DELETE SET NULL`);
+  await exec('lang_words: admin CMS columns', `
+    ALTER TABLE lang_words
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id) ON DELETE SET NULL`);
+  await exec('lang_words: unique (category_id, word)', `
+    CREATE UNIQUE INDEX IF NOT EXISTS lang_words_category_word_unique
+      ON lang_words(category_id, word)`);
+
+  // pronunciation_score/writing_score on lang_practice_sessions — mirrors
+  // em_practice_sessions' same two columns (see GAP 4a in
+  // ENGLISH_MASTERCLASS_AGENT_PROMPT.md); needed now that /sessions
+  // averages and persists both per session.
+  await exec('lang_practice_sessions: score columns', `
+    ALTER TABLE lang_practice_sessions
+      ADD COLUMN IF NOT EXISTS pronunciation_score NUMERIC(5,2),
+      ADD COLUMN IF NOT EXISTS writing_score        NUMERIC(5,2)`);
 
   // ── STEP 4: bring lang_* up to parity with em_*'s full feature set ────────
   // (writing submissions, per-word progress, aggregate user stats) --
