@@ -1,10 +1,10 @@
 // client/src/pages/em/EMRegisterPage.jsx
-// One-time Language Masterclass registration step.
-//
-// The user already has a valid AISchoolOnAir session at this point (this
-// page lives behind EMPrivateRoute), but that account alone does not grant
-// EM access — POST /english-masterclass/register is the explicit, separate
-// registration required before any EM content route will respond.
+// One-time Language Masterclass registration step — STANDALONE users only.
+// A tenant student's access is fully determined by their school's
+// enable_em flag (see EMPrivateRoute.jsx / requireEmRegistration in
+// englishMasterclassRoutes.js) — nothing to register, so EMPrivateRoute
+// never sends a tenant student here in normal navigation. The redirect
+// below is defense-in-depth for a stale bookmark or direct URL entry.
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -18,8 +18,10 @@ export default function EMRegisterPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState('');
 
-  // Already registered (e.g. back-button after completing this) — skip straight in.
-  if (user?.em_registered_at) {
+  // Already registered (e.g. back-button after completing this), or a
+  // tenant student whose access needs no registration at all — skip
+  // straight in either way.
+  if (user?.em_registered_at || user?.school) {
     navigate('/em/dashboard', { replace: true });
     return null;
   }
