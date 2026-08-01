@@ -1,6 +1,26 @@
 #!/usr/bin/env node
 // server/scripts/migrate_language_unification.js
 //
+// ═══════════════════════════════════════════════════════════════════════════
+// ⚠️  SUPERSEDED — DO NOT RUN THIS STANDALONE AGAINST A LIVE DATABASE  ⚠️
+//
+// This was the original one-time unification migration. Its logic has since
+// been folded into server/scripts/run_complete_migration.js (see that
+// file's own comment pointing back here), which is the ONE script actually
+// wired into deployment — confirmed by grepping deploy.sh and
+// fix_and_deploy.sh, both of which call run_complete_migration.js and never
+// reference this file. This file is kept only for historical reference
+// (it documents the original step-by-step unification design).
+//
+// Running this file directly against a live/deployed database is unsafe:
+// it independently seeds the `languages` table but does NOT include the
+// supports_writing UPDATE for french/german that run_complete_migration.js
+// has (only supports_listening was added to match, in a later fix) — so a
+// standalone run here can leave supports_writing = false for french/german
+// even though the rest of the app assumes it's true. If you need to
+// (re)run the unification/setup logic, use run_complete_migration.js.
+// ═══════════════════════════════════════════════════════════════════════════
+//
 // Consolidates "English Masterclass" (em_*) into the language-agnostic
 // "Language Masterclass" (lang_*) system as one of 8 languages, and
 // replaces the per-language column model (em_registered_at,
@@ -226,6 +246,13 @@ async function run() {
       ('swahili',  'Swahili',  false, false, false, false, 7),
       ('yoruba',   'Yoruba',   false, false, false, false, 8)
     ON CONFLICT (code) DO NOTHING`);
+
+  // Listening comprehension for French/German is a client-side spelling
+  // check plus a fully language-agnostic TTS route (see useLangAudio.js /
+  // languageMasterclassRoutes.js's /:language/audio) — real and verified,
+  // same as the supports_listening UPDATE in run_complete_migration.js.
+  await exec('languages: enable listening for french/german', `
+    UPDATE languages SET supports_listening = true WHERE code IN ('french', 'german')`);
 
   // ── STEP 4: bring lang_* up to parity with em_*'s full feature set ────────
   // (writing submissions, per-word progress, aggregate user stats) --

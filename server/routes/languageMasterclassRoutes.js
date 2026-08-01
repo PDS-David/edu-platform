@@ -14,12 +14,13 @@
 //   - English: pronunciation, listening (client-side only, no backend route
 //     needed beyond /audio), and writing all supported.
 //   - French/German: pronunciation, listening, AND writing now all
-//     supported (supports_writing flipped true for both — see the
-//     `languages` table UPDATE in run_complete_migration.js). Full admin
-//     CMS below (/:language/admin/*), word-explain, and /progress are all
-//     generalized and live for these two. Content still growing — see the
-//     Intermediate/Advanced seed additions in run_complete_migration.js;
-//     use the admin CMS's "Generate with AI" to keep expanding beyond that.
+//     supported (supports_writing and supports_listening both flipped true
+//     for both — see the `languages` table UPDATEs in
+//     run_complete_migration.js). Full admin CMS below (/:language/admin/*),
+//     word-explain, and /progress are all generalized and live for these
+//     two. Content still growing — see the Intermediate/Advanced seed
+//     additions in run_complete_migration.js; use the admin CMS's
+//     "Generate with AI" to keep expanding beyond that.
 //   - Mandarin/Arabic/Spanish/Swahili/Yoruba: Beginner-only seed shape,
 //     pronunciation/listening/writing NOT yet marked supported — see
 //     languages table. Flip supports_* on per-language only once that

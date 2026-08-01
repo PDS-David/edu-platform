@@ -2280,6 +2280,18 @@ async function run() {
   await exec('languages: enable writing for french/german', `
     UPDATE languages SET supports_writing = true WHERE code IN ('french', 'german')`);
 
+  // Listening comprehension needs no dedicated backend grading route (it's
+  // a client-side spelling check against the word, same shape as English
+  // Masterclass's listening step) and the /:language/audio TTS route above
+  // is fully language-agnostic — useLangAudio.js already localizes the
+  // browser-TTS fallback correctly per language (fr-FR/de-DE). Verified
+  // working end-to-end for French/German, unlike pronunciation/writing
+  // which needed real backend grading work first — flip the flag to match
+  // reality instead of leaving it permanently false while the routes file
+  // header comment claims it's supported.
+  await exec('languages: enable listening for french/german', `
+    UPDATE languages SET supports_listening = true WHERE code IN ('french', 'german')`);
+
   // Admin CMS support columns (mirrors em_categories/em_words) — needed so
   // the new /:language/admin/* routes can track who created what and when
   // something was last edited, and so a duplicate word can't silently
