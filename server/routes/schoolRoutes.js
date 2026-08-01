@@ -331,6 +331,21 @@ router.get('/:id/roster', protect, authorize('admin'), async (req, res) => {
 // { mandarin: true, arabic: false }) additionally lets any of the 5 new
 // languages be toggled through this same endpoint without needing 5 more
 // dedicated boolean columns.
+//
+// ACCESS-MODEL UPDATE (post Da's live review): enable_em is now the single
+// gate for ALL 8 Language Masterclass languages (see req.school.
+// hasLanguageMasterclass in middleware/auth.js -- it's just !!enable_em).
+// enable_french/enable_german/enable_languages below, and the
+// school_enabled_languages mirroring, are still accepted and still written
+// for backward compatibility and because other code may still read
+// req.school.enabledLanguages, but none of them affect what a student can
+// actually access anymore -- enable_em=true alone unlocks all 8 languages
+// for every student at this school, with no further per-language toggle or
+// per-student registration needed. Simplifying this endpoint's contract
+// itself (dropping the now-vestigial params) is a separate, deliberately
+// un-rushed follow-up -- see the admin-UI prompt in this consolidation's
+// handoff doc, since AdminSchools.jsx/SchoolAdminDashboard.jsx would need
+// to change in lockstep with any contract change here.
 router.patch('/:id/services', protect, authorize('admin'), async (req, res) => {
   const enableAISchoolonair = req.body.enable_aischoolonair;
   const enableEM            = req.body.enable_em;
