@@ -396,7 +396,7 @@ export default function LandingPage() {
               <Crown size={12} /> New · English Fluency Training
             </span>
             <h2 className="text-2xl sm:text-3xl font-extrabold leading-tight">
-              Master English with Language Masterclass
+              Master Languages like English, French, German and others with Language Masterclass
             </h2>
             <p className="text-sm sm:text-base leading-relaxed max-w-lg" style={{ color: SOVEREIGN[200] }}>
               A standalone vocabulary and pronunciation trainer built for non-native English
