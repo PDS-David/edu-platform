@@ -155,7 +155,7 @@ export default function LanguageMasterclass({ language: languageProp }) {
 
       {/* Header */}
       <div className="text-white" style={{ background: meta.accent }}>
-        <div className="max-w-4xl mx-auto px-4 py-6">
+        <div className="max-w-4xl mx-auto px-4 py-5 sm:py-6">
           {/* Persistent escape hatch + language switcher — every language
               routed through this component previously had no way back to
               the Language Masterclass hub (/em/dashboard) or across to
@@ -166,13 +166,17 @@ export default function LanguageMasterclass({ language: languageProp }) {
               handling) so it's safe to drop in here without adopting
               EMLayout's sidebar shell, which is shaped for English's
               separate Dashboard/Practice/Progress pages rather than this
-              single orchestrated page. */}
-          <div className="flex items-center justify-between gap-3 mb-3">
+              single orchestrated page.
+              flex-wrap + min-w-0/truncate on the link keeps this row from
+              ever forcing horizontal scroll on narrow phones — worst case
+              the link's own label wraps to a second line instead of
+              pushing the dropdown off the edge of the screen. */}
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 mb-3">
             <Link
               to="/em/dashboard"
-              className="flex items-center gap-1 text-sm text-white/80 hover:text-white transition-colors"
+              className="flex items-center gap-1 text-sm text-white/80 hover:text-white transition-colors min-w-0"
             >
-              <ArrowLeft size={14} /> Language Masterclass
+              <ArrowLeft size={14} className="shrink-0" /> <span className="truncate">Language Masterclass</span>
             </Link>
             <LanguageDropdown />
           </div>
@@ -184,7 +188,7 @@ export default function LanguageMasterclass({ language: languageProp }) {
               <ArrowLeft size={14} /> Back to levels
             </button>
           )}
-          <h1 className="text-2xl font-bold flex items-center gap-2">
+          <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
             <span>{meta.flag}</span> {meta.label}
           </h1>
           <p className="text-sm text-white/80 mt-1">
@@ -192,6 +196,7 @@ export default function LanguageMasterclass({ language: languageProp }) {
           </p>
         </div>
       </div>
+
 
       <div className="max-w-4xl mx-auto px-4 py-8">
         {view === 'loading' && (
