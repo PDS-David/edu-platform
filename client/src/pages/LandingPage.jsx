@@ -128,7 +128,7 @@ export default function LandingPage() {
             {/* Desktop nav links */}
             <nav className="hidden md:flex items-center gap-4 text-sm font-medium text-gray-600">
               <Link to="/english-masterclass" className="hover:text-blue-600 transition-colors">
-                English Masterclass
+                Language Masterclass
               </Link>
               <Link to="/login" className="hover:text-blue-600 transition-colors">
                 Login
@@ -152,7 +152,7 @@ export default function LandingPage() {
       {menuOpen && (
         <div className="md:hidden bg-white border-b border-gray-100 px-4 py-4 space-y-3 sticky top-14 z-40">
           <Link to="/english-masterclass" onClick={() => setMenuOpen(false)} className="block py-1 text-sm font-medium text-gray-700">
-            English Masterclass
+            Language Masterclass
           </Link>
           <Link to="/login" onClick={() => setMenuOpen(false)} className="block py-1 text-sm font-medium text-gray-700">
             Login
