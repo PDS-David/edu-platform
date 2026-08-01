@@ -1,6 +1,14 @@
 #!/usr/bin/env node
 // server/scripts/verify_language_unification.js
 //
+// Pairs with server/scripts/migrate_language_unification.js, which is
+// superseded by server/scripts/run_complete_migration.js (the only script
+// actually wired into deploy.sh/fix_and_deploy.sh) — see the warning banner
+// at the top of that file. This script is read-only (no schema/data
+// mutation, just row-count + spot-check verification), so it's low-risk to
+// keep around, but it's only meaningful in the context of that superseded
+// migration and its em_* -> lang_* rollback-safety-net question.
+//
 // Run AFTER migrate_language_unification.js. Confirms zero data loss:
 // every em_* row count matches its lang_* (language='english') count,
 // and a spot-check of specific rows (not just counts) matches field-by-field.
