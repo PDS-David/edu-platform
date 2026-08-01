@@ -10,6 +10,12 @@
 export const QUESTIONS_PER_LEVEL = 30;
 export const UNLOCK_ACCURACY = 70;
 
+// `enabled` is the single "introduce this language" switch on the
+// frontend — must match ENABLED_LANGUAGES in
+// server/routes/languageMasterclassRoutes.js exactly. A language flipped
+// to enabled here without also being added there (or vice versa) means a
+// mismatch, not a security hole either way: the backend's own gate is
+// what actually withholds content regardless of what this file says.
 export const LANGUAGE_META = {
   english: {
     label: 'English Masterclass',
@@ -17,6 +23,7 @@ export const LANGUAGE_META = {
     flag: '🇬🇧',
     accent: '#8B0000',
     accentSoft: '#FBEAEA',
+    enabled: true,
   },
   french: {
     label: 'French Masterclass',
@@ -26,6 +33,7 @@ export const LANGUAGE_META = {
     // crimson/sovereign theme and German's black/red/gold at a glance.
     accent: '#0055A4',
     accentSoft: '#E6F0FA',
+    enabled: true,
   },
   german: {
     label: 'German Masterclass',
@@ -33,6 +41,7 @@ export const LANGUAGE_META = {
     flag: '🇩🇪',
     accent: '#DD0000',
     accentSoft: '#FCE8E8',
+    enabled: true,
   },
   mandarin: {
     label: 'Mandarin Masterclass',
@@ -40,6 +49,7 @@ export const LANGUAGE_META = {
     flag: '🇨🇳',
     accent: '#DE2910',
     accentSoft: '#FBEAE8',
+    enabled: false,
   },
   arabic: {
     label: 'Arabic Masterclass',
@@ -48,6 +58,7 @@ export const LANGUAGE_META = {
     accent: '#006C35',
     accentSoft: '#E5F2EB',
     isRtl: true,
+    enabled: false,
   },
   spanish: {
     label: 'Spanish Masterclass',
@@ -55,6 +66,7 @@ export const LANGUAGE_META = {
     flag: '🇪🇸',
     accent: '#AA151B',
     accentSoft: '#FBEAEA',
+    enabled: false,
   },
   swahili: {
     label: 'Swahili Masterclass',
@@ -62,6 +74,7 @@ export const LANGUAGE_META = {
     flag: '🇰🇪',
     accent: '#006600',
     accentSoft: '#E6F2E6',
+    enabled: false,
   },
   yoruba: {
     label: 'Yoruba Masterclass',
@@ -69,6 +82,7 @@ export const LANGUAGE_META = {
     flag: '🇳🇬',
     accent: '#008751',
     accentSoft: '#E6F5EE',
+    enabled: false,
   },
 };
 

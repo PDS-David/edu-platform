@@ -22,11 +22,13 @@
 // so unauthenticated users still go to the shared /login, same as before.
 //
 // Standalone (schoolless) users are not gated here — per
-// languageMasterclassRoutes.js, their access is per-user
-// (req.user.hasLanguageMasterclass, set once they've registered for any
-// one language) and is handled inside LanguageMasterclass.jsx itself via
-// its own 'needs-registration' view state, the same way the page already
-// handles first-time registration today.
+// languageMasterclassRoutes.js, their one-time registration
+// (user_language_registrations) now happens silently on their first
+// request to any language-scoped route, inside requireLanguageRegistration
+// on the backend. There is no registration UI/button anywhere in the
+// frontend for this, and no separate view state in LanguageMasterclass.jsx
+// to redirect to — a not-yet-registered standalone student's first
+// content request just succeeds.
 
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';

@@ -238,29 +238,28 @@ export default function App() {
           <Route path="/join-school" element={<JoinSchoolPage />} />
         </Route>
 
-        {/* FRENCH / GERMAN MASTERCLASS — deliberately incomplete proof-of-concept,
-            not wired into the ChooseAppPage/getPostAuthRedirect login unification
-            on purpose (see LanguageMasterclass.jsx header comment). Own
-            registration gate (POST /language-masterclass/:language/register),
-            skipOnboardingCheck since this is independent of AISchoolonair's
-            subject-selection onboarding. */}
-        {/* LANGUAGE MASTERCLASS — French/German/Mandarin/Arabic/Spanish/
-            Swahili/Yoruba, all through one dynamic :code route now instead
-            of one hardcoded component per language (that pattern stopped
-            at 2 languages; it does not scale to 8). LanguageMasterclass.jsx
-            reads :code itself (see its own useParams) and renders the
-            "not a language we offer" state for anything outside
-            LANGUAGE_META, so an invalid code can't reach a blank/broken
-            page. Deliberately incomplete proof-of-concept for all 7 of
-            these (see LanguageMasterclass.jsx header + languages table's
-            supports_* flags) — not wired into ChooseAppPage/
-            getPostAuthRedirect login unification on purpose, same as
-            before. Own registration gate
-            (POST /language-masterclass/:language/register),
-            skipOnboardingCheck since this is independent of
-            AISchoolonair's subject-selection onboarding. English is
-            deliberately excluded from this dynamic route (handled by the
-            /language/english/* redirect group above instead) since
+        {/* LANGUAGE MASTERCLASS — French/German enabled; Mandarin/Arabic/
+            Spanish/Swahili/Yoruba withheld (LANGUAGE_META.enabled /
+            ENABLED_LANGUAGES in languageMasterclassRoutes.js — the single
+            "introduce this language" switch, code-only, no DB/admin
+            toggle) until there's real demand, all through one dynamic
+            :code route now instead of one hardcoded component per
+            language (that pattern stopped at 2 languages; it does not
+            scale to 8). LanguageMasterclass.jsx reads :code itself (see
+            its own useParams) and renders the "not a language we offer"
+            state for anything outside LANGUAGE_META, and a "will soon be
+            available" state for anything in LANGUAGE_META but not yet
+            enabled, so neither an invalid code nor a withheld one can
+            reach a blank/broken page or any of that language's content.
+            No registration step of any kind lives in this route or in
+            LanguageMasterclass.jsx — LangPrivateRoute below gates purely
+            on user.school.hasLanguageMasterclass /
+            user.hasLanguageMasterclass; a standalone user's one-time
+            registration now happens silently server-side on first content
+            request (see requireLanguageRegistration in
+            languageMasterclassRoutes.js), not through any UI here. English
+            is deliberately excluded from this dynamic route (handled by
+            the /language/english/* redirect group above instead) since
             LanguageMasterclass.jsx is the French/German-style single-page
             orchestrator, not English's fuller 3-exercise experience. */}
         <Route element={<LangPrivateRoute allowedRoles={["student", "teacher"]} />}>
