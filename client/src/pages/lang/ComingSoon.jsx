@@ -1,10 +1,13 @@
 // client/src/pages/lang/ComingSoon.jsx
-// Shared "yet to be completed" placeholder — used for the Listening
-// Comprehension and Written Composition exercises (deliberately not built
-// yet, see languageMasterclassRoutes.js for why) and for the empty
-// Intermediate/Advanced levels. This is not an error state or a loading
-// state — it's an honest, permanent placeholder until this is actually
-// built, so it says that plainly rather than pretending to be "loading."
+// Shared "yet to be completed" placeholder — used for the Written
+// Composition exercise (writing-score is gated server-side by
+// languages.supports_writing, not yet set for French/German — see
+// languageMasterclassRoutes.js) and for the empty Intermediate/Advanced
+// levels. Listening Comprehension used to show this too but is now
+// functional — see LangPracticeSession.jsx. This is not an error state or
+// a loading state — it's an honest, permanent placeholder until this is
+// actually built, so it says that plainly rather than pretending to be
+// "loading."
 
 import { Construction } from 'lucide-react';
 
