@@ -21,7 +21,6 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
 import api from '../services/apiClient';
 import TopNav from '../components/TopNav';
-import { useAuth } from '../context/AuthContext';
 import LangLevelsView from './lang/LangLevelsView';
 import LangPracticeSession from './lang/LangPracticeSession';
 import LangSessionSummary from './lang/LangSessionSummary';
@@ -30,7 +29,6 @@ import { LANGUAGE_META } from './lang/constants';
 export default function LanguageMasterclass({ language: languageProp }) {
   const { code } = useParams();
   const language = languageProp || code;
-  const { user } = useAuth();
   const navigate = useNavigate();
   const meta = LANGUAGE_META[language];
 
@@ -54,7 +52,28 @@ export default function LanguageMasterclass({ language: languageProp }) {
     );
   }
 
-  const [view, setView] = useState('loading'); // loading | needs-registration | levels | practice | summary | error
+  if (!meta.enabled) {
+    // Withheld language — introduced by code (LANGUAGE_META.enabled) on a
+    // demand basis. No categories/words/level-progress call is ever made
+    // for these, so there's no path by which any of their content could
+    // reach the browser ahead of that flip; the backend enforces the same
+    // boundary independently via ENABLED_LANGUAGES either way.
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <TopNav />
+        <div className="max-w-2xl mx-auto px-4 py-12 text-center">
+          <span className="text-4xl">{meta.flag}</span>
+          <h1 className="text-lg font-bold text-gray-900 mt-3 mb-1">{meta.label}</h1>
+          <p className="text-gray-600">Will soon be available.</p>
+          <Link to="/em/dashboard" className="text-sm font-semibold text-blue-600 hover:underline mt-3 inline-block">
+            Back to Language Masterclass
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const [view, setView] = useState('loading'); // loading | levels | practice | summary | error
   const [error, setError] = useState('');
   const [categories, setCategories] = useState([]);
   const [levelProgress, setLevelProgress] = useState(null);
@@ -62,19 +81,6 @@ export default function LanguageMasterclass({ language: languageProp }) {
   const [words, setWords] = useState([]);
   const [loadingCatId, setLoadingCatId] = useState(null);
   const [sessionResult, setSessionResult] = useState(null);
-  const [registering, setRegistering] = useState(false);
-
-  // FIX: was `${language}_registered_at`, read off `user`. That column
-  // never existed for French/German either (getMe only ever selected
-  // em_registered_at, confirmed by reading server/controllers/auth.js) —
-  // meaning this check was ALWAYS false and every visit showed
-  // "needs-registration" even for already-registered students, who then
-  // had to click through the register button (harmless — POST /register
-  // is idempotent — but a real, pre-existing UX bug, not something this
-  // consolidation introduced). Now reads the real signal: the
-  // registeredLanguages array middleware/auth.js populates from
-  // user_language_registrations and getMe now returns (see auth.js /me).
-  const isRegistered = Array.isArray(user?.registeredLanguages) && user.registeredLanguages.includes(language);
 
   const loadLevelsData = useCallback(async () => {
     try {
@@ -92,42 +98,30 @@ export default function LanguageMasterclass({ language: languageProp }) {
       setLevelProgress(progRes.data || null);
       setView('levels');
     } catch (err) {
+      // Registration is no longer a possible failure here — a not-yet-
+      // registered standalone student is silently registered by the
+      // backend on this very request (see requireLanguageRegistration in
+      // languageMasterclassRoutes.js) instead of being rejected. The only
+      // access-related failures left are a school without Language
+      // Masterclass enabled (should already be caught by LangPrivateRoute
+      // before this component even mounts — this is just defense in
+      // depth) or a language withheld at the backend
+      // (LANGUAGE_NOT_YET_ENABLED — shouldn't happen either, since
+      // meta.enabled already stops this call from firing, but the two
+      // lists living in two files means it's worth handling gracefully
+      // rather than showing a raw error).
       const code = err?.response?.data?.code;
-      if (code === 'LANGUAGE_NOT_ENABLED_FOR_SCHOOL') {
-        setError(err.response.data.error);
-        setView('error');
-      } else if (code === 'LANGUAGE_REGISTRATION_REQUIRED') {
-        setView('needs-registration');
-      } else {
-        setError(err?.response?.data?.error || `Could not load ${meta.short} Masterclass.`);
-        setView('error');
+      setError(err?.response?.data?.error || `Could not load ${meta.short} Masterclass.`);
+      setView('error');
+      if (code !== 'LANGUAGE_MASTERCLASS_NOT_ENABLED_FOR_SCHOOL' && code !== 'LANGUAGE_NOT_YET_ENABLED') {
+        console.error(`[LanguageMasterclass] unexpected error loading ${language}`, err);
       }
     }
   }, [language, meta.short]);
 
   useEffect(() => {
-    if (!isRegistered) {
-      // Try loading anyway — the backend is the source of truth; this just
-      // avoids a guaranteed round-trip failure for accounts we already know
-      // haven't registered.
-      setView('needs-registration');
-      return;
-    }
     loadLevelsData();
-  }, [user, isRegistered, loadLevelsData]);
-
-  const handleRegister = async () => {
-    setRegistering(true);
-    setError('');
-    try {
-      await api.post(`/language-masterclass/${language}/register`);
-      await loadLevelsData();
-    } catch (err) {
-      setError(err?.response?.data?.error || 'Could not complete registration.');
-    } finally {
-      setRegistering(false);
-    }
-  };
+  }, [loadLevelsData]);
 
   const handleStartCategory = async (cat) => {
     setLoadingCatId(cat.id);
@@ -185,35 +179,12 @@ export default function LanguageMasterclass({ language: languageProp }) {
           </div>
         )}
 
-        {view === 'needs-registration' && (
-          <div className="max-w-md mx-auto text-center bg-white rounded-2xl border border-gray-100 p-8">
-            <span className="text-4xl">{meta.flag}</span>
-            <h2 className="text-lg font-bold text-gray-900 mt-3 mb-1">Try {meta.label}</h2>
-            <p className="text-sm text-gray-500 mb-6">
-              A one-time, one-click registration — same account, no new signup needed.
-            </p>
-            {error && (
-              <p className="flex items-center gap-1.5 justify-center text-xs text-red-600 mb-3">
-                <AlertCircle size={13} /> {error}
-              </p>
-            )}
-            <button
-              onClick={handleRegister}
-              disabled={registering}
-              className="text-white font-semibold text-sm px-6 py-2.5 rounded-xl transition-opacity disabled:opacity-50"
-              style={{ background: meta.accent }}
-            >
-              {registering ? 'Registering…' : `Register for ${meta.short} Masterclass`}
-            </button>
-          </div>
-        )}
-
         {view === 'error' && (
           <div className="max-w-md mx-auto text-center bg-white rounded-2xl border border-gray-100 p-8">
             <AlertCircle size={28} className="text-red-400 mx-auto mb-3" />
             <p className="text-sm text-gray-600 mb-4">{error}</p>
-            <Link to="/student/dashboard" className="text-sm font-semibold" style={{ color: meta.accent }}>
-              ← Back to Dashboard
+            <Link to="/em/dashboard" className="text-sm font-semibold" style={{ color: meta.accent }}>
+              ← Back to Language Masterclass
             </Link>
           </div>
         )}

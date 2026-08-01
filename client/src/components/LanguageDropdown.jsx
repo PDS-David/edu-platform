@@ -10,10 +10,15 @@
 // access is all-or-nothing, driven by user.school.hasLanguageMasterclass
 // (true the moment the school is enabled for Language Masterclass at all —
 // no per-language toggle, no per-student registration). A standalone
-// (non-tenant) user's access is driven by user.hasLanguageMasterclass
-// (true once they've registered for any ONE language — that single
-// registration unlocks all 8). Locked languages still appear — greyed out
-// with a short explanation — rather than being hidden entirely, matching
+// (non-tenant) user's access is driven by user.hasLanguageMasterclass,
+// which the backend now sets silently on their first content request to
+// any language — there is no registration step visible anywhere in this
+// UI. Independent of both: a language can be withheld entirely
+// (LANGUAGE_META[code].enabled === false — the code-only "introduce this
+// language" switch, see constants.js), in which case it shows "Will soon
+// be available" regardless of school/user access. Locked and withheld
+// languages both still appear in the list — greyed out with a short
+// explanation — rather than being hidden entirely, matching
 // LangLevelsView.jsx's existing pattern for locked Intermediate/Advanced
 // tiers.
 
@@ -50,10 +55,11 @@ export default function LanguageDropdown() {
   // Masterclass entirely (all 8 unlocked) or not at all (all 8 locked). A
   // standalone user is symmetric: any one registration unlocks all 8.
   const hasAccess = isTenant ? !!user.school?.hasLanguageMasterclass : !!user.hasLanguageMasterclass;
-  const isLocked = () => isTenant && !hasAccess;
+  const isAccessLocked = () => isTenant && !hasAccess;
 
   const handleSelect = (code) => {
-    if (isLocked()) return;
+    const meta = LANGUAGE_META[code];
+    if (!meta.enabled || isAccessLocked()) return;
     setOpen(false);
     navigate(routeFor(code));
   };
@@ -79,25 +85,35 @@ export default function LanguageDropdown() {
         >
           {LANGUAGE_ORDER.map((code) => {
             const meta = LANGUAGE_META[code];
-            const locked = isLocked();
+            // Two independent, non-overlapping reasons a row can be
+            // unselectable — kept as separate checks (not merged into one
+            // "locked" flag) so the message shown always matches the real
+            // reason: a withheld language isn't waiting on the school/user,
+            // and a school without access isn't waiting on a code change.
+            const notYetEnabled = !meta.enabled;
+            const accessLocked = !notYetEnabled && isAccessLocked();
+            const disabled = notYetEnabled || accessLocked;
             return (
               <button
                 key={code}
                 type="button"
                 role="option"
                 aria-selected="false"
-                disabled={locked}
+                disabled={disabled}
                 onClick={() => handleSelect(code)}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${
-                  locked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer'
+                  disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer'
                 }`}
               >
                 <span className="text-xl leading-none shrink-0">{meta.flag}</span>
                 <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-semibold truncate ${locked ? 'text-gray-400' : 'text-gray-900'}`}>
+                  <p className={`text-sm font-semibold truncate ${disabled ? 'text-gray-400' : 'text-gray-900'}`}>
                     {meta.short}
                   </p>
-                  {locked && (
+                  {notYetEnabled && (
+                    <p className="text-[11px] text-gray-400 mt-0.5">Will soon be available</p>
+                  )}
+                  {accessLocked && (
                     <p className="flex items-center gap-1 text-[11px] text-gray-400 mt-0.5">
                       <Lock size={10} aria-hidden="true" />
                       Ask your school to enable Language Masterclass

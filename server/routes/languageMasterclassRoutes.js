@@ -61,6 +61,19 @@ const LANGUAGE_LABEL = {
   arabic: 'Arabic', spanish: 'Spanish', swahili: 'Swahili', yoruba: 'Yoruba',
 };
 
+// Languages actually live for users, independent of LANGUAGES above (which
+// only validates that :language is a recognized identifier) and independent
+// of any DB/admin flag. This is the single "enable on demand" switch: a
+// language is introduced by adding it here in code, and nowhere else — not
+// a school toggle, not a content-seeding step. Mandarin/Arabic/Spanish/
+// Swahili/Yoruba already have Beginner-only seed content in the DB (see
+// this file's header) but are deliberately withheld here until there's
+// real user demand, per Da's instruction. Every route below this point is
+// gated by requireLanguageEnabled, so no content for a withheld language
+// — categories, words, progress, anything — is reachable through the API
+// regardless of what the frontend does.
+const ENABLED_LANGUAGES = new Set(['english', 'french', 'german']);
+
 // Validates :language on every route below and rejects anything else with a
 // clear 400 rather than silently matching nothing.
 function validLanguage(req, res, next) {
@@ -71,6 +84,22 @@ function validLanguage(req, res, next) {
 }
 router.param('language', (req, res, next) => next()); // no-op, keeps :language visible in route tables
 router.use('/:language', validLanguage);
+
+// Second gate, mounted before every route below (including /register) —
+// a withheld language 404s here before it ever reaches a DB query, so
+// there's no code path that can return its content ahead of the
+// ENABLED_LANGUAGES change that turns it on.
+function requireLanguageEnabled(req, res, next) {
+  if (!ENABLED_LANGUAGES.has(req.params.language)) {
+    return res.status(404).json({
+      success: false,
+      error: `${LANGUAGE_LABEL[req.params.language]} Masterclass will soon be available.`,
+      code: 'LANGUAGE_NOT_YET_ENABLED',
+    });
+  }
+  next();
+}
+router.use('/:language', requireLanguageEnabled);
 
 // ─── level-unlock rules ─────────────────────────────────────────────────────
 // Same cumulative-across-sessions shape as English Masterclass
@@ -113,16 +142,18 @@ function computeUnlocked(byDiff) {
 // ═══════════════════════════════════════════════════════════════════════════
 // REGISTRATION
 // ─────────────────────────────────────────────────────────────────────────────
-// Per Da's explicit correction after live review: a tenant (school) student
-// needs NO registration step at all -- school enablement alone grants access
-// to all 8 languages (see requireLanguageRegistration below). This route is
-// now only meaningful for standalone (non-tenant) users, where registering
-// for any ONE language unlocks all 8 (req.user.hasLanguageMasterclass,
-// computed in middleware/auth.js from "has at least one row in
-// user_language_registrations"). For a tenant student this route is a
-// harmless no-op success -- kept rather than removed/404'd in case anything
-// still calls it during the Prompt 2 frontend cleanup, so nothing breaks
-// mid-rollout.
+// SUPERSEDED as a user-facing step: per Da's explicit instruction, there is
+// to be no registration UI/button of any kind, for tenant or standalone
+// users. A tenant student already needed no registration step (school
+// enablement alone grants access — see requireLanguageRegistration below).
+// A standalone user previously needed one explicit POST here before
+// anything else worked; that requirement is now satisfied silently, inline,
+// the first time a standalone student touches any language-scoped route
+// (see requireLanguageRegistration's auto-registration branch below) —
+// same underlying user_language_registrations write this route always
+// made, just no longer gated behind a click. This route itself is kept,
+// unchanged, as a harmless idempotent manual fallback — nothing in the
+// frontend calls it anymore.
 // ═══════════════════════════════════════════════════════════════════════════
 router.post('/:language/register', async (req, res) => {
   const { language } = req.params;
@@ -172,7 +203,14 @@ router.post('/:language/register', async (req, res) => {
 // includes(language)) are gone; enabledLanguages/registeredLanguages arrays
 // are left computed in auth.js for anything else still reading them, but
 // this gate no longer uses them.
-function requireLanguageRegistration(req, res, next) {
+//
+// UPDATE: standalone users are no longer blocked here pending a manual
+// registration click (see the REGISTRATION section above) -- the very
+// first request a not-yet-registered standalone student makes to any
+// language-scoped route silently writes the user_language_registrations
+// row itself and proceeds, rather than 403ing and waiting for a button
+// press that no longer exists in the UI.
+async function requireLanguageRegistration(req, res, next) {
   if (req.school) {
     if (!req.school.hasLanguageMasterclass) {
       return res.status(403).json({
@@ -187,11 +225,18 @@ function requireLanguageRegistration(req, res, next) {
   if (req.user.role !== 'student') return next();
 
   if (!req.user.hasLanguageMasterclass) {
-    return res.status(403).json({
-      success: false,
-      error: `You need to register for Language Masterclass before you can access it.`,
-      code: 'LANGUAGE_MASTERCLASS_REGISTRATION_REQUIRED',
-    });
+    try {
+      await q(
+        `INSERT INTO user_language_registrations (user_id, language)
+         VALUES ($1, $2)
+         ON CONFLICT (user_id, language) DO NOTHING`,
+        [req.user.id, req.params.language]
+      );
+      req.user.hasLanguageMasterclass = true;
+    } catch (err) {
+      console.error(`[LangMasterclass] silent auto-register failed for user ${req.user.id}/${req.params.language}`, err.message);
+      return res.status(500).json({ success: false, error: 'Could not set up Language Masterclass access. Please try again.' });
+    }
   }
   next();
 }
