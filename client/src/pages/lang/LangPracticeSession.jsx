@@ -36,9 +36,14 @@ const EXERCISES = [
 // PracticeSession.jsx uses for its WritingCheck (ATTEMPTS_PER_WORD_ALLOWANCE).
 const WRITING_ATTEMPTS_PER_WORD = 3;
 
-export default function LangPracticeSession({ language, category, words, onComplete }) {
+export default function LangPracticeSession({ language, category, words, supportedExercises, onComplete }) {
   const meta = LANGUAGE_META[language];
   const { playing, play } = useLangAudio(language);
+  // Defaults to all-supported if the caller hasn't loaded this yet (e.g.
+  // mid-navigation) — matches the current reality for every enabled
+  // language today, and getting this wrong just shows a tab that 501s
+  // rather than hiding a working one.
+  const support = supportedExercises || { pronunciation: true, listening: true, writing: true };
 
   const [idx, setIdx] = useState(0);
   const [activeExercise, setActiveExercise] = useState('pronunciation');
@@ -57,7 +62,8 @@ export default function LangPracticeSession({ language, category, words, onCompl
 
   // Reset per-word state whenever we move to a new word.
   useEffect(() => {
-    setActiveExercise('pronunciation');
+    const firstSupported = EXERCISES.find(ex => support[ex.key] !== false)?.key || 'pronunciation';
+    setActiveExercise(firstSupported);
     setPronDone(false);
     setPronScore(null);
     setListeningInput('');
@@ -151,6 +157,7 @@ export default function LangPracticeSession({ language, category, words, onCompl
         {EXERCISES.map(ex => {
           const Icon = ex.icon;
           const isActive = activeExercise === ex.key;
+          const isSupported = support[ex.key] !== false;
           const isDone = ex.key === 'pronunciation' ? pronDone
             : ex.key === 'listening' ? listeningDone
             : ex.key === 'writing' ? writingDone
@@ -158,15 +165,22 @@ export default function LangPracticeSession({ language, category, words, onCompl
           return (
             <button
               key={ex.key}
-              onClick={() => setActiveExercise(ex.key)}
+              type="button"
+              disabled={!isSupported}
+              title={!isSupported ? `Not available for ${meta.short} yet` : undefined}
+              onClick={() => isSupported && setActiveExercise(ex.key)}
               className={`w-full flex items-center gap-2 text-left px-3 py-3 md:py-2.5 rounded-xl text-sm font-medium transition-colors mb-1 ${
-                isActive ? 'text-white' : 'text-gray-600 hover:bg-gray-50'
+                !isSupported ? 'text-gray-300 cursor-not-allowed'
+                  : isActive ? 'text-white' : 'text-gray-600 hover:bg-gray-50'
               }`}
-              style={isActive ? { background: meta.accent } : undefined}
+              style={isActive && isSupported ? { background: meta.accent } : undefined}
             >
               <Icon size={15} aria-hidden="true" className="shrink-0" />
-              <span className="flex-1">{ex.label}</span>
-              {isDone && <Check size={14} className={isActive ? 'text-white' : 'text-emerald-500'} aria-hidden="true" />}
+              <span className="flex-1">
+                {ex.label}
+                {!isSupported && <span className="block text-[10px] font-normal text-gray-300">Coming soon</span>}
+              </span>
+              {isDone && isSupported && <Check size={14} className={isActive ? 'text-white' : 'text-emerald-500'} aria-hidden="true" />}
             </button>
           );
         })}

@@ -739,7 +739,10 @@ router.get('/:language/progress', async (req, res) => {
 router.get('/:language/level-progress', async (req, res) => {
   const { language } = req.params;
   try {
-    const byDiff = await getLevelTotals(req.user.id, language);
+    const [byDiff, support] = await Promise.all([
+      getLevelTotals(req.user.id, language),
+      q1(`SELECT supports_pronunciation, supports_listening, supports_writing FROM languages WHERE code = $1`, [language]),
+    ]);
 
     // Per-level detail for progress bars: "18/30 questions, 82% accuracy".
     // Same shape as English Masterclass's level_detail (see getLevelTotals's
@@ -765,6 +768,16 @@ router.get('/:language/level-progress', async (req, res) => {
         level_detail: levelDetail,
         questions_per_level: QUESTIONS_PER_LEVEL,
         unlock_accuracy: LEVEL_UNLOCK_ACCURACY,
+        // Real per-exercise support, straight from the languages table —
+        // lets the client hide/disable a tab instead of letting a student
+        // attempt an exercise that's just going to 501 (see
+        // LangPracticeSession.jsx). Defaults to all-false if the language
+        // row is somehow missing, which is the safe direction to fail in.
+        supported_exercises: {
+          pronunciation: !!support?.supports_pronunciation,
+          listening: !!support?.supports_listening,
+          writing: !!support?.supports_writing,
+        },
       },
     });
   } catch (err) {
