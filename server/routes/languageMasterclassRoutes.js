@@ -552,11 +552,29 @@ router.get('/:language/level-progress', async (req, res) => {
   const { language } = req.params;
   try {
     const byDiff = await getLevelTotals(req.user.id, language);
+
+    // Per-level detail for progress bars: "18/30 questions, 82% accuracy".
+    // Same shape as English Masterclass's level_detail (see getLevelTotals's
+    // comment above) — kept identical on purpose so LangLevelGate.jsx can
+    // consume this exactly like EM's LevelGate.jsx does.
+    const levelDetail = {};
+    ['Beginner', 'Intermediate', 'Advanced'].forEach(diff => {
+      const t = byDiff[diff] || { totalWords: 0, correctWords: 0 };
+      levelDetail[diff] = {
+        questions_answered: t.totalWords,
+        questions_required: QUESTIONS_PER_LEVEL,
+        accuracy: t.totalWords ? Math.round((t.correctWords / t.totalWords) * 1000) / 10 : 0,
+        accuracy_required: LEVEL_UNLOCK_ACCURACY,
+        passed: hasPassedLevel(byDiff, diff),
+      };
+    });
+
     res.json({
       success: true,
       data: {
         unlocked: computeUnlocked(byDiff),
         totals: byDiff,
+        level_detail: levelDetail,
         questions_per_level: QUESTIONS_PER_LEVEL,
         unlock_accuracy: LEVEL_UNLOCK_ACCURACY,
       },
