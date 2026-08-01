@@ -2220,6 +2220,13 @@ const AdminSettingsPanel = ({ setActivePanel }) => {
         { label: 'My Account Settings', desc: 'Update your admin profile and preferences',      action: () => navigate('/admin/settings')          },
       ],
     },
+    {
+      title: 'Language Masterclass',
+      items: [
+        { label: 'English Content',      desc: 'Manage English Masterclass categories and words',        action: () => navigate('/admin/english-masterclass') },
+        { label: 'French & German Content', desc: 'Manage vocabulary categories and words for both languages', action: () => navigate('/admin/language-masterclass/french') },
+      ],
+    },
   ];
 
   return (
