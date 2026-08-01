@@ -143,9 +143,9 @@ router.post('/register', async (req, res) => {
     try {
       await db.query(
         `INSERT INTO user_language_registrations (user_id, language, registered_at)
-         VALUES ($1, 'english', $2)
+         SELECT id, 'english', em_registered_at FROM users WHERE id = $1
          ON CONFLICT (user_id, language) DO NOTHING`,
-        [userId, row.em_registered_at]
+        [userId]
       );
     } catch (langRegErr) {
       console.error('[EM] POST /register — user_language_registrations dual-write failed:', langRegErr.message);
