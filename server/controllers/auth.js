@@ -112,6 +112,11 @@ async function safeUser(row) {
   } catch {
     safe.registeredLanguages = [];
   }
+  // Single access gate for standalone users -- see middleware/auth.js for
+  // the identical computation on req.user. Registering for any ONE
+  // language unlocks all 8, per Da's confirmed decision, so this is just
+  // "has at least one row," not language-specific.
+  safe.hasLanguageMasterclass = safe.registeredLanguages.length > 0;
   return safe;
 }
 
@@ -387,7 +392,7 @@ exports.registerForEnglishMasterclass = async (req, res, next) => {
         );
         enabledLanguages = langRows.map((r) => r.language);
       } catch { /* fail open, matches login/getMe's equivalent block */ }
-      user.school = { id: resolvedSchool.id, name: resolvedSchool.name, logo_url: resolvedSchool.logo_url, enable_aischoolonair: resolvedSchool.enable_aischoolonair, enable_em: resolvedSchool.enable_em, enabledLanguages };
+      user.school = { id: resolvedSchool.id, name: resolvedSchool.name, logo_url: resolvedSchool.logo_url, enable_aischoolonair: resolvedSchool.enable_aischoolonair, enable_em: resolvedSchool.enable_em, enabledLanguages, hasLanguageMasterclass: !!resolvedSchool.enable_em };
     }
     const { ipAddress, userAgent } = clientMeta(req);
 
@@ -615,7 +620,7 @@ exports.login = async (req, res, next) => {
         );
         enabledLanguages = langRows.map((r) => r.language);
       } catch { /* fail open, same as protect middleware's equivalent block */ }
-      user.school = { id: school.id, name: school.name, logo_url: school.logo_url, enable_aischoolonair: school.enable_aischoolonair, enable_em: school.enable_em, enabledLanguages };
+      user.school = { id: school.id, name: school.name, logo_url: school.logo_url, enable_aischoolonair: school.enable_aischoolonair, enable_em: school.enable_em, enabledLanguages, hasLanguageMasterclass: !!school.enable_em };
     }
     // registeredLanguages: mirrors what `protect` attaches to req.user on
     // every subsequent request — populated here too so it's present from
@@ -629,6 +634,10 @@ exports.login = async (req, res, next) => {
     } catch {
       user.registeredLanguages = [];
     }
+    // Single access gate for standalone users, same reasoning as safeUser's
+    // computation -- recomputed here (rather than trusting safeUser's
+    // earlier value) since registeredLanguages was just re-fetched above.
+    user.hasLanguageMasterclass = user.registeredLanguages.length > 0;
     return res.status(200).json({ success: true, token: accessToken, user });
 
   } catch (err) {
@@ -762,12 +771,17 @@ exports.getMe = async (req, res, next) => {
         id: rows[0].school_id, name: req.school.name, logo_url: req.school.logo_url,
         enable_aischoolonair: req.school.enable_aischoolonair, enable_em: req.school.enable_em,
         enabledLanguages: req.school.enabledLanguages || [],
+        hasLanguageMasterclass: !!req.school.hasLanguageMasterclass,
       };
     }
     // registeredLanguages: populated by `protect` from user_language_registrations.
     // Powers the new /language/:code route guard + StudentDashboard's
     // language dropdown — see LanguageMasterclass.jsx and StudentDashboard.jsx.
     user.registeredLanguages = req.user.registeredLanguages || [];
+    // hasLanguageMasterclass: reuse req.user's value (computed once by
+    // `protect`) rather than trusting safeUser's own query above to still
+    // be in sync -- same reasoning as registeredLanguages just above.
+    user.hasLanguageMasterclass = !!req.user.hasLanguageMasterclass;
     return res.status(200).json({ success: true, user });
   } catch (err) {
     console.error('[getMe]', err.message);

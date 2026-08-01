@@ -16,7 +16,6 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate, Outlet, useLocation } from "react-router-dom";
 import TopNav from "../components/TopNav";
-import LanguageDropdown from "../components/LanguageDropdown";
 import api, { TIMEOUT_DASHBOARD, TIMEOUT_ANALYTICS } from "../services/apiClient";
 import { openResourceAuth } from "../utils/authenticatedDownload";
 import {
@@ -739,7 +738,11 @@ export default function StudentDashboard() {
                 </p>
                 <h1 className="text-xl font-bold text-gray-900">{firstName}</h1>
               </div>
-              <LanguageDropdown />
+              {/* LanguageDropdown intentionally removed from here -- Da was
+                  explicit after live review that it does not belong on the
+                  AISchoolonair exam-prep dashboard. It now lives in
+                  EMLayout.jsx's header, on the Language Masterclass side of
+                  the app. */}
             </div>
           </div>
 

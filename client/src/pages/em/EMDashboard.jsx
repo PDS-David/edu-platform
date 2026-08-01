@@ -654,41 +654,13 @@ export default function EMDashboard() {
         ))}
       </section>
 
-      {/* ── More Languages (preview) ─────────────────────────────────────
-          Deliberately incomplete proof-of-concept siblings to this module —
-          French/German Masterclass. Not wired into the login-time product
-          chooser on purpose; this card is the one discoverable entry point
-          for now. See LanguageMasterclass.jsx for the full context. */}
-      <section aria-labelledby="em-more-languages-heading">
-        <h2
-          id="em-more-languages-heading"
-          className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3"
-        >
-          More Languages <span className="text-gray-400 normal-case font-medium">— Preview</span>
-        </h2>
-        <div className="grid sm:grid-cols-2 gap-3">
-          <button
-            onClick={() => navigate('/french')}
-            className="flex items-center gap-3 text-left p-4 rounded-2xl border-2 border-gray-100 hover:border-blue-300 hover:shadow-sm transition-all bg-white"
-          >
-            <span className="text-2xl">🇫🇷</span>
-            <div>
-              <p className="font-bold text-sm text-gray-900">French Masterclass</p>
-              <p className="text-xs text-gray-400">Early preview — pronunciation practice only</p>
-            </div>
-          </button>
-          <button
-            onClick={() => navigate('/german')}
-            className="flex items-center gap-3 text-left p-4 rounded-2xl border-2 border-gray-100 hover:border-red-300 hover:shadow-sm transition-all bg-white"
-          >
-            <span className="text-2xl">🇩🇪</span>
-            <div>
-              <p className="font-bold text-sm text-gray-900">German Masterclass</p>
-              <p className="text-xs text-gray-400">Early preview — pronunciation practice only</p>
-            </div>
-          </button>
-        </div>
-      </section>
+      {/* "More Languages (preview)" promo-card section intentionally
+          removed -- Da was explicit after live review: "The French and
+          German buttons at the bottom of the Language Masterclass page IS
+          NOT NEEDED. ALL THAT IS NEEDED TO NAVIGATE INTO THE LANGUAGES IS
+          THE DROPDOWN." That dropdown now lives in EMLayout.jsx's header
+          (see LanguageDropdown.jsx), reachable from every /em/* page,
+          including this one. */}
 
       {/* ── Recent sessions (returning users) ───────────────────────────── */}
       {!isFirstTimer && recentSessions.length > 0 && (
