@@ -382,6 +382,26 @@ exports.registerForEnglishMasterclass = async (req, res, next) => {
       return res.status(409).json({ success: false, error: 'An account with that email already exists' });
     }
 
+    // Dual-write into the 8-language join table so this standalone student's
+    // English Masterclass registration also unlocks the other 7 languages,
+    // via req.user.hasLanguageMasterclass (>0 rows here), the same way a
+    // standalone user registering for any other language does. Without
+    // this, a brand-new EM signup would be a former/current English
+    // Masterclass student who is nonetheless blocked from every other
+    // language until they separately register again -- exactly the gap Da
+    // flagged. Must happen before safeUser() below, which reads this same
+    // table to compute hasLanguageMasterclass for the response.
+    try {
+      await db.query(
+        `INSERT INTO user_language_registrations (user_id, language, registered_at)
+         VALUES (:id, 'english', NOW())
+         ON CONFLICT (user_id, language) DO NOTHING`,
+        { replacements: { id: rows[0].id } }
+      );
+    } catch (langRegErr) {
+      console.error('[EM signup] user_language_registrations dual-write failed:', langRegErr.message);
+    }
+
     const user = await safeUser(rows[0]);
     if (resolvedSchool) {
       let enabledLanguages = [];
