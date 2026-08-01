@@ -39,6 +39,7 @@ import SubjectCatalog from "./pages/SubjectCatalog";
 // Student
 import StudentDashboard, { DashboardContent } from "./pages/StudentDashboard";
 import AdminEnglishMasterclass from "./pages/AdminEnglishMasterclass";
+import AdminLanguageMasterclass from "./pages/AdminLanguageMasterclass";
 import StudentSubjectsPage from "./pages/StudentSubjectsPage";
 import StudentFilesPage from "./pages/StudentFilesPage";
 import StudentExamTypesPage from "./pages/StudentExamTypesPage";
@@ -208,6 +209,7 @@ export default function App() {
             <Route path="questions/review" element={<QuestionReview />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="english-masterclass" element={<AdminEnglishMasterclass />} />
+            <Route path="language-masterclass/:language" element={<AdminLanguageMasterclass />} />
           </Route>
         </Route>
 

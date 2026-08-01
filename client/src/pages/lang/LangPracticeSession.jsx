@@ -1,29 +1,29 @@
 // client/src/pages/lang/LangPracticeSession.jsx
 // Practice flow for one category's words. Mirrors English Masterclass's
 // left-panel exercise structure (Pronunciation / Listening / Writing).
-// Pronunciation Assessment and Listening Comprehension are functional —
-// see the file-level note in languageMasterclassRoutes.js for the backend
-// side (listening needs no dedicated backend route beyond /audio; it's
-// checked client-side the same way English Masterclass's PracticeSession.jsx
-// checks its listening/spelling step). Written Composition is still visible
-// (so the intended structure/order is clear) but always shows the
-// ComingSoon placeholder — writing-score is gated server-side by
-// languages.supports_writing, which isn't set for French/German yet.
+// All three exercises are now functional — see the file-level note in
+// languageMasterclassRoutes.js for the backend side (listening needs no
+// dedicated backend route beyond /audio; it's checked client-side the
+// same way English Masterclass's PracticeSession.jsx checks its
+// listening/spelling step. Written Composition posts to
+// /language-masterclass/:language/writing-score via LangWritingCheck,
+// which languages.supports_writing now allows for both french and german).
 //
-// Listening is NOT required to advance to the next word (see the "Next
-// word" button below, still gated on pronDone only) — it can be attempted
-// or skipped freely via its own tab, same freeform-tab spirit as the rest
-// of this page. English Masterclass's PracticeSession.jsx enforces a
-// stricter locked order where all three exercises are mandatory; that
-// wasn't carried over here so as not to change this page's existing
-// completion requirements as a side effect of enabling this exercise.
+// Listening and Writing are NOT required to advance to the next word (see
+// the "Next word" button below, still gated on pronDone only) — they can
+// be attempted or skipped freely via their own tabs, same freeform-tab
+// spirit as the rest of this page. English Masterclass's
+// PracticeSession.jsx enforces a stricter locked order where all three
+// exercises are mandatory; that wasn't carried over here so as not to
+// change this page's existing completion requirements as a side effect of
+// enabling these exercises.
 
 import { useState, useEffect } from 'react';
 import { Mic, Headphones, PenLine, Check, ChevronRight, Volume2, Loader2 } from 'lucide-react';
 import api from '../../services/apiClient';
 import { useLangAudio } from './useLangAudio';
 import LangPronunciationCheck from './LangPronunciationCheck';
-import ComingSoon from './ComingSoon';
+import LangWritingCheck from './LangWritingCheck';
 import { LANGUAGE_META } from './constants';
 
 const EXERCISES = [
@@ -31,6 +31,10 @@ const EXERCISES = [
   { key: 'listening',     label: 'Listening Comprehension',  icon: Headphones },
   { key: 'writing',       label: 'Written Composition',      icon: PenLine },
 ];
+
+// Same per-word cost-control allowance English Masterclass's
+// PracticeSession.jsx uses for its WritingCheck (ATTEMPTS_PER_WORD_ALLOWANCE).
+const WRITING_ATTEMPTS_PER_WORD = 3;
 
 export default function LangPracticeSession({ language, category, words, onComplete }) {
   const meta = LANGUAGE_META[language];
@@ -41,9 +45,13 @@ export default function LangPracticeSession({ language, category, words, onCompl
   const [pronDone, setPronDone] = useState(false);
   const [pronScore, setPronScore] = useState(null);
   const [scores, setScores] = useState([]); // per-word pronunciation scores this session
+  const [attempts, setAttempts] = useState([]); // full per-word records for the summary screen
   const [listeningInput, setListeningInput] = useState('');
   const [listeningFeedback, setListeningFeedback] = useState(null); // null | 'correct' | 'wrong'
   const [listeningDone, setListeningDone] = useState(false);
+  const [writingDone, setWritingDone] = useState(false);
+  const [writingScore, setWritingScore] = useState(null);
+  const [writingAttempts, setWritingAttempts] = useState(0);
 
   const currentWord = words[idx];
 
@@ -55,6 +63,9 @@ export default function LangPracticeSession({ language, category, words, onCompl
     setListeningInput('');
     setListeningFeedback(null);
     setListeningDone(false);
+    setWritingDone(false);
+    setWritingScore(null);
+    setWritingAttempts(0);
   }, [idx]);
 
   if (!currentWord) return null;
@@ -80,8 +91,18 @@ export default function LangPracticeSession({ language, category, words, onCompl
     setListeningDone(true);
   };
 
-  const finishSession = async (finalScores) => {
+  const handleWritingResult = (score) => {
+    setWritingScore(score);
+    setWritingDone(true);
+  };
+
+  const finishSession = async (finalScores, finalAttempts) => {
     const totalWords = words.length;
+    // Session "correct" stays pronunciation-score based (>=70) — this is
+    // what's sent to the backend and feeds the server's level-unlock
+    // accuracy check, so it must keep meaning exactly what it already
+    // means server-side. Listening/writing are informational extras shown
+    // on the summary screen only; they don't change this count.
     const correctWords = finalScores.filter(s => s >= 70).length;
     try {
       await api.post(`/language-masterclass/${language}/sessions`, {
@@ -93,16 +114,26 @@ export default function LangPracticeSession({ language, category, words, onCompl
     } catch {
       // session save is best-effort — don't block the summary screen on it
     }
-    onComplete?.({ totalWords, correctWords, scores: finalScores });
+    onComplete?.({ totalWords, correctWords, scores: finalScores, attempts: finalAttempts });
   };
 
   const handleNext = () => {
     const nextScores = [...scores, pronScore ?? 0];
     setScores(nextScores);
+    const nextAttempts = [...attempts, {
+      word_id: currentWord.id,
+      word: currentWord.word,
+      correct: (pronScore ?? 0) >= 70,
+      pronunciation_score: pronScore ?? null,
+      listening_correct: listeningFeedback === 'correct' ? true : listeningFeedback === 'wrong' ? false : null,
+      listening_answer: listeningDone ? listeningInput.trim() : null,
+      writing_score: writingScore,
+    }];
+    setAttempts(nextAttempts);
     if (idx + 1 < words.length) {
       setIdx(idx + 1);
     } else {
-      finishSession(nextScores);
+      finishSession(nextScores, nextAttempts);
     }
   };
 
@@ -122,6 +153,7 @@ export default function LangPracticeSession({ language, category, words, onCompl
           const isActive = activeExercise === ex.key;
           const isDone = ex.key === 'pronunciation' ? pronDone
             : ex.key === 'listening' ? listeningDone
+            : ex.key === 'writing' ? writingDone
             : false;
           return (
             <button
@@ -259,11 +291,24 @@ export default function LangPracticeSession({ language, category, words, onCompl
         )}
 
         {activeExercise === 'writing' && (
-          <ComingSoon
-            title="Written Composition"
-            description={`This exercise isn't built yet. It will ask you to write your own ${meta.short} sentences using the word.`}
-            accent={meta.accent}
-          />
+          <div>
+            <p className="text-center text-sm font-semibold text-gray-500 mb-1 uppercase tracking-wider">
+              Written Composition
+            </p>
+            <p className="text-center text-xs text-gray-400 mb-2 px-2">
+              Write your own {meta.short} sentences using the word.
+            </p>
+            <LangWritingCheck
+              key={`${language}-${currentWord.id}`}
+              language={language}
+              word={currentWord.word}
+              wordId={currentWord.id}
+              onResult={handleWritingResult}
+              attemptsUsed={writingAttempts}
+              budget={WRITING_ATTEMPTS_PER_WORD}
+              onAttempt={() => setWritingAttempts(a => a + 1)}
+            />
+          </div>
         )}
       </div>
     </div>
