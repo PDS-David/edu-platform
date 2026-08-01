@@ -132,6 +132,25 @@ router.post('/register', async (req, res) => {
       [userId]
     );
     if (!row) return res.status(404).json({ success: false, error: 'User not found' });
+
+    // Dual-write into the 8-language join table, same reasoning as the EM
+    // signup flow in auth.js's registerForEnglishMasterclass — a standalone
+    // user completing EM registration here should also unlock the other 7
+    // languages (req.user.hasLanguageMasterclass), not just English. Best
+    // effort: must not fail the response, since em_registered_at above (the
+    // pre-existing contract every current caller relies on) already
+    // succeeded.
+    try {
+      await db.query(
+        `INSERT INTO user_language_registrations (user_id, language, registered_at)
+         VALUES ($1, 'english', $2)
+         ON CONFLICT (user_id, language) DO NOTHING`,
+        [userId, row.em_registered_at]
+      );
+    } catch (langRegErr) {
+      console.error('[EM] POST /register — user_language_registrations dual-write failed:', langRegErr.message);
+    }
+
     res.json({ success: true, em_registered_at: row.em_registered_at });
   } catch (err) {
     console.error('[EM] POST /register', err.message);
