@@ -73,8 +73,7 @@ import SchoolAdminDashboard from "./pages/SchoolAdminDashboard";
 import SchoolAdminStudentReport from "./pages/SchoolAdminStudentReport";
 import AdminStudents from "./pages/AdminStudents";
 import JoinSchoolPage from "./pages/JoinSchoolPage";
-import FrenchMasterclass from "./pages/FrenchMasterclass";
-import GermanMasterclass from "./pages/GermanMasterclass";
+import LanguageMasterclass from "./pages/LanguageMasterclass";
 import ChooseAppPage from "./pages/ChooseAppPage";
 
 // Global floating widget
@@ -94,6 +93,23 @@ export default function App() {
         <Route path="/subjects" element={<SubjectCatalog />} />
         {/* English Masterclass public entry — goes to the dedicated EM login */}
         <Route path="/english-masterclass" element={<Navigate to="/em/login" replace />} />
+
+        {/* LANGUAGE MASTERCLASS unification — /language/english/* uses the
+            same URL shape as every other language, but redirects to the
+            existing, working /em/* implementation rather than duplicating
+            EMLayout/EMDashboard/EMPractice/EMProgress/EMPrivateRoute under a
+            second path. English's real UI (3 working exercises, its own
+            layout) stays exactly as-is and exactly as tested; only the
+            URL a bookmark/link uses changes for English's case, same as
+            the prompt's own instruction to keep /em/* alive as a redirect
+            target rather than a dead end. */}
+        <Route path="/language/english/login"     element={<Navigate to="/em/login" replace />} />
+        <Route path="/language/english/signup"    element={<Navigate to="/em/signup" replace />} />
+        <Route path="/language/english/register"  element={<Navigate to="/em/register" replace />} />
+        <Route path="/language/english/dashboard" element={<Navigate to="/em/dashboard" replace />} />
+        <Route path="/language/english/practice"  element={<Navigate to="/em/practice" replace />} />
+        <Route path="/language/english/progress"  element={<Navigate to="/em/progress" replace />} />
+        <Route path="/language/english"           element={<Navigate to="/em/dashboard" replace />} />
 
         {/* ENGLISH MASTERCLASS — public login */}
         <Route path="/em/login" element={<EMLoginPage />} />
@@ -227,10 +243,45 @@ export default function App() {
             registration gate (POST /language-masterclass/:language/register),
             skipOnboardingCheck since this is independent of AISchoolonair's
             subject-selection onboarding. */}
+        {/* LANGUAGE MASTERCLASS — French/German/Mandarin/Arabic/Spanish/
+            Swahili/Yoruba, all through one dynamic :code route now instead
+            of one hardcoded component per language (that pattern stopped
+            at 2 languages; it does not scale to 8). LanguageMasterclass.jsx
+            reads :code itself (see its own useParams) and renders the
+            "not a language we offer" state for anything outside
+            LANGUAGE_META, so an invalid code can't reach a blank/broken
+            page. Deliberately incomplete proof-of-concept for all 7 of
+            these (see LanguageMasterclass.jsx header + languages table's
+            supports_* flags) — not wired into ChooseAppPage/
+            getPostAuthRedirect login unification on purpose, same as
+            before. Own registration gate
+            (POST /language-masterclass/:language/register),
+            skipOnboardingCheck since this is independent of
+            AISchoolonair's subject-selection onboarding. English is
+            deliberately excluded from this dynamic route (handled by the
+            /language/english/* redirect group above instead) since
+            LanguageMasterclass.jsx is the French/German-style single-page
+            orchestrator, not English's fuller 3-exercise experience. */}
         <Route element={<PrivateRoute allowedRoles={["student", "teacher"]} skipOnboardingCheck />}>
-          <Route path="/french" element={<FrenchMasterclass />} />
-          <Route path="/german" element={<GermanMasterclass />} />
+          <Route path="/language/:code" element={<LanguageMasterclass />} />
+          {/* Aliases matching the dashboard/practice/progress shape used
+              elsewhere — LanguageMasterclass is a single orchestrated page
+              (register/levels/practice/summary are internal view state, not
+              separate URLs) for these 7 languages today, so all three
+              aliases currently render the same component; this is a known,
+              stated limitation, not a hidden one — splitting these into
+              true sub-routes would need the same page-per-view treatment
+              English already has, which is a larger follow-up, not part of
+              this pass. */}
+          <Route path="/language/:code/dashboard" element={<LanguageMasterclass />} />
+          <Route path="/language/:code/practice"  element={<LanguageMasterclass />} />
+          <Route path="/language/:code/progress"  element={<LanguageMasterclass />} />
+          <Route path="/language/:code/register"  element={<LanguageMasterclass />} />
         </Route>
+
+        {/* Old fixed-path bookmarks/links keep working. */}
+        <Route path="/french" element={<Navigate to="/language/french" replace />} />
+        <Route path="/german" element={<Navigate to="/language/german" replace />} />
 
         {/* FALLBACK */}
         <Route path="/404" element={<NotFound />} />

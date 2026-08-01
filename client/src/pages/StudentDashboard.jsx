@@ -16,6 +16,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate, Outlet, useLocation } from "react-router-dom";
 import TopNav from "../components/TopNav";
+import LanguageDropdown from "../components/LanguageDropdown";
 import api, { TIMEOUT_DASHBOARD, TIMEOUT_ANALYTICS } from "../services/apiClient";
 import { openResourceAuth } from "../utils/authenticatedDownload";
 import {
@@ -738,6 +739,7 @@ export default function StudentDashboard() {
                 </p>
                 <h1 className="text-xl font-bold text-gray-900">{firstName}</h1>
               </div>
+              <LanguageDropdown />
             </div>
           </div>
 

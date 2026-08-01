@@ -1,7 +1,10 @@
 // client/src/pages/LanguageMasterclass.jsx
-// Route: /french and /german (see FrenchMasterclass.jsx / GermanMasterclass.jsx)
+// Route: /language/:code (french, german, mandarin, arabic, spanish,
+// swahili, yoruba — English is deliberately excluded, see App.jsx).
+// FrenchMasterclass.jsx / GermanMasterclass.jsx are retired — this
+// component now reads :code from the URL directly.
 //
-// Orchestrator for the French/German Masterclass proof-of-concept — the
+// Orchestrator for the 7-language Masterclass proof-of-concept — the
 // deliberately incomplete sibling to English Masterclass. See the
 // file-level note in server/routes/languageMasterclassRoutes.js for the
 // full "why incomplete" explanation.
@@ -14,7 +17,7 @@
 // to EMDashboard.jsx) while logged in through the normal app.
 
 import { useState, useEffect, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
 import api from '../services/apiClient';
 import TopNav from '../components/TopNav';
@@ -24,10 +27,27 @@ import LangPracticeSession from './lang/LangPracticeSession';
 import LangSessionSummary from './lang/LangSessionSummary';
 import { LANGUAGE_META } from './lang/constants';
 
-export default function LanguageMasterclass({ language }) {
+export default function LanguageMasterclass({ language: languageProp }) {
+  const { code } = useParams();
+  const language = languageProp || code;
   const { user } = useAuth();
   const navigate = useNavigate();
   const meta = LANGUAGE_META[language];
+
+  if (!meta) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <TopNav />
+        <div className="max-w-2xl mx-auto px-4 py-12 text-center">
+          <AlertCircle className="mx-auto mb-3 text-gray-300" size={40} />
+          <p className="text-gray-600">"{language}" isn't a language we offer yet.</p>
+          <Link to="/student/dashboard" className="text-sm font-semibold text-blue-600 hover:underline mt-3 inline-block">
+            Back to dashboard
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const [view, setView] = useState('loading'); // loading | needs-registration | levels | practice | summary | error
   const [error, setError] = useState('');
@@ -39,7 +59,17 @@ export default function LanguageMasterclass({ language }) {
   const [sessionResult, setSessionResult] = useState(null);
   const [registering, setRegistering] = useState(false);
 
-  const registeredKey = `${language}_registered_at`;
+  // FIX: was `${language}_registered_at`, read off `user`. That column
+  // never existed for French/German either (getMe only ever selected
+  // em_registered_at, confirmed by reading server/controllers/auth.js) —
+  // meaning this check was ALWAYS false and every visit showed
+  // "needs-registration" even for already-registered students, who then
+  // had to click through the register button (harmless — POST /register
+  // is idempotent — but a real, pre-existing UX bug, not something this
+  // consolidation introduced). Now reads the real signal: the
+  // registeredLanguages array middleware/auth.js populates from
+  // user_language_registrations and getMe now returns (see auth.js /me).
+  const isRegistered = Array.isArray(user?.registeredLanguages) && user.registeredLanguages.includes(language);
 
   const loadLevelsData = useCallback(async () => {
     try {
@@ -71,7 +101,7 @@ export default function LanguageMasterclass({ language }) {
   }, [language, meta.short]);
 
   useEffect(() => {
-    if (!user?.[registeredKey]) {
+    if (!isRegistered) {
       // Try loading anyway — the backend is the source of truth; this just
       // avoids a guaranteed round-trip failure for accounts we already know
       // haven't registered.
@@ -79,7 +109,7 @@ export default function LanguageMasterclass({ language }) {
       return;
     }
     loadLevelsData();
-  }, [user, registeredKey, loadLevelsData]);
+  }, [user, isRegistered, loadLevelsData]);
 
   const handleRegister = async () => {
     setRegistering(true);
@@ -177,8 +207,8 @@ export default function LanguageMasterclass({ language }) {
           <div className="max-w-md mx-auto text-center bg-white rounded-2xl border border-gray-100 p-8">
             <AlertCircle size={28} className="text-red-400 mx-auto mb-3" />
             <p className="text-sm text-gray-600 mb-4">{error}</p>
-            <Link to="/em/dashboard" className="text-sm font-semibold" style={{ color: meta.accent }}>
-              ← Back to Language Masterclass
+            <Link to="/student/dashboard" className="text-sm font-semibold" style={{ color: meta.accent }}>
+              ← Back to Dashboard
             </Link>
           </div>
         )}

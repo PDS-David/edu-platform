@@ -193,7 +193,7 @@ export default function SchoolAdminStudentReport() {
                 were never enrolled in it. */}
             {summary.english_masterclass && (
               <>
-                <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-3">Language Masterclass</p>
+                <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-3">Language Masterclass (English)</p>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
                   <div className="border rounded-2xl p-4 bg-white border-gray-100">
                     <div className="flex items-center justify-between mb-2">

@@ -105,9 +105,9 @@ export default function LangPracticeSession({ language, category, words, onCompl
       <div className="bg-white rounded-2xl border border-gray-100 p-6">
         {activeExercise === 'pronunciation' && (
           <>
-            <div className="text-center mb-4">
+            <div className="text-center mb-4" dir={meta.isRtl ? 'rtl' : 'ltr'}>
               <p className="text-3xl font-bold text-gray-900 mb-1">{currentWord.word}</p>
-              {currentWord.phonetic && <p className="text-sm text-gray-400 mb-2">{currentWord.phonetic}</p>}
+              {currentWord.phonetic && <p className="text-sm text-gray-400 mb-2" dir="ltr">{currentWord.phonetic}</p>}
               <button
                 type="button"
                 onClick={() => play(currentWord.word)}
@@ -119,7 +119,7 @@ export default function LangPracticeSession({ language, category, words, onCompl
                 {playing ? 'Playing…' : 'Listen'}
               </button>
               {currentWord.definition && (
-                <p className="text-sm text-gray-500 mt-3">{currentWord.definition}</p>
+                <p className="text-sm text-gray-500 mt-3" dir="ltr">{currentWord.definition}</p>
               )}
               {currentWord.example_sentence && (
                 <p className="text-xs text-gray-400 italic mt-1">"{currentWord.example_sentence}"</p>

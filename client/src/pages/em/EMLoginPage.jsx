@@ -1,5 +1,5 @@
 // client/src/pages/em/EMLoginPage.jsx
-// Standalone English Masterclass login page — completely separate from the
+// Standalone Language Masterclass login page — completely separate from the
 // main AISchoolOnAir platform.
 //
 // Design system applied (see constants.js):
@@ -59,7 +59,7 @@ export default function EMLoginPage() {
     setLoading(true);
     try {
       const user = await login(email, password, false, 'em');
-      // AISchoolOnAir login succeeding is not enough — English Masterclass
+      // AISchoolOnAir login succeeding is not enough — Language Masterclass
       // requires its own one-time registration step on top of that account.
       //
       // BUGFIX: this used to send EVERY successful login here straight to
