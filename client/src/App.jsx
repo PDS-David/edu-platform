@@ -8,6 +8,7 @@ import EMLayout from "./layouts/EMLayout";
 // Auth guards
 import PrivateRoute from "./components/PrivateRoute";
 import EMPrivateRoute from "./components/EMPrivateRoute";
+import LangPrivateRoute from "./components/LangPrivateRoute";
 
 // Public / auth pages
 import LandingPage from "./pages/LandingPage";
@@ -262,7 +263,7 @@ export default function App() {
             /language/english/* redirect group above instead) since
             LanguageMasterclass.jsx is the French/German-style single-page
             orchestrator, not English's fuller 3-exercise experience. */}
-        <Route element={<PrivateRoute allowedRoles={["student", "teacher"]} skipOnboardingCheck />}>
+        <Route element={<LangPrivateRoute allowedRoles={["student", "teacher"]} />}>
           <Route path="/language/:code" element={<LanguageMasterclass />} />
           {/* Aliases matching the dashboard/practice/progress shape used
               elsewhere — LanguageMasterclass is a single orchestrated page
