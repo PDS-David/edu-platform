@@ -27,7 +27,20 @@ const LoginPage = () => {
     const reason = location.state?.closedDoor;
     if (reason?.service === 'aischoolonair') {
       setClosedDoor({
+        service: 'aischoolonair',
         message: 'Your school has not been registered for AISchoolonair. Contact your school admin or App Admin.',
+        otherServiceEnabled: !!reason.otherServiceEnabled,
+      });
+      window.history.replaceState({}, document.title);
+    } else if (reason?.service === 'language_masterclass') {
+      // Sent here by LangPrivateRoute when an already-authenticated
+      // tenant user's school doesn't have Language Masterclass enabled —
+      // e.g. they followed a bookmarked /language/:code link. They're
+      // still logged in, so if AISchoolonair IS enabled for them, point
+      // them at their real dashboard rather than a second login form.
+      setClosedDoor({
+        service: 'language_masterclass',
+        message: 'Your school has not been registered for Language Masterclass. Contact your school admin or App Admin.',
         otherServiceEnabled: !!reason.otherServiceEnabled,
       });
       window.history.replaceState({}, document.title);
@@ -154,10 +167,16 @@ const LoginPage = () => {
                       <p className="text-sm text-amber-700">{closedDoor.message}</p>
                     </div>
                   </div>
-                  {closedDoor.otherServiceEnabled && (
+                  {closedDoor.otherServiceEnabled && closedDoor.service === 'aischoolonair' && (
                     <p className="text-sm text-amber-700 mt-2 ml-6">
                       Your school does have Language Masterclass — try{' '}
                       <Link to="/em/login" className="font-semibold underline">signing in there</Link> instead.
+                    </p>
+                  )}
+                  {closedDoor.otherServiceEnabled && closedDoor.service === 'language_masterclass' && (
+                    <p className="text-sm text-amber-700 mt-2 ml-6">
+                      Your school does have AISchoolonair — you're already signed in, so head to{' '}
+                      <Link to="/student/dashboard" className="font-semibold underline">your dashboard</Link> instead.
                     </p>
                   )}
                 </div>

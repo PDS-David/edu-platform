@@ -25,13 +25,23 @@ export default function TopNav() {
   const role        = user?.role || 'student';
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
-  const dashboardPath =
-    role === 'admin'        ? '/admin/dashboard'        :
-    role === 'teacher'      ? '/teacher/dashboard'      :
-    role === 'school_admin' ? '/school-admin/dashboard' : '/student/dashboard';
+  // Language Masterclass (/language/:code*) reuses this component but is
+  // not part of AISchoolonair — the default dashboardPath/settingsPath
+  // below would otherwise drop a Language Masterclass student straight
+  // into the AISchoolonair student area on logo/settings click. Keep them
+  // inside Language Masterclass instead, same principle as EM's own
+  // dedicated EMLayout never linking back into AISchoolonair either.
+  const inLanguageMasterclass = location.pathname.startsWith('/language/');
 
-  const settingsPath =
-    role === 'school_admin' ? '/school-admin/settings' : `/${role}/settings`;
+  const dashboardPath = inLanguageMasterclass
+    ? location.pathname.split('/').slice(0, 3).join('/') // /language/:code
+    : role === 'admin'        ? '/admin/dashboard'        :
+      role === 'teacher'      ? '/teacher/dashboard'      :
+      role === 'school_admin' ? '/school-admin/dashboard' : '/student/dashboard';
+
+  const settingsPath = inLanguageMasterclass
+    ? null // Language Masterclass has no settings page of its own yet
+    : role === 'school_admin' ? '/school-admin/settings' : `/${role}/settings`;
 
   const roleColor = {
     admin:   'bg-violet-600',
@@ -139,8 +149,11 @@ export default function TopNav() {
 
       
       {/* RIGHT */}
-      {/* X17 — global search, students only */}
-      {role === 'student' && (
+      {/* X17 — global search, students only. AISchoolonair-specific (searches
+          subjects/topics/subtopics and routes into /student/subject/*), so
+          hidden on Language Masterclass pages — same territory boundary as
+          dashboardPath/settingsPath above. */}
+      {role === 'student' && !inLanguageMasterclass && (
         <div className="flex-1 flex justify-center px-4">
           <GlobalSearch />
         </div>
@@ -199,10 +212,12 @@ export default function TopNav() {
                 className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors">
                 <LayoutDashboard size={14} /> Dashboard
               </button>
-              <button onClick={() => { navigate(settingsPath); setDropOpen(false); }}
-                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors">
-                <Settings size={14} /> Settings
-              </button>
+              {settingsPath && (
+                <button onClick={() => { navigate(settingsPath); setDropOpen(false); }}
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors">
+                  <Settings size={14} /> Settings
+                </button>
+              )}
               <div className="border-t border-gray-100" />
               <button onClick={handleLogout}
                 className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-500 hover:text-red-600 hover:bg-red-50 transition-colors">

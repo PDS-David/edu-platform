@@ -41,8 +41,13 @@ export default function LanguageMasterclass({ language: languageProp }) {
         <div className="max-w-2xl mx-auto px-4 py-12 text-center">
           <AlertCircle className="mx-auto mb-3 text-gray-300" size={40} />
           <p className="text-gray-600">"{language}" isn't a language we offer yet.</p>
-          <Link to="/student/dashboard" className="text-sm font-semibold text-blue-600 hover:underline mt-3 inline-block">
-            Back to dashboard
+          {/* Was /student/dashboard — that's AISchoolonair, a different
+              product, and not necessarily one this account even has
+              access to. English is the one language handled elsewhere
+              (see App.jsx), so send them there instead of into
+              AISchoolonair. */}
+          <Link to="/em/dashboard" className="text-sm font-semibold text-blue-600 hover:underline mt-3 inline-block">
+            Back to Language Masterclass
           </Link>
         </div>
       </div>
