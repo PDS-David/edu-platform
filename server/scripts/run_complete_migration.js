@@ -29,6 +29,101 @@ async function exec(label, sql) {
   }
 }
 
+// The 8 supported Language Masterclass language codes, for every CHECK
+// constraint in the language-unification steps folded in below (originally
+// server/scripts/migrate_language_unification.js — that script was never
+// wired into deploy.sh, so its tables/join-tables never actually got
+// created outside whatever environment it was manually run against.
+// Folding it in here as permanent idempotent steps, matching this file's
+// existing single-source-of-truth pattern, fixes that for good.
+const LANGUAGES = ['english', 'french', 'german', 'mandarin', 'arabic', 'spanish', 'swahili', 'yoruba'];
+const LANG_CHECK_LIST = LANGUAGES.map((l) => `'${l}'`).join(', ');
+
+// Content seed for the 5 new languages (folded in from seed_new_languages.js —
+// same deploy-wiring gap as above, folded in for the same reason).
+const CONTENT = {
+  mandarin: {
+    flag: '🇨🇳',
+    categoryName: 'Everyday Mandarin',
+    description: 'Common everyday Mandarin words and greetings',
+    words: [
+      ['你好',   'Nǐ hǎo',   'Hello',       '你好，你好吗？',            '👋'],
+      ['谢谢',   'Xièxiè',   'Thank you',    '谢谢你的帮助。',            '🙏'],
+      ['是',     'Shì',      'Yes',          '是的，我明白了。',          '✅'],
+      ['不',     'Bù',       'No',           '不，谢谢。',                '❌'],
+      ['请',     'Qǐng',     'Please',       '请给我一杯水。',            '🙂'],
+      ['再见',   'Zàijiàn',  'Goodbye',      '再见，明天见！',            '👋'],
+      ['水',     'Shuǐ',     'Water',        '我想要一杯水。',            '💧'],
+      ['面包',   'Miànbāo',  'Bread',        '今天早上的面包很新鲜。',    '🥖'],
+    ],
+  },
+  arabic: {
+    flag: '🇸🇦',
+    categoryName: 'Everyday Arabic',
+    description: 'Common everyday Arabic words and greetings',
+    isRtl: true,
+    words: [
+      ['مرحبا',        'marḥaban',        'Hello',      'مرحبا، كيف حالك؟',           '👋'],
+      ['شكرا',         'shukran',         'Thank you',  'شكرا جزيلا على مساعدتك.',    '🙏'],
+      ['نعم',          'naʿam',           'Yes',        'نعم، أفهم.',                  '✅'],
+      ['لا',           'lā',              'No',         'لا، شكرا.',                    '❌'],
+      ['من فضلك',      'min faḍlik',      'Please',     'كوب ماء من فضلك.',            '🙂'],
+      ['مع السلامة',   'maʿa as-salāma',  'Goodbye',    'مع السلامة، أراك غدا!',       '👋'],
+      ['ماء',          'māʾ',             'Water',      'أريد كوب ماء.',                '💧'],
+      ['خبز',          'khubz',           'Bread',      'الخبز طازج هذا الصباح.',       '🥖'],
+    ],
+  },
+  spanish: {
+    flag: '🇪🇸',
+    categoryName: 'Everyday Spanish',
+    description: 'Common everyday Spanish words and greetings',
+    words: [
+      ['Hola',       '/ˈo.la/',        'Hello',      '¡Hola! ¿Cómo estás?',          '👋'],
+      ['Gracias',    '/ˈɡɾa.θjas/',    'Thank you',  'Gracias por tu ayuda.',        '🙏'],
+      ['Sí',         '/si/',           'Yes',        'Sí, entiendo.',                '✅'],
+      ['No',         '/no/',           'No',         'No, gracias.',                 '❌'],
+      ['Por favor',  '/poɾ faˈβoɾ/',   'Please',     'Un vaso de agua, por favor.',  '🙂'],
+      ['Adiós',      '/aˈðjos/',       'Goodbye',    'Adiós, ¡hasta mañana!',        '👋'],
+      ['Agua',       '/ˈa.ɣwa/',       'Water',      'Quiero un vaso de agua.',      '💧'],
+      ['Pan',        '/pan/',          'Bread',      'El pan está fresco hoy.',      '🥖'],
+    ],
+  },
+  swahili: {
+    flag: '🇰🇪',
+    categoryName: 'Everyday Swahili',
+    description: 'Common everyday Swahili words and greetings',
+    words: [
+      ['Jambo',      'JAM-boh',     'Hello',      'Jambo, habari yako?',        '👋'],
+      ['Asante',     'ah-SAHN-teh', 'Thank you',  'Asante kwa msaada wako.',    '🙏'],
+      ['Ndiyo',      'n-DEE-yoh',   'Yes',        'Ndiyo, naelewa.',            '✅'],
+      ['Hapana',     'ha-PAH-nah',  'No',         'Hapana, asante.',            '❌'],
+      ['Tafadhali',  'ta-fa-DHA-li','Please',     'Glasi ya maji, tafadhali.',  '🙂'],
+      ['Kwaheri',    'kwa-HEH-ri',  'Goodbye',    'Kwaheri, tuonane kesho!',    '👋'],
+      ['Maji',       'MAH-ji',      'Water',      'Nataka glasi ya maji.',      '💧'],
+      ['Mkate',      'm-KAH-teh',   'Bread',      'Mkate ni mpya asubuhi hii.', '🥖'],
+    ],
+  },
+  yoruba: {
+    flag: '🇳🇬',
+    categoryName: 'Everyday Yoruba',
+    description: 'Common everyday Yoruba words and greetings',
+    words: [
+      ['Ẹ n lẹ́',    'eh n leh',     'Hello',      'Ẹ n lẹ́, ṣé dáadáa ni?',       '👋'],
+      ['Ẹ ṣé',       'eh sheh',      'Thank you',  'Ẹ ṣé fún ìrànlọ́wọ́ yín.',      '🙏'],
+      ['Bẹ́ẹ̀ni',      'beh-eh-ni',    'Yes',        'Bẹ́ẹ̀ni, mo yé mi.',            '✅'],
+      ['Rárá',       'rah-rah',      'No',         'Rárá, ẹ ṣé.',                  '❌'],
+      ['Jọ̀wọ́',       'jaw-waw',      'Please',     'Ago omi kan, jọ̀wọ́.',          '🙂'],
+      ['Ó dàbọ̀',     'oh dah-baw',   'Goodbye',    'Ó dàbọ̀, á rí ọ ọ̀la!',         '👋'],
+      ['Omi',        'oh-mi',        'Water',      'Mo fẹ́ ago omi kan.',           '💧'],
+      ['Búrẹ́dì',     'boo-reh-dee',  'Bread',      'Búrẹ́dì náà ṣẹ̀ṣẹ̀ dáa ní òwúrọ̀.', '🥖'],
+    ],
+  },
+};
+
+function LANGUAGE_LABEL(code) {
+  return { mandarin: 'Mandarin', arabic: 'Arabic', spanish: 'Spanish', swahili: 'Swahili', yoruba: 'Yoruba' }[code];
+}
+
 async function run() {
   console.log('\n🔧 AISchoolonair — Complete DB Migration\n');
 
@@ -1910,6 +2005,374 @@ async function run() {
     CROSS JOIN (SELECT id FROM lang_categories WHERE language='german' AND name='Everyday German') c
     WHERE NOT EXISTS (SELECT 1 FROM lang_words lw WHERE lw.category_id = c.id AND lw.word = w.word)`
   );
+
+
+  // ══════════════════════════════════════════════════════════════════════
+  // Language Masterclass unification (folded in from migrate_language_unification.js
+  // to fix a deploy-wiring gap: that script existed and was correct, but
+  // deploy.sh only ever called this file, so the join tables/lang_* schema
+  // changes never ran automatically. Every step below is idempotent (same
+  // as the original script), so this is safe to run against a DB that's
+  // already been migrated by hand.
+  // ══════════════════════════════════════════════════════════════════════
+  // ── STEP 1: convert lang_categories.id and lang_words.id from INTEGER to
+  // UUID. Only French/German POC rows exist today (per commits b76c41a /
+  // 3131f3d) — this is a small, low-risk conversion now; it becomes far more
+  // disruptive to do later once 8 languages of real traffic depend on the
+  // integer PKs. Confirmed the int-vs-uuid mismatch directly against the
+  // live schema before writing this (em_categories/em_words are UUID; the
+  // French/German POC tables were built as SERIAL int) rather than assuming
+  // the prompt's "preserve all IDs" was automatically satisfiable.
+  //
+  // One-time structural change -- guarded so a re-run doesn't attempt it
+  // twice (the ADD COLUMN IF NOT EXISTS steps below are individually
+  // idempotent, but the DROP/RENAME sequence as a whole is not, since the
+  // "new_*" staging column names are gone once already promoted to "id").
+  const { rows: idTypeRows } = await pool.query(`
+    SELECT data_type FROM information_schema.columns
+     WHERE table_name = 'lang_categories' AND column_name = 'id'`);
+  const alreadyConverted = idTypeRows[0]?.data_type === 'uuid';
+  if (alreadyConverted) {
+    console.log('  ⏭️   lang_categories/lang_words PK conversion (already uuid, skipping)');
+  } else {
+  await exec('lang_categories: add uuid id column', `
+    ALTER TABLE lang_categories ADD COLUMN IF NOT EXISTS new_id UUID DEFAULT gen_random_uuid()`);
+  await exec('lang_categories: backfill uuid ids', `
+    UPDATE lang_categories SET new_id = gen_random_uuid() WHERE new_id IS NULL`);
+
+  await exec('lang_words: add uuid id + uuid category_id columns', `
+    ALTER TABLE lang_words
+      ADD COLUMN IF NOT EXISTS new_id UUID DEFAULT gen_random_uuid(),
+      ADD COLUMN IF NOT EXISTS new_category_id UUID`);
+  await exec('lang_words: backfill uuid category_id from lang_categories.new_id', `
+    UPDATE lang_words w SET new_category_id = c.new_id
+      FROM lang_categories c WHERE w.category_id = c.id AND w.new_category_id IS NULL`);
+
+  await exec('lang_practice_sessions: add uuid category_id column', `
+    ALTER TABLE lang_practice_sessions ADD COLUMN IF NOT EXISTS new_category_id UUID`);
+  await exec('lang_practice_sessions: backfill uuid category_id', `
+    UPDATE lang_practice_sessions s SET new_category_id = c.new_id
+      FROM lang_categories c WHERE s.category_id = c.id AND s.new_category_id IS NULL`);
+
+  await exec('lang_pronunciation_attempts: add uuid word_id column', `
+    ALTER TABLE lang_pronunciation_attempts ADD COLUMN IF NOT EXISTS new_word_id UUID`);
+  await exec('lang_pronunciation_attempts: backfill uuid word_id', `
+    UPDATE lang_pronunciation_attempts a SET new_word_id = w.new_id
+      FROM lang_words w WHERE a.word_id = w.id AND a.new_word_id IS NULL`);
+
+  // Swap columns: drop old int PK/FK chain, promote the new uuid columns.
+  await exec('lang_pronunciation_attempts: drop old int word_id FK/column', `
+    ALTER TABLE lang_pronunciation_attempts
+      DROP CONSTRAINT IF EXISTS lang_pronunciation_attempts_word_id_fkey,
+      DROP COLUMN IF EXISTS word_id`);
+  await exec('lang_practice_sessions: drop old int category_id FK/column', `
+    ALTER TABLE lang_practice_sessions
+      DROP CONSTRAINT IF EXISTS lang_practice_sessions_category_id_fkey,
+      DROP COLUMN IF EXISTS category_id`);
+  await exec('lang_words: drop old int category_id FK/column', `
+    ALTER TABLE lang_words
+      DROP CONSTRAINT IF EXISTS lang_words_category_id_fkey,
+      DROP COLUMN IF EXISTS category_id`);
+  await exec('lang_words: drop old int id, promote uuid id', `
+    ALTER TABLE lang_words
+      DROP CONSTRAINT IF EXISTS lang_words_pkey,
+      DROP COLUMN IF EXISTS id`);
+  await exec('lang_categories: drop old int id, promote uuid id', `
+    ALTER TABLE lang_categories
+      DROP CONSTRAINT IF EXISTS lang_categories_pkey,
+      DROP COLUMN IF EXISTS id`);
+
+  await exec('lang_categories: rename new_id -> id, re-add PK', `
+    ALTER TABLE lang_categories RENAME COLUMN new_id TO id`);
+  await exec('lang_categories: add PK on id', `
+    ALTER TABLE lang_categories ADD CONSTRAINT lang_categories_pkey PRIMARY KEY (id)`);
+
+  await exec('lang_words: rename new_id/new_category_id -> id/category_id', `
+    ALTER TABLE lang_words RENAME COLUMN new_id TO id`);
+  await exec('lang_words: rename category_id', `
+    ALTER TABLE lang_words RENAME COLUMN new_category_id TO category_id`);
+  await exec('lang_words: re-add PK + FK', `
+    ALTER TABLE lang_words
+      ADD CONSTRAINT lang_words_pkey PRIMARY KEY (id),
+      ADD CONSTRAINT lang_words_category_id_fkey FOREIGN KEY (category_id)
+        REFERENCES lang_categories(id) ON DELETE CASCADE`);
+  await exec('lang_words: category_id NOT NULL + index', `
+    ALTER TABLE lang_words ALTER COLUMN category_id SET NOT NULL`);
+  await exec('lang_words: recreate category index', `
+    CREATE INDEX IF NOT EXISTS idx_lang_words_category ON lang_words(category_id)`);
+
+  await exec('lang_practice_sessions: rename + re-add FK', `
+    ALTER TABLE lang_practice_sessions RENAME COLUMN new_category_id TO category_id`);
+  await exec('lang_practice_sessions: re-add category_id FK', `
+    ALTER TABLE lang_practice_sessions
+      ADD CONSTRAINT lang_practice_sessions_category_id_fkey FOREIGN KEY (category_id)
+        REFERENCES lang_categories(id) ON DELETE SET NULL`);
+
+  await exec('lang_pronunciation_attempts: rename + re-add FK', `
+    ALTER TABLE lang_pronunciation_attempts RENAME COLUMN new_word_id TO word_id`);
+  await exec('lang_pronunciation_attempts: re-add word_id FK', `
+    ALTER TABLE lang_pronunciation_attempts
+      ADD CONSTRAINT lang_pronunciation_attempts_word_id_fkey FOREIGN KEY (word_id)
+        REFERENCES lang_words(id) ON DELETE SET NULL`);
+
+  await exec('lang_categories: drop old sequence (no longer referenced)', `
+    DROP SEQUENCE IF EXISTS lang_categories_id_seq`);
+  await exec('lang_words: drop old sequence (no longer referenced)', `
+    DROP SEQUENCE IF EXISTS lang_words_id_seq`);
+  } // end alreadyConverted guard
+
+  // ── STEP 2: widen the language CHECK constraints to all 8 languages ──────
+  await exec('lang_categories: widen language check to 8 languages', `
+    ALTER TABLE lang_categories DROP CONSTRAINT IF EXISTS lang_categories_language_check;
+    ALTER TABLE lang_categories ADD CONSTRAINT lang_categories_language_check
+      CHECK (language = ANY (ARRAY[${LANG_CHECK_LIST}]))`);
+  await exec('lang_practice_sessions: widen language check to 8 languages', `
+    ALTER TABLE lang_practice_sessions DROP CONSTRAINT IF EXISTS lang_practice_sessions_language_check;
+    ALTER TABLE lang_practice_sessions ADD CONSTRAINT lang_practice_sessions_language_check
+      CHECK (language = ANY (ARRAY[${LANG_CHECK_LIST}]))`);
+  await exec('lang_pronunciation_attempts: widen language check to 8 languages', `
+    ALTER TABLE lang_pronunciation_attempts DROP CONSTRAINT IF EXISTS lang_pronunciation_attempts_language_check;
+    ALTER TABLE lang_pronunciation_attempts ADD CONSTRAINT lang_pronunciation_attempts_language_check
+      CHECK (language = ANY (ARRAY[${LANG_CHECK_LIST}]))`);
+  // lang_categories.language / lang_words have no length-10 problem since
+  // 'mandarin' (8) / 'swahili' (7) all fit VARCHAR(10); widen anyway in case
+  // a future code is longer than 10 chars.
+  await exec('lang_categories: widen language column length', `
+    ALTER TABLE lang_categories ALTER COLUMN language TYPE VARCHAR(20)`);
+  await exec('lang_practice_sessions: widen language column length', `
+    ALTER TABLE lang_practice_sessions ALTER COLUMN language TYPE VARCHAR(20)`);
+  await exec('lang_pronunciation_attempts: widen language column length', `
+    ALTER TABLE lang_pronunciation_attempts ALTER COLUMN language TYPE VARCHAR(20)`);
+
+  // ── STEP 3: per-language exercise-support metadata ────────────────────────
+  // Replaces "which exercises actually work per language" being implicit in
+  // which route file existed. English: all 3 exercises real. The other 7
+  // (including French/German, which per b76c41a/3131f3d only ever shipped
+  // real pronunciation scoring): pronunciation only for French/German,
+  // nothing yet for the 5 brand-new ones -- seeded conservatively (all
+  // false) below and can be flipped on per-language as real backend work
+  // for that language's listening/writing lands.
+  await exec('languages: create reference table', `
+    CREATE TABLE IF NOT EXISTS languages (
+      code                  VARCHAR(20) PRIMARY KEY,
+      display_name          TEXT NOT NULL,
+      supports_pronunciation BOOLEAN NOT NULL DEFAULT false,
+      supports_listening     BOOLEAN NOT NULL DEFAULT false,
+      supports_writing        BOOLEAN NOT NULL DEFAULT false,
+      is_rtl                BOOLEAN NOT NULL DEFAULT false,
+      display_order         INTEGER NOT NULL DEFAULT 0
+    )`);
+  await exec('languages: seed all 8', `
+    INSERT INTO languages (code, display_name, supports_pronunciation, supports_listening, supports_writing, is_rtl, display_order) VALUES
+      ('english',  'English',  true,  true,  true,  false, 1),
+      ('french',   'French',   true,  false, false, false, 2),
+      ('german',   'German',   true,  false, false, false, 3),
+      ('mandarin', 'Mandarin', false, false, false, false, 4),
+      ('arabic',   'Arabic',   false, false, false, true,  5),
+      ('spanish',  'Spanish',  false, false, false, false, 6),
+      ('swahili',  'Swahili',  false, false, false, false, 7),
+      ('yoruba',   'Yoruba',   false, false, false, false, 8)
+    ON CONFLICT (code) DO NOTHING`);
+
+  // ── STEP 4: bring lang_* up to parity with em_*'s full feature set ────────
+  // (writing submissions, per-word progress, aggregate user stats) --
+  // required so English doesn't lose these when it moves into lang_*, and
+  // so the other 7 languages have somewhere for this data to land once
+  // their backends grow these features.
+  await exec('lang_writing_submissions: create table', `
+    CREATE TABLE IF NOT EXISTS lang_writing_submissions (
+      id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id                 UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      language                VARCHAR(20) NOT NULL,
+      word_id                 UUID REFERENCES lang_words(id) ON DELETE SET NULL,
+      word_text               TEXT NOT NULL,
+      prompt                  TEXT NOT NULL,
+      submission_text         TEXT NOT NULL,
+      score                   NUMERIC(5,2) NOT NULL,
+      used_word_correctly     BOOLEAN NOT NULL DEFAULT false,
+      grammar_notes           TEXT,
+      feedback                TEXT,
+      sentence_count_required INTEGER,
+      sentence_count_written  INTEGER,
+      sentence_count_met      BOOLEAN,
+      created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      CONSTRAINT lang_writing_submissions_language_check
+        CHECK (language = ANY (ARRAY[${LANG_CHECK_LIST}]))
+    )`);
+  await exec('lang_writing_submissions: indexes', `
+    CREATE INDEX IF NOT EXISTS idx_lang_writing_user ON lang_writing_submissions(user_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_lang_writing_word ON lang_writing_submissions(word_id)`);
+
+  await exec('lang_word_progress: create table', `
+    CREATE TABLE IF NOT EXISTS lang_word_progress (
+      id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      language          VARCHAR(20) NOT NULL,
+      word_id           UUID NOT NULL REFERENCES lang_words(id) ON DELETE CASCADE,
+      correct_attempts  INTEGER NOT NULL DEFAULT 0,
+      total_attempts    INTEGER NOT NULL DEFAULT 0,
+      mastered          BOOLEAN NOT NULL DEFAULT false,
+      last_practiced    TIMESTAMPTZ,
+      created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (user_id, word_id),
+      CONSTRAINT lang_word_progress_language_check
+        CHECK (language = ANY (ARRAY[${LANG_CHECK_LIST}]))
+    )`);
+  await exec('lang_word_progress: index', `
+    CREATE INDEX IF NOT EXISTS idx_lang_word_progress_user ON lang_word_progress(user_id, language)`);
+
+  await exec('lang_user_stats: create table', `
+    CREATE TABLE IF NOT EXISTS lang_user_stats (
+      user_id             UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      language            VARCHAR(20) NOT NULL,
+      words_learned       INTEGER NOT NULL DEFAULT 0,
+      words_mastered      INTEGER NOT NULL DEFAULT 0,
+      practice_streak     INTEGER NOT NULL DEFAULT 0,
+      longest_streak      INTEGER NOT NULL DEFAULT 0,
+      total_sessions      INTEGER NOT NULL DEFAULT 0,
+      total_practice_secs INTEGER NOT NULL DEFAULT 0,
+      overall_accuracy    NUMERIC(5,2) NOT NULL DEFAULT 0,
+      last_practice_date  DATE,
+      updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (user_id, language),
+      CONSTRAINT lang_user_stats_language_check
+        CHECK (language = ANY (ARRAY[${LANG_CHECK_LIST}]))
+    )`);
+
+  // ── STEP 5: copy every em_* row into lang_* as language='english',
+  // preserving original IDs (both sides are UUID after step 1). Idempotent
+  // via WHERE NOT EXISTS -- safe to re-run without duplicating rows. ───────
+  await exec('data migration: em_categories -> lang_categories', `
+    INSERT INTO lang_categories (id, language, name, description, difficulty, icon_emoji, order_index, is_active, created_at)
+    SELECT id, 'english', name, description, difficulty, icon_emoji, order_index, is_active, created_at
+      FROM em_categories c
+     WHERE NOT EXISTS (SELECT 1 FROM lang_categories lc WHERE lc.id = c.id)`);
+
+  await exec('data migration: em_words -> lang_words', `
+    INSERT INTO lang_words (id, category_id, word, phonetic, definition, example_sentence, icon_emoji, is_active, created_at)
+    SELECT id, category_id, word, phonetic, definition, example_sentence, NULL, is_active, created_at
+      FROM em_words w
+     WHERE NOT EXISTS (SELECT 1 FROM lang_words lw WHERE lw.id = w.id)`);
+
+  await exec('data migration: em_practice_sessions -> lang_practice_sessions', `
+    INSERT INTO lang_practice_sessions (id, user_id, language, category_id, difficulty, total_words, correct_words, created_at)
+    SELECT id, user_id, 'english', category_id, difficulty, total_words, correct_words, created_at
+      FROM em_practice_sessions s
+     WHERE NOT EXISTS (SELECT 1 FROM lang_practice_sessions ls WHERE ls.id = s.id)`);
+
+  await exec('data migration: em_pronunciation_attempts -> lang_pronunciation_attempts', `
+    INSERT INTO lang_pronunciation_attempts (id, user_id, language, word_id, word_text, audio_url, heard, score, matched, feedback, created_at)
+    SELECT id, user_id, 'english', word_id, word_text, audio_url, heard, score, matched, feedback, created_at
+      FROM em_pronunciation_attempts a
+     WHERE NOT EXISTS (SELECT 1 FROM lang_pronunciation_attempts la WHERE la.id = a.id)`);
+
+  await exec('data migration: em_writing_submissions -> lang_writing_submissions', `
+    INSERT INTO lang_writing_submissions (id, user_id, language, word_id, word_text, prompt, submission_text, score, used_word_correctly, grammar_notes, feedback, sentence_count_required, sentence_count_written, sentence_count_met, created_at)
+    SELECT id, user_id, 'english', word_id, word_text, prompt, submission_text, score, used_word_correctly, grammar_notes, feedback, sentence_count_required, sentence_count_written, sentence_count_met, created_at
+      FROM em_writing_submissions ws
+     WHERE NOT EXISTS (SELECT 1 FROM lang_writing_submissions lws WHERE lws.id = ws.id)`);
+
+  await exec('data migration: em_word_progress -> lang_word_progress', `
+    INSERT INTO lang_word_progress (id, user_id, language, word_id, correct_attempts, total_attempts, mastered, last_practiced, created_at, updated_at)
+    SELECT id, user_id, 'english', word_id, correct_attempts, total_attempts, mastered, last_practiced, created_at, updated_at
+      FROM em_word_progress p
+     WHERE NOT EXISTS (SELECT 1 FROM lang_word_progress lp WHERE lp.id = p.id)`);
+
+  await exec('data migration: em_user_stats -> lang_user_stats', `
+    INSERT INTO lang_user_stats (user_id, language, words_learned, words_mastered, practice_streak, longest_streak, total_sessions, total_practice_secs, overall_accuracy, last_practice_date, updated_at)
+    SELECT user_id, 'english', words_learned, words_mastered, practice_streak, longest_streak, total_sessions, total_practice_secs, overall_accuracy, last_practice_date, updated_at
+      FROM em_user_stats s
+     WHERE NOT EXISTS (SELECT 1 FROM lang_user_stats ls WHERE ls.user_id = s.user_id AND ls.language = 'english')`);
+
+  // ── STEP 6: registration/enablement join tables ───────────────────────────
+  await exec('user_language_registrations: create table', `
+    CREATE TABLE IF NOT EXISTS user_language_registrations (
+      user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      language      VARCHAR(20) NOT NULL,
+      registered_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (user_id, language),
+      CONSTRAINT user_language_registrations_language_check
+        CHECK (language = ANY (ARRAY[${LANG_CHECK_LIST}]))
+    )`);
+  await exec('school_enabled_languages: create table', `
+    CREATE TABLE IF NOT EXISTS school_enabled_languages (
+      school_id  UUID NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+      language   VARCHAR(20) NOT NULL,
+      enabled_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (school_id, language),
+      CONSTRAINT school_enabled_languages_language_check
+        CHECK (language = ANY (ARRAY[${LANG_CHECK_LIST}]))
+    )`);
+
+  // Migrate existing per-column data into the join tables -- every existing
+  // registered/enabled account keeps its status exactly, timestamp included.
+  await exec('migrate em_registered_at -> user_language_registrations(english)', `
+    INSERT INTO user_language_registrations (user_id, language, registered_at)
+    SELECT id, 'english', em_registered_at FROM users
+     WHERE em_registered_at IS NOT NULL
+    ON CONFLICT (user_id, language) DO NOTHING`);
+  await exec('migrate french_registered_at -> user_language_registrations(french)', `
+    INSERT INTO user_language_registrations (user_id, language, registered_at)
+    SELECT id, 'french', french_registered_at FROM users
+     WHERE french_registered_at IS NOT NULL
+    ON CONFLICT (user_id, language) DO NOTHING`);
+  await exec('migrate german_registered_at -> user_language_registrations(german)', `
+    INSERT INTO user_language_registrations (user_id, language, registered_at)
+    SELECT id, 'german', german_registered_at FROM users
+     WHERE german_registered_at IS NOT NULL
+    ON CONFLICT (user_id, language) DO NOTHING`);
+
+  await exec('migrate enable_em -> school_enabled_languages(english)', `
+    INSERT INTO school_enabled_languages (school_id, language)
+    SELECT id, 'english' FROM schools WHERE enable_em = true
+    ON CONFLICT (school_id, language) DO NOTHING`);
+  await exec('migrate enable_french -> school_enabled_languages(french)', `
+    INSERT INTO school_enabled_languages (school_id, language)
+    SELECT id, 'french' FROM schools WHERE enable_french = true
+    ON CONFLICT (school_id, language) DO NOTHING`);
+  await exec('migrate enable_german -> school_enabled_languages(german)', `
+    INSERT INTO school_enabled_languages (school_id, language)
+    SELECT id, 'german' FROM schools WHERE enable_german = true
+    ON CONFLICT (school_id, language) DO NOTHING`);
+
+
+
+  // ── New-language content seed (Mandarin/Arabic/Spanish/Swahili/Yoruba) ──
+  console.log('\n🌍 Seeding content for 5 new languages\n');
+  for (const [language, data] of Object.entries(CONTENT)) {
+    await exec(`${language}: seed Beginner category`, `
+      INSERT INTO lang_categories (language, name, description, difficulty, icon_emoji, order_index)
+      VALUES ('${language}', '${data.categoryName}', '${data.description}', 'Beginner', '${data.flag}', 1)
+      ON CONFLICT (language, name) DO NOTHING`);
+
+    await exec(`${language}: seed empty Intermediate/Advanced placeholders`, `
+      INSERT INTO lang_categories (language, name, description, difficulty, icon_emoji, order_index)
+      VALUES
+        ('${language}', '${LANGUAGE_LABEL(language)} Conversation', 'Coming soon', 'Intermediate', '${data.flag}', 2),
+        ('${language}', 'Advanced ${LANGUAGE_LABEL(language)}',     'Coming soon', 'Advanced',     '${data.flag}', 3)
+      ON CONFLICT (language, name) DO NOTHING`);
+
+    const values = data.words.map(([word, phonetic, definition, example, icon]) => {
+      const esc = (s) => s.replace(/'/g, "''");
+      return `('${esc(word)}', '${esc(phonetic)}', '${esc(definition)}', '${esc(example)}', '${esc(icon)}')`;
+    }).join(',\n      ');
+
+    await exec(`${language}: seed Beginner words`, `
+      INSERT INTO lang_words (category_id, word, phonetic, definition, example_sentence, icon_emoji)
+      SELECT c.id, w.word, w.phonetic, w.definition, w.example_sentence, w.icon_emoji
+      FROM (VALUES
+      ${values}
+      ) AS w(word, phonetic, definition, example_sentence, icon_emoji)
+      CROSS JOIN (SELECT id FROM lang_categories WHERE language='${language}' AND name='${data.categoryName}') c
+      WHERE NOT EXISTS (SELECT 1 FROM lang_words lw WHERE lw.category_id = c.id AND lw.word = w.word)`);
+  }
+
+  // Set is_rtl on the languages reference table for Arabic (already seeded
+  // true by migrate_language_unification.js, but re-affirm here in case
+  // this script ever runs before that one).
+  await exec('languages: confirm Arabic is_rtl = true', `
+    UPDATE languages SET is_rtl = true WHERE code = 'arabic'`);
 
   console.log('\n✅ Migration complete.\n');
   await pool.end();
