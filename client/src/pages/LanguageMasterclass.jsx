@@ -17,7 +17,7 @@
 // to EMDashboard.jsx) while logged in through the normal app.
 
 import { useState, useEffect, useCallback } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
 import api from '../services/apiClient';
 import TopNav from '../components/TopNav';
@@ -32,6 +32,21 @@ export default function LanguageMasterclass({ language: languageProp }) {
   const language = languageProp || code;
   const navigate = useNavigate();
   const meta = LANGUAGE_META[language];
+
+  // Defense-in-depth, not the primary mechanism: English is meant to be
+  // intercepted before this component ever mounts, by the static
+  // /language/english/* redirect routes in App.jsx (see that file's
+  // "LANGUAGE MASTERCLASS unification" block). That works today, but it's
+  // fragile — it depends entirely on those specific routes continuing to
+  // exist exactly as written and matching before the generic /language/:code
+  // routes below them. LANGUAGE_META.english.enabled is true (English is a
+  // real, valid language here), so nothing else in this component would
+  // catch it if that App.jsx routing were ever removed or reordered by
+  // someone unaware of why it's there. This makes the rule enforced in two
+  // independent places instead of one.
+  if (language === 'english') {
+    return <Navigate to="/em/dashboard" replace />;
+  }
 
   if (!meta) {
     return (

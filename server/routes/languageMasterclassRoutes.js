@@ -862,7 +862,8 @@ router.patch('/:language/admin/categories/:id', adminOnly, async (req, res) => {
 router.delete('/:language/admin/categories/:id', adminOnly, async (req, res) => {
   const { language, id } = req.params;
   try {
-    await db.query(`DELETE FROM lang_categories WHERE id = $1 AND language = $2`, [id, language]);
+    const result = await db.query(`DELETE FROM lang_categories WHERE id = $1 AND language = $2`, [id, language]);
+    if (!result.rowCount) return res.status(404).json({ success: false, error: 'Category not found' });
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -931,8 +932,20 @@ router.patch('/:language/admin/words/:id', adminOnly, async (req, res) => {
 
 // DELETE /api/language-masterclass/:language/admin/words/:id
 router.delete('/:language/admin/words/:id', adminOnly, async (req, res) => {
+  const { language, id } = req.params;
   try {
-    await db.query(`DELETE FROM lang_words WHERE id = $1`, [req.params.id]);
+    // lang_words has no language column of its own (it's derived via
+    // category_id -> lang_categories.language), so scope through that join
+    // rather than leaving this the one unscoped admin mutation in the file
+    // — same reasoning as the category delete above, even though word IDs
+    // are globally unique (SERIAL, not per-language) so this isn't a
+    // literal ID-collision risk, just a URL/language mismatch one.
+    const result = await db.query(`
+      DELETE FROM lang_words
+       WHERE id = $1
+         AND category_id IN (SELECT id FROM lang_categories WHERE language = $2)
+    `, [id, language]);
+    if (!result.rowCount) return res.status(404).json({ success: false, error: 'Word not found' });
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
