@@ -585,8 +585,11 @@ router.post('/:language/sessions', async (req, res) => {
   const { category_id, difficulty, total_words, correct_words, duration_secs, answers } = req.body;
   const userId = req.user.id;
 
-  if (!Number.isInteger(total_words) || !Number.isInteger(correct_words)) {
-    return res.status(400).json({ success: false, error: 'total_words and correct_words must be integers' });
+  if (!Number.isInteger(total_words) || !Number.isInteger(correct_words) || total_words <= 0) {
+    return res.status(400).json({ success: false, error: 'total_words must be a positive integer and correct_words must be an integer' });
+  }
+  if (correct_words < 0 || correct_words > total_words) {
+    return res.status(400).json({ success: false, error: 'correct_words must be between 0 and total_words' });
   }
 
   // Same "null (not 0) unless attempted" averaging as EM — a student who
