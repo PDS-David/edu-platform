@@ -10,7 +10,8 @@
     "seed": "node seeds/seedDemoContent.js",
     "migrate:r2": "node scripts/migrateUploadsToR2.js",
     "migrate:r2:dry": "DRY_RUN=true node scripts/migrateUploadsToR2.js",
-    "test:security-regression": "node scripts/security-regression-check.js"
+    "test:security-regression": "node scripts/security-regression-check.js",
+    "check:languages": "node scripts/check_language_consistency.js"
   },
   "keywords": [
     "education",
