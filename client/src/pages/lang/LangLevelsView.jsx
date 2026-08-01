@@ -4,10 +4,13 @@
 // itself is visible) but are always empty and locked — see the file-level
 // note in languageMasterclassRoutes.js for why.
 
-import { Lock, ChevronRight } from 'lucide-react';
-import { LANGUAGE_META, DIFF_STYLE, QUESTIONS_PER_LEVEL, UNLOCK_ACCURACY } from './constants';
+import { ChevronRight } from 'lucide-react';
+import { LANGUAGE_META, DIFF_STYLE } from './constants';
+import LangLevelGate from './LangLevelGate';
 
-export default function LangLevelsView({ language, categories, unlocked, onStart, loadingCatId }) {
+const REQUIRED_LEVEL = { Intermediate: 'Beginner', Advanced: 'Intermediate' };
+
+export default function LangLevelsView({ language, categories, unlocked, levelDetail, onStart, loadingCatId }) {
   const meta = LANGUAGE_META[language];
   const byDifficulty = { Beginner: [], Intermediate: [], Advanced: [] };
   categories.forEach(c => { (byDifficulty[c.difficulty] ||= []).push(c); });
@@ -19,16 +22,28 @@ export default function LangLevelsView({ language, categories, unlocked, onStart
         const diffStyle = DIFF_STYLE[diff];
         const cats = byDifficulty[diff];
 
+        // Locked tiers get the same rich "here's what to do" progress card
+        // English Masterclass shows (LangLevelGate, ported from EM's
+        // LevelGate.jsx) instead of a grayed-out, unclickable category grid.
+        if (!isUnlocked && diff !== 'Beginner') {
+          return (
+            <div key={diff}>
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${diffStyle.badge}`}>{diffStyle.label}</span>
+              </div>
+              <LangLevelGate
+                level={diff}
+                requiredLevel={REQUIRED_LEVEL[diff]}
+                detail={levelDetail?.[REQUIRED_LEVEL[diff]]}
+              />
+            </div>
+          );
+        }
+
         return (
           <div key={diff}>
             <div className="flex flex-wrap items-center gap-2 mb-3">
               <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${diffStyle.badge}`}>{diffStyle.label}</span>
-              {!isUnlocked && (
-                <span className="flex items-center gap-1 text-xs text-gray-400">
-                  <Lock size={12} className="shrink-0" aria-hidden="true" />
-                  Unlocks after {QUESTIONS_PER_LEVEL} questions at {UNLOCK_ACCURACY}%+ in the level below
-                </span>
-              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

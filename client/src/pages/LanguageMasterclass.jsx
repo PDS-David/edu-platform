@@ -220,6 +220,7 @@ export default function LanguageMasterclass({ language: languageProp }) {
             language={language}
             categories={categories}
             unlocked={levelProgress?.unlocked}
+            levelDetail={levelProgress?.level_detail}
             onStart={handleStartCategory}
             loadingCatId={loadingCatId}
           />
