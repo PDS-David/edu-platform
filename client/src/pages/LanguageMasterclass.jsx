@@ -78,6 +78,7 @@ export default function LanguageMasterclass({ language: languageProp }) {
   const [error, setError] = useState('');
   const [categories, setCategories] = useState([]);
   const [levelProgress, setLevelProgress] = useState(null);
+  const [supportedExercises, setSupportedExercises] = useState(null);
   const [selectedCat, setSelectedCat] = useState(null);
   const [words, setWords] = useState([]);
   const [loadingCatId, setLoadingCatId] = useState(null);
@@ -97,6 +98,7 @@ export default function LanguageMasterclass({ language: languageProp }) {
       // don't wrap their payload in a "data" key to begin with.)
       setCategories(catRes.data || []);
       setLevelProgress(progRes.data || null);
+      setSupportedExercises(progRes.data?.supported_exercises || null);
       setView('levels');
     } catch (err) {
       // Registration is no longer a possible failure here — a not-yet-
@@ -231,6 +233,7 @@ export default function LanguageMasterclass({ language: languageProp }) {
             language={language}
             category={selectedCat}
             words={words}
+            supportedExercises={supportedExercises}
             onComplete={handleSessionComplete}
           />
         )}
