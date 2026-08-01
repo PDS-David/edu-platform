@@ -13,20 +13,20 @@
 // verified content/prompting for that language yet.
 //   - English: pronunciation, listening (client-side only, no backend route
 //     needed beyond /audio), and writing all supported.
-//   - French/German: pronunciation and listening (listening enabled
-//     client-side in LangPracticeSession.jsx — same client-side-only shape
-//     as English's listening step above, no backend route needed beyond
-//     /audio). Beginner-only content (~8 words), Intermediate/Advanced
-//     empty on purpose. Writing not yet validated for these languages.
-//   - Mandarin/Arabic/Spanish/Swahili/Yoruba: same Beginner-only seed shape,
+//   - French/German: pronunciation, listening, AND writing now all
+//     supported (supports_writing flipped true for both — see the
+//     `languages` table UPDATE in run_complete_migration.js). Full admin
+//     CMS below (/:language/admin/*), word-explain, and /progress are all
+//     generalized and live for these two. Content still growing — see the
+//     Intermediate/Advanced seed additions in run_complete_migration.js;
+//     use the admin CMS's "Generate with AI" to keep expanding beyond that.
+//   - Mandarin/Arabic/Spanish/Swahili/Yoruba: Beginner-only seed shape,
 //     pronunciation/listening/writing NOT yet marked supported — see
 //     languages table. Flip supports_* on per-language only once that
-//     language's real backend work lands and has been verified, not as part
-//     of "generalizing" this file.
-//   - No admin CMS routes for managing categories/words (unlike English
-//     Masterclass's /admin/* routes) — content seeded directly via
-//     migrations for this pass. Add an admin CMS here before relying on
-//     non-technical staff to maintain this content long-term.
+//     language's real backend work lands and has been verified. The admin
+//     CMS routes below work for these too (once ENABLED_LANGUAGES includes
+//     them), since they're generalized by :language, not French/German-
+//     specific.
 //   - Registration/enablement now reads user_language_registrations /
 //     school_enabled_languages (join tables) instead of one column per
 //     language — see requireLanguageRegistration below.
@@ -523,26 +523,202 @@ Respond in this exact JSON format, no markdown, no extra text:
   }
 });
 
+// POST /api/language-masterclass/:language/word-explain
+// Mirrors English Masterclass's /word-explain, generalized by language:
+// Gemini explains a word, and (if word_id is supplied) the response
+// backfills lang_words for any field that's currently empty — never
+// overwrites admin-curated content.
+router.post('/:language/word-explain', async (req, res) => {
+  const { language } = req.params;
+  const { word, context, word_id } = req.body;
+  const label = LANGUAGE_LABEL[language];
+  if (!word) return res.status(400).json({ success: false, error: 'word is required' });
+
+  try {
+    const prompt = `You are an expert ${label} language teacher helping a student around the world build strong ${label} vocabulary.
+
+Provide the following for the ${label} word or phrase: "${word}"
+Context (category): ${context || `General ${label} vocabulary`}
+
+Respond in this exact JSON format (no markdown, no extra text):
+{
+  "definition": "A clear, simple definition in English",
+  "phonetic": "IPA pronunciation",
+  "example_sentence": "A natural example sentence in ${label} showing everyday usage",
+  "usage_tip": "A tip for learners — a common mistake to avoid or a useful note",
+  "regional_note": "If this word or its usage commonly differs across regions/dialects, briefly note that as neutral trivia. Otherwise write null."
+}`;
+
+    const raw = await generate(prompt, 'explain');
+    const cleaned = raw.replace(/```json|```/g, '').trim();
+    const data = JSON.parse(cleaned);
+
+    if (word_id) {
+      try {
+        await db.query(`
+          UPDATE lang_words
+          SET
+            definition       = CASE WHEN (definition IS NULL OR definition = '') THEN $1 ELSE definition END,
+            example_sentence = CASE WHEN (example_sentence IS NULL OR example_sentence = '') THEN $2 ELSE example_sentence END,
+            phonetic          = CASE WHEN (phonetic IS NULL OR phonetic = '') THEN $3 ELSE phonetic END
+          WHERE id = $4
+        `, [data.definition || null, data.example_sentence || null, data.phonetic || null, word_id]);
+      } catch (backfillErr) {
+        console.warn(`[LangMasterclass] ${language} word-explain backfill failed:`, backfillErr.message);
+      }
+    }
+
+    res.json({ success: true, data });
+  } catch (err) {
+    console.error(`[LangMasterclass] POST /${language}/word-explain`, err.message);
+    res.status(500).json({ success: false, error: 'Could not generate explanation.' });
+  }
+});
+
 // POST /api/language-masterclass/:language/sessions
-// Saves one practice session's tally so level-progress math (below) has
-// something to read.
+// Saves one practice session's tally, updates per-word progress and
+// aggregate streak/accuracy stats, and reports whether this session just
+// unlocked a new level. Mirrors English Masterclass's /sessions exactly,
+// generalized by language and table (lang_* instead of em_*).
 router.post('/:language/sessions', async (req, res) => {
   const { language } = req.params;
-  const { category_id, difficulty, total_words, correct_words } = req.body;
+  const { category_id, difficulty, total_words, correct_words, duration_secs, answers } = req.body;
   const userId = req.user.id;
 
   if (!Number.isInteger(total_words) || !Number.isInteger(correct_words)) {
     return res.status(400).json({ success: false, error: 'total_words and correct_words must be integers' });
   }
 
+  // Same "null (not 0) unless attempted" averaging as EM — a student who
+  // never touches the mic/writing box this session shouldn't have their
+  // average dragged down by zeros that were never actually scored.
+  const pronScores = Array.isArray(answers)
+    ? answers.map(a => a.pronunciation_score).filter(s => typeof s === 'number')
+    : [];
+  const avgPronunciation = pronScores.length
+    ? Math.round((pronScores.reduce((s, v) => s + v, 0) / pronScores.length) * 100) / 100
+    : null;
+
+  const writingScores = Array.isArray(answers)
+    ? answers.map(a => a.writing_score).filter(s => typeof s === 'number')
+    : [];
+  const avgWriting = writingScores.length
+    ? Math.round((writingScores.reduce((s, v) => s + v, 0) / writingScores.length) * 100) / 100
+    : null;
+
   try {
+    const beforeUnlocked = computeUnlocked(await getLevelTotals(userId, language));
+
+    // 1. Save session
     await db.query(`
-      INSERT INTO lang_practice_sessions (user_id, language, category_id, difficulty, total_words, correct_words)
-      VALUES ($1,$2,$3,$4,$5,$6)
-    `, [userId, language, category_id || null, difficulty || null, total_words, correct_words]);
-    res.json({ success: true });
+      INSERT INTO lang_practice_sessions (user_id, language, category_id, difficulty, total_words, correct_words, pronunciation_score, writing_score)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+    `, [userId, language, category_id || null, difficulty || null, total_words, correct_words, avgPronunciation, avgWriting]);
+
+    // 2. Update per-word progress
+    if (Array.isArray(answers)) {
+      for (const a of answers) {
+        if (!a.word_id) continue;
+        await db.query(`
+          INSERT INTO lang_word_progress (user_id, language, word_id, correct_attempts, total_attempts, last_practiced, mastered)
+          VALUES ($1, $2, $3, $4, 1, NOW(), false)
+          ON CONFLICT (user_id, word_id) DO UPDATE SET
+            correct_attempts = lang_word_progress.correct_attempts + $4,
+            total_attempts   = lang_word_progress.total_attempts + 1,
+            last_practiced   = NOW(),
+            mastered         = (lang_word_progress.correct_attempts + $4) >= 3,
+            updated_at       = NOW()
+        `, [userId, language, a.word_id, a.correct ? 1 : 0]);
+      }
+    }
+
+    // 3. Upsert aggregate stats (streak logic)
+    const today = new Date().toISOString().split('T')[0];
+    const accuracy = Math.round((correct_words / total_words) * 100 * 100) / 100;
+    const stats = await q1(`SELECT * FROM lang_user_stats WHERE user_id = $1 AND language = $2`, [userId, language]);
+
+    if (stats) {
+      const lastDate  = stats.last_practice_date ? String(stats.last_practice_date).split('T')[0] : null;
+      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+      const streak    = lastDate === yesterday ? stats.practice_streak + 1
+                      : lastDate === today     ? stats.practice_streak
+                      : 1;
+      const longestStreak = Math.max(stats.longest_streak, streak);
+      const newLearned  = stats.words_learned + correct_words;
+      const newSessions = stats.total_sessions + 1;
+      const newAccuracy = ((stats.overall_accuracy * stats.total_sessions) + accuracy) / newSessions;
+
+      await db.query(`
+        UPDATE lang_user_stats SET
+          words_learned       = $1,
+          practice_streak      = $2,
+          longest_streak       = $3,
+          total_sessions       = $4,
+          total_practice_secs  = total_practice_secs + $5,
+          overall_accuracy     = $6,
+          last_practice_date   = $7,
+          updated_at           = NOW()
+        WHERE user_id = $8 AND language = $9
+      `, [newLearned, streak, longestStreak, newSessions, duration_secs || 0, newAccuracy, today, userId, language]);
+    } else {
+      await db.query(`
+        INSERT INTO lang_user_stats
+          (user_id, language, words_learned, practice_streak, longest_streak, total_sessions, total_practice_secs, overall_accuracy, last_practice_date)
+        VALUES ($1, $2, $3, 1, 1, 1, $4, $5, $6)
+      `, [userId, language, correct_words, duration_secs || 0, accuracy, today]);
+    }
+
+    // words_mastered is a rollup of lang_word_progress, refreshed here so
+    // /progress doesn't need a live COUNT on every read.
+    await db.query(`
+      UPDATE lang_user_stats SET words_mastered = (
+        SELECT COUNT(*)::int FROM lang_word_progress WHERE user_id = $1 AND language = $2 AND mastered = true
+      ) WHERE user_id = $1 AND language = $2
+    `, [userId, language]);
+
+    const afterUnlocked = computeUnlocked(await getLevelTotals(userId, language));
+    let newlyUnlockedLevel = null;
+    if (!beforeUnlocked.Intermediate && afterUnlocked.Intermediate) newlyUnlockedLevel = 'Intermediate';
+    else if (!beforeUnlocked.Advanced && afterUnlocked.Advanced)     newlyUnlockedLevel = 'Advanced';
+
+    res.json({ success: true, message: 'Session saved.', newly_unlocked_level: newlyUnlockedLevel });
   } catch (err) {
     console.error(`[LangMasterclass] POST /${language}/sessions`, err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/language-masterclass/:language/progress
+// The logged-in student's stats + recent sessions for this language —
+// mirrors English Masterclass's /progress, feeds a future dashboard card.
+router.get('/:language/progress', async (req, res) => {
+  const { language } = req.params;
+  const userId = req.user.id;
+  try {
+    const [stats, sessions, masteredCount] = await Promise.all([
+      q1(`SELECT * FROM lang_user_stats WHERE user_id = $1 AND language = $2`, [userId, language]),
+      q(`SELECT ps.*, c.icon_emoji, c.name AS category_name
+           FROM lang_practice_sessions ps
+           LEFT JOIN lang_categories c ON c.id = ps.category_id
+          WHERE ps.user_id = $1 AND ps.language = $2
+          ORDER BY ps.created_at DESC
+          LIMIT 10`, [userId, language]),
+      q1(`SELECT COUNT(*)::int AS count FROM lang_word_progress WHERE user_id = $1 AND language = $2 AND mastered = true`, [userId, language]),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        stats: stats || {
+          words_learned: 0, words_mastered: 0, practice_streak: 0,
+          longest_streak: 0, total_sessions: 0, overall_accuracy: 0,
+        },
+        mastered_count: masteredCount?.count || 0,
+        recent_sessions: sessions,
+      },
+    });
+  } catch (err) {
+    console.error(`[LangMasterclass] GET /${language}/progress`, err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -582,6 +758,223 @@ router.get('/:language/level-progress', async (req, res) => {
   } catch (err) {
     console.error(`[LangMasterclass] GET /${language}/level-progress`, err.message);
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ADMIN ROUTES — content CMS for lang_categories / lang_words, generalized by
+// :language. Mirrors englishMasterclassRoutes.js's admin block exactly (same
+// shape, same endpoints) so AdminLanguageMasterclass.jsx on the frontend can
+// reuse the same UI patterns AdminEnglishMasterclass.jsx already established.
+// Gated by requireLanguageEnabled above (applies to all /:language/* routes),
+// so this only ever manages content for a language that's actually live.
+// ═════════════════════════════════════════════════════════════════════════════
+
+// GET /api/language-masterclass/:language/admin/categories
+router.get('/:language/admin/categories', adminOnly, async (req, res) => {
+  const { language } = req.params;
+  try {
+    const rows = await q(`
+      SELECT c.*, COUNT(w.id)::int AS word_count
+        FROM lang_categories c
+        LEFT JOIN lang_words w ON w.category_id = c.id
+       WHERE c.language = $1
+       GROUP BY c.id
+       ORDER BY c.order_index ASC, c.name ASC
+    `, [language]);
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/language-masterclass/:language/admin/categories
+router.post('/:language/admin/categories', adminOnly, async (req, res) => {
+  const { language } = req.params;
+  const { name, description, difficulty, icon_emoji, order_index } = req.body;
+  if (!name) return res.status(400).json({ success: false, error: 'name is required' });
+  try {
+    const row = await q1(`
+      INSERT INTO lang_categories (language, name, description, difficulty, icon_emoji, order_index, created_by)
+      VALUES ($1,$2,$3,$4,$5,$6,$7)
+      RETURNING *
+    `, [language, name, description || '', difficulty || 'Beginner', icon_emoji || '📚', order_index || 0, req.user.id]);
+    res.status(201).json({ success: true, data: row });
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ success: false, error: `A category named "${name}" already exists for this language.` });
+    }
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// PATCH /api/language-masterclass/:language/admin/categories/:id
+router.patch('/:language/admin/categories/:id', adminOnly, async (req, res) => {
+  const { language, id } = req.params;
+  const { name, description, difficulty, icon_emoji, order_index, is_active } = req.body;
+  try {
+    const row = await q1(`
+      UPDATE lang_categories SET
+        name        = COALESCE($1, name),
+        description = COALESCE($2, description),
+        difficulty  = COALESCE($3, difficulty),
+        icon_emoji  = COALESCE($4, icon_emoji),
+        order_index = COALESCE($5, order_index),
+        is_active   = COALESCE($6, is_active),
+        updated_at  = NOW()
+      WHERE id = $7 AND language = $8
+      RETURNING *
+    `, [name, description, difficulty, icon_emoji, order_index, is_active, id, language]);
+    if (!row) return res.status(404).json({ success: false, error: 'Category not found' });
+    res.json({ success: true, data: row });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// DELETE /api/language-masterclass/:language/admin/categories/:id
+router.delete('/:language/admin/categories/:id', adminOnly, async (req, res) => {
+  const { language, id } = req.params;
+  try {
+    await db.query(`DELETE FROM lang_categories WHERE id = $1 AND language = $2`, [id, language]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/language-masterclass/:language/admin/words?category_id=...
+router.get('/:language/admin/words', adminOnly, async (req, res) => {
+  const { language } = req.params;
+  const { category_id } = req.query;
+  try {
+    const rows = await q(`
+      SELECT w.*, c.name AS category_name
+        FROM lang_words w
+        JOIN lang_categories c ON c.id = w.category_id
+       WHERE c.language = $1
+       ${category_id ? 'AND w.category_id = $2' : ''}
+       ORDER BY c.order_index, w.word ASC
+    `, category_id ? [language, category_id] : [language]);
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/language-masterclass/:language/admin/words
+router.post('/:language/admin/words', adminOnly, async (req, res) => {
+  const { category_id, word, phonetic, definition, example_sentence, icon_emoji } = req.body;
+  if (!category_id || !word) return res.status(400).json({ success: false, error: 'category_id and word are required' });
+  try {
+    const row = await q1(`
+      INSERT INTO lang_words (category_id, word, phonetic, definition, example_sentence, icon_emoji, created_by)
+      VALUES ($1,$2,$3,$4,$5,$6,$7)
+      ON CONFLICT (category_id, word) DO NOTHING
+      RETURNING *
+    `, [category_id, word.trim(), phonetic, definition, example_sentence, icon_emoji || null, req.user.id]);
+    if (!row) return res.status(409).json({ success: false, error: 'Word already exists in this category' });
+    res.status(201).json({ success: true, data: row });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// PATCH /api/language-masterclass/:language/admin/words/:id
+router.patch('/:language/admin/words/:id', adminOnly, async (req, res) => {
+  const { word, phonetic, definition, example_sentence, icon_emoji, is_active } = req.body;
+  try {
+    const row = await q1(`
+      UPDATE lang_words SET
+        word             = COALESCE($1, word),
+        phonetic         = COALESCE($2, phonetic),
+        definition       = COALESCE($3, definition),
+        example_sentence = COALESCE($4, example_sentence),
+        icon_emoji       = COALESCE($5, icon_emoji),
+        is_active        = COALESCE($6, is_active),
+        updated_at       = NOW()
+      WHERE id = $7
+      RETURNING *
+    `, [word, phonetic, definition, example_sentence, icon_emoji, is_active, req.params.id]);
+    if (!row) return res.status(404).json({ success: false, error: 'Word not found' });
+    res.json({ success: true, data: row });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// DELETE /api/language-masterclass/:language/admin/words/:id
+router.delete('/:language/admin/words/:id', adminOnly, async (req, res) => {
+  try {
+    await db.query(`DELETE FROM lang_words WHERE id = $1`, [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/language-masterclass/:language/admin/generate-words
+// Admin: use Gemini to generate a word list for a category, in the target
+// language (not English) — the one real difference from EM's version of
+// this route.
+router.post('/:language/admin/generate-words', adminOnly, async (req, res) => {
+  const { language } = req.params;
+  const label = LANGUAGE_LABEL[language];
+  const { category_id, category_name, difficulty, count = 10 } = req.body;
+  if (!category_id || !category_name) {
+    return res.status(400).json({ success: false, error: 'category_id and category_name are required' });
+  }
+
+  try {
+    const prompt = `You are an expert ${label} language teacher creating vocabulary lists for learners around the world.
+
+Generate ${Math.min(count, 20)} ${label} vocabulary words/phrases for the category: "${category_name}" (difficulty: ${difficulty || 'Beginner'}).
+
+IMPORTANT:
+- The "word" field must be in ${label}, not English.
+- Phonetics should use standard IPA (or a clear romanization for non-Latin scripts).
+- Example sentences must be natural ${label} sentences using the word.
+- The definition should be in clear, simple English.
+
+Respond ONLY with a JSON array, no markdown, no extra text:
+[
+  {
+    "word": "the ${label} word or phrase",
+    "phonetic": "/IPA/ or romanization",
+    "definition": "Clear, simple English definition",
+    "example_sentence": "A natural ${label} example sentence"
+  }
+]`;
+
+    const raw     = await generate(prompt, 'generate-questions');
+    const cleaned = raw.replace(/```json|```/g, '').trim();
+    const words   = JSON.parse(cleaned);
+
+    if (!Array.isArray(words)) throw new Error('Gemini did not return an array');
+
+    const inserted = [];
+    for (const w of words) {
+      if (!w.word) continue;
+      try {
+        const row = await q1(`
+          INSERT INTO lang_words (category_id, word, phonetic, definition, example_sentence, created_by)
+          VALUES ($1,$2,$3,$4,$5,$6)
+          ON CONFLICT (category_id, word) DO NOTHING
+          RETURNING *
+        `, [category_id, w.word.trim(), w.phonetic, w.definition, w.example_sentence, req.user.id]);
+        if (row) inserted.push(row);
+      } catch (_) { /* skip individual insert errors */ }
+    }
+
+    res.json({
+      success:  true,
+      inserted: inserted.length,
+      skipped:  words.length - inserted.length,
+      data:     inserted,
+    });
+  } catch (err) {
+    console.error(`[LangMasterclass] POST /${language}/admin/generate-words`, err.message);
+    res.status(500).json({ success: false, error: 'AI generation failed: ' + err.message });
   }
 });
 
