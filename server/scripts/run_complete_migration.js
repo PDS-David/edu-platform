@@ -2310,12 +2310,25 @@ async function run() {
   // required so English doesn't lose these when it moves into lang_*, and
   // so the other 7 languages have somewhere for this data to land once
   // their backends grow these features.
+  //
+  // word_id below is INT, not UUID: lang_words.id is SERIAL (see "lang_words:
+  // create table" above), unlike em_words.id which is UUID. This block was
+  // originally copied from the em_word_progress/em_writing_submissions
+  // pattern and kept word_id as UUID, which meant these two CREATE TABLE
+  // statements always failed silently (exec() only logs failures, it never
+  // throws) -- so on every environment that ran this script, these two
+  // tables never actually existed, and every session save with per-word
+  // answers, or every writing-score submission, silently failed to persist
+  // progress/history from that point on. If you're running this after
+  // upgrading from a version with the bug, this fixed version will create
+  // the tables correctly on this run (IF NOT EXISTS never found them
+  // before, since the broken CREATE TABLE never succeeded).
   await exec('lang_writing_submissions: create table', `
     CREATE TABLE IF NOT EXISTS lang_writing_submissions (
       id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       user_id                 UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       language                VARCHAR(20) NOT NULL,
-      word_id                 UUID REFERENCES lang_words(id) ON DELETE SET NULL,
+      word_id                 INT REFERENCES lang_words(id) ON DELETE SET NULL,
       word_text               TEXT NOT NULL,
       prompt                  TEXT NOT NULL,
       submission_text         TEXT NOT NULL,
@@ -2339,7 +2352,7 @@ async function run() {
       id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       language          VARCHAR(20) NOT NULL,
-      word_id           UUID NOT NULL REFERENCES lang_words(id) ON DELETE CASCADE,
+      word_id           INT NOT NULL REFERENCES lang_words(id) ON DELETE CASCADE,
       correct_attempts  INTEGER NOT NULL DEFAULT 0,
       total_attempts    INTEGER NOT NULL DEFAULT 0,
       mastered          BOOLEAN NOT NULL DEFAULT false,
