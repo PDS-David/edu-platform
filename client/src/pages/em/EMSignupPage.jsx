@@ -1,5 +1,5 @@
 // client/src/pages/em/EMSignupPage.jsx
-// Standalone English Masterclass registration — creates its own account and
+// Standalone Language Masterclass registration — creates its own account and
 // grants EM access in one step. Deliberately independent of AISchoolonair's
 // /register: no shared form, no "create an account there first" hand-off.
 

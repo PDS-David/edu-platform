@@ -1,7 +1,8 @@
 // client/src/pages/lang/constants.js
-// Shared config for French/German Masterclass — the deliberately incomplete
-// proof-of-concept sibling to English Masterclass. See languageMasterclassRoutes.js
-// for the full "why incomplete" explanation; kept in sync with it here:
+// Shared config for Language Masterclass across all 8 languages. See
+// languageMasterclassRoutes.js's file header for what's real vs
+// placeholder per language (languages.supports_pronunciation/listening/
+// writing is the source of truth — this file is presentation only).
 // QUESTIONS_PER_LEVEL and UNLOCK_ACCURACY must match the backend's
 // QUESTIONS_PER_LEVEL / LEVEL_UNLOCK_ACCURACY exactly, or the progress bar
 // shown here would lie about what's actually needed to unlock a level.
@@ -10,6 +11,13 @@ export const QUESTIONS_PER_LEVEL = 30;
 export const UNLOCK_ACCURACY = 70;
 
 export const LANGUAGE_META = {
+  english: {
+    label: 'English Masterclass',
+    short: 'English',
+    flag: '🇬🇧',
+    accent: '#8B0000',
+    accentSoft: '#FBEAEA',
+  },
   french: {
     label: 'French Masterclass',
     short: 'French',
@@ -25,6 +33,42 @@ export const LANGUAGE_META = {
     flag: '🇩🇪',
     accent: '#DD0000',
     accentSoft: '#FCE8E8',
+  },
+  mandarin: {
+    label: 'Mandarin Masterclass',
+    short: 'Mandarin',
+    flag: '🇨🇳',
+    accent: '#DE2910',
+    accentSoft: '#FBEAE8',
+  },
+  arabic: {
+    label: 'Arabic Masterclass',
+    short: 'Arabic',
+    flag: '🇸🇦',
+    accent: '#006C35',
+    accentSoft: '#E5F2EB',
+    isRtl: true,
+  },
+  spanish: {
+    label: 'Spanish Masterclass',
+    short: 'Spanish',
+    flag: '🇪🇸',
+    accent: '#AA151B',
+    accentSoft: '#FBEAEA',
+  },
+  swahili: {
+    label: 'Swahili Masterclass',
+    short: 'Swahili',
+    flag: '🇰🇪',
+    accent: '#006600',
+    accentSoft: '#E6F2E6',
+  },
+  yoruba: {
+    label: 'Yoruba Masterclass',
+    short: 'Yoruba',
+    flag: '🇳🇬',
+    accent: '#008751',
+    accentSoft: '#E6F5EE',
   },
 };
 

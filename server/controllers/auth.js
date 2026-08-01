@@ -89,7 +89,13 @@ try {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function safeUser(row) {
+// Async because it needs one extra query to attach registeredLanguages —
+// every existing call site below is already inside an async handler and
+// already awaits other queries, so this doesn't change call-site shape
+// beyond adding `await`. Centralized here (rather than repeating the query
+// at all 5 call sites) so every response that returns a user object —
+// login, register, getMe, refresh — stays consistent by construction.
+async function safeUser(row) {
   const {
     password,
     failed_login_count, locked_until,
@@ -97,6 +103,15 @@ function safeUser(row) {
     verification_token,  verification_token_expires,
     ...safe
   } = row;
+  try {
+    const regs = await db.query(
+      `SELECT language FROM user_language_registrations WHERE user_id = :id`,
+      { replacements: { id: row.id }, type: QueryTypes.SELECT }
+    );
+    safe.registeredLanguages = regs.map((r) => r.language);
+  } catch {
+    safe.registeredLanguages = [];
+  }
   return safe;
 }
 
@@ -221,7 +236,7 @@ exports.register = async (req, res, next) => {
       }
     );
 
-    const user = safeUser(rows[0]);
+    const user = await safeUser(rows[0]);
     const { ipAddress, userAgent } = clientMeta(req);
 
     // AUTH-003: no remember-me on register — short-lived default
@@ -362,9 +377,17 @@ exports.registerForEnglishMasterclass = async (req, res, next) => {
       return res.status(409).json({ success: false, error: 'An account with that email already exists' });
     }
 
-    const user = safeUser(rows[0]);
+    const user = await safeUser(rows[0]);
     if (resolvedSchool) {
-      user.school = { id: resolvedSchool.id, name: resolvedSchool.name, logo_url: resolvedSchool.logo_url, enable_aischoolonair: resolvedSchool.enable_aischoolonair, enable_em: resolvedSchool.enable_em };
+      let enabledLanguages = [];
+      try {
+        const langRows = await db.query(
+          `SELECT language FROM school_enabled_languages WHERE school_id = :id`,
+          { replacements: { id: resolvedSchool.id }, type: QueryTypes.SELECT }
+        );
+        enabledLanguages = langRows.map((r) => r.language);
+      } catch { /* fail open, matches login/getMe's equivalent block */ }
+      user.school = { id: resolvedSchool.id, name: resolvedSchool.name, logo_url: resolvedSchool.logo_url, enable_aischoolonair: resolvedSchool.enable_aischoolonair, enable_em: resolvedSchool.enable_em, enabledLanguages };
     }
     const { ipAddress, userAgent } = clientMeta(req);
 
@@ -578,13 +601,33 @@ exports.login = async (req, res, next) => {
     // AUTH-004: refresh token in HttpOnly Secure cookie
     setRefreshCookie(res, refreshToken, !!rememberMe);
 
-    const user = safeUser(userRow);
+    const user = await safeUser(userRow);
     // Surfaced to the client so route guards (e.g. EMPrivateRoute) can show
     // their own closed door immediately on navigation — not just at the
     // login form — without a second round trip. Only present for tenant
     // accounts; omitted (undefined) for standalone users and App Admin.
     if (school) {
-      user.school = { id: school.id, name: school.name, logo_url: school.logo_url, enable_aischoolonair: school.enable_aischoolonair, enable_em: school.enable_em };
+      let enabledLanguages = [];
+      try {
+        const langRows = await db.query(
+          `SELECT language FROM school_enabled_languages WHERE school_id = :id`,
+          { replacements: { id: school.id }, type: QueryTypes.SELECT }
+        );
+        enabledLanguages = langRows.map((r) => r.language);
+      } catch { /* fail open, same as protect middleware's equivalent block */ }
+      user.school = { id: school.id, name: school.name, logo_url: school.logo_url, enable_aischoolonair: school.enable_aischoolonair, enable_em: school.enable_em, enabledLanguages };
+    }
+    // registeredLanguages: mirrors what `protect` attaches to req.user on
+    // every subsequent request — populated here too so it's present from
+    // the very first response after login, not just after the next /me call.
+    try {
+      const regRows = await db.query(
+        `SELECT language FROM user_language_registrations WHERE user_id = :id`,
+        { replacements: { id: userRow.id }, type: QueryTypes.SELECT }
+      );
+      user.registeredLanguages = regRows.map((r) => r.language);
+    } catch {
+      user.registeredLanguages = [];
     }
     return res.status(200).json({ success: true, token: accessToken, user });
 
@@ -708,15 +751,23 @@ exports.getMe = async (req, res, next) => {
       { replacements: { id: req.user.id }, type: QueryTypes.SELECT }
     );
     if (!rows.length) return res.status(404).json({ success: false, error: 'User not found' });
-    const user = safeUser(rows[0]);
+    const user = await safeUser(rows[0]);
     // req.school is populated by the `protect` middleware for any
     // student/teacher/school_admin with a school_id — reuse it here rather
     // than a second query, same shape as the login response so client route
     // guards (EMPrivateRoute, etc.) work the same on page refresh as they
     // do right after login.
     if (req.school) {
-      user.school = { id: rows[0].school_id, name: req.school.name, logo_url: req.school.logo_url, enable_aischoolonair: req.school.enable_aischoolonair, enable_em: req.school.enable_em };
+      user.school = {
+        id: rows[0].school_id, name: req.school.name, logo_url: req.school.logo_url,
+        enable_aischoolonair: req.school.enable_aischoolonair, enable_em: req.school.enable_em,
+        enabledLanguages: req.school.enabledLanguages || [],
+      };
     }
+    // registeredLanguages: populated by `protect` from user_language_registrations.
+    // Powers the new /language/:code route guard + StudentDashboard's
+    // language dropdown — see LanguageMasterclass.jsx and StudentDashboard.jsx.
+    user.registeredLanguages = req.user.registeredLanguages || [];
     return res.status(200).json({ success: true, user });
   } catch (err) {
     console.error('[getMe]', err.message);

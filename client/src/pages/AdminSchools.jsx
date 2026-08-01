@@ -169,7 +169,7 @@ function CreateSchoolModal({ onClose, onCreated }) {
               <label className="flex items-center gap-2.5 px-3 py-2.5 border border-gray-200 rounded-lg cursor-pointer hover:border-indigo-300 transition-colors">
                 <input type="checkbox" checked={form.enable_em} onChange={toggle('enable_em')}
                   className="w-4 h-4 accent-indigo-600" />
-                <span className="text-sm text-gray-700">Language Masterclass</span>
+                <span className="text-sm text-gray-700">Language Masterclass (English)</span>
               </label>
             </div>
             {!form.enable_aischoolonair && !form.enable_em && (
@@ -211,7 +211,7 @@ function JoinCodeReveal({ school, onClose }) {
             <span className="px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-600 text-xs font-semibold">AISchoolonair</span>
           )}
           {school.enable_em && (
-            <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 text-xs font-semibold">Language Masterclass</span>
+            <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 text-xs font-semibold">Language Masterclass (English)</span>
           )}
         </div>
         <div className="flex items-center justify-center gap-2 bg-gray-50 border border-gray-200 rounded-xl py-3 px-4 mb-5">
@@ -522,7 +522,7 @@ function SchoolRow({ school, onServicesUpdated, onDetailsUpdated, onDeleted }) {
                     <input type="checkbox" checked={svcForm.enable_em}
                       onChange={() => setSvcForm(f => ({ ...f, enable_em: !f.enable_em }))}
                       className="w-3.5 h-3.5 accent-indigo-600" />
-                    Language Masterclass
+                    Language Masterclass (English)
                   </label>
                 </div>
                 <div className="flex items-center gap-2">
@@ -549,7 +549,7 @@ function SchoolRow({ school, onServicesUpdated, onDetailsUpdated, onDeleted }) {
                   <span className="text-gray-700">{u.first_name} {u.last_name} <span className="text-gray-400">({u.email})</span></span>
                   <div className="flex items-center gap-1.5">
                     {u.uses_english_masterclass && (
-                      <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 font-semibold" title="Also uses Language Masterclass">
+                      <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 font-semibold" title="Also uses Language Masterclass (English)">
                         EM
                       </span>
                     )}

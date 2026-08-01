@@ -1,5 +1,5 @@
 // client/src/pages/em/EMRegisterPage.jsx
-// One-time English Masterclass registration step.
+// One-time Language Masterclass registration step.
 //
 // The user already has a valid AISchoolOnAir session at this point (this
 // page lives behind EMPrivateRoute), but that account alone does not grant

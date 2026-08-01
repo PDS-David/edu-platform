@@ -551,8 +551,8 @@ export default function AdminEnglishMasterclass() {
             <span className="text-lg">🎓</span>
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Language Masterclass</h1>
-            <p className="text-xs text-gray-500">Manage vocabulary categories and words</p>
+            <h1 className="text-xl font-bold text-gray-900">Language Masterclass — English Content</h1>
+            <p className="text-xs text-gray-500">Manage vocabulary categories and words (English only — the other 7 languages don't have an admin CMS yet)</p>
           </div>
         </div>
         <button onClick={() => setShowAddCat(s => !s)}

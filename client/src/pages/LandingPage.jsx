@@ -130,7 +130,7 @@ export default function LandingPage() {
               {/* Just "Login" — there is one login now (getPostAuthRedirect
                   decides where an authenticated account goes, including a
                   chooser if it has both products). Previously this nav
-                  named both AISchoolonair and English Masterclass directly,
+                  named both AISchoolonair and Language Masterclass directly,
                   and "Start Free" was a dropdown asking a visitor to pick a
                   product before they'd even logged in — exposing both
                   products to every visitor regardless of which one (if
@@ -396,7 +396,7 @@ export default function LandingPage() {
               <Crown size={12} /> New · English Fluency Training
             </span>
             <h2 className="text-2xl sm:text-3xl font-extrabold leading-tight">
-              Master Languages with Language Masterclass
+              Master English with Language Masterclass
             </h2>
             <p className="text-sm sm:text-base leading-relaxed max-w-lg" style={{ color: SOVEREIGN[200] }}>
               A standalone vocabulary and pronunciation trainer built for non-native English
