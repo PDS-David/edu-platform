@@ -394,7 +394,7 @@ exports.registerForEnglishMasterclass = async (req, res, next) => {
     try {
       await db.query(
         `INSERT INTO user_language_registrations (user_id, language, registered_at)
-         VALUES (:id, 'english', NOW())
+         SELECT id, 'english', em_registered_at FROM users WHERE id = :id
          ON CONFLICT (user_id, language) DO NOTHING`,
         { replacements: { id: rows[0].id } }
       );
