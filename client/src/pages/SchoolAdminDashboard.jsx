@@ -13,6 +13,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/apiClient';
+import AssignExamTypeModal from '../components/AssignExamTypeModal';
 import {
   School, Users, GraduationCap, UserCheck, Copy, Check,
   Loader2, LogOut, AlertCircle, Plus, X, Image as ImageIcon, FileText,
@@ -385,6 +386,9 @@ export default function SchoolAdminDashboard() {
   const [showInvite, setShowInvite] = useState(false);
   const [logoSaving, setLogoSaving] = useState(false);
   const [logoError, setLogoError] = useState('');
+  // Phase 3 Step 5: shared assign-exam-type modal, keyed to which student
+  // row triggered it (or null when closed).
+  const [assigningStudent, setAssigningStudent] = useState(null);
 
   const loadRoster = () => {
     api.get('/schools/me/roster')
@@ -574,10 +578,16 @@ export default function SchoolAdminDashboard() {
                         {u.role.replace('_', ' ')}
                       </span>
                       {u.role === 'student' && (
-                        <Link to={`/school-admin/students/${u.id}`} state={{ student: u }}
-                          className="flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors shrink-0">
-                          <FileText size={12} /> Report
-                        </Link>
+                        <>
+                          <button onClick={() => setAssigningStudent(u)}
+                            className="flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors shrink-0">
+                            <GraduationCap size={12} /> Assign Exam Type
+                          </button>
+                          <Link to={`/school-admin/students/${u.id}`} state={{ student: u }}
+                            className="flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors shrink-0">
+                            <FileText size={12} /> Report
+                          </Link>
+                        </>
                       )}
                     </div>
                   </div>
@@ -597,6 +607,15 @@ export default function SchoolAdminDashboard() {
             setShowInvite(false);
             loadRoster();
           }}
+        />
+      )}
+
+      {assigningStudent && (
+        <AssignExamTypeModal
+          studentId={assigningStudent.id}
+          studentName={`${assigningStudent.first_name} ${assigningStudent.last_name}`}
+          onClose={() => setAssigningStudent(null)}
+          onAssigned={loadRoster}
         />
       )}
     </div>
