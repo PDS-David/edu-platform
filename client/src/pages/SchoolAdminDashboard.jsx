@@ -16,7 +16,275 @@ import api from '../services/apiClient';
 import {
   School, Users, GraduationCap, UserCheck, Copy, Check,
   Loader2, LogOut, AlertCircle, Plus, X, Image as ImageIcon, FileText,
+  BookOpen, ChevronRight, Trash2,
 } from 'lucide-react';
+
+// ─── Phase 2: School-Owned Classes ──────────────────────────────────────────
+
+function CreateClassModal({ teachers, onClose, onCreated }) {
+  const [form, setForm] = useState({ name: '', teacher_id: '' });
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState('');
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const res = await api.post('/schools/me/classes', {
+        name: form.name,
+        teacher_id: form.teacher_id || undefined,
+      });
+      onCreated(res.data);
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Could not create class.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-gray-900">Create a Class</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X size={20} />
+          </button>
+        </div>
+
+        {error && (
+          <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        )}
+
+        <form onSubmit={submit} className="space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Class Name *</label>
+            <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Teacher (optional)</label>
+            <select value={form.teacher_id} onChange={e => setForm(f => ({ ...f, teacher_id: e.target.value }))}
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100">
+              <option value="">No teacher assigned</option>
+              {teachers.map(t => (
+                <option key={t.id} value={t.id}>{t.first_name} {t.last_name}</option>
+              ))}
+            </select>
+          </div>
+          <button type="submit" disabled={!form.name.trim() || loading}
+            className="w-full mt-2 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold disabled:opacity-40 transition-colors flex items-center justify-center gap-2">
+            {loading ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+            {loading ? 'Creating…' : 'Create Class'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function ClassMembersModal({ cls, students, onClose, onChanged }) {
+  const [members, setMembers]   = useState(null);
+  const [selected, setSelected] = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [saving, setSaving]     = useState(false);
+  const [error, setError]       = useState('');
+
+  const loadMembers = () => {
+    setLoading(true);
+    api.get(`/schools/me/classes/${cls.id}/students`)
+      .then(res => setMembers(res.data || []))
+      .catch(err => setError(err?.response?.data?.error || 'Could not load members.'))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { loadMembers(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [cls.id]);
+
+  const memberIds = new Set((members || []).map(m => m.id));
+  const available = students.filter(s => !memberIds.has(s.id));
+
+  const addSelected = async () => {
+    if (!selected.length) return;
+    setSaving(true);
+    setError('');
+    try {
+      await api.post(`/schools/me/classes/${cls.id}/students`, { student_ids: selected });
+      setSelected([]);
+      loadMembers();
+      onChanged();
+    } catch (err) {
+      setError(err?.response?.data?.error || 'Could not add students.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const removeMember = async (studentId) => {
+    setError('');
+    try {
+      await api.delete(`/schools/me/classes/${cls.id}/students/${studentId}`);
+      loadMembers();
+      onChanged();
+    } catch (err) {
+      setError(err?.response?.data?.error || 'Could not remove student.');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40">
+      <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-gray-900">{cls.name}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X size={20} />
+          </button>
+        </div>
+
+        {error && (
+          <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        )}
+
+        {loading ? (
+          <div className="flex items-center justify-center py-10">
+            <Loader2 size={18} className="animate-spin text-gray-400" />
+          </div>
+        ) : (
+          <>
+            <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">
+              Members ({(members || []).length})
+            </p>
+            <div className="divide-y divide-gray-50 mb-4 max-h-40 overflow-y-auto">
+              {(members || []).length === 0 && (
+                <p className="text-sm text-gray-400 py-3">No students in this class yet.</p>
+              )}
+              {(members || []).map(m => (
+                <div key={m.id} className="flex items-center justify-between py-2 text-sm">
+                  <span className="text-gray-800">{m.first_name} {m.last_name}</span>
+                  <button onClick={() => removeMember(m.id)} className="text-gray-300 hover:text-red-500 transition-colors">
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Add students</p>
+            <div className="border border-gray-100 rounded-xl divide-y divide-gray-50 mb-3 max-h-40 overflow-y-auto">
+              {available.length === 0 && (
+                <p className="text-sm text-gray-400 py-3 px-3">Every student in your school is already in this class.</p>
+              )}
+              {available.map(s => (
+                <label key={s.id} className="flex items-center gap-2 py-2 px-3 text-sm cursor-pointer">
+                  <input type="checkbox" className="accent-indigo-600"
+                    checked={selected.includes(s.id)}
+                    onChange={e => setSelected(sel => e.target.checked ? [...sel, s.id] : sel.filter(id => id !== s.id))} />
+                  <span className="text-gray-700">{s.first_name} {s.last_name}</span>
+                </label>
+              ))}
+            </div>
+            <button onClick={addSelected} disabled={!selected.length || saving}
+              className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold disabled:opacity-40 transition-colors flex items-center justify-center gap-2">
+              {saving ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+              {saving ? 'Adding…' : `Add ${selected.length || ''} Selected`}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ClassesSection({ teachers, students }) {
+  const [classes, setClasses] = useState(null);
+  const [error, setError]     = useState('');
+  const [showCreate, setShowCreate] = useState(false);
+  const [openClass, setOpenClass]   = useState(null);
+
+  const loadClasses = () => {
+    api.get('/schools/me/classes')
+      .then(res => setClasses(res.data || []))
+      .catch(err => setError(err?.response?.data?.error || 'Could not load classes.'));
+  };
+
+  useEffect(() => { loadClasses(); }, []);
+
+  return (
+    <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-4 mt-4">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-xs font-bold uppercase tracking-wide text-gray-400">Classes</p>
+        <button onClick={() => setShowCreate(true)}
+          className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors">
+          <Plus size={14} /> Create Class
+        </button>
+      </div>
+
+      {error && (
+        <div className="mb-3 p-3 rounded-xl bg-red-50 border border-red-200 flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+          <p className="text-sm text-red-700">{error}</p>
+        </div>
+      )}
+
+      {classes === null && (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 size={18} className="animate-spin text-gray-400" />
+        </div>
+      )}
+
+      {classes && classes.length === 0 && (
+        <p className="text-sm text-gray-400 py-6 text-center">
+          No classes yet. Create one to start grouping students, with or without a teacher.
+        </p>
+      )}
+
+      {classes && classes.length > 0 && (
+        <div className="divide-y divide-gray-50">
+          {classes.map(c => (
+            <button key={c.id} onClick={() => setOpenClass(c)}
+              className="w-full flex items-center justify-between py-2.5 text-sm text-left hover:bg-gray-50 rounded-lg px-2 -mx-2 transition-colors">
+              <div className="flex items-center gap-2">
+                <BookOpen size={14} className="text-indigo-400" />
+                <span className="text-gray-800">{c.name}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-gray-400">
+                  {c.teacher_first_name ? `${c.teacher_first_name} ${c.teacher_last_name}` : 'No teacher assigned'}
+                </span>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
+                  {c.student_count} student{c.student_count === 1 ? '' : 's'}
+                </span>
+                <ChevronRight size={14} className="text-gray-300" />
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {showCreate && (
+        <CreateClassModal
+          teachers={teachers}
+          onClose={() => setShowCreate(false)}
+          onCreated={() => { setShowCreate(false); loadClasses(); }}
+        />
+      )}
+
+      {openClass && (
+        <ClassMembersModal
+          cls={openClass}
+          students={students}
+          onClose={() => setOpenClass(null)}
+          onChanged={loadClasses}
+        />
+      )}
+    </div>
+  );
+}
 
 function InviteModal({ onClose, onCreated }) {
   const [form, setForm] = useState({ role: 'teacher', email: '', password: '', first_name: '', last_name: '' });
@@ -316,6 +584,8 @@ export default function SchoolAdminDashboard() {
                 ))}
               </div>
             </div>
+
+            <ClassesSection teachers={teachers} students={students} />
           </>
         )}
       </div>
