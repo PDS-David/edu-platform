@@ -178,16 +178,14 @@ router.post('/register', protect, authorize('admin'), authLimiter, logoUpload.si
 // school by entering its join_code. Purely opt-in — never touches an account
 // that doesn't explicitly call this.
 router.post('/join', protect, schoolJoinLimiter, async (req, res) => {
-  // Phase 3 Step 4: self-service lockdown, same guard/message as
-  // studentRoutes.js's POST /subjects and DELETE /subjects/:subjectId.
-  // Teachers can still self-join via this route — only students are
-  // affected, per the phase spec.
-  if (req.user?.role === 'student') {
-    return res.status(403).json({
-      success: false,
-      error: 'Your exam type and subjects are managed by your school or app administrator',
-    });
-  }
+  // Phase 3 follow-up: the original Step 4 guard blocked every student from
+  // this route, which broke legitimate join-by-code onboarding — this is the
+  // only join-by-code endpoint in the app (JoinSchoolPage.jsx calls it) and
+  // is distinct from exam-type/subject self-service, which stays locked down
+  // via studentRoutes.js's POST /subjects, DELETE /subjects/:subjectId, and
+  // POST /exam-types/:examTypeId/join. A valid join_code (below) is the gate
+  // here, not the caller's role — students can self-join a school by code,
+  // same as teachers.
   const { join_code } = req.body || {};
   if (!join_code) {
     return res.status(400).json({ success: false, error: 'join_code is required' });

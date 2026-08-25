@@ -437,6 +437,15 @@ module.exports.ensureEnrollmentColumns = ensureEnrollmentColumns;
 // Reuses the exact same student_exam_types upsert as POST /subjects so both
 // paths produce identical board-membership state.
 router.post('/exam-types/:examTypeId/join', protect, studentOnly, async (req, res) => {
+  // Phase 3 follow-up: this route upserts student_exam_types directly and was
+  // missed by the original self-service lockdown (only POST /subjects and its
+  // frontend caller were closed). Same guard/message as those routes.
+  if (req.user?.role === 'student') {
+    return res.status(403).json({
+      success: false,
+      error: 'Your exam type and subjects are managed by your school or app administrator',
+    });
+  }
   const studentId  = req.user.id;
   const examTypeId = parseInt(req.params.examTypeId);
   if (!examTypeId) {
