@@ -728,4 +728,252 @@ router.post('/me/invite', protect, requireSchoolAdmin, async (req, res) => {
   }
 });
 
+// ─── PHASE 2 — School-Owned Classes ─────────────────────────────────────────
+// Lets a school_admin create and manage classes that belong to their school,
+// with teacher assignment optional. Entirely additive on top of the existing
+// `classes` / `class_memberships` tables (migration_007_school_classes.sql) —
+// every endpoint below is scoped to req.user.school_id and never trusts a
+// school_id from the request body. Teacher-owned classes created via
+// server/routes/teacherRoutes.js (school_id IS NULL) are untouched by any of
+// this — that file's routes/behavior are unmodified.
+
+// ─── POST /api/schools/me/classes ───────────────────────────────────────────
+// school_admin only. Creates a class owned by the caller's school. teacher_id
+// is optional; if provided, the target user must be a teacher in the same
+// school.
+router.post('/me/classes', protect, requireSchoolAdmin, async (req, res) => {
+  const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+  const { teacher_id } = req.body || {};
+
+  if (!name) {
+    return res.status(400).json({ success: false, error: 'name is required' });
+  }
+
+  try {
+    if (teacher_id) {
+      const teacherCheck = await q(
+        `SELECT id FROM users WHERE id = $1 AND role = 'teacher' AND school_id = $2`,
+        [teacher_id, req.user.school_id]
+      );
+      if (!teacherCheck.length) {
+        return res.status(400).json({ success: false, error: 'teacher_id must be a teacher in your school' });
+      }
+    }
+
+    // Ensure a unique join code (retry a few times on the rare collision) —
+    // same approach as POST /register above.
+    let joinCode, attempts = 0;
+    do {
+      joinCode = generateJoinCode();
+      const existing = await q(`SELECT 1 FROM classes WHERE join_code = $1`, [joinCode]);
+      if (existing.length === 0) break;
+      attempts++;
+    } while (attempts < 5);
+
+    const [inserted] = await sequelize.query(
+      `INSERT INTO classes (school_id, created_by, teacher_id, name, join_code, subject_ids, created_at)
+       VALUES ($1, $2, $3, $4, $5, '[]', NOW())
+       RETURNING id, school_id, teacher_id, name, join_code, created_at`,
+      {
+        bind: [req.user.school_id, req.user.id, teacher_id || null, name, joinCode],
+        type: sequelize.QueryTypes.INSERT,
+      }
+    );
+    const cls = inserted[0] || inserted; // pg returns rows directly for RETURNING
+    return res.status(201).json({ success: true, data: { ...cls, student_count: 0 } });
+  } catch (err) {
+    console.error('[schools] POST /me/classes', err.message);
+    return res.status(500).json({ success: false, error: 'Could not create class' });
+  }
+});
+
+// ─── GET /api/schools/me/classes ────────────────────────────────────────────
+// school_admin only. Lists the caller's school's classes with student count
+// and assigned teacher name (if any).
+router.get('/me/classes', protect, requireSchoolAdmin, async (req, res) => {
+  try {
+    const rows = await q(
+      `SELECT c.id, c.name, c.join_code, c.teacher_id, c.created_at,
+              t.first_name AS teacher_first_name, t.last_name AS teacher_last_name,
+              COUNT(cm.student_id)::INTEGER AS student_count
+         FROM classes c
+         LEFT JOIN users t ON t.id = c.teacher_id
+         LEFT JOIN class_memberships cm ON cm.class_id = c.id
+        WHERE c.school_id = $1
+        GROUP BY c.id, t.first_name, t.last_name
+        ORDER BY c.created_at DESC`,
+      [req.user.school_id]
+    );
+    return res.json({ success: true, data: rows });
+  } catch (err) {
+    console.error('[schools] GET /me/classes', err.message);
+    return res.status(500).json({ success: false, error: 'Could not load classes' });
+  }
+});
+
+// ─── PATCH /api/schools/me/classes/:id ──────────────────────────────────────
+// school_admin only, own school's classes. Updates name and/or teacher_id.
+// Ownership is verified BEFORE any update — a class from a different school
+// (or a teacher-owned class with school_id NULL) returns 404, never touched.
+router.patch('/me/classes/:id', protect, requireSchoolAdmin, async (req, res) => {
+  const name = typeof req.body?.name === 'string' ? req.body.name.trim() : undefined;
+  const teacherIdProvided = Object.prototype.hasOwnProperty.call(req.body || {}, 'teacher_id');
+  const teacher_id = teacherIdProvided ? req.body.teacher_id : undefined;
+
+  if (name === undefined && teacher_id === undefined) {
+    return res.status(400).json({ success: false, error: 'Nothing to update — provide name and/or teacher_id' });
+  }
+  if (name !== undefined && !name) {
+    return res.status(400).json({ success: false, error: 'name cannot be empty' });
+  }
+
+  try {
+    const owned = await q(`SELECT id FROM classes WHERE id = $1 AND school_id = $2`, [req.params.id, req.user.school_id]);
+    if (!owned.length) {
+      return res.status(404).json({ success: false, error: 'Class not found in your school' });
+    }
+
+    if (teacherIdProvided && teacher_id) {
+      const teacherCheck = await q(
+        `SELECT id FROM users WHERE id = $1 AND role = 'teacher' AND school_id = $2`,
+        [teacher_id, req.user.school_id]
+      );
+      if (!teacherCheck.length) {
+        return res.status(400).json({ success: false, error: 'teacher_id must be a teacher in your school' });
+      }
+    }
+
+    const rows = await q(
+      `UPDATE classes SET
+         name       = COALESCE($1, name),
+         teacher_id = CASE WHEN $2 THEN $3 ELSE teacher_id END
+       WHERE id = $4 AND school_id = $5
+       RETURNING id, school_id, teacher_id, name, join_code, created_at`,
+      [name ?? null, teacherIdProvided, teacher_id || null, req.params.id, req.user.school_id]
+    );
+    return res.json({ success: true, data: rows[0] });
+  } catch (err) {
+    console.error('[schools] PATCH /me/classes/:id', err.message);
+    return res.status(500).json({ success: false, error: 'Could not update class' });
+  }
+});
+
+// ─── DELETE /api/schools/me/classes/:id ─────────────────────────────────────
+// school_admin only, own school's classes. Ownership verified first; delete
+// cascades to class_memberships per the existing FK (ON DELETE CASCADE).
+router.delete('/me/classes/:id', protect, requireSchoolAdmin, async (req, res) => {
+  try {
+    const owned = await q(`SELECT id FROM classes WHERE id = $1 AND school_id = $2`, [req.params.id, req.user.school_id]);
+    if (!owned.length) {
+      return res.status(404).json({ success: false, error: 'Class not found in your school' });
+    }
+    await sequelize.query(
+      `DELETE FROM classes WHERE id = $1 AND school_id = $2`,
+      { bind: [req.params.id, req.user.school_id], type: sequelize.QueryTypes.DELETE }
+    );
+    return res.json({ success: true, data: { deleted: true } });
+  } catch (err) {
+    console.error('[schools] DELETE /me/classes/:id', err.message);
+    return res.status(500).json({ success: false, error: 'Could not delete class' });
+  }
+});
+
+// ─── POST /api/schools/me/classes/:id/students ──────────────────────────────
+// school_admin only. Adds one or more students to a class the caller's
+// school owns. Every student_id must belong to the caller's school — if any
+// don't, the WHOLE request is rejected (400, listing which ids failed) and
+// nothing is added, rather than partially adding the valid ones.
+router.post('/me/classes/:id/students', protect, requireSchoolAdmin, async (req, res) => {
+  const studentIds = Array.isArray(req.body?.student_ids) ? req.body.student_ids : [];
+  if (!studentIds.length) {
+    return res.status(400).json({ success: false, error: 'student_ids must be a non-empty array' });
+  }
+
+  try {
+    const owned = await q(`SELECT id FROM classes WHERE id = $1 AND school_id = $2`, [req.params.id, req.user.school_id]);
+    if (!owned.length) {
+      return res.status(404).json({ success: false, error: 'Class not found in your school' });
+    }
+
+    const validStudents = await q(
+      `SELECT id FROM users WHERE id = ANY($1::uuid[]) AND role = 'student' AND school_id = $2`,
+      [studentIds, req.user.school_id]
+    );
+    const validIds = new Set(validStudents.map(s => s.id));
+    const failedIds = studentIds.filter(id => !validIds.has(id));
+    if (failedIds.length) {
+      return res.status(400).json({
+        success: false,
+        error: 'Some student_ids are not students in your school',
+        failed_ids: failedIds,
+      });
+    }
+
+    const t = await sequelize.transaction();
+    try {
+      for (const studentId of studentIds) {
+        await sequelize.query(
+          `INSERT INTO class_memberships (class_id, student_id, joined_at)
+           VALUES ($1, $2, NOW())
+           ON CONFLICT (class_id, student_id) DO NOTHING`,
+          { bind: [req.params.id, studentId], type: sequelize.QueryTypes.INSERT, transaction: t }
+        );
+      }
+      await t.commit();
+    } catch (err) {
+      await t.rollback();
+      throw err;
+    }
+
+    return res.status(201).json({ success: true, data: { added: studentIds.length } });
+  } catch (err) {
+    console.error('[schools] POST /me/classes/:id/students', err.message);
+    return res.status(500).json({ success: false, error: 'Could not add students to class' });
+  }
+});
+
+// ─── DELETE /api/schools/me/classes/:id/students/:studentId ────────────────
+// school_admin only. Removes one membership row; class ownership is verified
+// first (same as every other /me/classes/:id endpoint above).
+router.delete('/me/classes/:id/students/:studentId', protect, requireSchoolAdmin, async (req, res) => {
+  try {
+    const owned = await q(`SELECT id FROM classes WHERE id = $1 AND school_id = $2`, [req.params.id, req.user.school_id]);
+    if (!owned.length) {
+      return res.status(404).json({ success: false, error: 'Class not found in your school' });
+    }
+    await sequelize.query(
+      `DELETE FROM class_memberships WHERE class_id = $1 AND student_id = $2`,
+      { bind: [req.params.id, req.params.studentId], type: sequelize.QueryTypes.DELETE }
+    );
+    return res.json({ success: true, data: { removed: true } });
+  } catch (err) {
+    console.error('[schools] DELETE /me/classes/:id/students/:studentId', err.message);
+    return res.status(500).json({ success: false, error: 'Could not remove student from class' });
+  }
+});
+
+// ─── GET /api/schools/me/classes/:id/students ───────────────────────────────
+// school_admin only. Lists a class's members via join to users. Ownership of
+// the class is verified first, same as the other :id endpoints above.
+router.get('/me/classes/:id/students', protect, requireSchoolAdmin, async (req, res) => {
+  try {
+    const owned = await q(`SELECT id FROM classes WHERE id = $1 AND school_id = $2`, [req.params.id, req.user.school_id]);
+    if (!owned.length) {
+      return res.status(404).json({ success: false, error: 'Class not found in your school' });
+    }
+    const rows = await q(
+      `SELECT u.id, u.first_name, u.last_name, u.email, cm.joined_at
+         FROM class_memberships cm
+         JOIN users u ON u.id = cm.student_id
+        WHERE cm.class_id = $1
+        ORDER BY cm.joined_at DESC`,
+      [req.params.id]
+    );
+    return res.json({ success: true, data: rows });
+  } catch (err) {
+    console.error('[schools] GET /me/classes/:id/students', err.message);
+    return res.status(500).json({ success: false, error: 'Could not load class students' });
+  }
+});
+
 module.exports = router;
