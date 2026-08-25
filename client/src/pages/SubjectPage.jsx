@@ -65,7 +65,7 @@ export default function SubjectPage() {
 
   const modeConfig = {
     resources: { label: 'Resources',          icon: BookOpen,      color: 'bg-blue-600',   tab: 'resources' },
-    practice:  { label: 'Practice Questions', icon: ClipboardList, color: 'bg-violet-600', tab: 'practice'  },
+    practice:  { label: 'Test-Yourself',      icon: ClipboardList, color: 'bg-violet-600', tab: 'practice'  },
     quiz:      { label: 'Quiz',               icon: Zap,           color: 'bg-amber-500',  tab: 'quiz'      },
   };
 
