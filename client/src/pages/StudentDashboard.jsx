@@ -21,7 +21,7 @@ import { openResourceAuth } from "../utils/authenticatedDownload";
 import {
   FileText, Video, Music, File, Download,
   Zap, ClipboardList, ClipboardCheck, History, BookMarked, BarChart2, BookOpen, TrendingUp,
-  Flame, Target, GraduationCap, ScanLine, Menu, X,
+  Flame, Target, GraduationCap, ScanLine, Menu, X, ChevronDown,
   AlertCircle, RefreshCw, Settings, School,
 } from "lucide-react";
 
@@ -601,22 +601,31 @@ export default function StudentDashboard() {
       .catch(() => {});
   }, []);
 
+  // Phase 1 nav restructure: Resources, Test-Yourself (formerly Practice),
+  // Past Papers, Mock Exam, and AI Marking now live as children under the
+  // "Subjects" group. "Subjects" itself keeps its existing direct link.
+  // "Exam Types" and "Join a School" nav entries are removed here — their
+  // routes/components are untouched and still reachable by direct URL
+  // (locked down in a later phase, not this one).
   const sidebarItems = [
     { label: "Dashboard",   icon: BarChart2,    path: "/student/dashboard"  },
-    { label: "Subjects",    icon: GraduationCap, path: "/student/subjects"  },
-    { label: "Resources",   icon: BookOpen,     path: "/student/resources"  },
-    { label: "Practice",    icon: Zap,          path: "/student/practice"   },
-    { label: "Past Papers", icon: FileText,     path: "/past-papers"        },
-    { label: "Mock Exam",    icon: ClipboardList,  path: null, onClick: () => setShowMockPicker(true) },
+    {
+      label: "Subjects", icon: GraduationCap, path: "/student/subjects",
+      children: [
+        { label: "Resources",     icon: BookOpen,       path: "/student/resources" },
+        { label: "Test-Yourself", icon: Zap,            path: "/student/practice"  },
+        { label: "Past Papers",   icon: FileText,       path: "/past-papers"       },
+        { label: "Mock Exam",     icon: ClipboardList,  path: null, onClick: () => setShowMockPicker(true) },
+        { label: "AI Marking",    icon: ScanLine,       path: "/student/mark-image" },
+      ],
+    },
     { label: "Mock History", icon: History,        path: "/student/mock-history"  },
     { label: "My Tests",     icon: ClipboardCheck, path: "/student/my-tests"     },
     { label: "Quiz History", icon: BookMarked,     path: "/student/quiz-history" },
     { label: "Analytics",    icon: TrendingUp,     path: "/student/analytics"    },
-    { label: "AI Marking",  icon: ScanLine,     path: "/student/mark-image" },
-    { label: "Exam Types",         icon: Download,   path: "/student/exam-types"         },
-    { label: "Join a School", icon: School,     path: "/join-school"                },
-
   ];
+
+  const [subjectsOpen, setSubjectsOpen] = useState(false);
 
   const isActive = (item) => {
     if (!item.path) return false;
@@ -630,6 +639,66 @@ export default function StudentDashboard() {
     if (item.onClick) { item.onClick(); return; }
     navigate(item.path);
     setDrawerOpen(false);
+  };
+
+  // Shared renderer for both the mobile drawer and desktop sidebar so the
+  // two surfaces can't drift out of sync. Handles plain items and the new
+  // collapsible "Subjects" group (children rendering, expand/collapse,
+  // auto-open when a child route is already active).
+  const renderNavItem = (item) => {
+    if (item.children) {
+      const Icon = item.icon;
+      const childActive = item.children.some(isActive);
+      const active = isActive(item) || childActive;
+      const open = subjectsOpen || childActive;
+      return (
+        <div key={item.label}>
+          <div className={`w-full flex items-center rounded-lg text-sm transition-all ${
+            active ? "bg-white text-[#1a1a1a] font-semibold shadow-sm border border-[#e8e4dd]" : "text-[#6b6259] hover:text-[#1a1a1a] hover:bg-white/60"
+          }`}>
+            <button onClick={() => handleNav(item)}
+              className="flex-1 flex items-center gap-3 px-3 py-2.5 text-left min-w-0">
+              <Icon size={14} className={active ? "text-[#d97757]" : "text-[#b5a99a]"} />
+              {item.label}
+            </button>
+            <button onClick={() => setSubjectsOpen(o => !o)}
+              aria-label={open ? "Collapse Subjects" : "Expand Subjects"}
+              className="px-2.5 py-2.5 shrink-0">
+              <ChevronDown size={14}
+                className={`transition-transform ${open ? "rotate-180" : ""} ${active ? "text-[#d97757]" : "text-[#b5a99a]"}`} />
+            </button>
+          </div>
+          {open && (
+            <div className="ml-4 pl-2 border-l border-[#e8e4dd] space-y-0.5 mt-0.5">
+              {item.children.map(child => {
+                const ChildIcon = child.icon;
+                const cActive = isActive(child);
+                return (
+                  <button key={child.label} onClick={() => handleNav(child)}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all text-left ${
+                      cActive ? "bg-white text-[#1a1a1a] font-semibold shadow-sm border border-[#e8e4dd]" : "text-[#6b6259] hover:text-[#1a1a1a] hover:bg-white/60"
+                    }`}>
+                    <ChildIcon size={13} className={cActive ? "text-[#d97757]" : "text-[#b5a99a]"} />
+                    {child.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      );
+    }
+    const Icon = item.icon;
+    const active = isActive(item);
+    return (
+      <button key={item.label} onClick={() => handleNav(item)}
+        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all text-left ${
+          active ? "bg-white text-[#1a1a1a] font-semibold shadow-sm border border-[#e8e4dd]" : "text-[#6b6259] hover:text-[#1a1a1a] hover:bg-white/60"
+        }`}>
+        <Icon size={14} className={active ? "text-[#d97757]" : "text-[#b5a99a]"} />
+        {item.label}
+      </button>
+    );
   };
 
   const streakDays = summary.study_streak_days ?? 0;
@@ -669,19 +738,7 @@ export default function StudentDashboard() {
             </div>
           )}
           <nav className="space-y-0.5">
-            {sidebarItems.map(item => {
-              const Icon   = item.icon;
-              const active = isActive(item);
-              return (
-                <button key={item.label} onClick={() => handleNav(item)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all text-left ${
-                    active ? "bg-white text-[#1a1a1a] font-semibold shadow-sm border border-[#e8e4dd]" : "text-[#6b6259] hover:text-[#1a1a1a] hover:bg-white/60"
-                  }`}>
-                  <Icon size={14} className={active ? "text-[#d97757]" : "text-[#b5a99a]"} />
-                  {item.label}
-                </button>
-              );
-            })}
+            {sidebarItems.map(renderNavItem)}
           </nav>
         </div>
       </aside>
@@ -704,19 +761,7 @@ export default function StudentDashboard() {
               </div>
             )}
             <nav className="space-y-0.5">
-              {sidebarItems.map(item => {
-                const Icon   = item.icon;
-                const active = isActive(item);
-                return (
-                  <button key={item.label} onClick={() => handleNav(item)}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all text-left ${
-                      active ? "bg-white text-[#1a1a1a] font-semibold shadow-sm border border-[#e8e4dd]" : "text-[#6b6259] hover:text-[#1a1a1a] hover:bg-white/60"
-                    }`}>
-                    <Icon size={14} className={active ? "text-[#d97757]" : "text-[#b5a99a]"} />
-                    {item.label}
-                  </button>
-                );
-              })}
+              {sidebarItems.map(renderNavItem)}
             </nav>
           </div>
         </aside>
@@ -758,7 +803,7 @@ export default function StudentDashboard() {
         {[
           { label: "Home",      icon: BarChart2,    path: "/student/dashboard" },
           { label: "Subjects",  icon: GraduationCap, path: "/student/subjects" },
-          { label: "Practice",  icon: Zap,          path: "/student/practice"  },
+          { label: "Test-Yourself", icon: Zap,      path: "/student/practice"  },
           { label: "Analytics", icon: TrendingUp,   path: "/student/analytics" },
           { label: "Resources", icon: BookOpen,     path: "/student/resources" },
         ].map(item => {
