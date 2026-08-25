@@ -19,8 +19,24 @@ try { awardXP = require('../middleware/xpMiddleware').awardXP; } catch {}
 
 // ── GET /api/questions/random ─────────────────────────────────────────────────
 router.get('/random', protect, async (req, res) => {
-  const { count = '10', subject_id, subtopic_id, board, difficulty } = req.query;
+  const { count = '10', subject_id, subtopic_id, board, difficulty, type } = req.query;
   const limit = Math.min(Math.max(parseInt(count) || 10, 1), 50);
+
+  // Phase 5: whitelist against the actual questions.type enum values.
+  // IMPORTANT: QuizTab.jsx already sends `type=${selectedPaper}` on this
+  // same endpoint for its "Paper 1 / Structured Questions / All" picker,
+  // where selectedPaper can be 'all' or 'paper1' — neither of which is a
+  // real question type. Before this filter existed those values were
+  // silently ignored (type was never read from req.query at all), so
+  // QuizTab's "All" and "Paper 1" options worked by pulling every type,
+  // unfiltered. A strict whitelist (rather than "any truthy type value
+  // filters") preserves that exact behavior for 'all'/'paper1' — the
+  // filter only activates for `type=structured` (and any other real enum
+  // value), so QuizTab's "Structured Questions" option starts working
+  // correctly for the first time, without touching its other two options
+  // or MockExamPage/QuizPage's separate (still-unread) question_sub_type
+  // param.
+  const VALID_QUESTION_TYPES = ['mcq', 'true_false', 'short_answer', 'essay', 'structured'];
 
   // Enrollment check: a student requesting questions for a specific subject
   // must actually be enrolled in that subject. This was previously absent
@@ -77,6 +93,10 @@ router.get('/random', protect, async (req, res) => {
   if (difficulty && ['easy','medium','hard'].includes(difficulty)) {
     filters.push('q.difficulty = :difficulty');
     replacements.difficulty = difficulty;
+  }
+  if (type && VALID_QUESTION_TYPES.includes(type)) {
+    filters.push('q.type = :type');
+    replacements.type = type;
   }
 
   let boardJoin = '';
@@ -266,7 +286,12 @@ router.post('/:id/answer', protect, async (req, res) => {
     }
 
     const question = questions[0];
-    const isEssay  = question.type === 'essay' || !!essay_response;
+    // Phase 5: 'structured' questions render with a free-text textarea on
+    // the frontend (same as essay), so they may also arrive here with
+    // essay_response set — but they must NOT trigger Gemini AI marking,
+    // same as short_answer today. Excluding by type first means this stays
+    // correct regardless of which field name the frontend posts.
+    const isEssay  = question.type !== 'structured' && (question.type === 'essay' || !!essay_response);
 
     let isCorrect    = false;
     let marksAwarded = 0;

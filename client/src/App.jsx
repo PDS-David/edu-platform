@@ -52,6 +52,7 @@ import QuizResultsPage from "./pages/QuizResultsPage";
 import QuizHistoryPage from "./pages/QuizHistoryPage";
 import AllQuizHistoryPage from "./pages/AllQuizHistoryPage";
 import PracticeMode from "./pages/PracticeMode";
+import TestYourselfPage from "./pages/TestYourselfPage";
 import MockExamPage from "./pages/MockExamPage";
 import MockExamHistoryPage from "./pages/MockExamHistoryPage";
 import MyTestsPage from "./pages/MyTestsPage";
@@ -162,7 +163,18 @@ export default function App() {
             <Route path="mock/:subjectId" element={<MockExamPage />} />
             <Route path="mock-history" element={<MockExamHistoryPage />} />
             <Route path="my-tests" element={<MyTestsPage />} />
-            <Route path="practice" element={<PracticeMode />} />
+            {/* Phase 5: /student/practice is now the Test-Yourself landing
+                page (four type tiles); the actual question-answering view
+                that used to live directly at /student/practice moved to
+                /student/practice/session, which the tiles link into with a
+                ?type= param. StudentDashboard.jsx's two bare
+                navigate('/student/practice') calls (Focus Areas' generic
+                "Practice" button, and the empty-state "Start practising"
+                link) intentionally now land here instead of jumping
+                straight to the old subject picker — that's the new
+                type-first flow this phase introduces, not a break. */}
+            <Route path="practice" element={<TestYourselfPage />} />
+            <Route path="practice/session" element={<PracticeMode />} />
             <Route path="mark-image" element={<ImageMarkingPage />} />
             <Route path="test/:testId" element={<StudentTestPage />} />
             <Route path="settings" element={<SettingsPage />} />

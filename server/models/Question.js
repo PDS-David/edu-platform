@@ -6,7 +6,11 @@ module.exports = (sequelize) => {
     subtopicId: { type: DataTypes.INTEGER, field: 'subtopic_id' }, // handoff: questions.subtopic_id
     submittedBy: { type: DataTypes.UUID, field: 'submitted_by' }, // handoff: questions.submitted_by
     questionText: { type: DataTypes.TEXT, allowNull: false, field: 'question_text' },
-    type: { type: DataTypes.ENUM('mcq', 'true_false', 'short_answer', 'essay'), defaultValue: 'mcq' },
+    // Phase 5: 'structured' added — theory/free-response questions, rendered
+    // like essay questions but NOT routed through AI marking (see
+    // questionsRoutes.js POST /:id/answer). Must match
+    // database/migration_009_structured_question_type.sql.
+    type: { type: DataTypes.ENUM('mcq', 'true_false', 'short_answer', 'essay', 'structured'), defaultValue: 'mcq' },
     options: { type: DataTypes.JSONB },
     correctAnswer: { type: DataTypes.TEXT, field: 'correct_answer' },
     explanation: { type: DataTypes.TEXT },

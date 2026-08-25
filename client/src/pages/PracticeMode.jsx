@@ -1,6 +1,10 @@
 // client/src/pages/PracticeMode.jsx
-// Launched from StudentDashboard subject card via react-router state:
-//   navigate('/student/practice', { state: { subjectId, subjectName, boardCode } })
+// Route: /student/practice/session (question-answering view; the landing
+// tile page at /student/practice is TestYourselfPage.jsx as of Phase 5).
+// Launched via react-router state:
+//   navigate('/student/practice/session', { state: { subjectId, subjectName, boardCode } })
+// and/or a `?type=` query param (mcq | short_answer | structured | essay)
+// from TestYourselfPage's tiles.
 //
 // v1.2 ADDITIONS:
 //   - Passes mode=practice to /questions/random (backend keeps AI-generated questions in practice)
@@ -8,9 +12,15 @@
 //   - Essay question support: shows textarea instead of MCQ options
 //   - Source attribution: shows question source when present
 //   - concept_hint is a DB field used internally — NOT the student hint system
+//
+// Phase 5 ADDITION:
+//   - `type` query param (from TestYourselfPage tiles) filters which
+//     question type is fetched. 'structured' questions render with the
+//     same free-text textarea as essay questions but are NOT AI-marked
+//     (see isFreeText vs isEssay below, and the backend's isEssay gate).
 
 import { useState, useEffect, useRef } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ChevronLeft, ChevronRight, Lightbulb, CheckCircle,
   XCircle, RotateCcw, ArrowRight, Loader2, BookOpen, Sparkles,
@@ -52,7 +62,15 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
   // so every essay question was silently rendered as an MCQ with no options
   // (since essay questions have no `options` array). Accept either field
   // name so this keeps working regardless of which key a given insert path uses.
-  const isEssay = (question.question_type ?? question.type) === 'essay';
+  const qType = question.question_type ?? question.type;
+  const isEssay = qType === 'essay';
+  // Phase 5: 'structured' questions get the same free-text textarea as
+  // essay questions (no options array to render as MCQ), but are NOT
+  // AI-marked — the backend's isEssay gate excludes 'structured'
+  // explicitly regardless of which field this posts. isFreeText controls
+  // input rendering + submit dispatch; isEssay stays narrow (essay only)
+  // for anything that should stay essay-specific.
+  const isFreeText = isEssay || qType === 'structured';
 
   useEffect(() => {
     setSelected(null);
@@ -210,6 +228,11 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
                 Essay
               </span>
             )}
+            {qType === 'structured' && (
+              <span className="px-2.5 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
+                Structured
+              </span>
+            )}
           </div>
 
           {/* Question */}
@@ -226,7 +249,7 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
           </div>
 
           {/* ── MCQ Options ── */}
-          {!isEssay && (
+          {!isFreeText && (
             <div className="px-5 pb-4 space-y-2.5">
               {question.options?.map((opt, i) => {
                 const optText = typeof opt === 'string' ? opt : (opt.option_text || '');
@@ -255,8 +278,8 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
             </div>
           )}
 
-          {/* ── Essay textarea ── */}
-          {isEssay && (
+          {/* ── Essay/Structured textarea ── */}
+          {isFreeText && (
             <div className="px-5 pb-4">
               <textarea
                 value={essayText}
@@ -323,7 +346,7 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
           )}
 
           {/* ── Explanation (MCQ after answer) ── */}
-          {result?.explanation && !isEssay && (
+          {result?.explanation && !isFreeText && (
             <div className="mx-5 mb-4 bg-blue-50 border border-blue-100 rounded-xl p-3">
               <p className="text-xs font-semibold text-blue-700 mb-1 flex items-center gap-1">
                 <BookOpen className="w-3.5 h-3.5" /> Explanation
@@ -332,11 +355,13 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
             </div>
           )}
 
-          {/* ── Essay result ── */}
-          {result && isEssay && (
+          {/* ── Essay/Structured result ── */}
+          {result && isFreeText && (
             <div className="mx-5 mb-4 space-y-3">
               <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
-                <p className="text-xs font-semibold text-blue-700 mb-1">AI Marking Feedback</p>
+                <p className="text-xs font-semibold text-blue-700 mb-1">
+                  {isEssay ? 'AI Marking Feedback' : 'Feedback'}
+                </p>
                 <p className="text-xs text-blue-600 leading-relaxed">
                   {result.feedback || result.explanation || 'Your answer has been submitted for review.'}
                 </p>
@@ -356,7 +381,7 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
           )}
 
           {/* ── MCQ result banner ── */}
-          {result && !isEssay && (
+          {result && !isFreeText && (
             <div className={`mx-5 mb-4 rounded-xl px-3 py-2.5 text-sm ${
               result.is_correct
                 ? 'bg-green-50 border border-green-200 text-green-700'
@@ -391,7 +416,7 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
           <div className="px-5 pb-5 flex justify-end">
             {!result ? (
               <button
-                onClick={isEssay ? handleSubmitEssay : handleSubmitMCQ}
+                onClick={isFreeText ? handleSubmitEssay : handleSubmitMCQ}
                 disabled={(!selected && !essayText.trim()) || submitting}
                 className="bg-indigo-500 hover:bg-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold px-6 py-2.5 rounded-xl flex items-center gap-2 transition-colors"
               >
@@ -473,8 +498,13 @@ function EndScreen({ score, total, subjectName, onRetry, onBack }) {
 export default function PracticeMode() {
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const { subjectId, subjectName, boardCode, isRemediation, conceptName } = location.state || {};
+  // Phase 5: type filter from TestYourselfPage's tile links
+  // (?type=mcq|short_answer|structured|essay). Read once — the session is
+  // scoped to one type for its lifetime, same as subjectId/boardCode.
+  const questionType = searchParams.get('type') || undefined;
 
   const [phase,          setPhase]          = useState('loading');
   const [questions,      setQuestions]      = useState([]);
@@ -499,8 +529,9 @@ export default function PracticeMode() {
     setErrMsg('');
     try {
       const params = { count: 10, mode: 'practice' };
-      if (bcode)  params.board      = bcode;
-      if (sid)    params.subject_id = sid;
+      if (bcode)         params.board      = bcode;
+      if (sid)           params.subject_id = sid;
+      if (questionType)  params.type       = questionType;
 
       const res = await api.get('/questions/random', { params });
 
