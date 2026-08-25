@@ -14,6 +14,7 @@ import TopNav from '../components/TopNav';
 import { useCatalog } from '../hooks/useCatalog';
 import AdminBulkUploadPanel from '../components/AdminBulkUploadPanel';
 import UploadPastPaperForm from '../components/UploadPastPaperForm';
+import AssignExamTypeModal from '../components/AssignExamTypeModal';
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Cell,
@@ -1669,6 +1670,8 @@ const UserManagementPanel = () => {
   const [editEmail,     setEditEmail]     = useState('');
   const [editSaving,    setEditSaving]    = useState(false);
   const [editError,     setEditError]     = useState('');
+  // Phase 3 Step 5: shared assign-exam-type modal (App Admin surface).
+  const [assigningStudent, setAssigningStudent] = useState(null);
 
   const showToast = (message, type = 'success') => { setToast({ message, type }); setTimeout(() => setToast(null), 3500); };
 
@@ -1764,6 +1767,9 @@ const UserManagementPanel = () => {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <button onClick={() => openEditUser(u)} title="Edit name/email" className="text-xs px-2.5 py-1 rounded-lg bg-gray-100 text-gray-500 hover:bg-violet-100 hover:text-violet-600"><Pencil size={12} /></button>
+                        {u.role === 'student' && (
+                          <button onClick={() => setAssigningStudent(u)} title="Assign exam type" className="text-xs px-2.5 py-1 rounded-lg bg-gray-100 text-gray-500 hover:bg-violet-100 hover:text-violet-600"><GraduationCap size={12} /></button>
+                        )}
                         <select value={u.role} onChange={e => changeRole(u.id, e.target.value)} className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-violet-400"><option value="student">Student</option><option value="teacher">Teacher</option><option value="admin">Admin</option></select>
                         <button onClick={() => toggleActive(u.id, u.is_active)} className={`text-xs px-2.5 py-1 rounded-lg font-semibold ${u.is_active ? 'bg-red-50 text-red-500 hover:bg-red-100' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'}`}>{u.is_active ? 'Deactivate' : 'Activate'}</button>
                         <button onClick={() => deleteUser(u.id, u.email)} className="text-xs px-2.5 py-1 rounded-lg bg-gray-100 text-gray-500 hover:bg-red-100 hover:text-red-600"><Trash2 size={12} /></button>
@@ -1820,6 +1826,15 @@ const UserManagementPanel = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {assigningStudent && (
+        <AssignExamTypeModal
+          studentId={assigningStudent.id}
+          studentName={`${assigningStudent.first_name} ${assigningStudent.last_name}`}
+          onClose={() => setAssigningStudent(null)}
+          onAssigned={fetchUsers}
+        />
       )}
     </div>
   );
