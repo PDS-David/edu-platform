@@ -50,20 +50,120 @@ router.patch('/:id/read', protect, async (req, res) => {
   }
 });
 
-// POST /api/notifications (admin only)
-router.post('/', protect, authorize('admin'), async (req, res) => {
+// POST /api/notifications (admin, school_admin)
+//
+// Phase 4: school_admin can now send notifications too, but strictly scoped
+// to their own school — enforced inside the handler, not just at the
+// authorize() gate. App Admin keeps the unrestricted behavior it always had.
+//
+// Body shape: { title, message, type?, action_url?, recipient: { kind: 'user'
+// | 'class' | 'school', id? } }. Back-compat: if `recipient` is omitted and a
+// bare `user_id` is passed instead (today's only shape), it's treated as
+// { kind: 'user', id: user_id } — every existing caller keeps working
+// unmodified.
+router.post('/', protect, authorize('admin', 'school_admin'), async (req, res) => {
   try {
-    const { user_id, title, message, type = 'info', action_url } = req.body;
-    const rows = await sequelize.query(
-      `INSERT INTO notifications (user_id, title, message, type, action_url)
-       VALUES (:user_id, :title, :message, :type, :action_url)
-       RETURNING id`,
-      {
-        replacements: { user_id, title, message, type, action_url },
-        type: QueryTypes.INSERT,
+    const { title, message, type = 'info', action_url } = req.body;
+    if (!title || !message) {
+      return res.status(400).json({ success: false, error: 'title and message are required' });
+    }
+
+    const recipient = req.body.recipient
+      || (req.body.user_id ? { kind: 'user', id: req.body.user_id } : null);
+    if (!recipient || !recipient.kind) {
+      return res.status(400).json({ success: false, error: 'recipient (or user_id) is required' });
+    }
+
+    const isSchoolAdmin = req.user.role === 'school_admin';
+
+    const insertOne = async (userId) => {
+      const rows = await sequelize.query(
+        `INSERT INTO notifications (user_id, title, message, type, action_url)
+         VALUES (:user_id, :title, :message, :type, :action_url)
+         RETURNING id`,
+        { replacements: { user_id: userId, title, message, type, action_url }, type: QueryTypes.INSERT }
+      );
+      return rows[0][0]?.id;
+    };
+
+    // Bulk fan-out via a single multi-row INSERT (not N sequential queries).
+    // There's no live Sequelize model for `notifications` at runtime (the
+    // model file exists but is never registered outside the one-off
+    // setupDb.js script), so this stays consistent with the raw-SQL style
+    // already used everywhere else in this file.
+    const insertMany = async (userIds) => {
+      if (!userIds.length) return 0;
+      const replacements = { title, message, type, action_url };
+      const valuesSql = userIds
+        .map((id, i) => {
+          replacements[`user_id_${i}`] = id;
+          return `(:user_id_${i}, :title, :message, :type, :action_url)`;
+        })
+        .join(', ');
+      await sequelize.query(
+        `INSERT INTO notifications (user_id, title, message, type, action_url) VALUES ${valuesSql}`,
+        { replacements, type: QueryTypes.INSERT }
+      );
+      return userIds.length;
+    };
+
+    if (recipient.kind === 'user') {
+      const targetId = recipient.id;
+      if (!targetId) {
+        return res.status(400).json({ success: false, error: 'recipient.id is required for kind "user"' });
       }
-    );
-    res.json({ success: true, data: { id: rows[0][0]?.id } });
+      if (isSchoolAdmin) {
+        const owner = await sequelize.query(
+          `SELECT id FROM users WHERE id = :id AND school_id = :school_id`,
+          { replacements: { id: targetId, school_id: req.user.school_id }, type: QueryTypes.SELECT }
+        );
+        if (!owner.length) {
+          return res.status(403).json({ success: false, error: 'That user is not in your school' });
+        }
+      }
+      const id = await insertOne(targetId);
+      return res.json({ success: true, data: { id } });
+    }
+
+    if (recipient.kind === 'class') {
+      const classId = recipient.id;
+      if (!classId) {
+        return res.status(400).json({ success: false, error: 'recipient.id is required for kind "class"' });
+      }
+      if (isSchoolAdmin) {
+        const owned = await sequelize.query(
+          `SELECT id FROM classes WHERE id = :id AND school_id = :school_id`,
+          { replacements: { id: classId, school_id: req.user.school_id }, type: QueryTypes.SELECT }
+        );
+        if (!owned.length) {
+          return res.status(403).json({ success: false, error: 'That class is not in your school' });
+        }
+      }
+      const members = await sequelize.query(
+        `SELECT student_id FROM class_memberships WHERE class_id = :class_id`,
+        { replacements: { class_id: classId }, type: QueryTypes.SELECT }
+      );
+      const sent = await insertMany(members.map((m) => m.student_id));
+      return res.json({ success: true, data: { sent } });
+    }
+
+    if (recipient.kind === 'school') {
+      const schoolId = isSchoolAdmin ? req.user.school_id : recipient.id;
+      if (!schoolId) {
+        return res.status(400).json({ success: false, error: 'recipient.id is required for kind "school"' });
+      }
+      if (isSchoolAdmin && recipient.id && recipient.id !== req.user.school_id) {
+        return res.status(403).json({ success: false, error: 'You can only send to your own school' });
+      }
+      const targets = await sequelize.query(
+        `SELECT id FROM users WHERE school_id = :school_id AND role IN ('teacher', 'student')`,
+        { replacements: { school_id: schoolId }, type: QueryTypes.SELECT }
+      );
+      const sent = await insertMany(targets.map((u) => u.id));
+      return res.json({ success: true, data: { sent } });
+    }
+
+    return res.status(400).json({ success: false, error: 'recipient.kind must be one of: user, class, school' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

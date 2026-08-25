@@ -17,7 +17,7 @@ import AssignExamTypeModal from '../components/AssignExamTypeModal';
 import {
   School, Users, GraduationCap, UserCheck, Copy, Check,
   Loader2, LogOut, AlertCircle, Plus, X, Image as ImageIcon, FileText,
-  BookOpen, ChevronRight, Trash2,
+  BookOpen, ChevronRight, Trash2, Bell, Send,
 } from 'lucide-react';
 
 // ─── Phase 2: School-Owned Classes ──────────────────────────────────────────
@@ -281,6 +281,202 @@ function ClassesSection({ teachers, students }) {
           students={students}
           onClose={() => setOpenClass(null)}
           onChanged={loadClasses}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Phase 4: School Admin Notifications ────────────────────────────────────
+
+function SendNotificationModal({ roster, classes, onClose, onSent }) {
+  const [form, setForm] = useState({
+    title: '',
+    message: '',
+    recipientType: 'people', // 'people' | 'class' | 'school'
+    personIds: [],
+    classId: '',
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState('');
+
+  const togglePerson = (id) => setForm(f => ({
+    ...f,
+    personIds: f.personIds.includes(id)
+      ? f.personIds.filter(x => x !== id)
+      : [...f.personIds, id],
+  }));
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      if (form.recipientType === 'people') {
+        // The endpoint sends to one recipient.kind:'user' per call — fan out
+        // client-side across every selected person.
+        for (const personId of form.personIds) {
+          await api.post('/notifications', {
+            title: form.title,
+            message: form.message,
+            recipient: { kind: 'user', id: personId },
+          });
+        }
+      } else if (form.recipientType === 'class') {
+        await api.post('/notifications', {
+          title: form.title,
+          message: form.message,
+          recipient: { kind: 'class', id: form.classId },
+        });
+      } else {
+        await api.post('/notifications', {
+          title: form.title,
+          message: form.message,
+          recipient: { kind: 'school' },
+        });
+      }
+      onSent();
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Could not send notification.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const ready = form.title.trim() && form.message.trim() && (
+    (form.recipientType === 'people' && form.personIds.length > 0) ||
+    (form.recipientType === 'class' && form.classId) ||
+    form.recipientType === 'school'
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-gray-900">Send Notification</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X size={20} />
+          </button>
+        </div>
+
+        {error && (
+          <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        )}
+
+        <form onSubmit={submit} className="space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Title *</label>
+            <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} required
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Message *</label>
+            <textarea value={form.message} onChange={e => setForm(f => ({ ...f, message: e.target.value }))} required rows={3}
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Send to</label>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 px-3 py-2.5 border border-gray-200 rounded-lg cursor-pointer">
+                <input type="radio" name="recipientType" checked={form.recipientType === 'people'}
+                  onChange={() => setForm(f => ({ ...f, recipientType: 'people' }))} className="accent-indigo-600" />
+                <span className="text-sm text-gray-700">Specific people</span>
+              </label>
+              <label className="flex items-center gap-2 px-3 py-2.5 border border-gray-200 rounded-lg cursor-pointer">
+                <input type="radio" name="recipientType" checked={form.recipientType === 'class'}
+                  onChange={() => setForm(f => ({ ...f, recipientType: 'class' }))} className="accent-indigo-600" />
+                <span className="text-sm text-gray-700">A class</span>
+              </label>
+              <label className="flex items-center gap-2 px-3 py-2.5 border border-gray-200 rounded-lg cursor-pointer">
+                <input type="radio" name="recipientType" checked={form.recipientType === 'school'}
+                  onChange={() => setForm(f => ({ ...f, recipientType: 'school' }))} className="accent-indigo-600" />
+                <span className="text-sm text-gray-700">Everyone in my school</span>
+              </label>
+            </div>
+          </div>
+
+          {form.recipientType === 'people' && (
+            <div className="border border-gray-100 rounded-xl divide-y divide-gray-50 max-h-40 overflow-y-auto">
+              {roster.length === 0 && (
+                <p className="text-sm text-gray-400 py-3 px-3">No teachers or students in your school yet.</p>
+              )}
+              {roster.map(u => (
+                <label key={u.id} className="flex items-center gap-2 py-2 px-3 text-sm cursor-pointer">
+                  <input type="checkbox" className="accent-indigo-600"
+                    checked={form.personIds.includes(u.id)}
+                    onChange={() => togglePerson(u.id)} />
+                  <span className="text-gray-700">{u.first_name} {u.last_name}</span>
+                  <span className="text-[10px] uppercase tracking-wide text-gray-400 ml-auto">{u.role}</span>
+                </label>
+              ))}
+            </div>
+          )}
+
+          {form.recipientType === 'class' && (
+            <div>
+              <select value={form.classId} onChange={e => setForm(f => ({ ...f, classId: e.target.value }))}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100">
+                <option value="">Select a class…</option>
+                {classes.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+              {classes.length === 0 && (
+                <p className="text-xs text-gray-400 mt-1">No classes yet — create one first.</p>
+              )}
+            </div>
+          )}
+
+          <button type="submit" disabled={!ready || loading}
+            className="w-full mt-2 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold disabled:opacity-40 transition-colors flex items-center justify-center gap-2">
+            {loading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+            {loading ? 'Sending…' : 'Send Notification'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function NotificationsSection({ roster }) {
+  const [showSend, setShowSend] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [classes, setClasses] = useState([]);
+
+  useEffect(() => {
+    api.get('/schools/me/classes')
+      .then(res => setClasses(res.data || []))
+      .catch(() => {}); // non-fatal — the class option just shows empty if this fails
+  }, []);
+
+  return (
+    <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-4 mt-4">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-xs font-bold uppercase tracking-wide text-gray-400">Notifications</p>
+        <button onClick={() => { setSent(false); setShowSend(true); }}
+          className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors">
+          <Bell size={14} /> Send Notification
+        </button>
+      </div>
+
+      {sent ? (
+        <p className="text-sm text-gray-400 py-6 text-center">Notification sent.</p>
+      ) : (
+        <p className="text-sm text-gray-400 py-6 text-center">
+          Send a message to specific people, a class, or your whole school.
+        </p>
+      )}
+
+      {showSend && (
+        <SendNotificationModal
+          roster={roster}
+          classes={classes}
+          onClose={() => setShowSend(false)}
+          onSent={() => { setShowSend(false); setSent(true); }}
         />
       )}
     </div>
@@ -596,6 +792,7 @@ export default function SchoolAdminDashboard() {
             </div>
 
             <ClassesSection teachers={teachers} students={students} />
+            <NotificationsSection roster={[...teachers, ...students]} />
           </>
         )}
       </div>
