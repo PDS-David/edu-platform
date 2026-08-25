@@ -21,7 +21,7 @@ import { openResourceAuth } from "../utils/authenticatedDownload";
 import {
   FileText, Video, Music, File, Download,
   Zap, ClipboardList, ClipboardCheck, History, BookMarked, BarChart2, BookOpen, TrendingUp,
-  Flame, Target, GraduationCap, ScanLine, Menu, X, ChevronDown,
+  Flame, Target, GraduationCap, Menu, X, ChevronDown,
   AlertCircle, RefreshCw, Settings, School,
 } from "lucide-react";
 
@@ -607,6 +607,10 @@ export default function StudentDashboard() {
   // "Exam Types" and "Join a School" nav entries are removed here — their
   // routes/components are untouched and still reachable by direct URL
   // (locked down in a later phase, not this one).
+  // Phase 5: the standalone "AI Marking" entry is removed here — it now
+  // only lives inside the Essay Questions tile on the Test-Yourself
+  // landing page (TestYourselfPage.jsx). /student/mark-image itself is
+  // untouched and still reachable from there.
   const sidebarItems = [
     { label: "Dashboard",   icon: BarChart2,    path: "/student/dashboard"  },
     {
@@ -616,7 +620,6 @@ export default function StudentDashboard() {
         { label: "Test-Yourself", icon: Zap,            path: "/student/practice"  },
         { label: "Past Papers",   icon: FileText,       path: "/past-papers"       },
         { label: "Mock Exam",     icon: ClipboardList,  path: null, onClick: () => setShowMockPicker(true) },
-        { label: "AI Marking",    icon: ScanLine,       path: "/student/mark-image" },
       ],
     },
     { label: "Mock History", icon: History,        path: "/student/mock-history"  },
