@@ -33,6 +33,7 @@ const { createUploadMiddleware } = require('../middleware/uploadSecurity');
 const { saveSchoolLogo, deleteSchoolLogo } = require('../utils/schoolLogoStorage');
 const User    = require('../models/User');
 const sequelize = require('../config/database');
+const { ENROLLMENT_SOURCE, ENROLLMENT_STATUS } = require('../constants/enrollmentConstants');
 
 // Single-file, image-only, small size cap — a logo isn't a document upload.
 // Same validation pipeline (magic-byte check + AV scan) as every other
@@ -177,6 +178,16 @@ router.post('/register', protect, authorize('admin'), authLimiter, logoUpload.si
 // school by entering its join_code. Purely opt-in — never touches an account
 // that doesn't explicitly call this.
 router.post('/join', protect, schoolJoinLimiter, async (req, res) => {
+  // Phase 3 Step 4: self-service lockdown, same guard/message as
+  // studentRoutes.js's POST /subjects and DELETE /subjects/:subjectId.
+  // Teachers can still self-join via this route — only students are
+  // affected, per the phase spec.
+  if (req.user?.role === 'student') {
+    return res.status(403).json({
+      success: false,
+      error: 'Your exam type and subjects are managed by your school or app administrator',
+    });
+  }
   const { join_code } = req.body || {};
   if (!join_code) {
     return res.status(400).json({ success: false, error: 'join_code is required' });
@@ -215,6 +226,17 @@ function requireSchoolAdmin(req, res, next) {
     return res.status(403).json({ success: false, error: 'School admin access required' });
   }
   next();
+}
+
+// ─── Middleware: school_admin (own school only) OR App Admin (any school) ──
+// Phase 3 Step 3. Does NOT check the target student's school here — that
+// needs :studentId from the route params, which isn't resolved yet at this
+// point in the middleware chain, so the handler itself re-verifies
+// ownership for school_admin callers before touching any data.
+function requireSchoolAdminOrAppAdmin(req, res, next) {
+  if (req.user?.role === 'admin') return next();
+  if (req.user?.role === 'school_admin' && req.user?.school_id) return next();
+  return res.status(403).json({ success: false, error: 'School admin or App admin access required' });
 }
 
 // ─── GET /api/schools ────────────────────────────────────────────────────────
@@ -973,6 +995,124 @@ router.get('/me/classes/:id/students', protect, requireSchoolAdmin, async (req, 
   } catch (err) {
     console.error('[schools] GET /me/classes/:id/students', err.message);
     return res.status(500).json({ success: false, error: 'Could not load class students' });
+  }
+});
+
+// ─── POST /api/schools/students/:studentId/assign-exam-type ────────────────
+// Phase 3 Step 3. Shared by both admin surfaces: a school_admin can only
+// target a student in their own school; App Admin can target any student
+// (including standalone students with no school_id). Body:
+// { exam_board_id, subject_ids: [int, ...] }.
+router.post('/students/:studentId/assign-exam-type', protect, requireSchoolAdminOrAppAdmin, async (req, res) => {
+  const { studentId } = req.params;
+  const { exam_board_id } = req.body || {};
+  const requestedSubjectIds = Array.isArray(req.body?.subject_ids)
+    ? req.body.subject_ids.map(id => parseInt(id)).filter(Number.isInteger)
+    : [];
+
+  if (!exam_board_id) {
+    return res.status(400).json({ success: false, error: 'exam_board_id is required' });
+  }
+
+  try {
+    // Verify the target is actually a student, and (for school_admin
+    // callers) that the student belongs to the caller's own school.
+    const studentRows = await q(
+      `SELECT id, school_id FROM users WHERE id = $1 AND role = 'student'`,
+      [studentId]
+    );
+    if (!studentRows.length) {
+      return res.status(404).json({ success: false, error: 'Student not found' });
+    }
+    if (req.user.role === 'school_admin' && studentRows[0].school_id !== req.user.school_id) {
+      return res.status(403).json({ success: false, error: 'That student is not in your school' });
+    }
+
+    // Look up the board's limit config — same columns Step 2 taught
+    // studentRoutes.js's POST /subjects to read from.
+    const boardRows = await q(
+      `SELECT id, name, max_subjects, requires_all_subjects
+         FROM exam_boards WHERE id = $1 AND is_active = true`,
+      [exam_board_id]
+    );
+    if (!boardRows.length) {
+      return res.status(404).json({ success: false, error: 'Exam board not found' });
+    }
+    const board = boardRows[0];
+
+    let subjectIds = requestedSubjectIds;
+    if (board.requires_all_subjects) {
+      // Ignore whatever subject_ids were passed — use every active subject
+      // for this board instead, same rule OnboardingPage.jsx applies for
+      // self-service onboarding on IELTS/TOEFL/SAT-style boards.
+      const allSubjects = await q(
+        `SELECT id FROM subjects WHERE exam_board_id = $1 AND is_active = true`,
+        [board.id]
+      );
+      subjectIds = allSubjects.map(s => s.id);
+    } else {
+      if (!subjectIds.length) {
+        return res.status(400).json({ success: false, error: 'subject_ids must be a non-empty array' });
+      }
+      if (board.max_subjects !== null && subjectIds.length > board.max_subjects) {
+        return res.status(400).json({
+          success: false,
+          error: `You can only assign ${board.max_subjects} subjects for ${board.name}. You have reached the limit.`,
+          code: 'SUBJECT_LIMIT_REACHED',
+          limit: board.max_subjects,
+          current: subjectIds.length,
+        });
+      }
+      // Confirm every requested subject actually belongs to this board —
+      // never trust subject_ids blindly against a different board's rows.
+      const validSubjects = await q(
+        `SELECT id FROM subjects WHERE id = ANY($1::int[]) AND exam_board_id = $2 AND is_active = true`,
+        [subjectIds, board.id]
+      );
+      if (validSubjects.length !== subjectIds.length) {
+        return res.status(400).json({ success: false, error: 'One or more subject_ids do not belong to this exam board' });
+      }
+    }
+
+    const t = await sequelize.transaction();
+    try {
+      // Same ON CONFLICT pattern as studentRoutes.js's POST /subjects, with
+      // enrollment_source = 'admin_assigned' instead of 'explicit'.
+      await sequelize.query(
+        `INSERT INTO student_exam_types (student_id, exam_board_id, is_active, status)
+         VALUES ($1, $2, true, $3)
+         ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active = true, status = $3`,
+        { bind: [studentId, board.id, ENROLLMENT_STATUS.APPROVED], type: sequelize.QueryTypes.INSERT, transaction: t }
+      );
+
+      for (const subjectId of subjectIds) {
+        await sequelize.query(
+          `INSERT INTO student_subjects (student_id, subject_id, is_active, status, enrollment_source)
+           VALUES ($1, $2, true, $3, $4)
+           ON CONFLICT (student_id, subject_id) DO UPDATE
+             SET is_active         = true,
+                 status            = $3,
+                 enrollment_source = COALESCE(student_subjects.enrollment_source, $4)`,
+          {
+            bind: [studentId, subjectId, ENROLLMENT_STATUS.APPROVED, ENROLLMENT_SOURCE.ADMIN_ASSIGNED],
+            type: sequelize.QueryTypes.INSERT,
+            transaction: t,
+          }
+        );
+      }
+      await t.commit();
+    } catch (err) {
+      await t.rollback();
+      throw err;
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: { student_id: studentId, exam_board_id: board.id, subject_ids: subjectIds },
+    });
+  } catch (err) {
+    console.error('[schools] POST /students/:studentId/assign-exam-type', err.message);
+    return res.status(500).json({ success: false, error: 'Could not assign exam type' });
   }
 });
 

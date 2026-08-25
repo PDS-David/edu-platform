@@ -579,6 +579,16 @@ router.get('/my-subjects', protect, studentOnly, async (req, res) => {
 // Add a subject to the student's selected subjects.
 // Body: { subject_id: <integer> }
 router.post('/subjects', protect, studentOnly, async (req, res) => {
+  // Phase 3 Step 4: self-service lockdown. Exam type / subject enrollment is
+  // now managed by the student's school or App Admin (see
+  // POST /api/schools/students/:studentId/assign-exam-type). Route handler
+  // is left in place (not deleted) so rollback is a one-line revert.
+  if (req.user?.role === 'student') {
+    return res.status(403).json({
+      success: false,
+      error: 'Your exam type and subjects are managed by your school or app administrator',
+    });
+  }
   const studentId = req.user.id;
   const { subject_id } = req.body;
   if (!subject_id) {
@@ -589,21 +599,14 @@ router.post('/subjects', protect, studentOnly, async (req, res) => {
     // environment's student_subjects/student_exam_types tables (Bug 1).
     await ensureEnrollmentColumns();
 
-    // ── S1: Subject limit enforcement ──────────────────────────────────────
-    // WAEC / NECO   → max 9 subjects
-    // JAMB / UTME   → max 4 subjects
-    // JUPEB         → max 4 subjects
-    // All others    → no limit (null)
-    const SUBJECT_LIMITS = {
-      JAMB:  4,
-      WAEC:  9,
-      NECO:  9,
-      JUPEB: 4,
-    };
-
-    // Get the exam board code for this subject
+    // ── S1 / Phase 3 Step 2: Subject limit enforcement ───────────────────────
+    // Limit now lives on exam_boards.max_subjects / requires_all_subjects
+    // (migration_008_exam_board_limits.sql) instead of a hardcoded object
+    // here — this is a genuine replacement, not a parallel path, so the two
+    // can never drift apart again. Changing max_subjects in the database
+    // takes effect immediately, no deploy required.
     const boardInfo = await sequelize.query(
-      `SELECT eb.code, eb.name, s.id AS subject_id
+      `SELECT eb.code, eb.name, eb.max_subjects, eb.requires_all_subjects, s.id AS subject_id
        FROM subjects s
        JOIN exam_boards eb ON eb.id::text = s.exam_board_id::text
        WHERE s.id = :subjectId AND s.is_active = true`,
@@ -612,7 +615,11 @@ router.post('/subjects', protect, studentOnly, async (req, res) => {
 
     if (boardInfo.length > 0) {
       const boardCode = (boardInfo[0].code || '').toUpperCase();
-      const limit = SUBJECT_LIMITS[boardCode] ?? null;
+      // requires_all_subjects boards (IELTS/TOEFL/SAT) have no per-subject
+      // cap here — the client pre-selects every subject for those boards
+      // (see OnboardingPage.jsx), so this endpoint's per-add limit doesn't
+      // apply to them.
+      const limit = boardInfo[0].requires_all_subjects ? null : boardInfo[0].max_subjects;
 
       if (limit !== null) {
         // Count how many active subjects this student already has in this board
@@ -685,6 +692,13 @@ router.post('/subjects', protect, studentOnly, async (req, res) => {
 // ── DELETE /api/students/subjects/:subjectId ──────────────────────────────────
 // Remove a subject from the student's selected subjects.
 router.delete('/subjects/:subjectId', protect, studentOnly, async (req, res) => {
+  // Phase 3 Step 4: same self-service lockdown as POST /subjects above.
+  if (req.user?.role === 'student') {
+    return res.status(403).json({
+      success: false,
+      error: 'Your exam type and subjects are managed by your school or app administrator',
+    });
+  }
   const studentId = req.user.id;
   const subjectId = parseInt(req.params.subjectId);
   if (!subjectId) {
