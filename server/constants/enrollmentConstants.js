@@ -16,9 +16,11 @@
 // enrollment_source  (student_subjects.enrollment_source column)
 // ---------------------------------------------------------------------------
 const ENROLLMENT_SOURCE = Object.freeze({
-  EXPLICIT:      'explicit',       // student or admin manually enrolled
-  AUTO_ENROLLED: 'auto_enrolled',  // system-triggered automatic enrollment
-  CASCADE:       'cascade',        // inherited from a parent subject/course
+  EXPLICIT:       'explicit',        // student or admin manually enrolled
+  AUTO_ENROLLED:  'auto_enrolled',   // system-triggered automatic enrollment
+  CASCADE:        'cascade',         // inherited from a parent subject/course
+  ADMIN_ASSIGNED: 'admin_assigned',  // Phase 3: School Admin or App Admin assigned via
+                                      // POST /api/schools/students/:studentId/assign-exam-type
 });
 
 // ---------------------------------------------------------------------------

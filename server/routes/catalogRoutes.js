@@ -70,6 +70,7 @@ router.get('/types', async (req, res) => {
       `SELECT
          eb.id, eb.code, eb.name, eb.full_name, eb.description,
          eb.country, eb.icon_emoji, eb.display_order, eb.is_active,
+         eb.max_subjects, eb.requires_all_subjects,
          eb.created_at, eb.updated_at,
          COUNT(s.id)::INTEGER AS subject_count
        FROM exam_boards eb
