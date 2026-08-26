@@ -313,15 +313,15 @@ function SendNotificationModal({ roster, classes, onClose, onSent }) {
     setLoading(true);
     try {
       if (form.recipientType === 'people') {
-        // The endpoint sends to one recipient.kind:'user' per call — fan out
-        // client-side across every selected person.
-        for (const personId of form.personIds) {
-          await api.post('/notifications', {
-            title: form.title,
-            message: form.message,
-            recipient: { kind: 'user', id: personId },
-          });
-        }
+        // Single request for the whole selection (backend recipient.kind:
+        // 'users' — plural) instead of one POST per person. Was previously
+        // N sequential calls, which meant one slow/failed pick left the
+        // sender with no idea which people had already been notified.
+        await api.post('/notifications', {
+          title: form.title,
+          message: form.message,
+          recipient: { kind: 'users', ids: form.personIds },
+        });
       } else if (form.recipientType === 'class') {
         await api.post('/notifications', {
           title: form.title,
