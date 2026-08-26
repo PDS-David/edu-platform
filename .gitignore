@@ -22,6 +22,11 @@ client/.env.local
 # ── Database dumps & large files ─────────────────────────────────────────────
 *.dump
 *_dump.sql
+# Migrations are intentionally tracked despite the blanket *.sql rule below —
+# without this exception, a plain `git add`/`git add .` silently drops any
+# new database/migration_*.sql file with no error (this is exactly how
+# Phase 5's migration_009 file went missing from commit 7564b10).
+!database/migration_*.sql
 *_dump.txt
 *.sql
 *.txt
