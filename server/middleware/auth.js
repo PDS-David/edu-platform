@@ -207,4 +207,41 @@ const authorize = (...roles) => (req, res, next) => {
   next();
 };
 
-module.exports = { protect, authorize };
+// ─────────────────────────────────────────────────────────────────────────────
+// optionalAuth
+// ─────────────────────────────────────────────────────────────────────────────
+// For routes that must stay reachable without login (public/free content)
+// but still want to know who the caller is *when* they happen to be logged
+// in, so the response can be personalised/restricted for that case without
+// requiring authentication for everyone else.
+//
+// Unlike protect(), this NEVER blocks the request: no token, an expired/
+// invalid/revoked token, or a deactivated/missing user all fall through to
+// next() with req.user left undefined — exactly the same as an anonymous
+// visitor. Only a genuinely valid token results in req.user being set. Kept
+// deliberately minimal (id, role only) rather than reusing protect()'s full
+// tenant/language-gating logic, which exists for routes that actually
+// require login — a public listing route has no business enforcing that.
+const optionalAuth = async (req, res, next) => {
+  const header = req.headers?.authorization || '';
+  const token  = header.startsWith('Bearer ') ? header.slice(7) : null;
+
+  if (!token) return next();
+
+  try {
+    const decoded = await tokenService.verifyAccessToken(token);
+    const users = await db.query(
+      `SELECT id, role, is_active FROM users WHERE id = :id AND is_active = true LIMIT 1`,
+      { replacements: { id: decoded.id }, type: QueryTypes.SELECT }
+    );
+    if (users.length) {
+      req.user = users[0];
+    }
+  } catch {
+    // Invalid/expired/revoked token on a route that doesn't require auth —
+    // treat as anonymous rather than failing the request.
+  }
+  next();
+};
+
+module.exports = { protect, authorize, optionalAuth };
