@@ -22,6 +22,7 @@ const { adminActionLimiter } = require('../middleware/rateLimiter');
 const { requireAdminConfirm } = require('../middleware/confirmDestructive');
 const audit = require('../services/auditLogger');
 const { ENROLLMENT_SOURCE, ENROLLMENT_STATUS } = require('../constants/enrollmentConstants');
+const logger = require('../config/logger');
 const { ensureEnrollmentColumns } = require('./studentRoutes');
 
 // ─────────────────────────────────────────────
@@ -359,7 +360,9 @@ router.patch('/preferences', protect, async (req, res) => {
                    enrollment_source = COALESCE(student_subjects.enrollment_source, :enrollmentSource)`,
             { replacements: { userId, subjectId: safeId, enrollmentSource: ENROLLMENT_SOURCE.EXPLICIT, approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.RAW }
           );
-        } catch (_e) {}
+        } catch (err) {
+          logger.warn('[users] failed to enroll student in subject', { userId, subjectId: safeId, error: err.message });
+        }
       }
 
       // Back-fill the exam boards those subjects belong to. Previously used

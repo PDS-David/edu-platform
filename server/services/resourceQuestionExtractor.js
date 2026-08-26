@@ -26,6 +26,7 @@ const fs = require('fs');
 const { QueryTypes } = require('sequelize');
 const sequelize = require('../config/database');
 const { generate } = require('./ai');
+const logger = require('../config/logger');
 
 const MAX_QUESTIONS_PER_FILE = 15;
 const MAX_TEXT_CHARS = 12000;
@@ -170,10 +171,13 @@ function parseJsonLoose(text) {
   if (!text) return null;
   // Strip code fences if Gemini added them
   const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
-  try { return JSON.parse(cleaned); } catch {}
+  try { return JSON.parse(cleaned); } catch (err) { logger.warn('[resourceQuestionExtractor] JSON.parse failed, trying fallback extraction', err.message); }
   // Try to find the first {...} block
   const m = cleaned.match(/\{[\s\S]*\}/);
-  if (m) { try { return JSON.parse(m[0]); } catch {} }
+  if (m) {
+    try { return JSON.parse(m[0]); }
+    catch (err) { logger.warn('[resourceQuestionExtractor] fallback {...} extraction also failed to parse', err.message); }
+  }
   return null;
 }
 
