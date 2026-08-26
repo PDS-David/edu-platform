@@ -6,6 +6,7 @@ const { QueryTypes }                            = require('sequelize');
 const sequelize                                 = require('../config/database');
 const { generateQuizByTopic }                   = require('./quizGenerator');
 const { formatMemoryBlock }                     = require('./userMemory');
+const logger                                    = require('../config/logger');
 
 // v2: central AI hub — all Gemini calls routed through generate()
 const { generate }                              = require('./ai');
@@ -186,7 +187,9 @@ async function orchestrate({ message, context = {}, conversationHistory = [], us
     if (intent === 'generate_quiz') {
       try {
         structured = JSON.parse(rawText);
-      } catch {}
+      } catch (err) {
+        logger.warn('[aiOrchestrator] generate_quiz: failed to parse LLM response as JSON', err.message);
+      }
     }
 
     reply = rawText;
