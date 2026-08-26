@@ -69,9 +69,20 @@ export default function TopNav() {
     if (!user) return;
     // The notifications endpoint returns { success, count, data: [...] }
     // but apiClient normalises it so r.data is already the array (via data?.data ?? data)
-    api.get('/notifications')
-      .then(r => setNotifications(Array.isArray(r.data) ? r.data : []))
-      .catch(() => setNotifications([]));
+    const fetchNotifications = () => {
+      api.get('/notifications')
+        .then(r => setNotifications(Array.isArray(r.data) ? r.data : []))
+        .catch(() => {}); // leave existing list as-is on a failed poll — don't blank it
+    };
+    fetchNotifications();
+    // Poll so the bell/badge picks up a new notification (e.g. one a
+    // school_admin just sent) without the user having to reload the page.
+    // A plain interval, not a socket — the app's socket.io client
+    // (realtimeClient.js) is only wired up for one orphaned dashboard route,
+    // so pushing through it here would mean building out global connection
+    // handling for a single badge; polling is the proportionate fix.
+    const intervalId = setInterval(fetchNotifications, 45000);
+    return () => clearInterval(intervalId);
   }, [user]);
 
   useEffect(() => {
