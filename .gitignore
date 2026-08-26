@@ -22,17 +22,23 @@ client/.env.local
 # ── Database dumps & large files ─────────────────────────────────────────────
 *.dump
 *_dump.sql
-# Migrations are intentionally tracked despite the blanket *.sql rule below —
-# without this exception, a plain `git add`/`git add .` silently drops any
-# new database/migration_*.sql file with no error (this is exactly how
-# Phase 5's migration_009 file went missing from commit 7564b10).
-!database/migration_*.sql
 *_dump.txt
 *.sql
 *.txt
 *.zip
 *.tar
 *.gz
+
+# Migrations are intentionally tracked despite the blanket *.sql rule above —
+# gitignore evaluates patterns in order and the LAST match wins, so this
+# exception must come AFTER *.sql, not before it (a previous attempt at this
+# same exception was placed before the blanket rule, which meant it never
+# actually took effect — *.sql, coming later, always won). Without this
+# working correctly, a plain `git add`/`git add .` silently drops any new
+# database/migration_*.sql file with no error (this is exactly how Phase 5's
+# migration_009 file went missing from commit 7564b10, and why the original
+# attempt at this fix still required force-adding migration_009 by hand).
+!database/migration_*.sql
 
 database/*.dump
 code_dump_fresh.txt
