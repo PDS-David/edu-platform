@@ -105,17 +105,27 @@ router.post('/register', protect, authorize('admin'), authLimiter, logoUpload.si
 
   const t = await sequelize.transaction();
   try {
-    // Ensure a unique join code (retry a few times on the rare collision)
-    let joinCode, attempts = 0;
+    // Ensure a unique join code (retry a few times on the rare collision).
+    // schools.join_code is UNIQUE at the DB level, so an exhausted retry
+    // loop can never actually create a duplicate — but without this check
+    // it would fall through to the generic 500 below with no clue what
+    // happened. Fail clearly and let the caller just retry the request.
+    let joinCode, attempts = 0, joinCodeFound = false;
     do {
       joinCode = generateJoinCode();
       const existing = await sequelize.query(
         `SELECT 1 FROM schools WHERE join_code = $1`,
         { bind: [joinCode], type: sequelize.QueryTypes.SELECT, transaction: t }
       );
-      if (existing.length === 0) break;
+      if (existing.length === 0) { joinCodeFound = true; break; }
       attempts++;
     } while (attempts < 5);
+
+    if (!joinCodeFound) {
+      await t.rollback();
+      if (logoUrl) deleteSchoolLogo(logoUrl).catch(() => {});
+      return res.status(503).json({ success: false, error: 'Could not generate a unique join code — please try again.' });
+    }
 
     const [school] = await sequelize.query(
       `INSERT INTO schools (name, join_code, contact_email, enable_aischoolonair, enable_em, logo_url)
@@ -752,14 +762,20 @@ router.post('/me/classes', protect, requireSchoolAdmin, async (req, res) => {
     }
 
     // Ensure a unique join code (retry a few times on the rare collision) —
-    // same approach as POST /register above.
-    let joinCode, attempts = 0;
+    // same approach as POST /register above. classes.join_code is UNIQUE at
+    // the DB level, so this can never create a duplicate — but fail clearly
+    // if all retries collide rather than falling through to a generic 500.
+    let joinCode, attempts = 0, joinCodeFound = false;
     do {
       joinCode = generateJoinCode();
       const existing = await q(`SELECT 1 FROM classes WHERE join_code = $1`, [joinCode]);
-      if (existing.length === 0) break;
+      if (existing.length === 0) { joinCodeFound = true; break; }
       attempts++;
     } while (attempts < 5);
+
+    if (!joinCodeFound) {
+      return res.status(503).json({ success: false, error: 'Could not generate a unique join code — please try again.' });
+    }
 
     const [inserted] = await sequelize.query(
       `INSERT INTO classes (school_id, created_by, teacher_id, name, join_code, subject_ids, created_at)
