@@ -6,7 +6,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/apiClient';
-import TopNav from '../components/TopNav';
 import {
   ClipboardList, ArrowLeft, Loader2, CheckCircle,
   XCircle, Clock, Calendar, TrendingUp, AlertCircle,
@@ -63,8 +62,6 @@ export default function MockExamHistoryPage() {
 
   return (
     <div className="min-h-screen bg-[#f9f7f4]">
-      <TopNav />
-
       <div className="max-w-3xl mx-auto px-4 py-6">
         {/* Header */}
         <button
