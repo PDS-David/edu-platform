@@ -407,6 +407,15 @@ router.get('/', async (req, res) => {
             SELECT 1 FROM resource_assignments ra
             JOIN class_memberships cm ON cm.class_id = ra.class_id
             WHERE ra.resource_id = r.id AND cm.student_id = :user_id
+              AND (
+                r.subject_id IS NULL
+                OR EXISTS (
+                  SELECT 1 FROM student_subjects ss
+                  WHERE ss.student_id = cm.student_id
+                    AND ss.subject_id = r.subject_id
+                    AND (ss.status = 'approved' OR ss.status IS NULL)
+                )
+              )
           )
         )`;
     }
@@ -490,6 +499,15 @@ router.get('/my-assignments', async (req, res) => {
               SELECT 1 FROM resource_assignments ra
               JOIN class_memberships cm ON cm.class_id = ra.class_id
               WHERE ra.resource_id = r.id AND cm.student_id = :uid
+                AND (
+                  r.subject_id IS NULL
+                  OR EXISTS (
+                    SELECT 1 FROM student_subjects ss
+                    WHERE ss.student_id = cm.student_id
+                      AND ss.subject_id = r.subject_id
+                      AND (ss.status = 'approved' OR ss.status IS NULL)
+                  )
+                )
             )
           )
         ORDER BY r.created_at DESC LIMIT 1000`,
@@ -661,6 +679,15 @@ router.get('/:id/download', protect, async (req, res) => {
                 SELECT 1 FROM resource_assignments ra
                   JOIN class_memberships cm ON cm.class_id = ra.class_id
                  WHERE ra.resource_id = r.id AND cm.student_id = :uid
+                   AND (
+                     r.subject_id IS NULL
+                     OR EXISTS (
+                       SELECT 1 FROM student_subjects ss
+                       WHERE ss.student_id = cm.student_id
+                         AND ss.subject_id = r.subject_id
+                         AND (ss.status = 'approved' OR ss.status IS NULL)
+                     )
+                   )
               )
             )
           LIMIT 1`,
