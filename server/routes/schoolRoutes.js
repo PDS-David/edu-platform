@@ -13,6 +13,8 @@
  *   POST /api/schools/join       — an existing teacher/student links their account
  *                                   to a school using its join_code
  *   GET  /api/schools/me/roster  — school_admin views their school's teachers/students
+ *   DELETE /api/schools/me/roster/:userId — school_admin removes a student or
+ *                                   teacher from their school (detach, not delete)
  *
  * What's deliberately NOT in this slice (next steps, not done yet):
  *   - No scoping of subjects/classes/content by school_id (all content stays
@@ -284,6 +286,80 @@ router.get('/me/roster', protect, requireSchoolAdmin, async (req, res) => {
   } catch (err) {
     console.error('[schools] GET /me/roster', err.message);
     return res.status(500).json({ success: false, error: 'Could not load roster' });
+  }
+});
+
+// ─── DELETE /api/schools/me/roster/:userId ──────────────────────────────────
+// school_admin only. Removes a student or teacher FROM THE CALLER'S SCHOOL —
+// this is a detach, not an account delete. The user's account, XP, quiz
+// history, and subscription are untouched; only the school link and the
+// school-scoped enrollment/membership rows tied to it are cleared, so the
+// person could later join another school (or the same one again) cleanly.
+//
+// Guards, in order:
+//   1. Target must belong to the caller's school (same ownership pattern as
+//      every other /me/* route in this file) — 404 otherwise, never a 403,
+//      so this endpoint can't be used to probe which user IDs exist.
+//   2. Target's role must be student or teacher — a school_admin cannot use
+//      this route to remove another school_admin or an App Admin.
+//   3. Caller cannot remove themself through this route.
+router.delete('/me/roster/:userId', protect, requireSchoolAdmin, async (req, res) => {
+  const { userId } = req.params;
+
+  if (userId === req.user.id) {
+    return res.status(400).json({ success: false, error: 'You cannot remove your own account from the school this way.' });
+  }
+
+  try {
+    const target = await q(
+      `SELECT id, role, first_name, last_name FROM users WHERE id = $1 AND school_id = $2`,
+      [userId, req.user.school_id]
+    );
+    if (!target.length) {
+      return res.status(404).json({ success: false, error: 'User not found in your school' });
+    }
+
+    const { role } = target[0];
+    if (role !== 'student' && role !== 'teacher') {
+      return res.status(400).json({ success: false, error: 'Only students and teachers can be removed through this route.' });
+    }
+
+    const t = await sequelize.transaction();
+    try {
+      await sequelize.query(
+        `UPDATE users SET school_id = NULL WHERE id = $1`,
+        { bind: [userId], type: sequelize.QueryTypes.UPDATE, transaction: t }
+      );
+
+      if (role === 'student') {
+        await sequelize.query(
+          `DELETE FROM class_memberships WHERE student_id = $1`,
+          { bind: [userId], type: sequelize.QueryTypes.DELETE, transaction: t }
+        );
+        await sequelize.query(
+          `UPDATE student_subjects SET is_active = false WHERE student_id = $1`,
+          { bind: [userId], type: sequelize.QueryTypes.UPDATE, transaction: t }
+        );
+      } else {
+        await sequelize.query(
+          `UPDATE teacher_subjects SET is_active = false WHERE teacher_id = $1`,
+          { bind: [userId], type: sequelize.QueryTypes.UPDATE, transaction: t }
+        );
+      }
+
+      await t.commit();
+    } catch (err) {
+      await t.rollback();
+      throw err;
+    }
+
+    return res.json({
+      success: true,
+      data: { removed: true, user_id: userId, role },
+    });
+  } catch (err) {
+    console.error('[schools] DELETE /me/roster/:userId', err.message);
+    return res.status(500).json({ success: false, error: 'Could not remove user from school' });
   }
 });
 
