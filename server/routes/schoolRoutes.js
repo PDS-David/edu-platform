@@ -174,48 +174,19 @@ router.post('/register', protect, authorize('admin'), authLimiter, logoUpload.si
 });
 
 // ─── POST /api/schools/join ─────────────────────────────────────────────────
-// Auth required. An existing teacher or student links their own account to a
-// school by entering its join_code. Purely opt-in — never touches an account
-// that doesn't explicitly call this.
+// DISABLED. This used to let any authenticated teacher or student link their
+// own account to a school by entering its join_code (Phase 3 follow-up
+// reopened it to students after an earlier role-based block broke
+// onboarding — see git history on this route for that context). Self-join
+// is now blocked outright for every role; accounts must be added to a
+// school by a school_admin/App Admin instead. JoinSchoolPage.jsx on the
+// client still POSTs here and needs to handle this 403 (update its UI/copy
+// to point users to their school admin rather than a join code).
 router.post('/join', protect, schoolJoinLimiter, async (req, res) => {
-  // Phase 3 follow-up: the original Step 4 guard blocked every student from
-  // this route, which broke legitimate join-by-code onboarding — this is the
-  // only join-by-code endpoint in the app (JoinSchoolPage.jsx calls it) and
-  // is distinct from exam-type/subject self-service, which stays locked down
-  // via studentRoutes.js's POST /subjects, DELETE /subjects/:subjectId, and
-  // POST /exam-types/:examTypeId/join. A valid join_code (below) is the gate
-  // here, not the caller's role — students can self-join a school by code,
-  // same as teachers.
-  const { join_code } = req.body || {};
-  if (!join_code) {
-    return res.status(400).json({ success: false, error: 'join_code is required' });
-  }
-  try {
-    const rows = await q(
-      `SELECT id, name, enable_aischoolonair FROM schools WHERE join_code = $1 AND is_active = true`,
-      [join_code.trim().toUpperCase()]
-    );
-    if (!rows.length) {
-      return res.status(404).json({ success: false, error: 'Invalid or inactive join code' });
-    }
-    const school = rows[0];
-    // Distinct from "invalid code" on purpose: the code is real, but this
-    // school registered for English Masterclass only, not AISchoolonair.
-    if (!school.enable_aischoolonair) {
-      return res.status(400).json({
-        success: false,
-        error: `${school.name} has not been registered for AISchoolonair. Contact your school admin or App Admin.`,
-      });
-    }
-    await sequelize.query(
-      `UPDATE users SET school_id = $1 WHERE id = $2`,
-      { bind: [school.id, req.user.id], type: sequelize.QueryTypes.UPDATE }
-    );
-    return res.json({ success: true, data: { school_id: school.id, school_name: school.name } });
-  } catch (err) {
-    console.error('[schools] POST /join', err.message);
-    return res.status(500).json({ success: false, error: 'Could not join school' });
-  }
+  return res.status(403).json({
+    success: false,
+    error: 'Self-join by code is no longer available. Ask your school admin to add your account directly.',
+  });
 });
 
 // ─── Middleware: only school_admin, only within their own school ──────────
