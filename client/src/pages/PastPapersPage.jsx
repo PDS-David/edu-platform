@@ -54,6 +54,30 @@ export default function PastPapersPage() {
   const [examTypes, setExamTypes] = useState([]); // full catalog/types list for id lookup
   const [downloadingId, setDownloadingId] = useState(null);
 
+  // Student-only: the exam board(s) this student is actually enrolled in.
+  // Server-side (GET /api/past-papers) already hard-restricts a student to
+  // only these boards regardless of what's requested — this is the matching
+  // frontend fix so the "Exam type" dropdown itself never lists a board the
+  // student isn't enrolled in (previously showed every board in EXAM_BOARDS
+  // to everyone, including boards a student could select but would always
+  // get zero results back for). Reuses the same /students/my-boards
+  // endpoint StudentDashboard already uses for its own board dropdown.
+  const [myBoards, setMyBoards] = useState(null); // null = not loaded yet / not a student
+  useEffect(() => {
+    if (user?.role !== 'student') { setMyBoards(null); return; }
+    api.get('/students/my-boards')
+      .then(r => setMyBoards(r.data || []))
+      .catch(() => setMyBoards([]));
+  }, [user?.role]);
+
+  // Options actually shown in the "Exam type" dropdown: every board for
+  // anyone who isn't a logged-in student (unchanged from before), but only
+  // the student's own enrolled board(s) for a student — never the full list.
+  const examBoardOptions = (user?.role === 'student')
+    ? (myBoards || []).map(b => ({ code: b.code, name: b.name }))
+    : EXAM_BOARDS;
+  const allTypesLabel = (user?.role === 'student') ? 'All my exam types' : 'All types';
+
   // Load exam board catalog once (for id→code mapping)
   useEffect(() => {
     api.get('/catalog/types')
@@ -135,8 +159,8 @@ export default function PastPapersPage() {
           <div className="flex flex-col gap-1">
             <label className="text-xs text-gray-500 font-medium">Exam type</label>
             <select value={board} onChange={e => setBoard(e.target.value)} className={selectCls}>
-              <option value="">All types</option>
-              {EXAM_BOARDS.map(b => <option key={b.code} value={b.code}>{b.name}</option>)}
+              <option value="">{allTypesLabel}</option>
+              {examBoardOptions.map(b => <option key={b.code} value={b.code}>{b.name}</option>)}
             </select>
           </div>
 
