@@ -4,7 +4,7 @@ import api from '../services/apiClient';
 import {
   Users, Plus, CheckCircle, Loader2, AlertTriangle,
   BarChart2, X, PenTool, BookOpen, Upload, Send, FileText,
-  ChevronDown, AlertCircle, Search, UserPlus, Settings, Check, Trash2, Pencil, School,
+  ChevronDown, AlertCircle, Search, UserPlus, Settings, Check, Trash2, Pencil,
 } from 'lucide-react';
 import TopNav from '../components/TopNav';
 import PrintReportButton from '../components/PrintReportButton';
@@ -1118,8 +1118,6 @@ export default function TeacherDashboard() {
     { id: 'resources',   icon: Upload,    label: 'Resources',       link: '/teacher/resources'    },
     { id: 'addq',        icon: Plus,      label: 'Add Question',    link: '/teacher/questions/add'},
     { id: 'pastpapers',  icon: FileText,  label: 'Past Papers',     link: '/teacher/past-papers'  },
-    { id: 'joinschool',  icon: School,    label: 'Join a School',   link: '/join-school'          },
-
   ];
 
   const isTabActive = (item) => item.tab && activeTab === item.id;
