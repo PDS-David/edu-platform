@@ -241,6 +241,10 @@ exports.register = async (req, res, next) => {
       }
     );
 
+    if (!rows.length) {
+      return res.status(409).json({ success: false, error: 'An account with this email already exists. Try logging in instead.' });
+    }
+
     const user = await safeUser(rows[0]);
     const { ipAddress, userAgent } = clientMeta(req);
 
