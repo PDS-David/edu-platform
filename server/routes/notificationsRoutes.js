@@ -57,10 +57,11 @@ router.patch('/:id/read', protect, async (req, res) => {
 // authorize() gate. App Admin keeps the unrestricted behavior it always had.
 //
 // Body shape: { title, message, type?, action_url?, recipient: { kind: 'user'
-// | 'class' | 'school', id? } }. Back-compat: if `recipient` is omitted and a
-// bare `user_id` is passed instead (today's only shape), it's treated as
-// { kind: 'user', id: user_id } — every existing caller keeps working
-// unmodified.
+// | 'users' | 'class' | 'school', id?, ids? } }. 'user' takes a single id;
+// 'users' takes an array of ids (one round trip for a multi-person send).
+// Back-compat: if `recipient` is omitted and a bare `user_id` is passed
+// instead (today's only shape), it's treated as { kind: 'user', id: user_id }
+// — every existing caller keeps working unmodified.
 router.post('/', protect, authorize('admin', 'school_admin'), async (req, res) => {
   try {
     // action_url defaults to null (not left undefined): Sequelize's raw-query
@@ -128,6 +129,37 @@ router.post('/', protect, authorize('admin', 'school_admin'), async (req, res) =
       }
       const id = await insertOne(targetId);
       return res.json({ success: true, data: { id } });
+    }
+
+    // kind: 'users' (plural) — send the same notification to several specific
+    // people in one request. Added so SendNotificationModal.jsx's "Specific
+    // people" option can submit its whole selection in a single round trip
+    // instead of one POST per person. All-or-nothing, same pattern as Phase
+    // 2's class-student bulk add: if any id isn't in the caller's school,
+    // NOTHING is sent and the offending ids are named back, rather than
+    // silently notifying only the valid subset.
+    if (recipient.kind === 'users') {
+      const targetIds = Array.isArray(recipient.ids) ? [...new Set(recipient.ids)] : [];
+      if (!targetIds.length) {
+        return res.status(400).json({ success: false, error: 'recipient.ids must be a non-empty array for kind "users"' });
+      }
+      if (isSchoolAdmin) {
+        const owned = await sequelize.query(
+          `SELECT id FROM users WHERE id = ANY(:ids) AND school_id = :school_id`,
+          { replacements: { ids: targetIds, school_id: req.user.school_id }, type: QueryTypes.SELECT }
+        );
+        const ownedIds = new Set(owned.map((u) => u.id));
+        const failedIds = targetIds.filter((id) => !ownedIds.has(id));
+        if (failedIds.length) {
+          return res.status(400).json({
+            success: false,
+            error: 'Some recipients are not in your school',
+            failed_ids: failedIds,
+          });
+        }
+      }
+      const sent = await insertMany(targetIds);
+      return res.json({ success: true, data: { sent } });
     }
 
     if (recipient.kind === 'class') {
