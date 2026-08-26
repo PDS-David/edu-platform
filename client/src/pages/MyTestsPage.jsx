@@ -6,7 +6,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/apiClient';
-import TopNav from '../components/TopNav';
 import {
   ClipboardCheck, ArrowLeft, Loader2, CheckCircle,
   Clock, Calendar, AlertCircle, BookOpen, Play,
@@ -64,8 +63,6 @@ export default function MyTestsPage() {
 
   return (
     <div className="min-h-screen bg-[#f9f7f4]">
-      <TopNav />
-
       <div className="max-w-3xl mx-auto px-4 py-6">
         {/* Header */}
         <button
