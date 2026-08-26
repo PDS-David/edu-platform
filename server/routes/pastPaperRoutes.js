@@ -25,8 +25,10 @@
  *     AFTER:  createUploadMiddleware uses callback pattern → 400/413/415/422.
  *
  *   ACCESS-02 (Informational — public listing with no auth)
- *     Preserved as intentional. GET /api/past-papers remains public.
- *     Comment added to make the policy explicit.
+ *     Originally preserved as fully public/unfiltered. Revised 2026-08-26:
+ *     still public for anyone not logged in as a student, but a logged-in
+ *     student is now restricted to only their own enrolled exam board(s) —
+ *     see the exam-type-mismatch fix comment on GET / below.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -37,7 +39,7 @@ const fs        = require('fs');
 const { QueryTypes } = require('sequelize');
 
 const sequelize  = require('../config/database');
-const { protect } = require('../middleware/auth');
+const { protect, optionalAuth } = require('../middleware/auth');
 const { createUploadMiddleware } = require('../middleware/uploadSecurity');
 const r2         = require('../utils/r2Storage');
 const pastPaperScraper = require('../services/pastPaperScraper');
@@ -62,10 +64,20 @@ const teacherOrAdmin = (req, res, next) => {
 };
 
 // ── GET /api/past-papers ──────────────────────────────────────────────────────
-// ACCESS-02: Intentionally public — past exam papers are freely shareable
-// reference material. Confirmed policy. If this should change, add `protect`
-// and appropriate tier/role gating here.
-router.get('/', async (req, res) => {
+// ACCESS-02: Public for anyone not logged in as a student (unauthenticated
+// visitors, teachers, admins) — past exam papers remain freely shareable
+// reference material for those callers, per the original confirmed policy.
+//
+// EXAM-TYPE MISMATCH FIX (2026-08-26): a logged-in student was seeing past
+// papers from EVERY exam board (e.g. a JUPEB student seeing NECO papers),
+// because this route never filtered by the caller's own exam-board
+// enrollment at all. Per explicit product decision, students are now
+// restricted to ONLY their own enrolled exam board(s) — no way to browse or
+// switch to see others, unlike other filters on this route (subject, year)
+// which remain caller-adjustable. optionalAuth (not protect) is used so the
+// route stays reachable without login for everyone else; the restriction
+// only activates once a request is positively identified as a student.
+router.get('/', optionalAuth, async (req, res) => {
   try {
     const tableCheck = await sequelize.query(
       `SELECT EXISTS (
@@ -86,6 +98,34 @@ router.get('/', async (req, res) => {
     if (exam_board) { conditions.push('pp.exam_board = :exam_board'); replacements.exam_board = exam_board; }
     if (year_from)  { conditions.push('pp.year >= :year_from');       replacements.year_from  = Number(year_from); }
     if (year_to)    { conditions.push('pp.year <= :year_to');         replacements.year_to    = Number(year_to); }
+
+    // Hard restriction for students: only exam boards they're actively
+    // enrolled in (student_exam_types, same enrollment table/status used
+    // elsewhere in the app), regardless of any exam_board query param they
+    // might pass — a student cannot opt out of this by requesting a
+    // different board directly.
+    if (req.user?.role === 'student') {
+      const enrolledBoards = await sequelize.query(
+        `SELECT eb.code FROM student_exam_types set2
+           JOIN exam_boards eb ON eb.id = set2.exam_board_id
+          WHERE set2.student_id = :studentId
+            AND (set2.status = 'approved' OR set2.status IS NULL)
+            AND set2.is_active = true`,
+        { replacements: { studentId: req.user.id }, type: QueryTypes.SELECT }
+      );
+      const boardCodes = enrolledBoards.map(r => r.code).filter(Boolean);
+
+      // No enrolled exam board on record — show nothing rather than
+      // falling back to "everything" (fail closed for this restriction,
+      // matching what "ONLY their own enrolled exam type(s)" means for a
+      // student with none on record yet).
+      if (!boardCodes.length) {
+        return res.json({ success: true, data: [] });
+      }
+
+      conditions.push('pp.exam_board IN (:boardCodes)');
+      replacements.boardCodes = boardCodes;
+    }
 
     const rows = await sequelize.query(
       `SELECT pp.id, pp.title, pp.exam_board, pp.year, pp.paper_type,
@@ -205,10 +245,29 @@ router.post('/', protect, teacherOrAdmin, upload.single('file'), async (req, res
 router.get('/:id/download', protect, async (req, res) => {
   try {
     const rows = await sequelize.query(
-      `SELECT file_url, title FROM past_papers WHERE id = :id`,
+      `SELECT file_url, title, exam_board FROM past_papers WHERE id = :id`,
       { replacements: { id: req.params.id }, type: QueryTypes.SELECT }
     );
     if (!rows.length) return res.status(404).json({ success: false, error: 'Paper not found' });
+
+    // Same exam-board restriction as GET / — closes off downloading a paper
+    // outside a student's own enrolled exam board(s) via a direct/known ID,
+    // which would otherwise bypass the listing-level filter entirely.
+    if (req.user?.role === 'student') {
+      const enrolledBoards = await sequelize.query(
+        `SELECT 1 FROM student_exam_types set2
+           JOIN exam_boards eb ON eb.id = set2.exam_board_id
+          WHERE set2.student_id = :studentId
+            AND eb.code = :examBoard
+            AND (set2.status = 'approved' OR set2.status IS NULL)
+            AND set2.is_active = true
+          LIMIT 1`,
+        { replacements: { studentId: req.user.id, examBoard: rows[0].exam_board }, type: QueryTypes.SELECT }
+      );
+      if (!enrolledBoards.length) {
+        return res.status(403).json({ success: false, error: 'This past paper is not available for your exam type.' });
+      }
+    }
 
     const { file_url, title } = rows[0];
 
