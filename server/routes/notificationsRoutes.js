@@ -63,7 +63,12 @@ router.patch('/:id/read', protect, async (req, res) => {
 // unmodified.
 router.post('/', protect, authorize('admin', 'school_admin'), async (req, res) => {
   try {
-    const { title, message, type = 'info', action_url } = req.body;
+    // action_url defaults to null (not left undefined): Sequelize's raw-query
+    // named replacements throw "has no entry in the replacement map" for an
+    // undefined value (unlike an explicit null, which binds fine as SQL
+    // NULL) — this was crashing every send from SendNotificationModal.jsx,
+    // which has no action_url field and never sends the key at all.
+    const { title, message, type = 'info', action_url = null } = req.body;
     if (!title || !message) {
       return res.status(400).json({ success: false, error: 'title and message are required' });
     }
