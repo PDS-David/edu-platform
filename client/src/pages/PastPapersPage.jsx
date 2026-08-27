@@ -78,6 +78,21 @@ export default function PastPapersPage() {
     : EXAM_BOARDS;
   const allTypesLabel = (user?.role === 'student') ? 'All my exam types' : 'All types';
 
+  // Student-only: this student's own registered subjects (own selections +
+  // class-assigned) — mirrors the my-boards fix above, closing the matching
+  // gap for subjects. Previously the dropdown loaded EITHER every subject on
+  // the platform (no board selected) OR every subject under the selected
+  // board's full catalog (board selected) — neither was scoped to what this
+  // student is actually registered for, so a student could still request
+  // past papers for a subject in their own board they aren't enrolled in.
+  const [mySubjects, setMySubjects] = useState(null); // null = not loaded / not a student
+  useEffect(() => {
+    if (user?.role !== 'student') { setMySubjects(null); return; }
+    api.get('/students/my-subjects')
+      .then(r => setMySubjects(r.data || []))
+      .catch(() => setMySubjects([]));
+  }, [user?.role]);
+
   // Load exam board catalog once (for id→code mapping)
   useEffect(() => {
     api.get('/catalog/types')
@@ -88,8 +103,19 @@ export default function PastPapersPage() {
   // Cascade: when board changes, reload subjects for that board only (#4)
   useEffect(() => {
     setSubjectId('');          // reset subject when board changes
+
+    if (user?.role === 'student') {
+      // Never the full catalog for a student — only their own registered
+      // subjects, additionally narrowed to the selected board if one is set.
+      const scoped = board
+        ? (mySubjects || []).filter(s => s.exam_board_code === board)
+        : (mySubjects || []);
+      setSubjects(scoped);
+      return;
+    }
+
     if (!board) {
-      // No board selected → load all subjects flat
+      // No board selected → load all subjects flat (non-student only)
       api.get('/subjects?for_test_builder=true')
         .then(r => setSubjects(r.data || []))
         .catch(() => setSubjects([]));
@@ -101,7 +127,7 @@ export default function PastPapersPage() {
     api.get(`/catalog/types/${found.id}/subjects`)
       .then(r => setSubjects(r.data || []))
       .catch(() => setSubjects([]));
-  }, [board, examTypes]); // eslint-disable-line
+  }, [board, examTypes, user?.role, mySubjects]); // eslint-disable-line
 
   // Load papers whenever filters change
   useEffect(() => {
@@ -167,7 +193,7 @@ export default function PastPapersPage() {
           <div className="flex flex-col gap-1">
             <label className="text-xs text-gray-500 font-medium">Subject</label>
             <select value={subjectId} onChange={e => setSubjectId(e.target.value)} className={selectCls}>
-              <option value="">All subjects</option>
+              <option value="">{user?.role === 'student' ? 'All my subjects' : 'All subjects'}</option>
               {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </div>
