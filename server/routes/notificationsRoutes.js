@@ -82,10 +82,21 @@ router.post('/', protect, authorize('admin', 'school_admin'), async (req, res) =
 
     const isSchoolAdmin = req.user.role === 'school_admin';
 
+    // created_at is set explicitly (NOW()) in both inserts below rather than
+    // left to the column's DEFAULT. Every versioned migration that defines
+    // `notifications` gives created_at a DEFAULT NOW(), but table creation
+    // everywhere is guarded by CREATE TABLE IF NOT EXISTS — if the live
+    // table predates those migrations (or was created some other ad hoc
+    // way, as has happened before in this codebase — see the EP-15
+    // schema-canonicalization history), that CREATE is a silent no-op and
+    // the missing default never gets backfilled. Setting it explicitly here
+    // means every insert succeeds regardless of what the live table's
+    // default actually is. See also migration_012_notifications_created_at_default.sql,
+    // which fixes the schema itself (manual run required).
     const insertOne = async (userId) => {
       const rows = await sequelize.query(
-        `INSERT INTO notifications (user_id, title, message, type, action_url)
-         VALUES (:user_id, :title, :message, :type, :action_url)
+        `INSERT INTO notifications (user_id, title, message, type, action_url, created_at)
+         VALUES (:user_id, :title, :message, :type, :action_url, NOW())
          RETURNING id`,
         { replacements: { user_id: userId, title, message, type, action_url }, type: QueryTypes.INSERT }
       );
@@ -103,11 +114,11 @@ router.post('/', protect, authorize('admin', 'school_admin'), async (req, res) =
       const valuesSql = userIds
         .map((id, i) => {
           replacements[`user_id_${i}`] = id;
-          return `(:user_id_${i}, :title, :message, :type, :action_url)`;
+          return `(:user_id_${i}, :title, :message, :type, :action_url, NOW())`;
         })
         .join(', ');
       await sequelize.query(
-        `INSERT INTO notifications (user_id, title, message, type, action_url) VALUES ${valuesSql}`,
+        `INSERT INTO notifications (user_id, title, message, type, action_url, created_at) VALUES ${valuesSql}`,
         { replacements, type: QueryTypes.INSERT }
       );
       return userIds.length;
