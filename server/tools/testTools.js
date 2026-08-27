@@ -152,7 +152,7 @@ async function generateTest(userId, options = {}) {
       `SELECT ao.question_id, ao.id AS option_id, ao.option_text,
               ao.is_correct, ao.order_index
        FROM answer_options ao
-       WHERE ao.question_id = ANY(:questionIds)
+       WHERE ao.question_id IN (:questionIds)
        ORDER BY ao.question_id, ao.order_index ASC`,
       { replacements: { questionIds }, type: QueryTypes.SELECT }
     );

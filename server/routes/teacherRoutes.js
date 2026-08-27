@@ -154,7 +154,7 @@ router.get('/topics/:id/delete-impact', protect, teacherOnly, async (req, res) =
       const countRow = await sequelize.query(
         `SELECT COUNT(DISTINCT student_id)::INTEGER AS count
            FROM subtopic_progress
-          WHERE subtopic_id = ANY(:ids)`,
+          WHERE subtopic_id IN (:ids)`,
         { replacements: { ids: subtopicIds }, type: QueryTypes.SELECT }
       ).catch(() => [{ count: 0 }]); // table/column drift shouldn't block the warning UI
       studentsAffected = countRow[0]?.count || 0;
