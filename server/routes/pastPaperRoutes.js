@@ -125,6 +125,37 @@ router.get('/', optionalAuth, async (req, res) => {
 
       conditions.push('pp.exam_board IN (:boardCodes)');
       replacements.boardCodes = boardCodes;
+
+      // Same restriction, one level down: a student is also limited to the
+      // subjects they're actually registered for (own selection OR
+      // class-assigned — same two sources /students/my-subjects merges),
+      // not every subject that happens to exist under their enrolled
+      // board(s). Applied unconditionally, not just when a subject_id query
+      // param is passed — otherwise a student could still browse every
+      // subject in their board by simply omitting the filter.
+      const registeredSubjects = await sequelize.query(
+        `SELECT s.id FROM student_subjects ss
+           JOIN subjects s ON s.id = ss.subject_id
+          WHERE ss.student_id = :studentId AND ss.status = 'approved' AND s.is_active = true
+         UNION
+         SELECT s.id FROM class_memberships cm
+           JOIN classes        c  ON c.id  = cm.class_id
+           JOIN class_subjects cs ON cs.class_id = c.id
+           JOIN subjects       s  ON s.id  = cs.subject_id
+          WHERE cm.student_id = :studentId AND s.is_active = true`,
+        { replacements: { studentId: req.user.id }, type: QueryTypes.SELECT }
+      );
+      const subjectIds = registeredSubjects.map(r => r.id).filter(Boolean);
+
+      // No registered subject on record — show nothing, same fail-closed
+      // stance as the board check above, rather than falling back to every
+      // subject under the board.
+      if (!subjectIds.length) {
+        return res.json({ success: true, data: [] });
+      }
+
+      conditions.push('pp.subject_id IN (:subjectIds)');
+      replacements.subjectIds = subjectIds;
     }
 
     const rows = await sequelize.query(
