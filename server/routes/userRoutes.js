@@ -181,190 +181,40 @@ router.put('/:id/deactivate', protect, authorize('admin'), async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // PATCH /api/users/preferences
 // Must be defined BEFORE /:id — otherwise Express treats "preferences" as an ID.
-// Called by OnboardingPage — saves exam board selections, subject_ids, daily goal.
-// Body: { exam_boards: ['JAMB','WAEC'], subject_ids: [uuid,...],
-//         daily_goal: 50, study_days: ['Mon','Tue'], study_time: 'evening' }
+// Called by OnboardingPage (goal/schedule only) and SettingsPage — saves
+// daily_goal, study_days, study_time, and marks onboarding complete.
+// Body: { daily_goal: 50, preferred_study_days: '["Mon","Tue"]',
+//         preferred_study_time: 'evening' }
+//
+// SELF-SERVICE LOCKDOWN, closing a gap the Phase 3 exam-type/subject
+// lockdown missed: this endpoint used to also accept `exam_boards` and
+// `subject_ids` and write them straight into student_exam_types /
+// student_subjects, with NO role check beyond being logged in, no limit
+// enforcement, and — critically — no guard against being called again after
+// onboarding. Every other self-service path into those two tables was
+// closed (POST /subjects, DELETE /subjects/:subjectId, POST
+// /exam-types/:examTypeId/join all 403 a student — see studentRoutes.js),
+// but a student could always revisit /onboarding (that route is
+// deliberately exempt from the onboarding-redirect check, since it IS the
+// onboarding page) and silently re-enroll themselves into ANY exam board or
+// subject via this route, completely undermining the lockdown and, by
+// extension, the past-papers exam-board restriction (which trusts
+// student_exam_types as the source of truth). exam_boards/subject_ids in
+// the request body are now ignored entirely — assignment is exclusively
+// via POST /api/schools/students/:studentId/assign-exam-type (school_admin
+// or App Admin). OnboardingPage.jsx no longer sends these fields; if an
+// older client still does, they're silently no-ops now rather than errors,
+// so nothing breaks, they just stop having any effect.
 // ─────────────────────────────────────────────────────────────────────────────
 router.patch('/preferences', protect, async (req, res) => {
-  const { exam_boards, subject_ids, daily_goal,
-          preferred_study_days, preferred_study_time } = req.body;
+  const { daily_goal, preferred_study_days, preferred_study_time } = req.body;
   // SettingsPage sends preferred_study_days as a JSON string directly
   if (preferred_study_days !== undefined) req.body.study_days = JSON.parse(preferred_study_days || '[]');
   if (preferred_study_time !== undefined) req.body.study_time = preferred_study_time;
   const userId = req.user.id;
 
   try {
-    // 1. Save exam_boards → student_exam_types
-    // exam_boards may arrive as either board CODES (strings, e.g. "WAEC") or
-    // board IDs (numbers/UUID strings) — OnboardingPage.jsx specifically
-    // sends IDs (it reads them from pending_exam_board_ids / a matched
-    // board's .id), while the original code here assumed codes and called
-    // code.toUpperCase() unconditionally. Calling .toUpperCase() on a
-    // non-string ID throws a TypeError that was NOT caught by the inner
-    // per-item try/catch below — it propagated to the outer catch and
-    // returned a generic 500 with no indication of the real cause. This is
-    // why "Set your study schedule" / Let's go! was failing with
-    // "Failed to save preferences" in production.
-    if (Array.isArray(exam_boards) && exam_boards.length > 0) {
-      for (const raw of exam_boards) {
-        if (raw == null) continue;
-        let board;
-        try {
-          if (typeof raw === 'string' && /^[A-Za-z]+$/.test(raw)) {
-            // Looks like a board code (letters only, e.g. "WAEC", "JAMB")
-            board = await sequelize.query(
-              `SELECT id FROM exam_boards WHERE code = :code LIMIT 1`,
-              { replacements: { code: raw.toUpperCase() }, type: QueryTypes.SELECT }
-            );
-          } else {
-            // Numeric or UUID — treat as an exam_board.id directly
-            board = await sequelize.query(
-              `SELECT id FROM exam_boards WHERE id::text = :id LIMIT 1`,
-              { replacements: { id: String(raw) }, type: QueryTypes.SELECT }
-            );
-          }
-        } catch (lookupErr) {
-          console.error('[PATCH /users/preferences] exam_boards lookup failed for value', raw, lookupErr.message);
-          continue; // skip this one board rather than fail the whole request
-        }
-
-        if (board?.[0]) {
-          await sequelize.query(
-            `INSERT INTO student_exam_types (student_id, exam_board_id, is_active)
-             VALUES (:userId, :boardId, true)
-             ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active = true`,
-            { replacements: { userId, boardId: board[0].id }, type: QueryTypes.INSERT }
-          );
-        }
-      }
-    }
-
-    // 2. Save subject_ids — upsert into student_subjects AND student_exam_types
-    if (Array.isArray(subject_ids) && subject_ids.length > 0) {
-      // Ensure student_subjects table exists (idempotent)
-      await sequelize.query(
-        `CREATE TABLE IF NOT EXISTS student_subjects (
-           id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-           student_id UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-           subject_id INTEGER     NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
-           is_active  BOOLEAN     NOT NULL DEFAULT true,
-           added_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-           UNIQUE(student_id, subject_id)
-         )`,
-        { type: QueryTypes.RAW }
-      );
-
-      // Save each selected subject.
-      // Uses a two-attempt pattern: try with status='approved' first (works
-      // when patch_enrollment_status_columns.sql has been run), fall back to
-      // the base schema (migration_004) which has no status column.
-      for (const sid of subject_ids) {
-        const safeId = parseInt(sid);
-        if (!safeId) continue;
-        try {
-          await sequelize.query(
-            `INSERT INTO student_subjects (student_id, subject_id, is_active, status)
-             VALUES (:userId, :subjectId, true, 'approved')
-             ON CONFLICT (student_id, subject_id) DO UPDATE
-               SET is_active = true,
-                   status    = 'approved'`,
-            { replacements: { userId, subjectId: safeId }, type: QueryTypes.INSERT }
-          );
-        } catch (e1) {
-          // status column does not exist yet — fall back to base schema
-          if (e1.message?.includes('status') || e1.original?.code === '42703') {
-            await sequelize.query(
-              `INSERT INTO student_subjects (student_id, subject_id, is_active)
-               VALUES (:userId, :subjectId, true)
-               ON CONFLICT (student_id, subject_id) DO UPDATE
-                 SET is_active = true`,
-              { replacements: { userId, subjectId: safeId }, type: QueryTypes.INSERT }
-            );
-          } else {
-            throw e1;
-          }
-        }
-      }
-
-      // Also save the boards those subjects belong to in student_exam_types
-      //
-      // FIX 2026-06-18: this previously used `id = ANY(:subjectIds)` with a
-      // plain JS array passed as a Sequelize named replacement. Sequelize's
-      // raw-query replacement binding does not reliably coerce a JS array
-      // into a Postgres array literal for ANY() — it throws a type-mismatch
-      // error ("operator does not exist: integer = integer[]" or similar)
-      // depending on the pg/Sequelize version. That error was NOT caught by
-      // any inner try/catch (unlike the exam_boards loop above), so it
-      // propagated straight to the outer catch and killed the whole
-      // request with a generic 500 ("Failed to save preferences"), even
-      // though the student_subjects rows above had already been inserted.
-      // This is the exact failure seen in production when a student
-      // selected subjects (e.g. Chemistry), set a study goal/schedule, and
-      // clicked "Let's go!" — DevTools showed
-      // `PATCH api/users/preferences` → 500, and the student was stuck on
-      // the final onboarding screen with onboarding_complete never set.
-      //
-      // Fix: use IN (:subjectIds), which Sequelize reliably expands for
-      // raw replacements (this pattern is already used safely elsewhere in
-      // this codebase). Also guard the empty-array case, since `IN ()` is
-      // invalid SQL, and wrap the whole block in its own try/catch so a
-      // failure here degrades gracefully — the subject enrollment itself
-      // (already inserted above) is not lost just because the board
-      // back-fill failed.
-      try {
-        const safeSubjectIds = subject_ids.map(Number).filter(Boolean);
-        if (safeSubjectIds.length > 0) {
-          const boardRows = await sequelize.query(
-            `SELECT DISTINCT exam_board_id FROM subjects
-             WHERE id IN (:subjectIds) AND is_active = true AND exam_board_id IS NOT NULL`,
-            { replacements: { subjectIds: safeSubjectIds }, type: QueryTypes.SELECT }
-          );
-          for (const row of boardRows) {
-            await sequelize.query(
-              `INSERT INTO student_exam_types (student_id, exam_board_id, is_active)
-               VALUES (:userId, :boardId, true)
-               ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active = true`,
-              { replacements: { userId, boardId: row.exam_board_id }, type: QueryTypes.INSERT }
-            );
-          }
-        }
-      } catch (boardLookupErr) {
-        console.error('[PATCH /users/preferences] board lookup from subjects failed', boardLookupErr.message);
-        // Don't fail the whole request — subjects are already saved above,
-        // and the exam_boards loop in step 1 (if the client sent
-        // detectedBoards) already covers the common case.
-      }
-
-      // Persist individual subject selections into student_subjects.
-      // NOTE: this previously inserted a `source` column that does not
-      // exist anywhere in the schema (student_subjects has
-      // `enrollment_source` instead, added by the enrollment-approval
-      // migration, with allowed values 'explicit' | 'auto_enrolled' |
-      // 'cascade'). That meant this INSERT threw on every single call —
-      // harmless only because it was wrapped in its own try/catch, but it
-      // silently meant enrollment_source was NEVER being set during
-      // onboarding. Still wrapped defensively here because it's not
-      // guaranteed every environment has run that migration yet — if the
-      // column doesn't exist, this fails closed and the enrollment itself
-      // (already inserted above, in the loop with `is_active`) is
-      // unaffected.
-      for (const sid of subject_ids) {
-        try {
-          await sequelize.query(
-            `INSERT INTO student_subjects (student_id, subject_id, enrollment_source)
-             VALUES (:userId, :sid, 'explicit')
-             ON CONFLICT (student_id, subject_id) DO UPDATE SET enrollment_source = 'explicit'`,
-            { replacements: { userId, sid }, type: QueryTypes.INSERT }
-          );
-        } catch (_e) {
-          // enrollment_source column may not exist yet in this environment
-          // (migration not yet run) — skip silently, enrollment itself
-          // already succeeded via the is_active upsert above.
-        }
-      }
-    }
-
-    // 3. Save daily_goal
+    // 1. Save daily_goal
     if (daily_goal != null) {
       await sequelize.query(
         `UPDATE users SET daily_goal = :daily_goal, updated_at = NOW() WHERE id = :userId`,
@@ -372,7 +222,7 @@ router.patch('/preferences', protect, async (req, res) => {
       );
     }
 
-    // 4. Save study_days + study_time
+    // 2. Save study_days + study_time
     if (Array.isArray(req.body.study_days)) {
       await sequelize.query(
         `UPDATE users
@@ -391,7 +241,7 @@ router.patch('/preferences', protect, async (req, res) => {
       );
     }
 
-    // 5. Mark onboarding complete
+    // 3. Mark onboarding complete
     await sequelize.query(
       `UPDATE users SET onboarding_complete = true, updated_at = NOW() WHERE id = :userId`,
       { replacements: { userId }, type: QueryTypes.UPDATE }
