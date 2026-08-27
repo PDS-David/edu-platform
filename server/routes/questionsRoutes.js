@@ -211,7 +211,7 @@ router.get('/random', protect, async (req, res) => {
       const fallbackRows = await sequelize.query(
         `SELECT question_id, option_text, is_correct, order_index
            FROM answer_options
-          WHERE question_id = ANY(:ids)
+          WHERE question_id IN (:ids)
           ORDER BY question_id, order_index ASC NULLS LAST`,
         { replacements: { ids: needsFallback.map(q => q.id) }, type: QueryTypes.SELECT }
       ).catch(() => []); // table may not exist in some environments — degrade gracefully

@@ -435,7 +435,7 @@ async function getMemoryForPrompt(userId, { subjectId = null } = {}) {
     sequelize.query(
       `UPDATE ai_conversation_memory
        SET times_used = times_used + 1, last_used_at = NOW()
-       WHERE id = ANY(:ids)`,
+       WHERE id IN (:ids)`,
       { replacements: { ids }, type: QueryTypes.UPDATE }
     ).catch(() => {});
   }

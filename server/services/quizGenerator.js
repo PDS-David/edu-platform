@@ -205,7 +205,7 @@ async function fetchQuestionsForTopic(topic, safeLimit, difficulty, randomise) {
          ao.is_correct,
          ao.order_index
        FROM answer_options ao
-       WHERE ao.question_id = ANY(:questionIds)
+       WHERE ao.question_id IN (:questionIds)
        ORDER BY ao.question_id, ao.order_index ASC`,
       { replacements: { questionIds }, type: QueryTypes.SELECT }
     );
