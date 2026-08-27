@@ -20,6 +20,125 @@ import {
   BookOpen, ChevronRight, Trash2, Bell, Send,
 } from 'lucide-react';
 
+// ─── Assign Subjects to Teacher ─────────────────────────────────────────────
+// Backend: GET/POST /schools/me/teachers/:teacherId/subjects, DELETE
+// .../subjects/:subjectId (school_admin only, scoped to the caller's own
+// school — see schoolRoutes.js). Subject picker sources from the same
+// public /catalog/all-subjects endpoint the App Admin equivalent uses.
+function AssignSubjectsModal({ teacher, onClose, onAssigned }) {
+  const [allSubjects,     setAllSubjects]     = useState(null);
+  const [assignedIds,     setAssignedIds]     = useState(null);
+  const [selectedIds,     setSelectedIds]     = useState(new Set());
+  const [loading,         setLoading]         = useState(true);
+  const [saving,          setSaving]          = useState(false);
+  const [error,           setError]           = useState('');
+
+  useEffect(() => {
+    setLoading(true);
+    setError('');
+    Promise.all([
+      api.get('/catalog/all-subjects'),
+      api.get(`/schools/me/teachers/${teacher.id}/subjects`),
+    ])
+      .then(([allRes, assignedRes]) => {
+        const assigned = assignedRes.data || [];
+        setAllSubjects(allRes.data || []);
+        setAssignedIds(assigned.map(s => s.id));
+        setSelectedIds(new Set(assigned.map(s => s.id)));
+      })
+      .catch(err => setError(err?.response?.data?.error || 'Could not load subjects.'))
+      .finally(() => setLoading(false));
+  }, [teacher.id]);
+
+  const toggle = (id) => setSelectedIds(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+
+  const save = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      const toAdd    = [...selectedIds].filter(id => !(assignedIds || []).includes(id));
+      const toRemove = (assignedIds || []).filter(id => !selectedIds.has(id));
+
+      if (toAdd.length) {
+        await api.post(`/schools/me/teachers/${teacher.id}/subjects`, { subject_ids: toAdd });
+      }
+      // Removals have no bulk endpoint (mirrors the App Admin route's own
+      // one-at-a-time unassign) — fine here since a single save is realistically
+      // a handful of changes, not a large unbounded batch like Phase 2's roster add.
+      for (const id of toRemove) {
+        await api.delete(`/schools/me/teachers/${teacher.id}/subjects/${id}`);
+      }
+      onAssigned();
+      onClose();
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Could not save subject assignments.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const dirty = allSubjects && assignedIds && (
+    selectedIds.size !== assignedIds.length || [...selectedIds].some(id => !assignedIds.includes(id))
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-gray-900">
+            Assign Subjects — {teacher.first_name} {teacher.last_name}
+          </h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X size={20} />
+          </button>
+        </div>
+
+        {error && (
+          <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        )}
+
+        {loading ? (
+          <div className="flex justify-center py-10"><Loader2 size={20} className="animate-spin text-gray-400" /></div>
+        ) : (
+          <>
+            {(allSubjects || []).length === 0 ? (
+              <p className="text-sm text-gray-400 py-6 text-center">No subjects in the catalog yet.</p>
+            ) : (
+              <div className="border border-gray-100 rounded-xl divide-y divide-gray-50 max-h-72 overflow-y-auto">
+                {allSubjects.map(s => (
+                  <label key={s.id} className="flex items-center justify-between py-2 px-3 text-sm cursor-pointer">
+                    <span className="flex items-center gap-2">
+                      <input type="checkbox" checked={selectedIds.has(s.id)} onChange={() => toggle(s.id)}
+                        className="accent-indigo-600" />
+                      <span className="text-gray-800">{s.name}</span>
+                    </span>
+                    {s.exam_board_code && (
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">{s.exam_board_code}</span>
+                    )}
+                  </label>
+                ))}
+              </div>
+            )}
+
+            <button onClick={save} disabled={!dirty || saving}
+              className="w-full mt-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold disabled:opacity-40 transition-colors flex items-center justify-center gap-2">
+              {saving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Phase 2: School-Owned Classes ──────────────────────────────────────────
 
 function CreateClassModal({ teachers, onClose, onCreated }) {
@@ -585,6 +704,7 @@ export default function SchoolAdminDashboard() {
   // Phase 3 Step 5: shared assign-exam-type modal, keyed to which student
   // row triggered it (or null when closed).
   const [assigningStudent, setAssigningStudent] = useState(null);
+  const [assigningTeacher, setAssigningTeacher] = useState(null);
   // Remove-from-school (backend: DELETE /schools/me/roster/:userId, already
   // in place) — frontend confirm + trigger for it.
   const [removeConfirm, setRemoveConfirm] = useState(null); // roster row pending removal
@@ -812,6 +932,12 @@ export default function SchoolAdminDashboard() {
                           </Link>
                         </>
                       )}
+                      {u.role === 'teacher' && (
+                        <button onClick={() => setAssigningTeacher(u)}
+                          className="flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors shrink-0">
+                          <BookOpen size={12} /> Assign Subjects
+                        </button>
+                      )}
                       {(u.role === 'student' || u.role === 'teacher') && (
                         removing === u.id ? (
                           <Loader2 size={14} className="animate-spin text-red-300 shrink-0" />
@@ -890,6 +1016,14 @@ export default function SchoolAdminDashboard() {
           studentId={assigningStudent.id}
           studentName={`${assigningStudent.first_name} ${assigningStudent.last_name}`}
           onClose={() => setAssigningStudent(null)}
+          onAssigned={loadRoster}
+        />
+      )}
+
+      {assigningTeacher && (
+        <AssignSubjectsModal
+          teacher={assigningTeacher}
+          onClose={() => setAssigningTeacher(null)}
           onAssigned={loadRoster}
         />
       )}

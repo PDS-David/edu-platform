@@ -1177,4 +1177,122 @@ router.post('/students/:studentId/assign-exam-type', protect, requireSchoolAdmin
   }
 });
 
+// ─── Teacher Subject Assignment (school_admin, scoped to own school) ───────
+// Mirrors server/routes/catalogRoutes.js's App-Admin-only
+// GET/POST /catalog/teachers/:teacherId/subjects and
+// DELETE /catalog/teachers/:teacherId/subjects/:subjectId — same
+// teacher_subjects table, same is_active-flag semantics — but scoped to a
+// teacher in the caller's own school instead of any teacher on the platform.
+// exam_board_id is deliberately never passed from JS: it's pulled straight
+// from subjects.exam_board_id inside the SQL (SELECT/INSERT ... FROM
+// subjects), the same source the App Admin route ultimately uses, so this
+// never has to know or assume that column's exact type.
+
+// ─── GET /api/schools/me/teachers/:teacherId/subjects ───────────────────────
+router.get('/me/teachers/:teacherId/subjects', protect, requireSchoolAdmin, async (req, res) => {
+  const { teacherId } = req.params;
+  try {
+    const owned = await q(
+      `SELECT id FROM users WHERE id = $1 AND school_id = $2 AND role = 'teacher'`,
+      [teacherId, req.user.school_id]
+    );
+    if (!owned.length) {
+      return res.status(404).json({ success: false, error: 'Teacher not found in your school' });
+    }
+
+    const rows = await q(
+      `SELECT s.id, s.name, s.code
+         FROM teacher_subjects ts
+         JOIN subjects s ON s.id = ts.subject_id
+        WHERE ts.teacher_id = $1 AND ts.is_active = true
+        ORDER BY s.name ASC`,
+      [teacherId]
+    );
+    return res.json({ success: true, data: rows });
+  } catch (err) {
+    console.error('[schools] GET /me/teachers/:teacherId/subjects', err.message);
+    return res.status(500).json({ success: false, error: 'Could not load teacher subjects' });
+  }
+});
+
+// ─── POST /api/schools/me/teachers/:teacherId/subjects ──────────────────────
+// Body: { subject_ids: [...] }. All-or-nothing, same as Phase 2's class
+// bulk-add — if any subject_id doesn't exist/isn't active, nothing is
+// assigned and the offending ids are named back, rather than silently
+// skipping them the way the App Admin route's per-id loop does.
+router.post('/me/teachers/:teacherId/subjects', protect, requireSchoolAdmin, async (req, res) => {
+  const { teacherId } = req.params;
+  const subjectIds = Array.isArray(req.body?.subject_ids) ? [...new Set(req.body.subject_ids)] : null;
+
+  if (!subjectIds || !subjectIds.length) {
+    return res.status(400).json({ success: false, error: 'subject_ids (non-empty array) is required' });
+  }
+  if (subjectIds.length > 100) {
+    return res.status(400).json({ success: false, error: 'Too many subject_ids in one request (max 100)' });
+  }
+
+  try {
+    const owned = await q(
+      `SELECT id FROM users WHERE id = $1 AND school_id = $2 AND role = 'teacher'`,
+      [teacherId, req.user.school_id]
+    );
+    if (!owned.length) {
+      return res.status(404).json({ success: false, error: 'Teacher not found in your school' });
+    }
+
+    const validRows = await q(
+      `SELECT id FROM subjects WHERE id = ANY($1::int[]) AND is_active = true`,
+      [subjectIds]
+    );
+    const validIds = new Set(validRows.map(r => r.id));
+    const failedIds = subjectIds.filter(sid => !validIds.has(sid));
+    if (failedIds.length) {
+      return res.status(400).json({
+        success: false,
+        error: 'Some subject_ids are not valid, active subjects',
+        failed_ids: failedIds,
+      });
+    }
+
+    // Single set-based statement — exam_board_id flows straight from
+    // subjects in the same query, never touched in JS.
+    await sequelize.query(
+      `INSERT INTO teacher_subjects (teacher_id, subject_id, exam_board_id, assigned_by, assigned_at, is_active)
+       SELECT $1, s.id, s.exam_board_id, $2, NOW(), true
+         FROM subjects s
+        WHERE s.id = ANY($3::int[]) AND s.is_active = true
+       ON CONFLICT (teacher_id, subject_id) DO UPDATE
+         SET is_active = true, assigned_by = EXCLUDED.assigned_by, assigned_at = NOW()`,
+      { bind: [teacherId, req.user.id, subjectIds], type: sequelize.QueryTypes.INSERT }
+    );
+
+    return res.status(201).json({ success: true, data: { assigned: subjectIds.length } });
+  } catch (err) {
+    console.error('[schools] POST /me/teachers/:teacherId/subjects', err.message);
+    return res.status(500).json({ success: false, error: 'Could not assign subjects to teacher' });
+  }
+});
+
+// ─── DELETE /api/schools/me/teachers/:teacherId/subjects/:subjectId ─────────
+router.delete('/me/teachers/:teacherId/subjects/:subjectId', protect, requireSchoolAdmin, async (req, res) => {
+  const { teacherId, subjectId } = req.params;
+  try {
+    const owned = await q(
+      `SELECT id FROM users WHERE id = $1 AND school_id = $2 AND role = 'teacher'`,
+      [teacherId, req.user.school_id]
+    );
+    if (!owned.length) {
+      return res.status(404).json({ success: false, error: 'Teacher not found in your school' });
+    }
+    await sequelize.query(
+      `UPDATE teacher_subjects SET is_active = false WHERE teacher_id = $1 AND subject_id = $2`,
+      { bind: [teacherId, subjectId], type: sequelize.QueryTypes.UPDATE }
+    );
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('[schools] DELETE /me/teachers/:teacherId/subjects/:subjectId', err.message);
+    return res.status(500).json({ success: false, error: 'Could not remove subject from teacher' });
+  }
+});
+
 module.exports = router;
