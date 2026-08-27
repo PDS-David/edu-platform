@@ -27,7 +27,7 @@ router.get('/', async (req, res) => {
     // subtopics — O(boards × subjects × topics) sequential round-trips, which
     // scales to thousands of queries on a real catalog. Replaced with exactly
     // 4 queries total (1 + 3 batched-by-parent-id), each scoped with
-    // WHERE x = ANY(:ids), then grouped in memory. Response shape, field
+    // WHERE x IN (:ids), then grouped in memory. Response shape, field
     // names, and ordering (name ASC within each parent) are unchanged so no
     // consumer of this endpoint's JSON needs to change.
     let allSubjects = [];
@@ -35,7 +35,7 @@ router.get('/', async (req, res) => {
       allSubjects = await sequelize.query(
         `SELECT id, name, code, subject_code, exam_board_id
          FROM subjects
-         WHERE exam_board_id = ANY(:board_ids)
+         WHERE exam_board_id IN (:board_ids)
            AND is_active = true
          ORDER BY name ASC`,
         { replacements: { board_ids: boardIds }, type: QueryTypes.SELECT }
@@ -52,7 +52,7 @@ router.get('/', async (req, res) => {
         allTopics = await sequelize.query(
           `SELECT id, name, subject_id
            FROM topics
-           WHERE subject_id = ANY(:subject_ids)
+           WHERE subject_id IN (:subject_ids)
            ORDER BY name ASC`,
           { replacements: { subject_ids: subjectIds }, type: QueryTypes.SELECT }
         );
@@ -69,7 +69,7 @@ router.get('/', async (req, res) => {
         allSubtopics = await sequelize.query(
           `SELECT id, name, topic_id
            FROM subtopics
-           WHERE topic_id = ANY(:topic_ids)
+           WHERE topic_id IN (:topic_ids)
            ORDER BY name ASC`,
           { replacements: { topic_ids: topicIds }, type: QueryTypes.SELECT }
         );

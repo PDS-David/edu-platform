@@ -199,7 +199,7 @@ async function importConcepts(filePath, { dryRun = false } = {}) {
   const uniqueSubs = [...new Set(rows.map(getSubId))];
 
   const existingSubtopics = await sequelize.query(
-    `SELECT id FROM subtopics WHERE id = ANY(:ids)`,
+    `SELECT id FROM subtopics WHERE id IN (:ids)`,
     { replacements: { ids: uniqueSubs }, type: QueryTypes.SELECT }
   );
   const existingSubSet = new Set(existingSubtopics.map(r => r.id));
@@ -217,7 +217,7 @@ async function importConcepts(filePath, { dryRun = false } = {}) {
   const existingConcepts = await sequelize.query(
     `SELECT subtopic_id, LOWER(TRIM(name)) AS name_key
      FROM concepts
-     WHERE subtopic_id = ANY(:ids)`,
+     WHERE subtopic_id IN (:ids)`,
     { replacements: { ids: uniqueSubs }, type: QueryTypes.SELECT }
   );
   // Build a Set of "subtopic_id:lower(name)" for O(1) duplicate lookup
