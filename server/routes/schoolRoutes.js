@@ -286,6 +286,86 @@ router.get('/me/roster', protect, requireSchoolAdmin, async (req, res) => {
   }
 });
 
+// ─── DELETE /api/schools/me/roster/:userId ──────────────────────────────────
+// school_admin only. Removes a teacher or student from the caller's own
+// school. Deliberately an UNLINK, not an account deletion: a school_admin
+// only has authority over their own tenant, not the account itself (that's
+// App Admin's DELETE /api/users/:id, which does hard-delete). Unlinking
+// (school_id -> NULL) is also reversible — the account still exists and can
+// re-join via a join_code or be invited to a different school — whereas a
+// hard delete here would risk unrecoverable data loss if a school_admin
+// account were compromised or the action were a mistake.
+//
+// Scope is double-checked: the target must (a) currently belong to the
+// caller's own school (school_id match — cannot touch another school's
+// roster or a standalone/no-school account) and (b) have role 'teacher' or
+// 'student' (cannot be used against another school_admin or an App Admin —
+// removing those requires the platform-level DELETE /api/users/:id instead).
+//
+// Side effects, so the roster is actually clean afterward rather than just
+// hiding the row: a removed teacher is unassigned from any of this school's
+// classes (classes.teacher_id -> NULL, class kept); a removed student is
+// dropped from any of this school's class_memberships. Both run in the same
+// transaction as the unlink so a failure can't leave a half-removed user.
+router.delete('/me/roster/:userId', protect, requireSchoolAdmin, async (req, res) => {
+  const { userId } = req.params;
+
+  if (userId === req.user.id) {
+    return res.status(400).json({ success: false, error: 'You cannot remove your own account' });
+  }
+
+  const t = await sequelize.transaction();
+  try {
+    const [target] = await sequelize.query(
+      `SELECT id, email, first_name, last_name, role, school_id
+         FROM users WHERE id = $1 FOR UPDATE`,
+      { bind: [userId], type: sequelize.QueryTypes.SELECT, transaction: t }
+    );
+
+    if (!target || target.school_id !== req.user.school_id) {
+      await t.rollback();
+      return res.status(404).json({ success: false, error: 'That user is not in your school' });
+    }
+    if (target.role !== 'teacher' && target.role !== 'student') {
+      await t.rollback();
+      return res.status(403).json({
+        success: false,
+        error: 'Only teachers and students can be removed here — contact App Admin for other roles',
+      });
+    }
+
+    if (target.role === 'teacher') {
+      await sequelize.query(
+        `UPDATE classes SET teacher_id = NULL WHERE teacher_id = $1 AND school_id = $2`,
+        { bind: [userId, req.user.school_id], type: sequelize.QueryTypes.UPDATE, transaction: t }
+      );
+    } else {
+      await sequelize.query(
+        `DELETE FROM class_memberships
+          WHERE student_id = $1
+            AND class_id IN (SELECT id FROM classes WHERE school_id = $2)`,
+        { bind: [userId, req.user.school_id], type: sequelize.QueryTypes.DELETE, transaction: t }
+      );
+    }
+
+    await sequelize.query(
+      `UPDATE users SET school_id = NULL WHERE id = $1`,
+      { bind: [userId], type: sequelize.QueryTypes.UPDATE, transaction: t }
+    );
+
+    await t.commit();
+    console.log(`[schools] DELETE /me/roster/:userId — school_admin ${req.user.id} removed ${target.role} ${target.email} from school ${req.user.school_id}`);
+    return res.json({
+      success: true,
+      data: { removed_id: target.id, email: target.email, role: target.role },
+    });
+  } catch (err) {
+    await t.rollback();
+    console.error('[schools] DELETE /me/roster/:userId', err.message);
+    return res.status(500).json({ success: false, error: 'Could not remove user — no changes were made (transaction rolled back).' });
+  }
+});
+
 // ─── GET /api/schools/:id/roster ────────────────────────────────────────────
 // App Admin only. Same shape as GET /me/roster, but for any school by ID —
 // App Admin can see every school's data; a school_admin still only ever sees

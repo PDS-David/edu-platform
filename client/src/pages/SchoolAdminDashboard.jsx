@@ -15,7 +15,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/apiClient';
 import {
   School, Users, GraduationCap, UserCheck, Copy, Check,
-  Loader2, LogOut, AlertCircle, Plus, X, Image as ImageIcon, FileText,
+  Loader2, LogOut, AlertCircle, AlertTriangle, Plus, X, Image as ImageIcon, FileText,
   BookOpen, ChevronRight, Trash2,
 } from 'lucide-react';
 
@@ -385,6 +385,9 @@ export default function SchoolAdminDashboard() {
   const [showInvite, setShowInvite] = useState(false);
   const [logoSaving, setLogoSaving] = useState(false);
   const [logoError, setLogoError] = useState('');
+  const [removeConfirm, setRemoveConfirm] = useState(null); // roster row pending removal
+  const [removing, setRemoving] = useState(null);           // id currently being removed
+  const [removeError, setRemoveError] = useState('');
 
   const loadRoster = () => {
     api.get('/schools/me/roster')
@@ -396,6 +399,22 @@ export default function SchoolAdminDashboard() {
     api.get('/schools/me')
       .then(res => setSchool(res.data || null))
       .catch(() => {});
+  };
+
+  const handleRemove = async () => {
+    if (!removeConfirm) return;
+    const target = removeConfirm;
+    setRemoveConfirm(null);
+    setRemoveError('');
+    setRemoving(target.id);
+    try {
+      await api.delete(`/schools/me/roster/${target.id}`);
+      setRoster(prev => (prev || []).filter(u => u.id !== target.id));
+    } catch (err) {
+      setRemoveError(err?.response?.data?.error || err?.message || 'Could not remove user.');
+    } finally {
+      setRemoving(null);
+    }
   };
 
   useEffect(() => {
@@ -554,6 +573,12 @@ export default function SchoolAdminDashboard() {
                   <Plus size={14} /> Add Teacher or Student
                 </button>
               </div>
+              {removeError && (
+                <div className="mb-3 p-2.5 rounded-lg bg-red-50 border border-red-100 flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                  <p className="text-xs text-red-700">{removeError}</p>
+                </div>
+              )}
               {(roster || []).length === 0 && (
                 <p className="text-sm text-gray-400 py-6 text-center">
                   No one has joined your school yet. Share your join code above to get started.
@@ -579,6 +604,19 @@ export default function SchoolAdminDashboard() {
                           <FileText size={12} /> Report
                         </Link>
                       )}
+                      {(u.role === 'student' || u.role === 'teacher') && (
+                        removing === u.id ? (
+                          <Loader2 size={14} className="animate-spin text-red-300 shrink-0" />
+                        ) : (
+                          <button
+                            onClick={() => setRemoveConfirm(u)}
+                            title={`Remove this ${u.role} from your school`}
+                            className="p-1 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )
+                      )}
                     </div>
                   </div>
                 ))}
@@ -589,6 +627,44 @@ export default function SchoolAdminDashboard() {
           </>
         )}
       </div>
+
+      {removeConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="shrink-0 w-9 h-9 rounded-full bg-red-50 flex items-center justify-center">
+                <AlertTriangle size={18} className="text-red-500" />
+              </div>
+              <div>
+                <p className="font-semibold text-gray-900 text-sm">
+                  Remove {removeConfirm.first_name} {removeConfirm.last_name}?
+                </p>
+                <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                  They'll lose access to your school{removeConfirm.role === 'teacher' ? ' and be unassigned from any classes' : ' and be removed from any classes'}.
+                  Their account itself isn't deleted — they can rejoin with a new invite or join code.
+                </p>
+              </div>
+              <button
+                onClick={() => setRemoveConfirm(null)}
+                className="shrink-0 p-1 rounded-lg text-gray-300 hover:text-gray-500 transition-colors ml-auto">
+                <X size={15} />
+              </button>
+            </div>
+            <div className="flex gap-2 mt-2">
+              <button
+                onClick={() => setRemoveConfirm(null)}
+                className="flex-1 text-sm font-semibold border border-gray-200 text-gray-600 hover:bg-gray-50 px-4 py-2 rounded-xl transition-colors">
+                Cancel
+              </button>
+              <button
+                onClick={handleRemove}
+                className="flex-1 text-sm font-semibold bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl transition-colors">
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showInvite && (
         <InviteModal
