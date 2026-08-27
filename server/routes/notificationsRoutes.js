@@ -145,7 +145,7 @@ router.post('/', protect, authorize('admin', 'school_admin'), async (req, res) =
       }
       if (isSchoolAdmin) {
         const owned = await sequelize.query(
-          `SELECT id FROM users WHERE id = ANY(:ids) AND school_id = :school_id`,
+          `SELECT id FROM users WHERE id IN (:ids) AND school_id = :school_id`,
           { replacements: { ids: targetIds, school_id: req.user.school_id }, type: QueryTypes.SELECT }
         );
         const ownedIds = new Set(owned.map((u) => u.id));

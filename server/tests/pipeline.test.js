@@ -127,55 +127,55 @@ afterAll(async () => {
   // Delete in reverse-dependency order
   if (cleanup.ai_question_logs.length) {
     await q(
-      `DELETE FROM ai_question_logs WHERE id = ANY(:ids)`,
+      `DELETE FROM ai_question_logs WHERE id IN (:ids)`,
       { ids: cleanup.ai_question_logs }, QueryTypes.DELETE
     ).catch(() => {});
   }
   if (cleanup.student_concept_mastery.length) {
     await q(
-      `DELETE FROM student_concept_mastery WHERE id = ANY(:ids)`,
+      `DELETE FROM student_concept_mastery WHERE id IN (:ids)`,
       { ids: cleanup.student_concept_mastery }, QueryTypes.DELETE
     ).catch(() => {});
   }
   if (cleanup.subtopic_quiz_answers.length) {
     await q(
-      `DELETE FROM subtopic_quiz_answers WHERE id = ANY(:ids)`,
+      `DELETE FROM subtopic_quiz_answers WHERE id IN (:ids)`,
       { ids: cleanup.subtopic_quiz_answers }, QueryTypes.DELETE
     ).catch(() => {});
   }
   if (cleanup.subtopic_quiz_attempts.length) {
     await q(
-      `DELETE FROM subtopic_quiz_attempts WHERE id = ANY(:ids)`,
+      `DELETE FROM subtopic_quiz_attempts WHERE id IN (:ids)`,
       { ids: cleanup.subtopic_quiz_attempts }, QueryTypes.DELETE
     ).catch(() => {});
   }
   if (cleanup.question_concepts.length) {
     await q(
-      `DELETE FROM question_concepts WHERE id = ANY(:ids)`,
+      `DELETE FROM question_concepts WHERE id IN (:ids)`,
       { ids: cleanup.question_concepts }, QueryTypes.DELETE
     ).catch(() => {});
   }
   if (cleanup.answer_options.length) {
     await q(
-      `DELETE FROM answer_options WHERE question_id = ANY(:ids)`,
+      `DELETE FROM answer_options WHERE question_id IN (:ids)`,
       { ids: cleanup.answer_options }, QueryTypes.DELETE
     ).catch(() => {});
   }
   if (cleanup.questions.length) {
     await q(
-      `DELETE FROM questions WHERE id = ANY(:ids)`,
+      `DELETE FROM questions WHERE id IN (:ids)`,
       { ids: cleanup.questions }, QueryTypes.DELETE
     ).catch(() => {});
   }
   if (cleanup.concepts.length) {
     await q(
-      `DELETE FROM concepts WHERE id = ANY(:ids)`,
+      `DELETE FROM concepts WHERE id IN (:ids)`,
       { ids: cleanup.concepts }, QueryTypes.DELETE
     ).catch(() => {});
   }
   if (cleanup.users.length) {
     await q(
-      `DELETE FROM users WHERE id = ANY(:ids)`,
+      `DELETE FROM users WHERE id IN (:ids)`,
       { ids: cleanup.users }, QueryTypes.DELETE
     ).catch(() => {});
   }
