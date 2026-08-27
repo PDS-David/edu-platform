@@ -125,10 +125,15 @@ function ResourcesTab({ subtopicId, subtopic, subtopicName, onComplete }) {
       api.get('/resources', { params: { subtopic_id: subtopicId } }).then(r => r.data || []).catch(() => []),
       api.get('/resources/my-assignments').then(r => r.data || []).catch(() => []),
     ]).then(([linked, assigned]) => {
-      // Filter assigned to only lecture-type materials relevant to this subtopic (or subject)
+      // Filter assigned to only lecture-type materials relevant to this
+      // subtopic (exact match) or, for subject-wide assignments (no
+      // subtopic_id set), this subtopic's own subject. Previously any
+      // subtopic-less assignment showed on every subtopic page regardless of
+      // subject — e.g. a Yoruba/English resource assigned at the class or
+      // subject level would appear under Basic Science and Tech too.
       const relevant = assigned.filter(a =>
         LECTURE_TYPES.has(a.push_type?.toLowerCase() || '') &&
-        (a.subtopic_id == subtopicId || !a.subtopic_id)      // include if linked to subtopic or unlinked
+        (a.subtopic_id == subtopicId || (!a.subtopic_id && a.subject_id == subtopic?.subject_id))
       );
       // Merge: deduplicate by id, linked resources take base, assigned override if dupe
       const map = new Map();
@@ -136,7 +141,7 @@ function ResourcesTab({ subtopicId, subtopic, subtopicName, onComplete }) {
       for (const r of relevant)  if (!map.has(r.id)) map.set(r.id, { ...r, _assigned: true });
       setResources([...map.values()]);
     }).finally(() => setLoading(false));
-  }, [subtopicId]);
+  }, [subtopicId, subtopic?.subject_id]);
 
   const handleOpen = async (res) => {
     setActiveRes(res);
