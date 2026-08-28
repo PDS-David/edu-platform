@@ -82,21 +82,23 @@ router.post('/', protect, authorize('admin', 'school_admin'), async (req, res) =
 
     const isSchoolAdmin = req.user.role === 'school_admin';
 
-    // created_at is set explicitly (NOW()) in both inserts below rather than
-    // left to the column's DEFAULT. Every versioned migration that defines
-    // `notifications` gives created_at a DEFAULT NOW(), but table creation
-    // everywhere is guarded by CREATE TABLE IF NOT EXISTS — if the live
-    // table predates those migrations (or was created some other ad hoc
-    // way, as has happened before in this codebase — see the EP-15
-    // schema-canonicalization history), that CREATE is a silent no-op and
-    // the missing default never gets backfilled. Setting it explicitly here
-    // means every insert succeeds regardless of what the live table's
-    // default actually is. See also migration_012_notifications_created_at_default.sql,
-    // which fixes the schema itself (manual run required).
+    // created_at AND updated_at are both set explicitly (NOW()) in every
+    // insert below rather than left to the column's DEFAULT. Every
+    // versioned migration that defines `notifications` gives both columns
+    // a DEFAULT NOW(), but table creation everywhere is guarded by CREATE
+    // TABLE IF NOT EXISTS — if the live table predates those migrations
+    // (or was created some other ad hoc way, as has happened before in
+    // this codebase — see the EP-15 schema-canonicalization history), that
+    // CREATE is a silent no-op and the missing defaults never get
+    // backfilled. Setting both explicitly here means every insert succeeds
+    // regardless of what the live table's defaults actually are.
+    // created_at was fixed first (migration_012) and updated_at was missed
+    // as its sibling — see migration_014_notifications_updated_at_default.sql,
+    // which fixes the schema itself for both (manual run required).
     const insertOne = async (userId) => {
       const rows = await sequelize.query(
-        `INSERT INTO notifications (user_id, title, message, type, action_url, created_at)
-         VALUES (:user_id, :title, :message, :type, :action_url, NOW())
+        `INSERT INTO notifications (user_id, title, message, type, action_url, created_at, updated_at)
+         VALUES (:user_id, :title, :message, :type, :action_url, NOW(), NOW())
          RETURNING id`,
         { replacements: { user_id: userId, title, message, type, action_url }, type: QueryTypes.INSERT }
       );
@@ -114,11 +116,11 @@ router.post('/', protect, authorize('admin', 'school_admin'), async (req, res) =
       const valuesSql = userIds
         .map((id, i) => {
           replacements[`user_id_${i}`] = id;
-          return `(:user_id_${i}, :title, :message, :type, :action_url, NOW())`;
+          return `(:user_id_${i}, :title, :message, :type, :action_url, NOW(), NOW())`;
         })
         .join(', ');
       await sequelize.query(
-        `INSERT INTO notifications (user_id, title, message, type, action_url, created_at) VALUES ${valuesSql}`,
+        `INSERT INTO notifications (user_id, title, message, type, action_url, created_at, updated_at) VALUES ${valuesSql}`,
         { replacements, type: QueryTypes.INSERT }
       );
       return userIds.length;
