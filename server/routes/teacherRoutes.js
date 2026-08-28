@@ -1078,9 +1078,13 @@ router.post('/nudge/:userId', protect, teacherOnly, async (req, res) => {
 
     // A7 fix: actually create the nudge instead of only returning a string
     // claiming one was "queued". In-app notification row + best-effort email.
+    // created_at/updated_at set explicitly — same reasoning as
+    // notificationsRoutes.js insertOne/insertMany: the live table's
+    // DEFAULT NOW() on these columns may predate their addition to the
+    // versioned migration, so don't rely on it.
     await sequelize.query(
-      `INSERT INTO notifications (user_id, title, message, type, created_at)
-       VALUES (:uid, 'Study Reminder', 'Your teacher wants you to keep up your study streak — jump back in!', 'nudge', NOW())`,
+      `INSERT INTO notifications (user_id, title, message, type, created_at, updated_at)
+       VALUES (:uid, 'Study Reminder', 'Your teacher wants you to keep up your study streak — jump back in!', 'nudge', NOW(), NOW())`,
       { replacements: { uid: student.id }, type: QueryTypes.INSERT }
     );
 
