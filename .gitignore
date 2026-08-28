@@ -39,6 +39,10 @@ client/.env.local
 # migration_009 file went missing from commit 7564b10, and why the original
 # attempt at this fix still required force-adding migration_009 by hand).
 !database/migration_*.sql
+# Same exemption for the one-off read-only audit script — not a migration
+# (changes nothing), but same *.sql-blanket-rule trap applies to any new
+# database/*.sql file, not just migration_*.sql ones.
+!database/audit_missing_column_defaults.sql
 
 database/*.dump
 code_dump_fresh.txt
