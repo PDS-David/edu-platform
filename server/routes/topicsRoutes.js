@@ -26,11 +26,10 @@ router.get('/', protect, async (req, res) => {
     // Scoping: a student may only browse topics for a subject they're
     // actually registered for (own selection OR class-assigned — same
     // check used by resourceRoutes.js / pastPaperRoutes.js). A teacher is
-    // limited to their assigned subject(s) via teacher_subjects, but only
-    // once they actually have an assignment on record — a teacher with
-    // zero rows there is unaffected (matches the TEACHER-01 rollout
-    // pattern already used in pastPaperRoutes.js, so nobody teaching
-    // before assignments were introduced gets locked out mid-rollout).
+    // limited to their assigned subject(s) via teacher_subjects, and must
+    // have at least one active assignment on record — fail-closed, not
+    // fail-open: a teacher a School Admin hasn't assigned anything to yet
+    // sees nothing, rather than seeing every subject.
     if (req.user.role === 'student') {
       const registered = await sequelize.query(
         `SELECT 1 FROM student_subjects ss
@@ -51,7 +50,10 @@ router.get('/', protect, async (req, res) => {
         { replacements: { teacherId: req.user.id }, type: QueryTypes.SELECT }
       );
       const assignedIds = assigned.map(r => String(r.subject_id));
-      if (assignedIds.length && !assignedIds.includes(String(rawId))) {
+      // Fail-closed: a teacher with zero assignments on record sees
+      // nothing, not everything. A School Admin must assign at least one
+      // subject before a teacher can browse any topic.
+      if (!assignedIds.includes(String(rawId))) {
         return res.status(403).json({ success: false, error: 'You are not assigned to this subject' });
       }
     }
@@ -126,16 +128,13 @@ router.get('/', protect, async (req, res) => {
 });
 
 // ── Helper: is this teacher allowed to write to this subject_id? ────────────
-// Same fail-open-if-unassigned rollout pattern as the GET / read scoping
-// above and pastPaperRoutes.js's TEACHER-01 fix — a teacher with zero
-// teacher_subjects rows on record is unaffected, so this doesn't lock
-// anyone out before school admins have assigned subjects.
+// Fail-closed: a teacher with zero teacher_subjects rows on record cannot
+// write to any subject until a School Admin assigns at least one.
 async function teacherCanWriteSubject(teacherId, subjectId) {
   const assigned = await sequelize.query(
     `SELECT subject_id FROM teacher_subjects WHERE teacher_id = :teacherId AND is_active = true`,
     { replacements: { teacherId }, type: QueryTypes.SELECT }
   );
-  if (!assigned.length) return true; // no assignments on record — unrestricted
   return assigned.some(r => String(r.subject_id) === String(subjectId));
 }
 

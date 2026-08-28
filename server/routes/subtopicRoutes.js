@@ -58,7 +58,9 @@ router.get('/', protect, async (req, res) => {
       { replacements: { teacherId: req.user.id }, type: QueryTypes.SELECT }
     );
     const assignedIds = assigned.map(r => String(r.subject_id));
-    if (assignedIds.length && !assignedIds.includes(String(subjectId))) {
+    // Fail-closed: zero assignments on record means zero access, not
+    // unrestricted access.
+    if (!assignedIds.includes(String(subjectId))) {
       return res.status(403).json({ success: false, error: 'You are not assigned to this subject' });
     }
   }
@@ -340,7 +342,8 @@ router.get('/:id', protect, async (req, res) => {
         { replacements: { teacherId: req.user.id }, type: QueryTypes.SELECT }
       );
       const assignedIds = assigned.map(r => String(r.subject_id));
-      if (assignedIds.length && !assignedIds.includes(String(subjectId))) {
+      // Fail-closed: zero assignments on record means zero access.
+      if (!assignedIds.includes(String(subjectId))) {
         return res.status(403).json({ success: false, error: 'You are not assigned to this subject' });
       }
     }
