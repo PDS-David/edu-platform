@@ -38,8 +38,23 @@ export default function AssignExamTypeModal({ studentId, studentName, onClose, o
     setLoadingSubjects(true);
     try {
       const subs = await fetchSubjectsForType(board.id);
-      setAllSubs(subs);
-      setSubjectIds(board.requires_all_subjects ? subs.map(s => s.id) : []);
+      // Only offer subjects that can actually be assigned. The shared
+      // /catalog/types/:id/subjects endpoint deliberately returns every
+      // subject regardless of is_active — other consumers (App Admin's own
+      // subject-management screens in AdminDashboard.jsx) need to see and
+      // manage inactive subjects too, so that filter can't live in the
+      // backend without breaking that. But the assign endpoint's own
+      // validation (server/routes/schoolRoutes.js POST
+      // .../assign-exam-type) correctly rejects inactive subjects — so
+      // without this filter, an inactive subject shows here as a normal
+      // checkable option that will always fail on submit with a confusing
+      // "does not belong to this exam board" error. Confirmed live via a
+      // real case: exam_board_id=14 ("A-LEVELS") has a Business Studies
+      // row (id=210) with is_active=false, distinct from the active one
+      // under exam_board_id=5 ("GCE A' Levels").
+      const assignableSubs = subs.filter(s => s.is_active !== false);
+      setAllSubs(assignableSubs);
+      setSubjectIds(board.requires_all_subjects ? assignableSubs.map(s => s.id) : []);
       setStep(2);
     } catch {
       setError('Could not load subjects for that exam type. Please try again.');
