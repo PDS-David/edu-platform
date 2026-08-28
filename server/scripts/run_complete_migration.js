@@ -354,8 +354,8 @@ async function run() {
   await exec('exam_boards: seed BECE',          BOARD_UPSERT('BECE',    'Junior WAEC (BECE)',     'Basic Education Certificate Examination',                     4));
   await exec('exam_boards: seed GCE_AL',        BOARD_UPSERT('GCE_AL',  "GCE A' Levels",         'General Certificate of Education Advanced Level',             5));
   await exec('exam_boards: seed JUPEB',         BOARD_UPSERT('JUPEB',   'JUPEB',                  'Joint Universities Preliminary Examinations Board',           6));
-  await exec('exam_boards: seed CAMBAL',        BOARD_UPSERT('CAMBAL',  'Cambridge A Level',      'Cambridge International AS & A Level',                        7));
-  await exec('exam_boards: seed CAMBOL',        BOARD_UPSERT('CAMBOL',  'Cambridge O Level',      'Cambridge International O Level / IGCSE',                     8));
+  await exec('exam_boards: seed CAMBAL',        BOARD_UPSERT('CAMBAL',  "Cambridge GCE A' Level", 'Cambridge International AS & A Level',                        7));
+  await exec('exam_boards: seed CAMBOL',        BOARD_UPSERT('CAMBOL',  "Cambridge GCE O' Level", 'Cambridge International O Level / IGCSE',                     8));
   await exec('exam_boards: seed AQAAL',         BOARD_UPSERT('AQAAL',   'AQA A Level',            'AQA Advanced Level Qualifications',                           9));
   await exec('exam_boards: seed EDXAL',         BOARD_UPSERT('EDXAL',   'Edexcel A Level',        'Pearson Edexcel Advanced Level Qualifications',               10));
   await exec('exam_boards: seed IELTS',         BOARD_UPSERT('IELTS',   'IELTS',                  'International English Language Testing System',               11));

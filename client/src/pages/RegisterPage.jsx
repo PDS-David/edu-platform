@@ -207,8 +207,8 @@ const COUNTRY_CODES = [
 const GRADE_MAP = {
   'AQA A Level':                   ['Grade 11/Year 12', 'Grade 12/Year 13'],
   'AQA A-Level':                   ['Grade 11/Year 12', 'Grade 12/Year 13'],
-  'Cambridge A Level':             ['Grade 11/Year 12', 'Grade 12/Year 13'],
-  'Cambridge O Level':             ['Grade 9/Year 10',  'Grade 10/Year 11'],
+  "Cambridge GCE A' Level":        ['Grade 11/Year 12', 'Grade 12/Year 13'],
+  "Cambridge GCE O' Level":        ['Grade 9/Year 10',  'Grade 10/Year 11'],
   'Cambridge Pre IGCSE':           ['Grade 7/Year 8',   'Grade 8/Year 9'],
   'Cambridge Primary':             ['Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6'],
   'Edexcel A Level':               ['Grade 11/Year 12', 'Grade 12/Year 13'],
@@ -243,8 +243,8 @@ const FALLBACK_CURRICULA = [
   { id: null, code: 'BECE',    name: 'Junior WAEC (BECE)',      icon_emoji: '' },
   { id: null, code: 'GCE_AL',  name: "GCE A' Levels",          icon_emoji: '' },
   { id: null, code: 'JUPEB',   name: 'JUPEB',                   icon_emoji: '' },
-  { id: null, code: 'CAMBAL',  name: 'Cambridge A Level',       icon_emoji: '' },
-  { id: null, code: 'CAMBOL',  name: 'Cambridge O Level',       icon_emoji: '' },
+  { id: null, code: 'CAMBAL',  name: "Cambridge GCE A' Level", icon_emoji: '' },
+  { id: null, code: 'CAMBOL',  name: "Cambridge GCE O' Level", icon_emoji: '' },
   { id: null, code: 'AQAAL',   name: 'AQA A Level',             icon_emoji: '' },
   { id: null, code: 'EDXAL',   name: 'Edexcel A Level',         icon_emoji: '' },
   { id: null, code: 'IELTS',   name: 'IELTS',                   icon_emoji: '' },
@@ -300,12 +300,12 @@ function getGradeOptions(curriculum) {
   }
   if (lowerName.includes('cambridge') && lowerName.includes('primary'))
     return GRADE_MAP['Cambridge Primary'];
-  if (lowerName.includes('cambridge') && (lowerName.includes('o level') || lowerName.includes('igcse')))
-    return GRADE_MAP['Cambridge O Level'];
+  if (lowerName.includes('cambridge') && (lowerName.includes("o' level") || lowerName.includes('o level') || lowerName.includes('igcse')))
+    return GRADE_MAP["Cambridge GCE O' Level"];
   if (lowerName.includes('cambridge') && lowerName.includes('pre'))
     return GRADE_MAP['Cambridge Pre IGCSE'];
   if (lowerName.includes('cambridge'))
-    return GRADE_MAP['Cambridge A Level'];
+    return GRADE_MAP["Cambridge GCE A' Level"];
   if (lowerName.includes('aqa'))
     return GRADE_MAP['AQA A Level'];
   if (lowerName.includes('edexcel') && lowerName.includes('international'))
