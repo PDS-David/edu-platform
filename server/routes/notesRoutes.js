@@ -25,8 +25,8 @@ router.get('/', protect, async (req, res) => {
     // Scoping: was previously readable for any subtopic_id by any
     // authenticated user. A student may only read notes for a subject
     // they're registered for; a teacher only for a subject they're
-    // assigned to (fail-open if they have zero assignments on record —
-    // same rollout-safe pattern as topicsRoutes.js / pastPaperRoutes.js).
+    // assigned to (fail-closed — zero assignments on record means zero
+    // access, not unrestricted access).
     const subjRow = await sequelize.query(
       `SELECT subject_id FROM subtopics WHERE id = :subtopic_id LIMIT 1`,
       { replacements: { subtopic_id }, type: QueryTypes.SELECT }
@@ -52,7 +52,8 @@ router.get('/', protect, async (req, res) => {
         { replacements: { teacherId: req.user.id }, type: QueryTypes.SELECT }
       );
       const assignedIds = assigned.map(r => String(r.subject_id));
-      if (assignedIds.length && !assignedIds.includes(String(subjectId))) {
+      // Fail-closed: zero assignments on record means zero access.
+      if (!assignedIds.includes(String(subjectId))) {
         return res.status(403).json({ success: false, error: 'You are not assigned to this subject' });
       }
     }
@@ -82,9 +83,9 @@ router.post('/', protect, teacherOrAdmin, async (req, res) => {
     return res.status(400).json({ success: false, error: 'subtopic_id, title and content_html are required' });
   try {
     // Ownership check — was missing entirely: any teacher could attach a
-    // note to any subtopic_id regardless of subject assignment. Fail-open
-    // if the teacher has zero teacher_subjects rows on record, same as
-    // the GET / scoping above.
+    // note to any subtopic_id regardless of subject assignment. Fail-closed,
+    // same as the GET / scoping above — zero assignments on record means
+    // zero access.
     if (req.user.role === 'teacher') {
       const subjRow = await sequelize.query(
         `SELECT subject_id FROM subtopics WHERE id = :subtopic_id LIMIT 1`,
@@ -97,7 +98,8 @@ router.post('/', protect, teacherOrAdmin, async (req, res) => {
           { replacements: { teacherId: req.user.id }, type: QueryTypes.SELECT }
         );
         const assignedIds = assigned.map(r => String(r.subject_id));
-        if (assignedIds.length && !assignedIds.includes(String(subjectId))) {
+        // Fail-closed: zero assignments on record means zero access.
+        if (!assignedIds.includes(String(subjectId))) {
           return res.status(403).json({ success: false, error: 'You are not assigned to this subject' });
         }
       }

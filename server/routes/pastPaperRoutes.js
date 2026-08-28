@@ -32,7 +32,9 @@
  *     2026-08-27 (TEACHER-01): a teacher with active teacher_subjects
  *     assignments is now restricted to those subject(s) too, same as
  *     resource uploads already were — see the TEACHER-01 comment on GET /
- *     below. A teacher with no assignments on record is unaffected.
+ *     below. Revised again 2026-08-28: a teacher with NO assignments on
+ *     record now sees nothing (fails closed), not everything — a School
+ *     Admin must assign at least one subject first.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -169,26 +171,23 @@ router.get('/', optionalAuth, async (req, res) => {
     // had no equivalent restriction at all: a teacher assigned only e.g.
     // Mathematics could browse every subject's past papers platform-wide.
     //
-    // Restricted here the same way, but ONLY once a teacher actually has at
-    // least one active assignment on record — a teacher with zero rows in
-    // teacher_subjects (not yet migrated onto the new assignment feature)
-    // keeps seeing everything, same as before this fix, rather than being
-    // suddenly locked out of every past paper the moment this ships. This
-    // mirrors the file's existing student restriction in shape (IN list of
-    // subject ids) but deliberately does NOT fail closed like the student
-    // check does — that's the one intentional difference, and it's there so
-    // this rolls out without breaking any teacher school_admins haven't
-    // gotten to yet.
+    // UPDATED (explicit product decision, supersedes the original TEACHER-01
+    // rollout choice): this now fails CLOSED, matching the student
+    // restriction above in shape and in strictness — a teacher with zero
+    // active teacher_subjects rows sees no past papers at all, not every
+    // subject's. A School Admin must assign at least one subject before a
+    // teacher can browse any.
     if (req.user?.role === 'teacher') {
       const assignedSubjects = await sequelize.query(
         `SELECT subject_id FROM teacher_subjects WHERE teacher_id = :teacherId AND is_active = true`,
         { replacements: { teacherId: req.user.id }, type: QueryTypes.SELECT }
       );
       const teacherSubjectIds = assignedSubjects.map(r => r.subject_id).filter(Boolean);
-      if (teacherSubjectIds.length) {
-        conditions.push('pp.subject_id IN (:teacherSubjectIds)');
-        replacements.teacherSubjectIds = teacherSubjectIds;
+      if (!teacherSubjectIds.length) {
+        return res.json({ success: true, data: [] });
       }
+      conditions.push('pp.subject_id IN (:teacherSubjectIds)');
+      replacements.teacherSubjectIds = teacherSubjectIds;
     }
 
     const rows = await sequelize.query(
@@ -336,18 +335,15 @@ router.get('/:id/download', protect, async (req, res) => {
     // TEACHER-01: same subject restriction as GET /, and for the same
     // reason as the student check above — otherwise a teacher who can no
     // longer see an out-of-subject paper in the list could still fetch it
-    // directly via a bookmarked/previously-seen link. Same opt-in-only
-    // behavior: a teacher with no teacher_subjects rows yet is unrestricted.
+    // directly via a bookmarked/previously-seen link. UPDATED: fails closed
+    // now, matching GET / above — a teacher with zero assignments on record
+    // cannot download any past paper.
     if (req.user?.role === 'teacher') {
       const assignedSubjects = await sequelize.query(
         `SELECT 1 FROM teacher_subjects WHERE teacher_id = :teacherId AND subject_id = :subjectId AND is_active = true LIMIT 1`,
         { replacements: { teacherId: req.user.id, subjectId: rows[0].subject_id }, type: QueryTypes.SELECT }
       );
-      const hasAnyAssignment = await sequelize.query(
-        `SELECT 1 FROM teacher_subjects WHERE teacher_id = :teacherId AND is_active = true LIMIT 1`,
-        { replacements: { teacherId: req.user.id }, type: QueryTypes.SELECT }
-      );
-      if (hasAnyAssignment.length && !assignedSubjects.length) {
+      if (!assignedSubjects.length) {
         return res.status(403).json({ success: false, error: 'This past paper is not available for your assigned subject(s).' });
       }
     }
