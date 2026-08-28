@@ -96,6 +96,13 @@ router.post('/topics', protect, teacherOnly, async (req, res) => {
   const { subject_id, name, description, order_index = 0 } = req.body;
   if (!subject_id || !name?.trim()) return res.status(400).json({ success: false, error: 'subject_id and name are required' });
   try {
+    // Ownership check (was missing entirely on this route before — any
+    // teacher could create a topic under any subject_id, not just one
+    // they're assigned to). Same teacherOwnsSubject() helper GET /topics
+    // above already uses. Admins bypass, same as everywhere else in this file.
+    if (req.user.role === 'teacher' && !(await teacherOwnsSubject(req.user.id, subject_id))) {
+      return res.status(403).json({ success: false, error: 'Not assigned to this subject' });
+    }
     const rows = await sequelize.query(
       `INSERT INTO topics (subject_id, name, description, order_index, is_active, created_at, updated_at)
        VALUES (:subjectId, :name, :description, :orderIndex, true, NOW(), NOW())
@@ -116,6 +123,18 @@ router.post('/topics', protect, teacherOnly, async (req, res) => {
 router.put('/topics/:id', protect, teacherOnly, async (req, res) => {
   const { name, description, order_index } = req.body;
   try {
+    // Ownership check — look up the topic's own subject_id first (was
+    // missing entirely: this route previously updated by id with no check
+    // the caller has any relationship to that topic's subject at all).
+    if (req.user.role === 'teacher') {
+      const topicRow = await sequelize.query(
+        `SELECT subject_id FROM topics WHERE id = :id LIMIT 1`,
+        { replacements: { id: parseInt(req.params.id) }, type: QueryTypes.SELECT }
+      );
+      if (topicRow.length && !(await teacherOwnsSubject(req.user.id, topicRow[0].subject_id))) {
+        return res.status(403).json({ success: false, error: 'Not assigned to this subject' });
+      }
+    }
     await sequelize.query(
       `UPDATE topics SET
          name        = COALESCE(NULLIF(:name,''), name),
@@ -143,6 +162,18 @@ router.put('/topics/:id', protect, teacherOnly, async (req, res) => {
 router.get('/topics/:id/delete-impact', protect, teacherOnly, async (req, res) => {
   try {
     const topicId = parseInt(req.params.id);
+    // Ownership check — this endpoint reveals subtopic names and an
+    // affected-student count for the topic, so it's gated the same way
+    // as the actual DELETE below rather than left open.
+    if (req.user.role === 'teacher') {
+      const topicRow = await sequelize.query(
+        `SELECT subject_id FROM topics WHERE id = :id LIMIT 1`,
+        { replacements: { id: topicId }, type: QueryTypes.SELECT }
+      );
+      if (topicRow.length && !(await teacherOwnsSubject(req.user.id, topicRow[0].subject_id))) {
+        return res.status(403).json({ success: false, error: 'Not assigned to this subject' });
+      }
+    }
     const subtopics = await sequelize.query(
       `SELECT id, name FROM subtopics WHERE topic_id = :id AND is_active = true`,
       { replacements: { id: topicId }, type: QueryTypes.SELECT }
@@ -175,6 +206,17 @@ router.get('/topics/:id/delete-impact', protect, teacherOnly, async (req, res) =
 // topics.id is INTEGER — parseInt(req.params.id) is correct here
 router.delete('/topics/:id', protect, teacherOnly, async (req, res) => {
   try {
+    // Ownership check — same gap as PUT above: this route previously
+    // soft-deleted any topic by id regardless of the caller's subject.
+    if (req.user.role === 'teacher') {
+      const topicRow = await sequelize.query(
+        `SELECT subject_id FROM topics WHERE id = :id LIMIT 1`,
+        { replacements: { id: parseInt(req.params.id) }, type: QueryTypes.SELECT }
+      );
+      if (topicRow.length && !(await teacherOwnsSubject(req.user.id, topicRow[0].subject_id))) {
+        return res.status(403).json({ success: false, error: 'Not assigned to this subject' });
+      }
+    }
     await sequelize.query(
       `UPDATE topics SET is_active = false, updated_at = NOW() WHERE id = :id`,
       { replacements: { id: parseInt(req.params.id) }, type: QueryTypes.UPDATE }
@@ -189,6 +231,17 @@ router.get('/subtopics', protect, teacherOrAdmin, async (req, res) => {
   const { topic_id } = req.query;
   if (!topic_id) return res.status(400).json({ success: false, error: 'topic_id is required' });
   try {
+    // Ownership check — was missing entirely: any teacher could list
+    // subtopics for any topic_id regardless of that topic's subject.
+    if (req.user.role === 'teacher') {
+      const topicRow = await sequelize.query(
+        `SELECT subject_id FROM topics WHERE id = :topicId LIMIT 1`,
+        { replacements: { topicId: topic_id }, type: QueryTypes.SELECT }
+      );
+      if (topicRow.length && !(await teacherOwnsSubject(req.user.id, topicRow[0].subject_id))) {
+        return res.status(403).json({ success: false, error: 'Not assigned to this subject' });
+      }
+    }
     const rows = await sequelize.query(
       `SELECT id, name, description, order_index, is_active
        FROM subtopics WHERE topic_id = :topicId AND is_active = true
@@ -232,6 +285,14 @@ router.post('/subtopics', protect, teacherOrAdmin, async (req, res) => {
     }
     const subjectId = topicRows[0].subject_id;
 
+    // Ownership check — was missing entirely: subjectId above is correctly
+    // derived from the topic (not trusted from the client), but nothing
+    // then verified the calling teacher is actually assigned to that
+    // subject, so any teacher could still add subtopics under any topic.
+    if (req.user.role === 'teacher' && !(await teacherOwnsSubject(req.user.id, subjectId))) {
+      return res.status(403).json({ success: false, error: 'Not assigned to this subject' });
+    }
+
     const rows = await sequelize.query(
       `INSERT INTO subtopics (topic_id, subject_id, name, description, order_index, is_active, created_at, updated_at)
        VALUES (:topicId, :subjectId, :name, :description, :orderIndex, true, NOW(), NOW())
@@ -250,6 +311,16 @@ router.post('/subtopics', protect, teacherOrAdmin, async (req, res) => {
 router.put('/subtopics/:id', protect, teacherOnly, async (req, res) => {
   const { name, description, order_index } = req.body;
   try {
+    // Ownership check — was missing entirely on this route.
+    if (req.user.role === 'teacher') {
+      const stRow = await sequelize.query(
+        `SELECT subject_id FROM subtopics WHERE id = :id LIMIT 1`,
+        { replacements: { id: parseInt(req.params.id) }, type: QueryTypes.SELECT }
+      );
+      if (stRow.length && !(await teacherOwnsSubject(req.user.id, stRow[0].subject_id))) {
+        return res.status(403).json({ success: false, error: 'Not assigned to this subject' });
+      }
+    }
     await sequelize.query(
       `UPDATE subtopics SET name = COALESCE(NULLIF(:name,''), name), description = COALESCE(:description, description), order_index = COALESCE(:oi, order_index), updated_at = NOW() WHERE id = :id`,
       { replacements: { id: parseInt(req.params.id), name: name || '', description: description ?? null, oi: order_index != null ? parseInt(order_index) : null }, type: QueryTypes.UPDATE }
@@ -267,6 +338,16 @@ router.put('/subtopics/:id', protect, teacherOnly, async (req, res) => {
 // subtopics.id is INTEGER — parseInt(req.params.id) is correct here
 router.delete('/subtopics/:id', protect, teacherOnly, async (req, res) => {
   try {
+    // Ownership check — was missing entirely on this route.
+    if (req.user.role === 'teacher') {
+      const stRow = await sequelize.query(
+        `SELECT subject_id FROM subtopics WHERE id = :id LIMIT 1`,
+        { replacements: { id: parseInt(req.params.id) }, type: QueryTypes.SELECT }
+      );
+      if (stRow.length && !(await teacherOwnsSubject(req.user.id, stRow[0].subject_id))) {
+        return res.status(403).json({ success: false, error: 'Not assigned to this subject' });
+      }
+    }
     await sequelize.query(
       `UPDATE subtopics SET is_active = false, updated_at = NOW() WHERE id = :id`,
       { replacements: { id: parseInt(req.params.id) }, type: QueryTypes.UPDATE }

@@ -23,6 +23,39 @@ router.get('/', protect, async (req, res) => {
   const includeSubtopics = req.query.include_subtopics !== 'false';
 
   try {
+    // Scoping: a student may only browse topics for a subject they're
+    // actually registered for (own selection OR class-assigned — same
+    // check used by resourceRoutes.js / pastPaperRoutes.js). A teacher is
+    // limited to their assigned subject(s) via teacher_subjects, but only
+    // once they actually have an assignment on record — a teacher with
+    // zero rows there is unaffected (matches the TEACHER-01 rollout
+    // pattern already used in pastPaperRoutes.js, so nobody teaching
+    // before assignments were introduced gets locked out mid-rollout).
+    if (req.user.role === 'student') {
+      const registered = await sequelize.query(
+        `SELECT 1 FROM student_subjects ss
+          WHERE ss.student_id = :studentId AND ss.subject_id = :subjectId AND ss.status = 'approved'
+         UNION
+         SELECT 1 FROM class_memberships cm
+           JOIN class_subjects cs ON cs.class_id = cm.class_id
+          WHERE cm.student_id = :studentId AND cs.subject_id = :subjectId
+         LIMIT 1`,
+        { replacements: { studentId: req.user.id, subjectId: rawId }, type: QueryTypes.SELECT }
+      ).catch(() => []); // fail open if class_memberships/class_subjects don't exist yet in this environment
+      if (!registered.length) {
+        return res.status(403).json({ success: false, error: 'You are not registered for this subject' });
+      }
+    } else if (req.user.role === 'teacher') {
+      const assigned = await sequelize.query(
+        `SELECT subject_id FROM teacher_subjects WHERE teacher_id = :teacherId AND is_active = true`,
+        { replacements: { teacherId: req.user.id }, type: QueryTypes.SELECT }
+      );
+      const assignedIds = assigned.map(r => String(r.subject_id));
+      if (assignedIds.length && !assignedIds.includes(String(rawId))) {
+        return res.status(403).json({ success: false, error: 'You are not assigned to this subject' });
+      }
+    }
+
     // ── Primary lookup: exact subject_id ──────────────────────────────────────
     let topics = await sequelize.query(
       `SELECT t.id, COALESCE(t.name, t.title, 'Untitled Topic') AS name,
@@ -92,11 +125,28 @@ router.get('/', protect, async (req, res) => {
   }
 });
 
+// ── Helper: is this teacher allowed to write to this subject_id? ────────────
+// Same fail-open-if-unassigned rollout pattern as the GET / read scoping
+// above and pastPaperRoutes.js's TEACHER-01 fix — a teacher with zero
+// teacher_subjects rows on record is unaffected, so this doesn't lock
+// anyone out before school admins have assigned subjects.
+async function teacherCanWriteSubject(teacherId, subjectId) {
+  const assigned = await sequelize.query(
+    `SELECT subject_id FROM teacher_subjects WHERE teacher_id = :teacherId AND is_active = true`,
+    { replacements: { teacherId }, type: QueryTypes.SELECT }
+  );
+  if (!assigned.length) return true; // no assignments on record — unrestricted
+  return assigned.some(r => String(r.subject_id) === String(subjectId));
+}
+
 // ── POST /api/topics ─────────────────────────────────────────────────────────
 router.post('/', protect, authorize('admin', 'teacher'), async (req, res) => {
   const { subject_id, name, description, order_index } = req.body;
   if (!subject_id || !name?.trim()) return res.status(400).json({ success: false, error: 'subject_id and name are required' });
   try {
+    if (req.user.role === 'teacher' && !(await teacherCanWriteSubject(req.user.id, subject_id))) {
+      return res.status(403).json({ success: false, error: 'You are not assigned to this subject' });
+    }
     const rows = await sequelize.query(
       `INSERT INTO topics (subject_id, name, title, description, order_index, created_at, updated_at)
        VALUES (:subject_id, :name, :name, :description, :order_index, NOW(), NOW())
@@ -113,6 +163,15 @@ router.post('/', protect, authorize('admin', 'teacher'), async (req, res) => {
 router.put('/:id', protect, authorize('admin', 'teacher'), async (req, res) => {
   const { name, description, order_index } = req.body;
   try {
+    if (req.user.role === 'teacher') {
+      const topicRow = await sequelize.query(
+        `SELECT subject_id FROM topics WHERE id = :id LIMIT 1`,
+        { replacements: { id: req.params.id }, type: QueryTypes.SELECT }
+      );
+      if (topicRow.length && !(await teacherCanWriteSubject(req.user.id, topicRow[0].subject_id))) {
+        return res.status(403).json({ success: false, error: 'You are not assigned to this subject' });
+      }
+    }
     await sequelize.query(
       `UPDATE topics SET name=COALESCE(:name,name), title=COALESCE(:name,title),
        description=COALESCE(:desc,description), order_index=COALESCE(:ord,order_index), updated_at=NOW()
@@ -126,6 +185,15 @@ router.put('/:id', protect, authorize('admin', 'teacher'), async (req, res) => {
 // ── DELETE /api/topics/:id ───────────────────────────────────────────────────
 router.delete('/:id', protect, authorize('admin', 'teacher'), async (req, res) => {
   try {
+    if (req.user.role === 'teacher') {
+      const topicRow = await sequelize.query(
+        `SELECT subject_id FROM topics WHERE id = :id LIMIT 1`,
+        { replacements: { id: req.params.id }, type: QueryTypes.SELECT }
+      );
+      if (topicRow.length && !(await teacherCanWriteSubject(req.user.id, topicRow[0].subject_id))) {
+        return res.status(403).json({ success: false, error: 'You are not assigned to this subject' });
+      }
+    }
     await sequelize.query(`DELETE FROM subtopics WHERE topic_id=:id`, { replacements: { id: req.params.id }, type: QueryTypes.DELETE });
     await sequelize.query(`DELETE FROM topics WHERE id=:id`, { replacements: { id: req.params.id }, type: QueryTypes.DELETE });
     return res.json({ success: true, message: 'Topic deleted' });
@@ -143,6 +211,9 @@ router.post('/:topicId/subtopics', protect, authorize('admin', 'teacher'), async
       { replacements: { id: req.params.topicId }, type: QueryTypes.SELECT }
     );
     const subjectId = topicRow[0]?.subject_id || null;
+    if (req.user.role === 'teacher' && subjectId && !(await teacherCanWriteSubject(req.user.id, subjectId))) {
+      return res.status(403).json({ success: false, error: 'You are not assigned to this subject' });
+    }
     const rows = await sequelize.query(
       `INSERT INTO subtopics (topic_id, subject_id, name, description, order_index, is_active, created_at, updated_at)
        VALUES (:topic_id, :subject_id, :name, :description, :order_index, true, NOW(), NOW())
@@ -157,6 +228,15 @@ router.post('/:topicId/subtopics', protect, authorize('admin', 'teacher'), async
 router.put('/subtopics/:id', protect, authorize('admin', 'teacher'), async (req, res) => {
   const { name, description, order_index } = req.body;
   try {
+    if (req.user.role === 'teacher') {
+      const stRow = await sequelize.query(
+        `SELECT subject_id FROM subtopics WHERE id = :id LIMIT 1`,
+        { replacements: { id: req.params.id }, type: QueryTypes.SELECT }
+      );
+      if (stRow.length && stRow[0].subject_id && !(await teacherCanWriteSubject(req.user.id, stRow[0].subject_id))) {
+        return res.status(403).json({ success: false, error: 'You are not assigned to this subject' });
+      }
+    }
     await sequelize.query(
       `UPDATE subtopics SET name=COALESCE(:name,name), description=COALESCE(:desc,description),
        order_index=COALESCE(:ord,order_index), updated_at=NOW() WHERE id=:id`,
@@ -169,6 +249,15 @@ router.put('/subtopics/:id', protect, authorize('admin', 'teacher'), async (req,
 // ── DELETE /api/topics/subtopics/:id ────────────────────────────────────────
 router.delete('/subtopics/:id', protect, authorize('admin', 'teacher'), async (req, res) => {
   try {
+    if (req.user.role === 'teacher') {
+      const stRow = await sequelize.query(
+        `SELECT subject_id FROM subtopics WHERE id = :id LIMIT 1`,
+        { replacements: { id: req.params.id }, type: QueryTypes.SELECT }
+      );
+      if (stRow.length && stRow[0].subject_id && !(await teacherCanWriteSubject(req.user.id, stRow[0].subject_id))) {
+        return res.status(403).json({ success: false, error: 'You are not assigned to this subject' });
+      }
+    }
     await sequelize.query(`DELETE FROM subtopics WHERE id=:id`, { replacements: { id: req.params.id }, type: QueryTypes.DELETE });
     return res.json({ success: true, message: 'Subtopic deleted' });
   } catch (err) { return res.status(500).json({ success: false, error: err.message }); }

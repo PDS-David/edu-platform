@@ -323,6 +323,41 @@ router.get('/course/:courseId', protect, async (req, res) => {
   }
 
   try {
+    // Enrollment check (students only): was previously absent on this
+    // metadata listing — a student not enrolled in this course's subject
+    // could still browse every video's title/description/thumbnail here,
+    // even though the actual stream is already correctly gated by
+    // videoAccess middleware. Same enrollment logic as videoAccess (both
+    // the subject-based and direct-enrollment paths), applied here too so
+    // the list a student sees matches what they can actually watch.
+    if (req.user.role !== 'admin' && req.user.role !== 'teacher') {
+      const enrolled = await sequelize.query(
+        `SELECT ss.id
+         FROM student_subjects ss
+         JOIN subjects s ON s.id = ss.subject_id
+         JOIN course_subjects cs ON cs.subject_id = s.id
+         WHERE ss.student_id  = :userId
+           AND cs.course_id   = :courseId
+           AND ss.status      = 'approved'
+           AND (ss.expires_at IS NULL OR ss.expires_at > NOW())
+         LIMIT 1`,
+        { replacements: { userId: req.user.id, courseId }, type: QueryTypes.SELECT }
+      );
+      let hasEnrollment = enrolled.length > 0;
+      if (!hasEnrollment) {
+        const directEnroll = await sequelize.query(
+          `SELECT id FROM enrollments
+           WHERE user_id = :userId AND course_id = :courseId AND status = 'active'
+           LIMIT 1`,
+          { replacements: { userId: req.user.id, courseId }, type: QueryTypes.SELECT }
+        );
+        hasEnrollment = directEnroll.length > 0;
+      }
+      if (!hasEnrollment) {
+        return res.status(403).json({ success: false, error: 'You are not enrolled in this course', code: 'NOT_ENROLLED' });
+      }
+    }
+
     const videos = await sequelize.query(
       `SELECT
          v.id, v.title, v.description, v.duration_seconds,
@@ -514,6 +549,37 @@ router.get('/:id', protect, async (req, res) => {
         required_tier: video.required_tier,
         code: 'TIER_REQUIRED',
       });
+    }
+
+    // Enrollment check (students only) — same gap as GET /course/:courseId
+    // above: metadata for any video was readable by tier alone, with no
+    // check the student is actually enrolled in that video's course.
+    if (req.user.role !== 'admin' && req.user.role !== 'teacher') {
+      const enrolled = await sequelize.query(
+        `SELECT ss.id
+         FROM student_subjects ss
+         JOIN subjects s ON s.id = ss.subject_id
+         JOIN course_subjects cs ON cs.subject_id = s.id
+         WHERE ss.student_id  = :userId
+           AND cs.course_id   = :courseId
+           AND ss.status      = 'approved'
+           AND (ss.expires_at IS NULL OR ss.expires_at > NOW())
+         LIMIT 1`,
+        { replacements: { userId: req.user.id, courseId: video.course_id }, type: QueryTypes.SELECT }
+      );
+      let hasEnrollment = enrolled.length > 0;
+      if (!hasEnrollment) {
+        const directEnroll = await sequelize.query(
+          `SELECT id FROM enrollments
+           WHERE user_id = :userId AND course_id = :courseId AND status = 'active'
+           LIMIT 1`,
+          { replacements: { userId: req.user.id, courseId: video.course_id }, type: QueryTypes.SELECT }
+        );
+        hasEnrollment = directEnroll.length > 0;
+      }
+      if (!hasEnrollment) {
+        return res.status(403).json({ success: false, error: 'You are not enrolled in this course', code: 'NOT_ENROLLED' });
+      }
     }
 
     await sequelize.query(
