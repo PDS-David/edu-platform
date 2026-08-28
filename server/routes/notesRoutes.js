@@ -22,6 +22,40 @@ router.get('/', protect, async (req, res) => {
   if (!subtopic_id)
     return res.status(400).json({ success: false, error: 'subtopic_id is required' });
   try {
+    // Scoping: was previously readable for any subtopic_id by any
+    // authenticated user. A student may only read notes for a subject
+    // they're registered for; a teacher only for a subject they're
+    // assigned to (fail-open if they have zero assignments on record —
+    // same rollout-safe pattern as topicsRoutes.js / pastPaperRoutes.js).
+    const subjRow = await sequelize.query(
+      `SELECT subject_id FROM subtopics WHERE id = :subtopic_id LIMIT 1`,
+      { replacements: { subtopic_id }, type: QueryTypes.SELECT }
+    );
+    const subjectId = subjRow[0]?.subject_id;
+    if (subjectId && req.user.role === 'student') {
+      const registered = await sequelize.query(
+        `SELECT 1 FROM student_subjects ss
+          WHERE ss.student_id = :studentId AND ss.subject_id = :subjectId AND ss.status = 'approved'
+         UNION
+         SELECT 1 FROM class_memberships cm
+           JOIN class_subjects cs ON cs.class_id = cm.class_id
+          WHERE cm.student_id = :studentId AND cs.subject_id = :subjectId
+         LIMIT 1`,
+        { replacements: { studentId: req.user.id, subjectId }, type: QueryTypes.SELECT }
+      ).catch(() => []);
+      if (!registered.length) {
+        return res.status(403).json({ success: false, error: 'You are not registered for this subject' });
+      }
+    } else if (subjectId && req.user.role === 'teacher') {
+      const assigned = await sequelize.query(
+        `SELECT subject_id FROM teacher_subjects WHERE teacher_id = :teacherId AND is_active = true`,
+        { replacements: { teacherId: req.user.id }, type: QueryTypes.SELECT }
+      );
+      const assignedIds = assigned.map(r => String(r.subject_id));
+      if (assignedIds.length && !assignedIds.includes(String(subjectId))) {
+        return res.status(403).json({ success: false, error: 'You are not assigned to this subject' });
+      }
+    }
     const rows = await sequelize.query(
       `SELECT rn.id, rn.title, rn.content_html, rn.created_at, rn.updated_at,
               u.first_name || ' ' || u.last_name AS author_name
@@ -47,6 +81,27 @@ router.post('/', protect, teacherOrAdmin, async (req, res) => {
   if (!subtopic_id || !title || !content_html)
     return res.status(400).json({ success: false, error: 'subtopic_id, title and content_html are required' });
   try {
+    // Ownership check — was missing entirely: any teacher could attach a
+    // note to any subtopic_id regardless of subject assignment. Fail-open
+    // if the teacher has zero teacher_subjects rows on record, same as
+    // the GET / scoping above.
+    if (req.user.role === 'teacher') {
+      const subjRow = await sequelize.query(
+        `SELECT subject_id FROM subtopics WHERE id = :subtopic_id LIMIT 1`,
+        { replacements: { subtopic_id }, type: QueryTypes.SELECT }
+      );
+      const subjectId = subjRow[0]?.subject_id;
+      if (subjectId) {
+        const assigned = await sequelize.query(
+          `SELECT subject_id FROM teacher_subjects WHERE teacher_id = :teacherId AND is_active = true`,
+          { replacements: { teacherId: req.user.id }, type: QueryTypes.SELECT }
+        );
+        const assignedIds = assigned.map(r => String(r.subject_id));
+        if (assignedIds.length && !assignedIds.includes(String(subjectId))) {
+          return res.status(403).json({ success: false, error: 'You are not assigned to this subject' });
+        }
+      }
+    }
     const result = await sequelize.query(
       `INSERT INTO revision_notes (id, subtopic_id, title, content_html, created_by, created_at, updated_at)
        VALUES (:subtopic_id, :title, :content_html, :created_by, NOW(), NOW())

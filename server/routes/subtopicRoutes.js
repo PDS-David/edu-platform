@@ -33,6 +33,36 @@ router.get('/', protect, async (req, res) => {
   const subjectId = req.query.subject_id ? Number(req.query.subject_id) : null;
   const topicId = req.query.topic_id ? Number(req.query.topic_id) : null;
 
+  // Scoping: same registered-subject / assigned-subject checks as
+  // topicsRoutes.js's GET / — only applies when a subject_id was actually
+  // passed (matches this endpoint's existing "filters are optional" shape;
+  // an unfiltered call still returns everything, same as before, since
+  // there's no single subject_id here to check against).
+  if (subjectId && req.user.role === 'student') {
+    const registered = await sequelize.query(
+      `SELECT 1 FROM student_subjects ss
+        WHERE ss.student_id = :studentId AND ss.subject_id = :subjectId AND ss.status = 'approved'
+       UNION
+       SELECT 1 FROM class_memberships cm
+         JOIN class_subjects cs ON cs.class_id = cm.class_id
+        WHERE cm.student_id = :studentId AND cs.subject_id = :subjectId
+       LIMIT 1`,
+      { replacements: { studentId: req.user.id, subjectId }, type: QueryTypes.SELECT }
+    ).catch(() => []);
+    if (!registered.length) {
+      return res.status(403).json({ success: false, error: 'You are not registered for this subject' });
+    }
+  } else if (subjectId && req.user.role === 'teacher') {
+    const assigned = await sequelize.query(
+      `SELECT subject_id FROM teacher_subjects WHERE teacher_id = :teacherId AND is_active = true`,
+      { replacements: { teacherId: req.user.id }, type: QueryTypes.SELECT }
+    );
+    const assignedIds = assigned.map(r => String(r.subject_id));
+    if (assignedIds.length && !assignedIds.includes(String(subjectId))) {
+      return res.status(403).json({ success: false, error: 'You are not assigned to this subject' });
+    }
+  }
+
   const filters = [];
   const replacements = { studentId: req.user.id };
 
@@ -285,6 +315,34 @@ router.get('/:id', protect, async (req, res) => {
 
     if (!rows.length) {
       return res.status(404).json({ success: false, error: 'Not found' });
+    }
+
+    // Scoping: same registered-subject / assigned-subject check as GET /
+    // above, applied to the subject this subtopic actually belongs to.
+    const subjectId = rows[0].subject_id;
+    if (req.user.role === 'student') {
+      const registered = await sequelize.query(
+        `SELECT 1 FROM student_subjects ss
+          WHERE ss.student_id = :studentId AND ss.subject_id = :subjectId AND ss.status = 'approved'
+         UNION
+         SELECT 1 FROM class_memberships cm
+           JOIN class_subjects cs ON cs.class_id = cm.class_id
+          WHERE cm.student_id = :studentId AND cs.subject_id = :subjectId
+         LIMIT 1`,
+        { replacements: { studentId: req.user.id, subjectId }, type: QueryTypes.SELECT }
+      ).catch(() => []);
+      if (!registered.length) {
+        return res.status(403).json({ success: false, error: 'You are not registered for this subject' });
+      }
+    } else if (req.user.role === 'teacher') {
+      const assigned = await sequelize.query(
+        `SELECT subject_id FROM teacher_subjects WHERE teacher_id = :teacherId AND is_active = true`,
+        { replacements: { teacherId: req.user.id }, type: QueryTypes.SELECT }
+      );
+      const assignedIds = assigned.map(r => String(r.subject_id));
+      if (assignedIds.length && !assignedIds.includes(String(subjectId))) {
+        return res.status(403).json({ success: false, error: 'You are not assigned to this subject' });
+      }
     }
 
     return res.json({
