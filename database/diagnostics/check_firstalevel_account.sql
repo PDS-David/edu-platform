@@ -15,9 +15,15 @@
 -- active student_exam_types row now living on exam_board_id=21 (CAMBAL)
 -- after migration_017's merge. Re-run that context check below too, in
 -- case anything's changed since.
+--
+-- RESULT (2026-08-29): ran clean -- exactly one account, no near-
+-- duplicates, school_id NULL, one exam-board enrollment row (board 21,
+-- approved). Legitimate individual/unaffiliated student. NOT a bug.
+-- Nothing to fix. Kept as a reusable script in case this pattern needs
+-- checking for a different email later.
 
 -- 1. Exact-match account lookup.
-SELECT id, email, role, school_id, email_verified, created_at
+SELECT id, email, role, school_id, created_at
   FROM users WHERE LOWER(email) = 'firstalevel@gmail.com';
 
 -- 2. Near-duplicate check (whitespace, alias, typo'd second account).
