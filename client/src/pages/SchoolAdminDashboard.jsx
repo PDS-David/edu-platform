@@ -920,7 +920,16 @@ export default function SchoolAdminDashboard() {
                       <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
                         {u.role.replace('_', ' ')}
                       </span>
-                      {u.role === 'student' && (
+                      {/* EM-only guard: exam types/subjects are an
+                          AISchoolonair-only concept — hidden entirely when
+                          this school hasn't been granted AISchoolonair,
+                          since in that case every student in this roster is
+                          EM-only, not just some. Enforced authoritatively
+                          server-side (see the is_em_only check in
+                          POST /students/:studentId/assign-exam-type) — this
+                          is just keeping the option from being offered when
+                          it can never succeed. */}
+                      {u.role === 'student' && school?.enable_aischoolonair && (
                         <>
                           <button onClick={() => setAssigningStudent(u)}
                             className="flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors shrink-0">
@@ -931,6 +940,12 @@ export default function SchoolAdminDashboard() {
                             <FileText size={12} /> Report
                           </Link>
                         </>
+                      )}
+                      {u.role === 'student' && !school?.enable_aischoolonair && (
+                        <Link to={`/school-admin/students/${u.id}`} state={{ student: u }}
+                          className="flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors shrink-0">
+                          <FileText size={12} /> Report
+                        </Link>
                       )}
                       {u.role === 'teacher' && (
                         <button onClick={() => setAssigningTeacher(u)}

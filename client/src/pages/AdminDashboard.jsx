@@ -1767,7 +1767,14 @@ const UserManagementPanel = () => {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <button onClick={() => openEditUser(u)} title="Edit name/email" className="text-xs px-2.5 py-1 rounded-lg bg-gray-100 text-gray-500 hover:bg-violet-100 hover:text-violet-600"><Pencil size={12} /></button>
-                        {u.role === 'student' && (
+                        {/* EM-only guard: exam types/subjects are an
+                            AISchoolonair-only concept — hidden for students
+                            whose only access is English Masterclass
+                            (u.is_em_only, computed server-side in GET
+                            /users). Enforced authoritatively on the backend
+                            regardless of this — see is_em_only in
+                            POST /students/:studentId/assign-exam-type. */}
+                        {u.role === 'student' && !u.is_em_only && (
                           <button onClick={() => setAssigningStudent(u)} title="Assign exam type" className="text-xs px-2.5 py-1 rounded-lg bg-gray-100 text-gray-500 hover:bg-violet-100 hover:text-violet-600"><GraduationCap size={12} /></button>
                         )}
                         <select value={u.role} onChange={e => changeRole(u.id, e.target.value)} className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-violet-400"><option value="student">Student</option><option value="teacher">Teacher</option><option value="admin">Admin</option></select>

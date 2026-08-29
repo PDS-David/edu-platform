@@ -71,8 +71,24 @@ router.get('/', protect, authorize('admin'), async (req, res) => {
         `SELECT
            u.id, u.email, u.first_name, u.last_name, u.role::text AS role,
            u.is_active, u.subscription_status::text AS subscription_status, u.created_at,
-           0::INTEGER AS questions_submitted
+           0::INTEGER AS questions_submitted,
+           -- EM-only guard (see the identical case expression and full
+           -- rationale in POST /students/:studentId/assign-exam-type,
+           -- server/routes/schoolRoutes.js) — App Admin's roster spans
+           -- every school plus standalone accounts, so unlike
+           -- SchoolAdminDashboard.jsx (one shared school flag for the whole
+           -- list) this has to be computed per row.
+           CASE
+             WHEN u.role != 'student' THEN false
+             WHEN u.school_id IS NOT NULL THEN NOT COALESCE(s.enable_aischoolonair, false)
+             ELSE (
+               u.em_registered_at IS NOT NULL
+               AND (u.pending_exam_board_ids IS NULL OR u.pending_exam_board_ids = '{}')
+               AND NOT EXISTS (SELECT 1 FROM student_exam_types set2 WHERE set2.student_id = u.id)
+             )
+           END AS is_em_only
          FROM users u
+         LEFT JOIN schools s ON s.id = u.school_id
          WHERE (:role = '' OR u.role::text = :role)
            AND (:search = '' OR u.email      ILIKE :searchLike
                              OR u.first_name ILIKE :searchLike
@@ -97,7 +113,8 @@ router.get('/', protect, authorize('admin'), async (req, res) => {
       const fallback = await sequelize.query(
         `SELECT id, email, first_name, last_name, role,
                 is_active, subscription_status::text AS subscription_status, created_at,
-                0::INTEGER AS questions_submitted
+                0::INTEGER AS questions_submitted,
+                false AS is_em_only
          FROM users
          ORDER BY created_at DESC
          LIMIT :limit OFFSET :offset`,
