@@ -352,18 +352,24 @@ async function run() {
   await exec('exam_boards: seed WAEC',          BOARD_UPSERT('WAEC',    'WAEC (SSCE)',            'West African Examinations Council Senior School Certificate',  2));
   await exec('exam_boards: seed NECO',          BOARD_UPSERT('NECO',    'NECO',                   'National Examinations Council',                               3));
   await exec('exam_boards: seed BECE',          BOARD_UPSERT('BECE',    'Junior WAEC (BECE)',     'Basic Education Certificate Examination',                     4));
-  await exec('exam_boards: seed GCE_AL',        BOARD_UPSERT('GCE_AL',  "GCE A' Levels",         'General Certificate of Education Advanced Level',             5));
+  // GCE_AL (id=5) removed by migration_018_remove_empty_confusing_boards.sql
+  // (2026-08-28) -- "no such thing as GCE A' Levels" per explicit decision.
+  // Seed line deleted, not just commented with the old values, so a future
+  // re-run of this script cannot resurrect it via BOARD_UPSERT's INSERT path.
   await exec('exam_boards: seed JUPEB',         BOARD_UPSERT('JUPEB',   'JUPEB',                  'Joint Universities Preliminary Examinations Board',           6));
   await exec('exam_boards: seed CAMBAL',        BOARD_UPSERT('CAMBAL',  "Cambridge GCE A' Level", 'Cambridge International AS & A Level',                        7));
   await exec('exam_boards: seed CAMBOL',        BOARD_UPSERT('CAMBOL',  "Cambridge GCE O' Level", 'Cambridge International O Level / IGCSE',                     8));
-  await exec('exam_boards: seed AQAAL',         BOARD_UPSERT('AQAAL',   'AQA A Level',            'AQA Advanced Level Qualifications',                           9));
-  await exec('exam_boards: seed EDXAL',         BOARD_UPSERT('EDXAL',   'Edexcel A Level',        'Pearson Edexcel Advanced Level Qualifications',               10));
+  // AQAAL (id=23) and EDXAL (id=24) removed by
+  // migration_018_remove_empty_confusing_boards.sql (2026-08-28) -- not
+  // part of what the platform actually offers, per explicit decision.
   await exec('exam_boards: seed IELTS',         BOARD_UPSERT('IELTS',   'IELTS',                  'International English Language Testing System',               11));
   await exec('exam_boards: seed TOEFL',         BOARD_UPSERT('TOEFL',   'TOEFL',                  'Test of English as a Foreign Language',                       12));
   await exec('exam_boards: seed SAT',           BOARD_UPSERT('SAT',     'SAT',                    'Scholastic Assessment Test',                                  13));
-  await exec('exam_boards: seed LANG_EN',       BOARD_UPSERT('LANG_EN', 'Language Lab – English', 'English Language Laboratory',                                 14));
-  await exec('exam_boards: seed LANG_FR',       BOARD_UPSERT('LANG_FR', 'Language Lab – French',  'French Language Laboratory',                                  15));
-  await exec('exam_boards: seed LANG_YO',       BOARD_UPSERT('LANG_YO', 'Language Lab – Yoruba',  'Yoruba Language Laboratory',                                  16));
+  // LANG_EN, LANG_FR, LANG_YO (ids 10, 11, 12) deactivated by
+  // migration_019_deactivate_language_labs.sql (2026-08-28) -- zero
+  // students of any status, ever, per explicit decision. Seed lines
+  // removed (not just left to reactivate on every reseed) so this stays
+  // deactivated; re-add if Language Lab is ever relaunched.
   await exec('classes: student_count', `
     ALTER TABLE classes ADD COLUMN IF NOT EXISTS student_count INTEGER DEFAULT 0`);
 

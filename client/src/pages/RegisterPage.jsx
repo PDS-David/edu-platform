@@ -236,22 +236,21 @@ const GRADE_MAP = {
 
 // ── FIX A: Hardcoded fallback curricula used if the API call fails ─────────────
 // This means the Curriculum dropdown is ALWAYS populated, even offline.
+// GCE_AL, AQAAL, EDXAL removed and LANG_EN/LANG_FR/LANG_YO removed here to
+// match migration_018_remove_empty_confusing_boards.sql /
+// migration_019_deactivate_language_labs.sql (2026-08-28) -- otherwise a
+// student on a failed API call could still pick a board that no longer
+// exists (or is deactivated) in the live catalog.
 const FALLBACK_CURRICULA = [
   { id: null, code: 'JAMB',    name: 'JAMB/UTME',              icon_emoji: '' },
   { id: null, code: 'WAEC',    name: 'WAEC (SSCE)',            icon_emoji: '' },
   { id: null, code: 'BECE',    name: 'Junior WAEC (BECE)',      icon_emoji: '' },
-  { id: null, code: 'GCE_AL',  name: "GCE A' Levels",          icon_emoji: '' },
   { id: null, code: 'JUPEB',   name: 'JUPEB',                   icon_emoji: '' },
   { id: null, code: 'CAMBAL',  name: "Cambridge GCE A' Level", icon_emoji: '' },
   { id: null, code: 'CAMBOL',  name: "Cambridge GCE O' Level", icon_emoji: '' },
-  { id: null, code: 'AQAAL',   name: 'AQA A Level',             icon_emoji: '' },
-  { id: null, code: 'EDXAL',   name: 'Edexcel A Level',         icon_emoji: '' },
   { id: null, code: 'IELTS',   name: 'IELTS',                   icon_emoji: '' },
   { id: null, code: 'TOEFL',   name: 'TOEFL',                   icon_emoji: '' },
   { id: null, code: 'SAT',     name: 'SAT',                     icon_emoji: '' },
-  { id: null, code: 'LANG_EN', name: 'Language Lab – English',  icon_emoji: '' },
-  { id: null, code: 'LANG_FR', name: 'Language Lab – French',   icon_emoji: '' },
-  { id: null, code: 'LANG_YO', name: 'Language Lab – Yoruba',   icon_emoji: '' },
 ];
 
 // ── Resolve grade options for a curriculum ───────────────────────────────────
