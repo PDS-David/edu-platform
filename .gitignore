@@ -43,6 +43,11 @@ client/.env.local
 # (changes nothing), but same *.sql-blanket-rule trap applies to any new
 # database/*.sql file, not just migration_*.sql ones.
 !database/audit_missing_column_defaults.sql
+# Same exemption for the diagnostics/ directory — reusable, version-
+# controlled read-only check scripts (Prompts 1 & 3, Batch 3). Not
+# migrations, but the same blanket *.sql trap applies to any new
+# database/*.sql file regardless of subdirectory.
+!database/diagnostics/*.sql
 
 database/*.dump
 code_dump_fresh.txt
