@@ -1078,8 +1078,46 @@ router.post('/students/:studentId/assign-exam-type', protect, requireSchoolAdmin
   try {
     // Verify the target is actually a student, and (for school_admin
     // callers) that the student belongs to the caller's own school.
+    //
+    // EM-only guard: exam types/subjects are an AISchoolonair-only concept
+    // (student_exam_types / student_subjects below — English Masterclass
+    // has its own separate data model, categories/words, unrelated to
+    // exam_boards entirely). A student with no AISchoolonair access at all
+    // should never be assignable here, regardless of which admin surface
+    // the request came from — this is the authoritative guard; the two
+    // frontend surfaces (SchoolAdminDashboard.jsx, AdminDashboard.jsx) hide
+    // the action UI-side too, but this is what actually enforces it.
+    //
+    // "EM-only" is computed two different ways depending on account type,
+    // since there's no single column that means this directly:
+    //   - Tenant student (school_id set): governed entirely by their
+    //     school's enable_aischoolonair flag — every student at that school
+    //     shares it, so if it's off, none of them have AISchoolonair access,
+    //     independent of enable_em.
+    //   - Standalone student (school_id null): there is no per-school flag
+    //     to check. Distinguished by registration path instead —
+    //     POST /auth/em-register (registerForEnglishMasterclass in auth.js)
+    //     sets em_registered_at but deliberately never touches
+    //     pending_exam_board_ids, unlike POST /auth/register which always
+    //     sets it. Combined with never having an actual student_exam_types
+    //     row (covers an EM standalone account that was, at some point,
+    //     separately hand-assigned anyway — that student does have real
+    //     AISchoolonair access now and this guard must not block them),
+    //     this reliably identifies an account that only ever went through
+    //     the EM signup path and has no AISchoolonair intent or access.
     const studentRows = await q(
-      `SELECT id, school_id FROM users WHERE id = $1 AND role = 'student'`,
+      `SELECT u.id, u.school_id,
+              CASE
+                WHEN u.school_id IS NOT NULL THEN NOT COALESCE(s.enable_aischoolonair, false)
+                ELSE (
+                  u.em_registered_at IS NOT NULL
+                  AND (u.pending_exam_board_ids IS NULL OR u.pending_exam_board_ids = '{}')
+                  AND NOT EXISTS (SELECT 1 FROM student_exam_types set2 WHERE set2.student_id = u.id)
+                )
+              END AS is_em_only
+         FROM users u
+         LEFT JOIN schools s ON s.id = u.school_id
+        WHERE u.id = $1 AND u.role = 'student'`,
       [studentId]
     );
     if (!studentRows.length) {
@@ -1087,6 +1125,13 @@ router.post('/students/:studentId/assign-exam-type', protect, requireSchoolAdmin
     }
     if (req.user.role === 'school_admin' && studentRows[0].school_id !== req.user.school_id) {
       return res.status(403).json({ success: false, error: 'That student is not in your school' });
+    }
+    if (studentRows[0].is_em_only) {
+      return res.status(403).json({
+        success: false,
+        error: 'This student only has English Masterclass access — exam types and subjects are an AISchoolonair-only feature and cannot be assigned.',
+        code: 'EM_ONLY_ACCOUNT',
+      });
     }
 
     // Look up the board's limit config — same columns Step 2 taught
