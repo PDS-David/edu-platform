@@ -349,7 +349,7 @@ async function run() {
       updated_at    = NOW()`;
 
   await exec('exam_boards: seed JAMB',          BOARD_UPSERT('JAMB',    'JAMB/UTME',             'Joint Admissions and Matriculation Board',                    1));
-  await exec('exam_boards: seed WAEC',          BOARD_UPSERT('WAEC',    'WAEC/NECO (SSCE)',       'West African Examinations Council Senior School Certificate',  2));
+  await exec('exam_boards: seed WAEC',          BOARD_UPSERT('WAEC',    'WAEC (SSCE)',            'West African Examinations Council Senior School Certificate',  2));
   await exec('exam_boards: seed NECO',          BOARD_UPSERT('NECO',    'NECO',                   'National Examinations Council',                               3));
   await exec('exam_boards: seed BECE',          BOARD_UPSERT('BECE',    'Junior WAEC (BECE)',     'Basic Education Certificate Examination',                     4));
   await exec('exam_boards: seed GCE_AL',        BOARD_UPSERT('GCE_AL',  "GCE A' Levels",         'General Certificate of Education Advanced Level',             5));
