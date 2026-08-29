@@ -213,7 +213,6 @@ const GRADE_MAP = {
   'Cambridge Primary':             ['Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6'],
   'Edexcel A Level':               ['Grade 11/Year 12', 'Grade 12/Year 13'],
   'Edexcel International A Level': ['Grade 11/Year 12', 'Grade 12/Year 13'],
-  'WAEC/NECO (SSCE)':              ['SS1', 'SS2', 'SS3'],
   'WAEC':                          ['SS1', 'SS2', 'SS3'],
   'NECO':                          ['SS1', 'SS2', 'SS3'],
   'JAMB/UTME':                     ['SS3 / Year 13'],
@@ -239,7 +238,7 @@ const GRADE_MAP = {
 // This means the Curriculum dropdown is ALWAYS populated, even offline.
 const FALLBACK_CURRICULA = [
   { id: null, code: 'JAMB',    name: 'JAMB/UTME',              icon_emoji: '' },
-  { id: null, code: 'WAEC',    name: 'WAEC/NECO (SSCE)',        icon_emoji: '' },
+  { id: null, code: 'WAEC',    name: 'WAEC (SSCE)',            icon_emoji: '' },
   { id: null, code: 'BECE',    name: 'Junior WAEC (BECE)',      icon_emoji: '' },
   { id: null, code: 'GCE_AL',  name: "GCE A' Levels",          icon_emoji: '' },
   { id: null, code: 'JUPEB',   name: 'JUPEB',                   icon_emoji: '' },
