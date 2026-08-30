@@ -25,7 +25,6 @@ import PaymentVerify from "./pages/PaymentVerify";
 import NotFound from "./pages/NotFound";
 
 // English Masterclass standalone portal
-import EMLoginPage from "./pages/em/EMLoginPage";
 import EMSignupPage from "./pages/em/EMSignupPage";
 import EMRegisterPage from "./pages/em/EMRegisterPage";
 import EMDashboard from "./pages/em/EMDashboard";
@@ -96,7 +95,7 @@ export default function App() {
         <Route path="/past-papers" element={<PastPapersPage />} />
         <Route path="/subjects" element={<SubjectCatalog />} />
         {/* English Masterclass public entry — goes to the dedicated EM login */}
-        <Route path="/english-masterclass" element={<Navigate to="/em/login" replace />} />
+        <Route path="/english-masterclass" element={<Navigate to="/login" replace />} />
 
         {/* LANGUAGE MASTERCLASS unification — /language/english/* uses the
             same URL shape as every other language, but redirects to the
@@ -107,7 +106,7 @@ export default function App() {
             URL a bookmark/link uses changes for English's case, same as
             the prompt's own instruction to keep /em/* alive as a redirect
             target rather than a dead end. */}
-        <Route path="/language/english/login"     element={<Navigate to="/em/login" replace />} />
+        <Route path="/language/english/login"     element={<Navigate to="/login" replace />} />
         <Route path="/language/english/signup"    element={<Navigate to="/em/signup" replace />} />
         <Route path="/language/english/register"  element={<Navigate to="/em/register" replace />} />
         <Route path="/language/english/dashboard" element={<Navigate to="/em/dashboard" replace />} />
@@ -116,7 +115,11 @@ export default function App() {
         <Route path="/language/english"           element={<Navigate to="/em/dashboard" replace />} />
 
         {/* ENGLISH MASTERCLASS — public login */}
-        <Route path="/em/login" element={<EMLoginPage />} />
+        {/* One login for everyone (see LoginPage.jsx and
+            postAuthRedirect.js) — /em/login kept as a redirect only, so
+            bookmarks and any external links written before this
+            consolidation still land somewhere real. */}
+        <Route path="/em/login" element={<Navigate to="/login" replace />} />
         <Route path="/em/signup" element={<EMSignupPage />} />
 
         {/* ENGLISH MASTERCLASS — protected portal (own layout, no AISchoolOnAir chrome) */}
