@@ -3,8 +3,8 @@
 // AI-callable tool: student performance analytics.
 //
 // Wraps the DB queries that live in:
-//   server/routes/analytics.js   (summary, weak-topics, subject-breakdown,
-//                                  score-trend, leaderboard, time-metrics)
+//   server/routes/analyticsRoutes.js (summary, weak-topics, subject-breakdown,
+//                                      score-trend, leaderboard, time-metrics)
 //   server/services/aiService.js  (predictGrade)
 //
 // Does NOT modify those files.

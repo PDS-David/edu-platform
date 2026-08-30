@@ -7,13 +7,13 @@ const path = require('path');
 // passed as a Sequelize NAMED replacement.
 //
 // This is the same root cause as the 2026-06-18 onboarding crash covered by
-// onboarding-preferences.test.js (one call site, in userRoutes.js). On
-// 2026-08-27 the identical pattern was found independently broken in SIX more
+// onboarding-preferences.test.js (one call site, in server/routes/users.js).
+// On 2026-08-27 the identical pattern was found independently broken in SIX more
 // places across the codebase (notificationsRoutes.js, curriculumRoutes.js x3,
 // questionsRoutes.js, teacherRoutes.js, memoryService.js, quizGenerator.js)
 // plus two dev tools and a test file — none of which onboarding-preferences's
 // narrowly-scoped test could have caught, since it only inspects
-// userRoutes.js's PATCH /preferences handler.
+// server/routes/users.js's PATCH /preferences handler.
 //
 // Root cause (verified directly against Sequelize 6.35's replacement engine,
 // not assumed): a named replacement whose value is a JS array is rendered as
@@ -23,8 +23,8 @@ const path = require('path');
 // error (2+ elements: `ANY('a', 'b')`), a malformed-array-literal error
 // (1 element: `ANY('a')`), or empty parens (0 elements: `ANY()`) — broken in
 // every case. `IN (:param)` is the correct, already-idiomatic replacement
-// used throughout the rest of this codebase (see userRoutes.js's own
-// documented fix).
+// used throughout the rest of this codebase (see server/routes/users.js's
+// own documented fix).
 //
 // This test scans every route/service/tool source file under server/ (this
 // tests/ directory excluded, since its own fixture strings would self-match)

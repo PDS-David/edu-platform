@@ -25,7 +25,18 @@ const path = require('path');
 // no Sequelize/DB mocking harness set up for live-query tests.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const SRC_PATH = path.join(__dirname, '../routes/userRoutes.js');
+// NOTE (2026-08-29): originally asserted against server/routes/
+// userRoutes.js — an unreferenced dead-code duplicate of the real,
+// mounted users.js (server.js only ever requires './routes/users',
+// never './routes/userRoutes' — same file, confusingly similar names).
+// This test was therefore checking the wrong source file: userRoutes.js
+// is never reachable via any live HTTP request, so passing this test
+// proved nothing about the actual production code path. Repointed at
+// users.js, the file server.js genuinely mounts. Manually verified
+// users.js's real PATCH /preferences handler already has the correct
+// fix (IN (:subjectIds), wrapped in its own try/catch) before making
+// this change — this was a test-target bug, not a regression.
+const SRC_PATH = path.join(__dirname, '../routes/users.js');
 const src = fs.readFileSync(SRC_PATH, 'utf8');
 
 // Isolate just the PATCH /preferences handler body for targeted assertions.
@@ -35,7 +46,7 @@ const handlerMatch = src.match(
 const handlerSrc = handlerMatch ? handlerMatch[0] : '';
 
 describe('PATCH /api/users/preferences — onboarding 500 regression', () => {
-  test('handler exists and is found in userRoutes.js', () => {
+  test('handler exists and is found in users.js', () => {
     expect(handlerSrc.length).toBeGreaterThan(0);
   });
 
@@ -91,8 +102,14 @@ describe('PATCH /api/users/preferences — onboarding 500 regression', () => {
     // investigation. This must stay explicit, not rely on a column
     // default that the inline CREATE TABLE IF NOT EXISTS fallback
     // above does not even define.
+    // Accepts either the literal 'approved' string or a reference to the
+    // ENROLLMENT_STATUS.APPROVED constant (confirmed === 'approved' in
+    // server/constants/enrollmentConstants.js) — users.js (the live file
+    // this test now targets) uses the named constant rather than a magic
+    // string; both are functionally identical, so the assertion checks
+    // for either form instead of assuming one specific implementation.
     expect(handlerSrc).toMatch(
-      /INSERT INTO student_subjects[\s\S]*?is_active,\s*status[\s\S]*?VALUES[\s\S]*?true,\s*'approved'/i
+      /INSERT INTO student_subjects[\s\S]*?is_active,\s*status[\s\S]*?VALUES[\s\S]*?true,\s*(?:'approved'|:approvedStatus|ENROLLMENT_STATUS\.APPROVED)/i
     );
   });
 
