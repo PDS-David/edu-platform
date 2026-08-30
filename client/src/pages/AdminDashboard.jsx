@@ -107,7 +107,7 @@ const CatalogPanel = () => {
   // only the very first mount-time load does that now.
   const fetchTypes = async (silent = false) => {
     if (!silent) setLoading(true);
-    try { const res = await api.get('/catalog/types'); if (res?.success) setTypes(res.data || []); }
+    try { const res = await api.get('/catalog/types?include_inactive=true'); if (res?.success) setTypes(res.data || []); }
     catch (err) { showToast(err?.status === 401 ? 'Session expired — please log back in' : 'Failed to load examination types', 'error'); }
     finally { if (!silent) setLoading(false); }
   };

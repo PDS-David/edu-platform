@@ -10,7 +10,7 @@ const express    = require('express');
 const router     = express.Router();
 const { QueryTypes } = require('sequelize');
 const sequelize  = require('../config/database');
-const { protect, authorize } = require('../middleware/auth');
+const { protect, authorize, optionalAuth } = require('../middleware/auth');
 
 // ---------------------------------------------------------------------------
 // GET /api/catalog/stats  — admin dashboard summary cards (public, no auth)
@@ -62,10 +62,28 @@ router.get('/all-subjects', async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// GET /api/catalog/types — list all exam types with subject counts
+// GET /api/catalog/types — list exam types with subject counts.
+//
+// This is a dual-use, mostly-public endpoint: PastPapersPage.jsx calls it
+// unauthenticated from the public /past-papers marketing page, so the
+// default MUST stay active-only — an anonymous visitor should never see a
+// deactivated/retired exam type. AdminDashboard.jsx's Catalog Management
+// screen (the "Recycle Bin") is the one caller that needs to see inactive
+// types too, so it can render them with the Reactivate/Delete Forever
+// actions — that's opt-in via ?include_inactive=true, only honored once
+// optionalAuth confirms the caller is a genuinely logged-in admin.
+// Without this, GET /catalog/types always excluded eb.is_active = false
+// rows unconditionally, so a deactivated exam type (e.g. via the ordinary
+// "Deactivate (move to recycle bin)" button) simply vanished from the
+// admin's own list with no way back in the UI, even though the Reactivate
+// button/flow was fully built and worked fine once called directly — this
+// is exactly what happened to Language Lab – Yoruba on 2026-08-30,
+// recovered by hand via direct SQL UPDATE.
 // ---------------------------------------------------------------------------
-router.get('/types', async (req, res) => {
+router.get('/types', optionalAuth, async (req, res) => {
   try {
+    const includeInactive = req.query.include_inactive === 'true' && req.user?.role === 'admin';
+
     const types = await sequelize.query(
       `SELECT
          eb.id, eb.code, eb.name, eb.full_name, eb.description,
@@ -75,10 +93,10 @@ router.get('/types', async (req, res) => {
          COUNT(s.id)::INTEGER AS subject_count
        FROM exam_boards eb
        LEFT JOIN subjects s ON s.exam_board_id = eb.id AND s.is_active = true
-       WHERE eb.is_active = true
+       WHERE (:includeInactive OR eb.is_active = true)
        GROUP BY eb.id
        ORDER BY eb.display_order ASC NULLS LAST, eb.name ASC`,
-      { type: QueryTypes.SELECT }
+      { replacements: { includeInactive }, type: QueryTypes.SELECT }
     );
     return res.status(200).json({ success: true, count: types.length, data: types });
   } catch (err) {
