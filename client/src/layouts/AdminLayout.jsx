@@ -2,6 +2,7 @@ import { Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import TopNav from "../components/TopNav";
 import PortalSidebar from "../components/PortalSidebar";
+import PortalMobileNav from "../components/PortalMobileNav";
 import {
   Zap, Shield, Users, BookOpen, GraduationCap, Layers, UserCheck,
   Sparkles, Upload, School, Settings,
@@ -37,6 +38,13 @@ export default function AdminLayout() {
   return (
     <div className="min-h-screen bg-[#f9f7f4] text-[#1a1a1a]">
       <TopNav />
+      <PortalMobileNav
+        roleLabel="Admin"
+        displayName={firstName}
+        items={ADMIN_NAV_ITEMS}
+        dashboardPath={ADMIN_DASHBOARD_PATH}
+        tabParam="panel"
+      />
       <div className="flex">
         <PortalSidebar
           roleLabel="Admin"
@@ -45,7 +53,7 @@ export default function AdminLayout() {
           dashboardPath={ADMIN_DASHBOARD_PATH}
           tabParam="panel"
         />
-        <main className="flex-1 min-w-0">
+        <main className="flex-1 min-w-0 pb-16 md:pb-0">
           <Outlet />
         </main>
       </div>
