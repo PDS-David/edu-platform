@@ -18,6 +18,7 @@ const express  = require('express');
 const multer   = require('multer');
 const router   = express.Router();
 const { protect }            = require('../middleware/auth');
+const { aiLimiter }          = require('../middleware/rateLimiter');
 const { QueryTypes }         = require('sequelize');
 const sequelize              = require('../config/database');
 const { generate }           = require('../services/ai');
@@ -75,7 +76,7 @@ function toArray(val) {
 }
 
 // ── POST /api/ai/chat ─────────────────────────────────────────────────────────
-router.post('/chat', protect, async (req, res) => {
+router.post('/chat', protect, aiLimiter, async (req, res) => {
   try {
     const { message, context = {}, session_id } = req.body;
     if (!message?.trim()) {
@@ -105,7 +106,7 @@ Give concise, curriculum-aligned answers suited for WAEC/JAMB/NECO preparation.`
 });
 
 // ── POST /api/ai/explain ──────────────────────────────────────────────────────
-router.post('/explain', protect, async (req, res) => {
+router.post('/explain', protect, aiLimiter, async (req, res) => {
   const { question_id, selected_option_id, typed_answer } = req.body;
 
   if (!question_id) {
@@ -187,7 +188,7 @@ Be concise and curriculum-aligned.`;
 });
 
 // ── POST /api/ai/hint ─────────────────────────────────────────────────────────
-router.post('/hint', protect, async (req, res) => {
+router.post('/hint', protect, aiLimiter, async (req, res) => {
   const { question_id, selected_option_id, hint_level = 1 } = req.body;
 
   if (!question_id) {
@@ -255,7 +256,7 @@ No preamble, no markdown.`;
 });
 
 // ── POST /api/ai/notes/generate ───────────────────────────────────────────────
-router.post('/notes/generate', protect, async (req, res) => {
+router.post('/notes/generate', protect, aiLimiter, async (req, res) => {
   const { subject_id, topic_name, subtopic_id } = req.body;
 
   if (!topic_name?.trim()) {
@@ -323,7 +324,7 @@ Total length: under 300 words. Plain text only — no markdown, no headers with 
   }
 });
 
-router.post('/mark-image', protect, (req, res) => {
+router.post('/mark-image', protect, aiLimiter, (req, res) => {
   imageUpload(req, res, async (uploadErr) => {
     // BUG FIX (AI marking showing generic "Server error"): everything below
     // used to run outside any try/catch until the Gemini call itself further
@@ -427,7 +428,7 @@ router.post('/mark-image', protect, (req, res) => {
 // ── GET /api/ai/predict-grade/:userId/:subjectId ──────────────────────────────
 // Analyses practice_attempts for the subject and returns an AI-predicted grade
 // in WAEC A1–F9 format with confidence level and personalised study advice.
-router.get('/predict-grade/:userId/:subjectId', protect, async (req, res) => {
+router.get('/predict-grade/:userId/:subjectId', protect, aiLimiter, async (req, res) => {
   const { userId, subjectId } = req.params;
 
   // Ownership guard — students may only access their own data
@@ -550,7 +551,7 @@ Return ONLY valid JSON (no markdown):
 // ── GET /api/ai/learning-path/:userId ─────────────────────────────────────────
 // Analyses weak topics, unstarted subtopics, and recent activity to generate
 // a prioritised 5-step AI study plan with reasons, actions, and subtopic links.
-router.get('/learning-path/:userId', protect, async (req, res) => {
+router.get('/learning-path/:userId', protect, aiLimiter, async (req, res) => {
   const { userId } = req.params;
 
   // Ownership guard — students may only access their own data

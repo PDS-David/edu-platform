@@ -6,6 +6,7 @@ const express = require('express');
 const router  = express.Router();
 
 const { protect }                  = require('../middleware/auth');
+const { aiLimiter }                = require('../middleware/rateLimiter');
 const { generateQuiz, submitQuiz } = require('../controllers/quizController');
 
 // Optional subscription guard -- silently skipped if not yet installed
@@ -16,7 +17,7 @@ try { subscriptionGuard = require('../middleware/subscriptionGuard'); } catch {}
 // GET /api/quiz/generate
 // Requires: auth, optional subscription
 // ---------------------------------------------------------------------------
-router.get('/generate', protect, subscriptionGuard, generateQuiz);
+router.get('/generate', protect, subscriptionGuard, aiLimiter, generateQuiz);
 
 // ---------------------------------------------------------------------------
 // POST /api/quiz/submit
