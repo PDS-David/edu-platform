@@ -181,7 +181,7 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-start justify-center pt-8 pb-12 px-4">
+    <div className="min-h-screen bg-[#f9f7f4] flex items-start justify-center pt-8 pb-12 px-4">
       <div className="w-full max-w-2xl">
 
         {/* Progress */}
@@ -449,7 +449,7 @@ function EndScreen({ score, total, subjectName, onRetry, onBack }) {
                 { label: 'Keep Trying', color: 'text-red-600',    ring: 'border-red-300',    emoji: '' };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-[#f9f7f4] flex items-center justify-center px-4">
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 w-full max-w-md p-8 text-center">
         <div className="text-5xl mb-3">{grade.emoji}</div>
         <h2 className={`text-2xl font-bold mb-1 ${grade.color}`}>{grade.label}</h2>
@@ -619,7 +619,7 @@ export default function PracticeMode() {
 
   if (phase === 'loading') {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-3">
+      <div className="min-h-screen bg-[#f9f7f4] flex flex-col items-center justify-center gap-3">
         <Loader2 className="w-8 h-8 text-indigo-400 animate-spin" />
         <p className="text-sm text-gray-400">
           Loading {subjectName ? `${subjectName} ` : ''}practice questions…
@@ -630,7 +630,7 @@ export default function PracticeMode() {
 
   if (phase === 'error') {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+      <div className="min-h-screen bg-[#f9f7f4] flex items-center justify-center px-4">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center max-w-sm w-full">
           <div className="text-4xl mb-3"></div>
           <p className="text-gray-600 mb-6 text-sm">{errMsg}</p>
