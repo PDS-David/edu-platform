@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { CheckCircle, AlertCircle, Plus, Trash2, ChevronDown, X, Loader2 } from "lucide-react";
 import api from "../services/apiClient";
-import TopNav from "../components/TopNav";
 import { useAuth } from "../context/AuthContext";
 
 const DIFFICULTIES = ["easy", "medium", "hard"];
@@ -247,7 +246,6 @@ export default function TeacherAddQuestionPage() {
 
   return (
     <>
-      <TopNav />
       <div className="min-h-screen bg-gray-50 py-8 px-4">
       <div className="max-w-2xl mx-auto">
 
