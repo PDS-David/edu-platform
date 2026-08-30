@@ -42,6 +42,7 @@ import AdminEnglishMasterclass from "./pages/AdminEnglishMasterclass";
 import AdminLanguageMasterclass from "./pages/AdminLanguageMasterclass";
 import StudentSubjectsPage from "./pages/StudentSubjectsPage";
 import StudentFilesPage from "./pages/StudentFilesPage";
+import StudentPastPapersPage from "./pages/StudentPastPapersPage";
 import StudentExamTypesPage from "./pages/StudentExamTypesPage";
 import StudentAnalyticsDashboard from "./pages/StudentAnalyticsDashboard";
 import StudentTestPage from "./pages/StudentTestPage";
@@ -182,6 +183,7 @@ export default function App() {
             {/* DEF-018: canonical URL is /student/resources; /student/files redirects */}
             <Route path="files"      element={<Navigate to="/student/resources" replace />} />
             <Route path="resources"  element={<StudentFilesPage />} />
+            <Route path="past-papers" element={<StudentPastPapersPage />} />
             <Route path="exam-types" element={<StudentExamTypesPage />} />
           </Route>
 

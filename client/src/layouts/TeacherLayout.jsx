@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import api from "../services/apiClient";
 import TopNav from "../components/TopNav";
 import PortalSidebar from "../components/PortalSidebar";
+import PortalMobileNav from "../components/PortalMobileNav";
 import {
   Users, BarChart2, PenTool, BookOpen, Upload, Plus, FileText, AlertCircle,
 } from "lucide-react";
@@ -66,6 +67,13 @@ export default function TeacherLayout() {
   return (
     <div className="min-h-screen bg-[#f9f7f4] text-[#1a1a1a]">
       <TopNav />
+      <PortalMobileNav
+        roleLabel="Teacher"
+        displayName={getDisplayName(user)}
+        items={TEACHER_NAV_ITEMS}
+        dashboardPath={TEACHER_DASHBOARD_PATH}
+        tabParam="tab"
+      />
       <div className="flex">
         <PortalSidebar
           roleLabel="Teacher"
@@ -75,7 +83,7 @@ export default function TeacherLayout() {
           tabParam="tab"
           extra={subjectPills}
         />
-        <main className="flex-1 min-w-0">
+        <main className="flex-1 min-w-0 pb-16 md:pb-0">
           <Outlet />
         </main>
       </div>
