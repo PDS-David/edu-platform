@@ -14,6 +14,7 @@
 const express              = require('express');
 const router               = express.Router();
 const { protect }          = require('../middleware/auth');
+const { aiLimiter }        = require('../middleware/rateLimiter');
 const { QueryTypes }       = require('sequelize');
 const sequelize            = require('../config/database');
 const { orchestrate }      = require('../services/aiOrchestrator');
@@ -84,7 +85,7 @@ router.get('/chat/session', protect, async (req, res) => {
 // ============================================================================
 // POST /api/ai/chat
 // ============================================================================
-router.post('/chat', protect, subscriptionGuard, async (req, res) => {
+router.post('/chat', protect, subscriptionGuard, aiLimiter, async (req, res) => {
   const { message, context = {}, session_id } = req.body;
 
   if (!message?.trim()) {
@@ -248,7 +249,7 @@ router.post('/chat', protect, subscriptionGuard, async (req, res) => {
 // POST /api/ai/chat/stream
 // v2: Updated to use @google/genai SDK for streaming.
 // ============================================================================
-router.post('/chat/stream', protect, subscriptionGuard, async (req, res) => {
+router.post('/chat/stream', protect, subscriptionGuard, aiLimiter, async (req, res) => {
   if (!STREAMING_ENABLED) {
     return res.status(404).json({
       success:    false,
