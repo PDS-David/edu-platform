@@ -9,7 +9,6 @@ import { Link } from 'react-router-dom';
 import api from '../services/apiClient';
 import { getToken } from '../utils/token';
 import { openResourceAuth } from '../utils/authenticatedDownload';
-import TopNav from '../components/TopNav';
 import {
   Upload, FileText, Video, Music, Trash2, Loader2,
   CheckCircle, AlertTriangle, X, Plus, BookOpen,
@@ -1242,7 +1241,6 @@ export default function TeacherResourcesPage({ defaultTab = 'upload' }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <TopNav />
 
       {/* Header */}
       <div className="bg-[#0a4a3f] px-4 py-5">

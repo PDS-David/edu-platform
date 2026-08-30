@@ -9,7 +9,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/apiClient';
 import { useAuth } from '../context/AuthContext';
-import TopNav from '../components/TopNav';
 import {
   CheckCircle, XCircle, Clock, ChevronLeft, ChevronRight,
   User, Calendar, BookOpen, Tag, Loader, RefreshCw, AlertCircle,
@@ -99,7 +98,6 @@ export default function QuestionReview() {
   if (!loading && !error && questions.length === 0 && offset === 0) {
     return (
       <>
-        <TopNav />
         <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl p-10 text-center max-w-md">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -125,7 +123,6 @@ export default function QuestionReview() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
-      <TopNav />
       <div className="max-w-4xl mx-auto">
 
         {/* Header */}

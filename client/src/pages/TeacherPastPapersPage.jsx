@@ -11,7 +11,6 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/apiClient';
 import { useAuth } from '../context/AuthContext';
-import TopNav from '../components/TopNav';
 import UploadPastPaperForm from '../components/UploadPastPaperForm';
 import {
   BookOpen, RefreshCw, Trash2, Loader2, CheckCircle, AlertTriangle, X,
@@ -101,7 +100,6 @@ export default function TeacherPastPapersPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <TopNav />
 
       <div className="bg-white border-b border-gray-100 px-4 py-4">
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">

@@ -618,7 +618,7 @@ export default function StudentDashboard() {
       children: [
         { label: "Resources",     icon: BookOpen,       path: "/student/resources" },
         { label: "Test-Yourself", icon: Zap,            path: "/student/practice"  },
-        { label: "Past Papers",   icon: FileText,       path: "/past-papers"       },
+        { label: "Past Papers",   icon: FileText,       path: "/student/resources" },
         { label: "Mock Exam",     icon: ClipboardList,  path: null, onClick: () => setShowMockPicker(true) },
       ],
     },

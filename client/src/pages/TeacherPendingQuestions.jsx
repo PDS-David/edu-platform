@@ -5,7 +5,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/apiClient';
-import TopNav from '../components/TopNav';
 import {
   CheckCircle, Loader2, BookOpen, Plus, Clock, XCircle, Trash2,
 } from 'lucide-react';
@@ -90,7 +89,6 @@ export default function TeacherPendingQuestions() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <TopNav />
 
       {/* Header */}
       <div className="bg-[#0a4a3f] px-4 py-5">

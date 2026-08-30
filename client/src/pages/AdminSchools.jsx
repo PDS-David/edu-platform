@@ -10,7 +10,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/apiClient';
-import TopNav from '../components/TopNav';
 import {
   School, Plus, X, Copy, Check, Loader2, Users, UserCheck,
   ChevronDown, ChevronUp, AlertCircle, Trash2, Image as ImageIcon,
@@ -593,7 +592,6 @@ export default function AdminSchools() {
 
   return (
     <div className="min-h-screen bg-[#f9f7f4] text-[#1a1a1a]">
-      <TopNav />
       <div className="max-w-4xl mx-auto px-6 py-8">
         <div className="flex items-center justify-between mb-6">
           <div>
