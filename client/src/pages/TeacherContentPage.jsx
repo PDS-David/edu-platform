@@ -11,7 +11,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link }                        from 'react-router-dom';
 import api                             from '../services/apiClient';
-import TopNav                          from '../components/TopNav';
 import ConceptList                     from '../components/ConceptList';
 import {
   BookOpen, Plus, ChevronDown, ChevronUp,
@@ -548,7 +547,6 @@ export default function TeacherContentPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <TopNav />
 
       <div className="bg-[#0a4a3f] px-4 py-5">
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">

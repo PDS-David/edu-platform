@@ -42,7 +42,7 @@ export default function QuizHistoryPage() {
     : null;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#f9f7f4]">
 
       <div className="bg-[#0a4a3f] px-4 py-5">
         <div className="max-w-3xl mx-auto flex items-center gap-4">

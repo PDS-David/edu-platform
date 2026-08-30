@@ -1,6 +1,6 @@
 import { useState, useEffect, Component } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import api, { TIMEOUT_AI_GENERATE } from '../services/apiClient';
 import {
   Users, School, BookOpen, Settings, LogOut,
@@ -10,7 +10,6 @@ import {
   Layers, Search, FileText,
 } from 'lucide-react';
 import branding from '../config/branding';
-import TopNav from '../components/TopNav';
 import { useCatalog } from '../hooks/useCatalog';
 import AdminBulkUploadPanel from '../components/AdminBulkUploadPanel';
 import UploadPastPaperForm from '../components/UploadPastPaperForm';
@@ -2277,6 +2276,7 @@ const AdminSettingsPanel = ({ setActivePanel }) => {
 const AdminDashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [activePanel, setActivePanel] = useState(null);
   const [stats, setStats]             = useState(null);
   const [statsLoading, setStatsLoading] = useState(true);
@@ -2295,6 +2295,11 @@ const AdminDashboard = () => {
     { label: 'Active Students', value: stats?.active_students   ?? '—', icon: UserCheck,     bg: 'bg-amber-50 border-amber-100',    val: 'text-amber-700'  },
   ];
 
+  // DEF-020: sidebar (including this same item list, previously hand-copied
+  // as `navItems` + rendered inline below) moved to layouts/AdminLayout.jsx
+  // -- the real shared shell every /admin/* route now renders inside.
+  // `navItems` is kept here only because the mobile tab bar further down
+  // still uses it (desktop sidebar is `hidden md:block`).
   const navItems = [
     { key: 'analytics',  icon: Zap,          label: 'Analytics'   },
     { key: 'auditlog',   icon: Shield,       label: 'Audit Log'   },
@@ -2311,6 +2316,15 @@ const AdminDashboard = () => {
     { key: 'settings',            icon: Settings,   label: 'Quick Links'        },
   ];
 
+  // Read ?panel= from the URL on mount, same "N2 fix" pattern already
+  // proven in TeacherDashboard.jsx's ?tab= handling — lets
+  // layouts/AdminLayout.jsx's sidebar navigate here with a panel
+  // pre-selected from any other admin page, not just from this dashboard.
+  useEffect(() => {
+    const panelParam = searchParams.get('panel');
+    if (panelParam) setActivePanel(panelParam);
+  }, []); // run once on mount only
+
   const Panel = ({ children }) => (
     <div className="bg-white border border-gray-100 rounded-2xl mt-4 overflow-hidden shadow-sm">
       <div className="p-6">{children}</div>
@@ -2322,48 +2336,9 @@ const AdminDashboard = () => {
   const greeting = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
 
   return (
-    <div className="min-h-screen bg-[#f9f7f4] text-[#1a1a1a]">
-      <TopNav />
-
-      <div className="flex">
-        {/* ── SIDEBAR ── */}
-        <aside className="w-52 shrink-0 min-h-[calc(100vh-48px)] bg-[#f0ede8] border-r border-[#e8e4dd] sticky top-12 self-start hidden md:block">
-          <div className="px-3 py-5">
-            <div className="px-3 py-2 mb-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-[#b5a99a]">Admin</p>
-              <p className="text-xs font-semibold text-gray-700 mt-0.5 truncate">{firstName}</p>
-            </div>
-            <nav className="space-y-0.5">
-              {navItems.map(({ key, icon: Icon, label, href }) => {
-                const active = activePanel === key;
-                if (href) {
-                  // Items with href navigate to a dedicated page instead of opening an inline panel
-                  return (
-                    <a key={key} href={href}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all text-left text-[#6b6259] hover:text-[#1a1a1a] hover:bg-white/60">
-                      {Icon && <Icon size={14} className="text-[#b5a99a]" />}
-                      {label}
-                    </a>
-                  );
-                }
-                return (
-                  <button key={key} onClick={() => setActivePanel(active ? null : key)}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all text-left ${
-                      active
-                        ? 'bg-white text-[#1a1a1a] font-semibold shadow-sm border border-[#e8e4dd]'
-                        : 'text-[#6b6259] hover:text-[#1a1a1a] hover:bg-white/60'
-                    }`}>
-                    {Icon && <Icon size={14} className={active ? 'text-[#d97757]' : 'text-[#b5a99a]'} />}
-                    {label}
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
-        </aside>
-
-        {/* ── MAIN ── */}
-        <main className="flex-1 min-w-0">
+    <div>
+        {/* ── CONTENT ── */}
+        <div>
           {/* Header */}
           <div className="border-b border-[#e8e4dd] px-6 md:px-8 py-5 bg-white">
             <p className="text-[#b5a99a] text-xs uppercase tracking-widest mb-0.5 font-medium">Admin Console</p>
@@ -2455,8 +2430,7 @@ const AdminDashboard = () => {
             {activePanel === 'pastpapers' && <Panel><PanelErrorBoundary><AdminPastPapersPanel /></PanelErrorBoundary></Panel>}
             {activePanel === 'settings'   && <Panel><PanelErrorBoundary><AdminSettingsPanel setActivePanel={setActivePanel} /></PanelErrorBoundary></Panel>}
           </div>
-        </main>
-      </div>
+        </div>
     </div>
   );
 };

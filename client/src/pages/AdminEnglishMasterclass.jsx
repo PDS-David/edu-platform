@@ -4,7 +4,6 @@
 
 import { useState, useEffect, useCallback, useRef, useId } from 'react';
 import api from '../services/apiClient';
-import TopNav from '../components/TopNav';
 import {
   Plus, Trash2, Pencil, Save, X, Loader2, Sparkles,
   ChevronDown, ChevronRight, BookOpen, AlertCircle,
@@ -540,7 +539,6 @@ export default function AdminEnglishMasterclass() {
 
   return (
     <div className="min-h-screen bg-[#f9f7f4]">
-      <TopNav />
       <div className="max-w-3xl mx-auto py-8 px-4">
       <Toast msg={toast.msg} type={toast.type} />
 

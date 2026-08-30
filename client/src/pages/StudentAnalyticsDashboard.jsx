@@ -162,7 +162,7 @@ export default function StudentAnalyticsDashboard() {
 
   // ── Loading state ─────────────────────────────────────────────────────────
   if (loading) return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#f9f7f4]">
       <div className="flex justify-center pt-24">
         <Loader2 size={28} className="text-blue-400 animate-spin" />
       </div>
@@ -187,7 +187,7 @@ export default function StudentAnalyticsDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#f9f7f4]">
 
       {/* Dark header with stat cards */}
       <div className="bg-[#0a4a3f]">

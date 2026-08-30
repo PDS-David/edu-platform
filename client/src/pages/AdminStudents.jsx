@@ -15,7 +15,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/apiClient';
-import TopNav from '../components/TopNav';
 import { Loader2, AlertCircle, FileText, Search, GraduationCap } from 'lucide-react';
 
 export default function AdminStudents() {
@@ -43,7 +42,6 @@ export default function AdminStudents() {
 
   return (
     <div className="min-h-screen bg-[#f9f7f4] text-[#1a1a1a]">
-      <TopNav />
 
       <div className="max-w-4xl mx-auto px-6 py-8">
         <div className="flex items-center gap-2 mb-1">
