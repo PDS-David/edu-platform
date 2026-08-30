@@ -395,7 +395,16 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
     .update(req.body)
     .digest('hex');
 
-  if (hash !== signature) {
+  // Constant-time comparison — a plain !== leaks timing information that
+  // could in principle help an attacker guess a valid signature byte by
+  // byte. Length-checked first since crypto.timingSafeEqual throws (rather
+  // than returning false) on mismatched buffer lengths.
+  const hashBuf = Buffer.from(hash, 'utf8');
+  const sigBuf  = Buffer.from(signature, 'utf8');
+  const validSignature =
+    hashBuf.length === sigBuf.length && crypto.timingSafeEqual(hashBuf, sigBuf);
+
+  if (!validSignature) {
     console.warn('[Webhook] Invalid Paystack signature — ignoring');
     return res.status(401).send('Invalid signature');
   }
