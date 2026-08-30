@@ -5,13 +5,21 @@
 // Resources page (StudentFilesPage.jsx / /student/resources). Pulls from
 // the same past-papers bank teachers/admins upload into
 // (server/routes/pastPaperRoutes.js), which already scopes GET / to only
-// the exam board(s) and subject(s) the student is actually enrolled in —
+// the exam board(s) and subject(s) the student is actually enrolled in --
 // this page just needs to render that, plus a subject/year filter UI.
+//
+// Styling matched to the established student-page conventions (verified
+// against StudentFilesPage.jsx / StudentSubjectsPage.jsx / MyTestsPage.jsx):
+// max-w-3xl content width, "Back to Dashboard" link, text-xl/text-sm
+// header sizing, text-blue-400 loading spinner, bg-blue-600 action buttons
+// -- blue is the student-content-page action accent, not the sidebar's
+// warm orange (#d97757), which is a different UI surface.
 
 import { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../services/apiClient';
 import {
-  BookOpen, Loader2, Download, FileText, ChevronDown, X,
+  BookOpen, Loader2, Download, FileText, ChevronDown, X, ArrowLeft,
 } from 'lucide-react';
 
 function fmtSize(bytes) {
@@ -41,10 +49,10 @@ export default function StudentPastPapersPage() {
 
   useEffect(() => { fetchPapers(); }, []);
 
-  // Subject filter options come from the student's own enrolled subjects —
-  // same endpoint StudentSubjectsPage.jsx / StudentFilesPage.jsx already use
-  // — not the full catalog, since a student can only ever see past papers
-  // for subjects they're registered for anyway (server-enforced).
+  // Subject filter options come from the student's own enrolled subjects --
+  // same endpoint StudentSubjectsPage.jsx / StudentFilesPage.jsx already
+  // use -- not the full catalog, since a student can only ever see past
+  // papers for subjects they're registered for anyway (server-enforced).
   useEffect(() => {
     api.get('/students/my-subjects')
       .then(r => setSubjects(r.data || []))
@@ -74,12 +82,16 @@ export default function StudentPastPapersPage() {
   return (
     <div className="min-h-screen bg-[#f9f7f4]">
       <div className="max-w-3xl mx-auto px-4 py-6">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <FileText size={20} className="text-[#d97757]" /> Past Papers
-          </h1>
-          <p className="text-xs text-gray-400 mt-0.5">
+        {/* Back — matches every other student sub-page */}
+        <Link to="/student/dashboard"
+          className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 mb-5 transition-colors">
+          <ArrowLeft size={14} /> Back to Dashboard
+        </Link>
+
+        {/* Header — same text-xl/text-sm sizing used by every sibling page */}
+        <div className="mb-4">
+          <h1 className="text-xl font-bold text-gray-900">Past Papers</h1>
+          <p className="text-sm text-gray-400 mt-0.5">
             Past exam papers for the subjects you're enrolled in
           </p>
         </div>
@@ -90,7 +102,7 @@ export default function StudentPastPapersPage() {
             <select
               value={subjectFilter}
               onChange={(e) => setSubjectFilter(e.target.value)}
-              className="appearance-none text-xs font-medium border border-gray-200 rounded-lg pl-3 pr-7 py-2 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#d97757]">
+              className="appearance-none text-xs font-medium border border-gray-200 rounded-lg pl-3 pr-7 py-2 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-400">
               <option value="">All subjects</option>
               {subjects.map(s => (
                 <option key={s.id} value={s.id}>{s.name}</option>
@@ -103,7 +115,7 @@ export default function StudentPastPapersPage() {
             <select
               value={yearFilter}
               onChange={(e) => setYearFilter(e.target.value)}
-              className="appearance-none text-xs font-medium border border-gray-200 rounded-lg pl-3 pr-7 py-2 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#d97757]">
+              className="appearance-none text-xs font-medium border border-gray-200 rounded-lg pl-3 pr-7 py-2 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-400">
               <option value="">All years</option>
               {years.map(y => (
                 <option key={y} value={y}>{y}</option>
@@ -113,7 +125,7 @@ export default function StudentPastPapersPage() {
           </div>
 
           <button onClick={applyFilters}
-            className="text-xs font-semibold bg-[#d97757] hover:bg-[#c56646] text-white px-3 py-2 rounded-lg transition-colors">
+            className="text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg transition-colors">
             Apply
           </button>
 
@@ -128,7 +140,7 @@ export default function StudentPastPapersPage() {
         {/* List */}
         {loading ? (
           <div className="flex justify-center py-16">
-            <Loader2 className="w-6 h-6 text-[#d97757] animate-spin" />
+            <Loader2 className="w-6 h-6 text-blue-400 animate-spin" />
           </div>
         ) : papers.length === 0 ? (
           <div className="text-center py-16 border border-dashed border-gray-200 rounded-2xl">
@@ -146,9 +158,9 @@ export default function StudentPastPapersPage() {
           <div className="space-y-2">
             {papers.map(p => (
               <div key={p.id}
-                className="flex items-center gap-3 px-4 py-3 bg-white border border-gray-100 rounded-xl hover:border-[#d97757]/30 transition-colors group">
-                <div className="w-9 h-9 rounded-lg bg-[#fdf1ec] flex items-center justify-center shrink-0">
-                  <FileText size={16} className="text-[#d97757]" />
+                className="flex items-center gap-3 px-4 py-3 bg-white border border-gray-100 rounded-xl hover:border-blue-200 transition-colors group">
+                <div className="w-9 h-9 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
+                  <FileText size={16} className="text-red-500" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-800 truncate">{p.title}</p>
@@ -162,8 +174,8 @@ export default function StudentPastPapersPage() {
                 </div>
                 {p.file_url && (
                   <a href={p.file_url} target="_blank" rel="noopener noreferrer"
-                    className="shrink-0 flex items-center gap-1.5 text-xs font-semibold text-[#d97757] hover:text-[#c56646] px-3 py-1.5 rounded-lg border border-[#d97757]/30 hover:bg-[#fdf1ec] transition-colors">
-                    <Download size={12} /> Download
+                    className="shrink-0 p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Download">
+                    <Download size={16} />
                   </a>
                 )}
               </div>
