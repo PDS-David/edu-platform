@@ -6,7 +6,6 @@ import {
   BarChart2, X, PenTool, BookOpen, Upload, Send, FileText,
   ChevronDown, AlertCircle, Search, UserPlus, Settings, Check, Trash2, Pencil,
 } from 'lucide-react';
-import TopNav from '../components/TopNav';
 import PrintReportButton from '../components/PrintReportButton';
 import PrintableReportHeader from '../components/PrintableReportHeader';
 import { useAuth } from '../context/AuthContext';
@@ -1109,71 +1108,19 @@ export default function TeacherDashboard() {
 
   ];
 
-  // ── Sidebar items — all wired ─────────────────────────────────────────────
-  const sidebarItems = [
-    { id: 'classes',     icon: Users,     label: 'My Classes',      tab: true  },
-    { id: 'analytics',   icon: BarChart2, label: 'Analytics',       tab: true  },
-    { id: 'testbuilder', icon: PenTool,   label: 'Test Builder',    tab: true  },
-    { id: 'content',     icon: BookOpen,  label: 'Content Manager', link: '/teacher/content'      },
-    { id: 'resources',   icon: Upload,    label: 'Resources',       link: '/teacher/resources'    },
-    { id: 'addq',        icon: Plus,      label: 'Add Question',    link: '/teacher/questions/add'},
-    { id: 'pastpapers',  icon: FileText,  label: 'Past Papers',     link: '/teacher/past-papers'  },
-  ];
-
-  const isTabActive = (item) => item.tab && activeTab === item.id;
+  // DEF-020: sidebar rendering (including this same item list, previously
+  // hand-copied here as `sidebarItems`) moved to layouts/TeacherLayout.jsx
+  // -- the real shared shell every /teacher/* route now renders inside, so
+  // it appears on every teacher page, not just this dashboard. The `tabs`
+  // array above still drives the mobile tab bar further down, which stays
+  // dashboard-specific (desktop sidebar is `hidden md:block`, so mobile
+  // still needs its own nav -- unchanged from before this fix, and a
+  // separate gap from the one this fix addresses).
 
   return (
-    <div className="min-h-screen bg-[#f9f7f4] text-[#1a1a1a]">
-      <TopNav />
-
-      <div className="flex">
-        {/* ── SIDEBAR ── */}
-        <aside className="w-52 shrink-0 min-h-[calc(100vh-48px)] bg-[#f0ede8] border-r border-[#e8e4dd] sticky top-12 self-start hidden md:block">
-          <div className="px-3 py-5">
-            <div className="px-3 py-2 mb-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-[#b5a99a]">Teacher</p>
-              <p className="text-xs font-semibold text-gray-700 mt-0.5 truncate">{displayName}</p>
-            </div>
-
-            {/* Subject pills */}
-            {!subjectsLoading && hasSubjects && (
-              <div className="mx-3 mb-3 space-y-1">
-                {(assignedSubjects || []).slice(0, 3).map(s => (
-                  <div key={s.id} className="flex items-center gap-1.5 px-2 py-1 bg-white/60 border border-[#e8e4dd] rounded-lg">
-                    <div className="w-1.5 h-1.5 rounded-full bg-[#d97757] shrink-0" />
-                    <span className="text-[10px] font-medium text-[#6b6259] truncate">{s.name}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {!subjectsLoading && !hasSubjects && (
-              <div className="mx-3 mb-3 px-2 py-1.5 bg-amber-50 border border-amber-200 rounded-lg">
-                <p className="text-[10px] text-amber-700">No subjects assigned</p>
-              </div>
-            )}
-
-            <nav className="space-y-0.5">
-              {sidebarItems.map(({ id, icon: Icon, label, tab, link }) => {
-                const active = tab ? isTabActive({ id, tab }) : location.pathname.startsWith(link || '/_');
-                return (
-                  <button key={id}
-                    onClick={() => link ? navigate(link) : setActiveTab(id)}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all text-left ${
-                      active
-                        ? 'bg-white text-[#1a1a1a] font-semibold shadow-sm border border-[#e8e4dd]'
-                        : 'text-[#6b6259] hover:text-[#1a1a1a] hover:bg-white/60'
-                    }`}>
-                    <Icon size={14} className={active ? 'text-[#d97757]' : 'text-[#b5a99a]'} />
-                    {label}
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
-        </aside>
-
-        {/* ── MAIN ── */}
-        <main className="flex-1 min-w-0">
+    <div>
+        {/* ── CONTENT ── */}
+        <div>
           {/* Header */}
           <div className="border-b border-[#e8e4dd] px-4 md:px-8 py-5 bg-white">
             <div className="flex items-center justify-between">
@@ -1234,8 +1181,7 @@ export default function TeacherDashboard() {
             {activeTab === 'analytics'   && <AnalyticsTab />}
             {activeTab === 'testbuilder' && <TestBuilderTab />}
           </div>
-        </main>
-      </div>
+        </div>
     </div>
   );
 }
