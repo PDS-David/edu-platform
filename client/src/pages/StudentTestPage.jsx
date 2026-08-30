@@ -56,7 +56,7 @@ function SubmitConfirmModal({ onConfirm, onCancel }) {
 
 function ResultScreen({ result, testTitle, onDone }) {
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-[#f9f7f4] flex items-center justify-center px-4">
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 max-w-sm w-full text-center">
         <div className="text-4xl mb-3">{result.accuracy_pct >= 70 ? '🎉' : '📘'}</div>
         <h2 className="text-lg font-bold text-gray-900 mb-1">{testTitle} — Complete</h2>
@@ -150,9 +150,9 @@ export default function StudentTestPage() {
   // version of handleSubmit (with current test + answers in its closure).
   handleSubmitRef.current = handleSubmit;
 
-  if (loading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><Loader2 size={28} className="text-blue-400 animate-spin" /></div>;
+  if (loading) return <div className="min-h-screen bg-[#f9f7f4] flex items-center justify-center"><Loader2 size={28} className="text-blue-400 animate-spin" /></div>;
   if (submitting && !result) return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4">
+    <div className="min-h-screen bg-[#f9f7f4] flex flex-col items-center justify-center gap-4">
       <Loader2 size={28} className="text-blue-400 animate-spin" />
       <p className="text-gray-600 text-sm font-medium">Submitting your test…</p>
     </div>
@@ -163,7 +163,7 @@ export default function StudentTestPage() {
   const q = test.questions[current];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#f9f7f4]">
       {/* Top bar */}
       <div className="bg-white border-b border-gray-100 sticky top-0 z-40">
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
