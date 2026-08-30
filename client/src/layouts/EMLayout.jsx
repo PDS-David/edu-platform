@@ -42,7 +42,7 @@ export default function EMLayout() {
 
   const handleLogout = async () => {
     await logout();
-    navigate('/em/login', { replace: true });
+    navigate('/login', { replace: true });
   };
 
   const firstName = user?.first_name || user?.name?.split(' ')[0] || 'Student';

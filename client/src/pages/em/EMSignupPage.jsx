@@ -68,8 +68,9 @@ export default function EMSignupPage() {
             <p className="text-white font-bold text-sm leading-tight tracking-wide truncate">
               Language Masterclass
             </p>
-            {/* Dropped below sm — see EMLoginPage.jsx for why (keeps this
-                header from overflowing on a narrow phone). */}
+            {/* Dropped below sm — keeps this header from overflowing on a
+                narrow phone (same reasoning previously documented on the
+                since-removed EMLoginPage.jsx, which had the same header). */}
             <p className="hidden sm:block text-[10px] tracking-widest mt-0.5" style={{ color: SOVEREIGN[200] }}>
               ENGLISH FLUENCY TRAINING
             </p>
@@ -243,7 +244,7 @@ export default function EMSignupPage() {
 
           <p className="text-center text-xs text-gray-500">
             Already have a Language Masterclass account?{' '}
-            <Link to="/em/login" className="font-semibold hover:underline" style={{ color: SOVEREIGN[700] }}>
+            <Link to="/login" className="font-semibold hover:underline" style={{ color: SOVEREIGN[700] }}>
               Sign in
             </Link>
           </p>

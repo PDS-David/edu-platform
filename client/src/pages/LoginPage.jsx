@@ -32,12 +32,17 @@ const LoginPage = () => {
         otherServiceEnabled: !!reason.otherServiceEnabled,
       });
       window.history.replaceState({}, document.title);
-    } else if (reason?.service === 'language_masterclass') {
-      // Sent here by LangPrivateRoute when an already-authenticated
-      // tenant user's school doesn't have Language Masterclass enabled —
-      // e.g. they followed a bookmarked /language/:code link. They're
-      // still logged in, so if AISchoolonair IS enabled for them, point
-      // them at their real dashboard rather than a second login form.
+    } else if (reason?.service === 'language_masterclass' || reason?.service === 'em') {
+      // 'em' is EMPrivateRoute's own service key (the /em/* route group);
+      // 'language_masterclass' is LangPrivateRoute's, for the other 7
+      // languages. Same underlying product, same messaging, same "already
+      // signed in — just go to the right dashboard" recovery, so they
+      // share this one branch rather than being duplicated. Sent here by
+      // either guard when an already-authenticated tenant user's school
+      // doesn't have that product enabled — e.g. they followed a
+      // bookmarked /em/* or /language/:code link. They're still logged
+      // in, so if AISchoolonair IS enabled for them, point them at their
+      // real dashboard rather than a second login form.
       setClosedDoor({
         service: 'language_masterclass',
         message: 'Your school has not been registered for Language Masterclass. Contact your school admin or App Admin.',
@@ -169,8 +174,8 @@ const LoginPage = () => {
                   </div>
                   {closedDoor.otherServiceEnabled && closedDoor.service === 'aischoolonair' && (
                     <p className="text-sm text-amber-700 mt-2 ml-6">
-                      Your school does have Language Masterclass — try{' '}
-                      <Link to="/em/login" className="font-semibold underline">signing in there</Link> instead.
+                      Your school does have Language Masterclass — you're already signed in, so head to{' '}
+                      <Link to="/em/dashboard" className="font-semibold underline">your dashboard</Link> instead.
                     </p>
                   )}
                   {closedDoor.otherServiceEnabled && closedDoor.service === 'language_masterclass' && (

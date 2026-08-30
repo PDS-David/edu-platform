@@ -1,12 +1,14 @@
 // client/src/components/EMPrivateRoute.jsx
 // Auth guard for the /em/* route group.
-// Unauthenticated users go to /em/login (not /login).
+// Unauthenticated users go to /login — one login for everyone now (see
+// LoginPage.jsx / postAuthRedirect.js); /em/login itself is kept only as a
+// redirect to /login, for old bookmarks/links.
 // Students, teachers and (platform) admins are permitted — EM is
 // role-agnostic vocabulary training for them — EXCEPT a tenant-school
 // account whose school was never granted English Masterclass. That's not
 // a "wait for the API to 403" situation; it's a closed door, so it's
 // caught here, before any /em/* page or API call ever fires, and sent
-// back through /em/login where the same closed-door messaging as a fresh
+// back through /login where the same closed-door messaging as a fresh
 // login attempt applies.
 // A tenant school_admin is excluded entirely, regardless of enable_em —
 // this route group is student/study-facing, and a school_admin must never
@@ -28,12 +30,14 @@ export default function EMPrivateRoute() {
   }
 
   if (!user) {
-    // Preserve the intended destination so we can restore it after login if needed
-    return <Navigate to="/em/login" state={{ from: location }} replace />;
+    // One login for everyone now (see LoginPage.jsx / postAuthRedirect.js)
+    // — preserve the intended destination so we can restore it after login.
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   // A school_admin must never reach a student/study-facing page — not via
-  // login redirect (fixed separately in EMLoginPage.jsx), and not via a
+  // login redirect (fixed separately in the closedDoor branch on
+  // LoginPage.jsx now that there's one login for everyone), and not via a
   // bookmarked or manually-typed /em/* URL either. This is deliberately a
   // role check, not an enable_em check: even a school with EM fully granted
   // must never let its own admin land inside the student experience itself.
@@ -45,14 +49,15 @@ export default function EMPrivateRoute() {
   }
 
   // Tenant boundary: a student/teacher whose school hasn't
-  // been granted English Masterclass gets sent back to /em/login, which
-  // will re-derive and display the same closed-door message a fresh login
-  // attempt would show (user.school is only present for tenant accounts —
-  // standalone users and App Admin are unaffected).
+  // been granted English Masterclass gets sent back to /login (one login
+  // for everyone now), which will re-derive and display the same
+  // closed-door message a fresh login attempt would show (user.school is
+  // only present for tenant accounts — standalone users and App Admin are
+  // unaffected).
   if (user.school && !user.school.enable_em) {
     return (
       <Navigate
-        to="/em/login"
+        to="/login"
         state={{ closedDoor: { service: 'em', otherServiceEnabled: !!user.school.enable_aischoolonair } }}
         replace
       />
