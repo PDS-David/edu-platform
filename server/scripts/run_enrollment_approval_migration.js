@@ -841,7 +841,7 @@ async function runMigration() {
   await execConstraint('enrollment_source constraint', `
     ALTER TABLE student_subjects
     ADD CONSTRAINT chk_ss_source
-    CHECK (enrollment_source IN ('explicit','auto_enrolled','cascade'))
+    CHECK (enrollment_source IN ('explicit','auto_enrolled','cascade','admin_assigned'))
   `, stepOpts);
 
   // ── [I] Verify ──────────────────────────────────────────────────────────────
