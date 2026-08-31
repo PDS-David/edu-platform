@@ -15,6 +15,7 @@ const router         = express.Router();
 const { QueryTypes } = require('sequelize');
 const sequelize      = require('../config/database');
 const { protect }    = require('../middleware/auth');
+const { generate }   = require('../services/ai');
 const { ENROLLMENT_SOURCE, ENROLLMENT_STATUS } = require('../constants/enrollmentConstants');
 
 const UUID_REGEX  = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -343,7 +344,42 @@ router.get('/test/:testId', protect, studentOnly, async (req, res) => {
 
 // ── POST /api/students/test/:testId/submit ───────────────────────────────────
 // Submits a student's test answers.
-// Body: { answers: [{ question_id, selected_option_id }], total_time_ms }
+// Body: { answers: [{ question_id, selected_answer | selected_option_id | essay_response }], total_time_ms }
+//
+// BUG FIX (marking overhaul): this handler previously graded every question —
+// regardless of type — by comparing the submitted value as a raw string
+// against the questions.correct_answer column, and scored the test as a flat
+// "N correct out of N questions" count.
+//
+// That had three real, user-facing effects:
+//   1. MCQ drift: correct_answer and options[].option_text are stored
+//      independently and can differ in wording/punctuation (especially for
+//      AI-generated questions). When they drift, every option — including
+//      the one flagged is_correct: true — compares false against
+//      correct_answer, so the student is marked wrong no matter what they
+//      picked. quizzes.js and questionsRoutes.js both already fix this by
+//      grading against options[].is_correct; this endpoint never got the
+//      same fix.
+//   2. No marks weighting: teachers can set marks_allocated per question via
+//      POST /teacher/tests/:id/questions, and custom_tests has its own
+//      total_marks/passing_marks — none of that was used. Every question
+//      counted as exactly 1 mark regardless of what the teacher configured.
+//   3. structured/essay questions: teachers can attach any question type
+//      (including 'structured' and 'essay') from the bank to a test via
+//      POST /teacher/tests/:id/questions — nothing filters by type there.
+//      But this handler only ever read selected_answer/selected_option_id,
+//      never essay_response, and had no branch for free-text types at all —
+//      so any structured/essay question on an assigned test silently scored
+//      0 with no feedback, regardless of what the student wrote.
+//
+// Fix: fetch each question's type/options/marks_allocated via test_questions,
+// grade mcq/true_false/short_answer against options[].is_correct (falling
+// back to correct_answer text only when no usable options exist — same
+// precedence as questionsRoutes.js), route essay AND structured answers
+// through the same AI marking used for essay elsewhere (services/ai.js,
+// task 'essay-mark') since an assigned test needs an actual mark rather than
+// the self-assessment treatment structured gets in ad-hoc practice mode, and
+// weight the total by marks_allocated instead of a flat per-question count.
 router.post('/test/:testId/submit', protect, studentOnly, async (req, res) => {
   const { testId } = req.params;
   if (!isValidUUID(testId)) {
@@ -355,31 +391,106 @@ router.post('/test/:testId/submit', protect, studentOnly, async (req, res) => {
     return res.status(400).json({ success: false, error: 'answers array is required' });
   }
 
-  try {
-    // Resolve correct options for all questions
-    const questionIds = answers.map(a => a.question_id).filter(Boolean);
-    // Use correct_answer from questions table (JSONB options approach)
-    const questionRows = await sequelize.query(
-      `SELECT id, correct_answer FROM questions WHERE id::text = ANY(ARRAY[:questionIds]::text[])`,
-      { replacements: { questionIds }, type: QueryTypes.SELECT }
-    );
-    const correctMap = {};
-    for (const r of questionRows) {
-      correctMap[r.id] = String(r.correct_answer || '');
-    }
+  const normalize = (s) =>
+    String(s ?? '')
+      .replace(/[\u2018\u2019\u201B]/g, "'")
+      .replace(/[\u201C\u201D\u201F]/g, '"')
+      .replace(/[\u00A0\u2007\u202F]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
 
-    let correct = 0;
-    const total  = answers.length;
+  try {
+    const questionIds = answers.map(a => a.question_id).filter(Boolean);
+
+    // Pull type/options/marks_allocated together — marks_allocated lives on
+    // test_questions (per-test weighting), everything else on questions.
+    const questionRows = await sequelize.query(
+      `SELECT q.id, q.question_text, q.correct_answer, q.options, q.type, q.explanation,
+              tq.marks_allocated
+       FROM test_questions tq
+       JOIN questions q ON q.id = tq.question_id
+       WHERE tq.test_id = :testId AND q.id::text = ANY(ARRAY[:questionIds]::text[])`,
+      { replacements: { testId, questionIds }, type: QueryTypes.SELECT }
+    );
+    const questionMap = {};
+    for (const r of questionRows) questionMap[String(r.id)] = r;
+
+    let totalScore = 0;
+    let maxScore   = 0;
+    const results  = [];
 
     for (const answer of answers) {
-      const isCorrect = answer.selected_answer !== undefined
-        ? String(answer.selected_answer).trim().toLowerCase() === (correctMap[answer.question_id] || '').trim().toLowerCase()
-        : answer.selected_option_id
-        ? String(answer.selected_option_id) === correctMap[answer.question_id]
-        : false;
-      if (isCorrect) correct++;
+      const question = questionMap[String(answer.question_id)];
+      if (!question) continue; // question not actually on this test — skip
 
-      // Record practice attempt
+      const markValue = question.marks_allocated || 1;
+      maxScore += markValue;
+
+      const submittedAnswer = answer.selected_answer ?? answer.selected_option_id ?? '';
+      const essayText       = (answer.essay_response ?? (question.type !== 'mcq' && question.type !== 'true_false' ? submittedAnswer : '')) || '';
+
+      let isCorrect    = false;
+      let marksAwarded = 0;
+      let feedback     = null;
+
+      if (question.type === 'essay' || question.type === 'structured') {
+        // Assigned tests need an actual mark (unlike ad-hoc practice mode,
+        // where 'structured' is intentionally left as self-assessment) —
+        // route both through the same AI marking essay questions already
+        // use elsewhere, scaled to this test's marks_allocated.
+        if (process.env.GEMINI_API_KEY && essayText.trim()) {
+          try {
+            const prompt = `You are a Nigerian exam marker. Question: "${question.question_text}". Max marks: ${markValue}. Model answer: "${question.correct_answer || 'Not specified'}". Student answer: "${essayText.trim()}". Return ONLY JSON: {"marks_awarded": N, "feedback": "...", "is_correct": true/false}`;
+            const raw    = await generate(prompt, 'essay-mark');
+            const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
+            marksAwarded = Math.min(Math.max(parsed.marks_awarded || 0, 0), markValue);
+            isCorrect    = parsed.is_correct ?? (marksAwarded >= markValue * 0.5);
+            feedback     = parsed.feedback || null;
+          } catch (aiErr) {
+            console.error(`[POST /students/test/${testId}/submit] AI marking failed:`, aiErr.message);
+            feedback = 'Submitted for manual review — automated marking was unavailable.';
+          }
+        } else if (!essayText.trim()) {
+          feedback = 'No answer submitted.';
+        } else {
+          feedback = 'Submitted for manual review.';
+        }
+      } else {
+        // mcq / true_false / short_answer — grade against options[].is_correct
+        // first (authoritative, set at question creation/review time); only
+        // fall back to a raw correct_answer text comparison when there's no
+        // usable options array to grade against.
+        let opts = question.options;
+        if (typeof opts === 'string') { try { opts = JSON.parse(opts); } catch { opts = null; } }
+        const usableOpts = Array.isArray(opts)
+          ? opts.filter(o => o && typeof o === 'object' && o.option_text)
+          : [];
+
+        if (usableOpts.length > 0) {
+          const matchedOpt = usableOpts.find(o => normalize(o.option_text) === normalize(submittedAnswer));
+          if (matchedOpt && typeof matchedOpt.is_correct === 'boolean') {
+            isCorrect = matchedOpt.is_correct;
+          } else {
+            isCorrect = normalize(submittedAnswer) === normalize(question.correct_answer);
+          }
+        } else {
+          isCorrect = normalize(submittedAnswer) === normalize(question.correct_answer);
+        }
+        marksAwarded = isCorrect ? markValue : 0;
+      }
+
+      totalScore += marksAwarded;
+
+      results.push({
+        question_id:    answer.question_id,
+        is_correct:     isCorrect,
+        marks_awarded:  marksAwarded,
+        max_marks:      markValue,
+        feedback,
+      });
+
+      // Record practice attempt (non-blocking)
       sequelize.query(
         // BUG FIX: created_at/updated_at are NOT NULL with no value
         // supplied here — same root cause confirmed via live production
@@ -391,7 +502,7 @@ router.post('/test/:testId/submit', protect, studentOnly, async (req, res) => {
           replacements: {
             studentId:  req.user.id,
             questionId: answer.question_id,
-            isCorrect:  isCorrect,
+            isCorrect:  !!isCorrect,
             timeTaken:  Math.round((answer.time_taken_ms || 0) / 1000),
           },
           type: QueryTypes.INSERT,
@@ -399,20 +510,24 @@ router.post('/test/:testId/submit', protect, studentOnly, async (req, res) => {
       ).catch(() => {});
     }
 
-    const accuracyPct = total > 0 ? Math.round((correct / total) * 100) : 0;
+    const accuracyPct = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
 
-    // Mark test assignment as completed
+    // Mark test assignment as completed — score now holds weighted marks
+    // (out of maxScore/total_marks), not a flat correct-question count.
     sequelize.query(
       `UPDATE test_assignments SET completed_at = NOW(), score = :score
        WHERE test_id = :testId AND student_id = :studentId`,
-      { replacements: { score: correct, testId, studentId: req.user.id }, type: QueryTypes.UPDATE }
+      { replacements: { score: totalScore, testId, studentId: req.user.id }, type: QueryTypes.UPDATE }
     ).catch(() => {});
 
     return res.status(200).json({
       success:      true,
-      correct,
-      total,
+      correct:      results.filter(r => r.is_correct).length,
+      total:        results.length,
+      total_score:  totalScore,
+      max_score:    maxScore,
       accuracy_pct: accuracyPct,
+      answers:      results,
     });
   } catch (err) {
     console.error(`[POST /students/test/${testId}/submit]`, err.message);
