@@ -119,11 +119,18 @@ export default function StudentTestPage() {
     clearInterval(timerRef.current);
     setSubmitting(true);
     try {
-      const answersArray = (test?.questions || []).map(q => ({
-        question_id: q.id,
-        selected_answer:    answers[q.id] || null,  // option text string
-        time_taken_ms: Math.round((Date.now() - startTime.current) / (test?.questions?.length || 1)),
-      }));
+      const answersArray = (test?.questions || []).map(q => {
+        const isFreeText = q.type === 'essay' || q.type === 'structured';
+        return {
+          question_id: q.id,
+          // Free-text questions send essay_response explicitly; MCQ/other
+          // types keep sending selected_answer as before.
+          ...(isFreeText
+            ? { essay_response: answers[q.id] || null }
+            : { selected_answer: answers[q.id] || null }),
+          time_taken_ms: Math.round((Date.now() - startTime.current) / (test?.questions?.length || 1)),
+        };
+      });
       const res = await api.post(
         `/students/test/${testId}/submit`,
         { answers: answersArray, total_time_ms: Date.now() - startTime.current }
@@ -161,6 +168,12 @@ export default function StudentTestPage() {
   if (!test?.questions?.length) return <div className="flex items-center justify-center min-h-screen"><p className="text-gray-400">No questions in this test.</p></div>;
 
   const q = test.questions[current];
+  // BUG FIX: this page only ever rendered q.options?.map(...) as clickable
+  // buttons — structured/essay questions have no options array, so a
+  // student assigned a test containing one saw an empty answer area with
+  // no way to respond. Matches the same isFreeText convention already used
+  // in PracticeMode.jsx.
+  const isFreeText = q.type === 'essay' || q.type === 'structured';
 
   return (
     <div className="min-h-screen bg-[#f9f7f4]">
@@ -190,26 +203,46 @@ export default function StudentTestPage() {
           <div className="px-5 pt-4 flex items-center gap-2">
             <span className="text-xs text-gray-500 font-medium bg-gray-100 px-2.5 py-1 rounded-full">Question {current + 1}</span>
             {q.difficulty && <span className={`text-xs text-white font-bold px-2.5 py-1 rounded-full ${q.difficulty === 'easy' ? 'bg-green-500' : q.difficulty === 'hard' ? 'bg-red-500' : 'bg-amber-500'}`}>{q.difficulty.toUpperCase()}</span>}
+            {isFreeText && (
+              <span className="text-xs text-white font-bold px-2.5 py-1 rounded-full bg-blue-500">
+                {q.type === 'essay' ? 'ESSAY' : 'STRUCTURED'}
+              </span>
+            )}
           </div>
           <div className="px-5 py-4">
             <p className="text-gray-900 text-sm leading-relaxed">{q.question_text}</p>
           </div>
-          <div className="px-5 pb-5 space-y-2">
-            {q.options?.map((opt, i) => {
-              const optText  = typeof opt === 'string' ? opt : (opt.option_text || '');
-              const isSel    = answers[q.id] === optText;
-              return (
-                <button key={i}
-                  onClick={() => setAnswers(prev => ({ ...prev, [q.id]: optText }))}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${
-                    isSel ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-blue-300'
-                  }`}>
-                  <span className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 bg-gray-100 text-gray-500">{LABELS[i]}</span>
-                  <span className="text-sm text-gray-800 flex-1">{optText}</span>
-                </button>
-              );
-            })}
-          </div>
+          {isFreeText ? (
+            <div className="px-5 pb-5">
+              <textarea
+                value={answers[q.id] || ''}
+                onChange={e => setAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
+                rows={6}
+                placeholder="Write your answer here…"
+                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 focus:outline-none focus:border-blue-400 resize-y"
+              />
+              {q.marks && (
+                <p className="text-xs text-gray-400 mt-1.5">{q.marks} mark{q.marks !== 1 ? 's' : ''} available</p>
+              )}
+            </div>
+          ) : (
+            <div className="px-5 pb-5 space-y-2">
+              {q.options?.map((opt, i) => {
+                const optText  = typeof opt === 'string' ? opt : (opt.option_text || '');
+                const isSel    = answers[q.id] === optText;
+                return (
+                  <button key={i}
+                    onClick={() => setAnswers(prev => ({ ...prev, [q.id]: optText }))}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${
+                      isSel ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-blue-300'
+                    }`}>
+                    <span className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 bg-gray-100 text-gray-500">{LABELS[i]}</span>
+                    <span className="text-sm text-gray-800 flex-1">{optText}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
