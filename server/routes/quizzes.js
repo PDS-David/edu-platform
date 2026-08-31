@@ -158,7 +158,6 @@ router.post('/attempt', protect, async (req, res) => {
       if (!question) continue;
 
       const markValue  = question.marks || 1;
-      maxScore        += markValue;
 
       // Accept selected_answer (option text) OR selected_option_id (also option text in JSONB schema)
       const submittedAnswer = answer.selected_answer ?? answer.selected_option_id ?? '';
@@ -170,6 +169,62 @@ router.post('/attempt', protect, async (req, res) => {
           .replace(/\s+/g, ' ')
           .trim()
           .toLowerCase();
+
+      // BUG FIX: 'structured' questions (free-response, no options array)
+      // previously had no dedicated handling here and fell straight into
+      // the MCQ branch below — which found no matching option, then fell
+      // back to comparing the student's free-typed text verbatim against
+      // correct_answer, so a structured question in a mixed-type quiz
+      // scored wrong essentially every time regardless of what was typed.
+      // Match the self-assessment treatment questionsRoutes.js already
+      // gives structured questions elsewhere: not machine-graded (is_correct
+      // stays null, same signal PracticeMode.jsx already reads as "not
+      // graded" rather than "wrong"), model answer shown for comparison,
+      // and excluded from the score denominator so an ungraded free-response
+      // question can't silently drag down the quiz's accuracy_pct.
+      if (question.type === 'structured') {
+        const answerText = answer.essay_response ?? submittedAnswer ?? '';
+        results.push({
+          question_id:          answer.question_id,
+          question_text:        question.question_text,
+          selected_option_text: answerText || null,
+          correct_answer:       question.correct_answer,
+          correct_options:      [],
+          is_correct:           null,
+          marks_awarded:        0,
+          max_marks:            markValue,
+          model_answer:         question.correct_answer || null,
+          explanation:          question.explanation || 'Compare your answer with the model answer above.',
+          ai_explanation:       question.explanation || '',
+          ai_marking_scheme:    {},
+          options:              question.options,
+        });
+
+        await sequelize.query(
+          `INSERT INTO practice_attempts
+             (student_id, question_id, is_correct, time_taken_seconds, attempted_at, created_at, updated_at, selected_option_text, paper_type, subject_id, session_id)
+           VALUES (:studentId, :questionId, :isCorrect, :timeTaken, NOW(), NOW(), NOW(), :selectedText, :paperType, :subjectId, :sessionId)`,
+          {
+            replacements: {
+              studentId:    req.user.id,
+              questionId:   answer.question_id,
+              isCorrect:    false,
+              timeTaken:    parseInt(answer.time_taken_seconds ?? (answer.time_taken_ms / 1000)) || 0,
+              selectedText: answerText || null,
+              paperType:    paper_type || 'quiz',
+              subjectId:    subject_id || null,
+              sessionId:    sessionId,
+            },
+            type: QueryTypes.INSERT,
+          }
+        ).catch((err) => {
+          console.error('[POST /quizzes/attempt] practice_attempts insert failed:', err.message);
+        });
+
+        continue;
+      }
+
+      maxScore += markValue;
 
       // Resolve options array up front so grading can use it
       let qOpts = question.options;
