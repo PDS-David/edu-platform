@@ -621,7 +621,7 @@ function OpenAnswerQuestion({ question, questionNumber, totalQuestions, dismisse
         {result && (
           <div className="mt-3 bg-blue-50 border border-blue-100 rounded-xl p-3">
             <p className="text-xs font-semibold text-blue-700 mb-1 flex items-center gap-1"><Sparkles size={12} /> AI Feedback</p>
-            <p className="text-xs text-blue-700 leading-relaxed">{result}</p>
+            <p className="text-xs text-blue-700 leading-relaxed whitespace-pre-line">{result}</p>
           </div>
         )}
       </div>
