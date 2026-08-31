@@ -36,6 +36,20 @@ const { saveSchoolLogo, deleteSchoolLogo } = require('../utils/schoolLogoStorage
 const User    = require('../models/User');
 const sequelize = require('../config/database');
 const { ENROLLMENT_SOURCE, ENROLLMENT_STATUS } = require('../constants/enrollmentConstants');
+// BUG FIX (school admin: "Could not assign exam type", generic 500 on every
+// attempt): this endpoint's INSERTs below reference student_subjects.
+// enrollment_source and student_subjects/student_exam_types.status. Those
+// columns are only guaranteed to exist via studentRoutes.js's
+// ensureEnrollmentColumns() — which is ONLY ever invoked from that file's
+// own two student self-service routes (POST/DELETE /subjects). Phase 3
+// intentionally added an early 403 block to both of those routes for the
+// student role, so on any environment where migration_010_documented_
+// runtime_columns.sql hasn't actually been run yet, ensureEnrollmentColumns()
+// may now never execute in practice at all — leaving these columns missing
+// and this admin-assignment endpoint (which never called it either) failing
+// on its very first real use. Calling the same idempotent function
+// defensively here closes the gap regardless of migration/deploy order.
+const { ensureEnrollmentColumns } = require('./studentRoutes');
 
 // Single-file, image-only, small size cap — a logo isn't a document upload.
 // Same validation pipeline (magic-byte check + AV scan) as every other
@@ -1076,6 +1090,8 @@ router.post('/students/:studentId/assign-exam-type', protect, requireSchoolAdmin
   }
 
   try {
+    await ensureEnrollmentColumns();
+
     // Verify the target is actually a student, and (for school_admin
     // callers) that the student belongs to the caller's own school.
     //
