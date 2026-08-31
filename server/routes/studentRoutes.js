@@ -321,9 +321,20 @@ router.get('/test/:testId', protect, studentOnly, async (req, res) => {
     }
     const test = tests[0];
 
+    // BUG FIX: this SELECT never returned q.type, so the frontend
+    // (StudentTestPage.jsx) had no way to know a question was 'structured'
+    // or 'essay' rather than 'mcq' — it always rendered q.options?.map(...)
+    // as clickable buttons, which is empty for free-text question types, so
+    // a student assigned a test containing one had no way to answer it at
+    // all. Also switched the `marks` field to tq.marks_allocated (the
+    // per-test weight a teacher actually set via POST
+    // /teacher/tests/:id/questions) instead of the question bank's default
+    // q.marks, so the "N marks available" hint students see matches what
+    // they're actually scored out of.
     const questions = await sequelize.query(
-      `SELECT q.id, q.question_text, q.marks, q.difficulty,
+      `SELECT q.id, q.question_text, q.type, q.difficulty,
               tq.question_order,
+              tq.marks_allocated AS marks,
               q.options
        FROM test_questions tq
        JOIN questions q ON q.id = tq.question_id
