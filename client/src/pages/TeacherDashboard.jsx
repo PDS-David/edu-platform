@@ -987,7 +987,12 @@ function TestBuilderTab() {
                                 <span className={`mt-0.5 shrink-0 w-3.5 h-3.5 rounded border flex items-center justify-center ${on ? 'bg-emerald-500 border-emerald-500' : 'border-gray-300'}`}>
                                   {on && <Check size={10} className="text-white" />}
                                 </span>
-                                <span className="line-clamp-2">{q.question_text}</span>
+                                <span className="line-clamp-2 flex-1">{q.question_text}</span>
+                                {(q.type === 'essay' || q.type === 'structured') && (
+                                  <span className="shrink-0 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
+                                    {q.type}
+                                  </span>
+                                )}
                               </button>
                             </div>
                           );

@@ -1210,7 +1210,12 @@ router.post('/nudge/:userId', protect, teacherOnly, async (req, res) => {
 router.get('/questions', protect, teacherOnly, async (req, res) => {
   try {
     const rows = await sequelize.query(
-      `SELECT q.id, q.question_text, q.difficulty, q.explanation,
+      // BUG FIX: this never selected q.type, so the Test Builder's question
+      // picker (TeacherDashboard.jsx) had no way to show a teacher which
+      // questions were mcq vs essay/structured before attaching them to a
+      // test — a teacher could unknowingly build a test mixing free-text
+      // questions into what they assumed was an all-MCQ assessment.
+      `SELECT q.id, q.question_text, q.type, q.difficulty, q.explanation,
               q.options, q.correct_answer, q.created_at,
               s.name AS subject_name
        FROM questions q
