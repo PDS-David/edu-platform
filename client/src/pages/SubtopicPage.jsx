@@ -641,7 +641,37 @@ function OpenAnswerQuestion({ question, questionNumber, totalQuestions, dismisse
 // ─── Structured Question ───────────────────────────────────────────────────────
 function StructuredQuestion({ question, questionNumber, totalQuestions, onNext, onPrev }) {
   const [answers, setAnswers] = useState({});
+  const [result,  setResult]  = useState(null);
+  const [loading, setLoading] = useState(false);
   const parts = question.sub_parts || [{ label: '(i)', text: question.question_text, marks: question.marks || 3 }];
+
+  // BUG FIX: this component previously had no submission logic at all —
+  // "Submit" just called onNext directly, discarding every typed answer
+  // with no marking and no feedback ever shown. There's no per-sub-part
+  // correct-answer data modeled anywhere (question.sub_parts only carries
+  // label/text/marks), so — matching how OpenAnswerQuestion (Smart Answers)
+  // already marks a single free-text answer via the same endpoint — every
+  // part's answer is combined into one typed_answer string and marked as
+  // one submission against the parent question.
+  const hasAnyAnswer = Object.values(answers).some(a => a && a.trim());
+
+  const handleSubmit = async () => {
+    if (!hasAnyAnswer) return;
+    setLoading(true);
+    try {
+      const combined = parts
+        .map((part, i) => `${part.label} ${(answers[i] || '').trim()}`)
+        .join('\n');
+      const r = await api.post('/ai/explain', {
+        question_id:        question.id,
+        selected_option_id: null,
+        typed_answer:       combined,
+      });
+      setResult(r.data?.explanation ?? r.explanation ?? 'AI feedback submitted.');
+    } catch { setResult('AI marking not available. Continue to next question.'); }
+    finally  { setLoading(false); }
+  };
+
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
       <div className="px-5 pt-4 flex items-center gap-2">
@@ -660,7 +690,8 @@ function StructuredQuestion({ question, questionNumber, totalQuestions, onNext, 
             </div>
             <div className="relative">
               <textarea value={answers[i] || ''} onChange={e => setAnswers(a => ({ ...a, [i]: e.target.value }))}
-                placeholder="Type your answer here ..." className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm resize-none focus:outline-none focus:border-blue-400 min-h-[100px]" />
+                disabled={!!result}
+                placeholder="Type your answer here ..." className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm resize-none focus:outline-none focus:border-blue-400 min-h-[100px] disabled:bg-gray-50 disabled:text-gray-500" />
               <div className="absolute bottom-3 right-3 flex gap-2">
                 <button className="w-6 h-6 rounded-full bg-purple-500 flex items-center justify-center text-white"><Upload size={10} /></button>
                 <button className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white"><Sigma size={10} /></button>
@@ -668,10 +699,20 @@ function StructuredQuestion({ question, questionNumber, totalQuestions, onNext, 
             </div>
           </div>
         ))}
+        {result && (
+          <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+            <p className="text-xs font-semibold text-blue-700 mb-1 flex items-center gap-1"><Sparkles size={12} /> AI Feedback</p>
+            <p className="text-xs text-blue-700 leading-relaxed whitespace-pre-line">{result}</p>
+          </div>
+        )}
       </div>
       <div className="px-5 pb-5 flex items-center gap-3">
         {onPrev && <button onClick={onPrev} className="border-2 border-gray-200 text-gray-600 font-semibold px-4 py-2.5 rounded-xl text-sm hover:bg-gray-50">← Prev</button>}
-        <button onClick={onNext} className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2.5 rounded-xl text-sm">Submit</button>
+        <button onClick={result ? onNext : handleSubmit} disabled={loading || (!result && !hasAnyAnswer)}
+          className="flex-1 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-200 disabled:text-gray-400 text-white font-semibold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2">
+          {loading && <Loader2 size={14} className="animate-spin" />}
+          {result ? 'Next Question' : loading ? 'Marking…' : 'Submit'}
+        </button>
         <span className="text-xs text-gray-400 shrink-0">{questionNumber} of {totalQuestions}</span>
       </div>
     </div>
