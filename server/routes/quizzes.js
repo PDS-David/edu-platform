@@ -9,9 +9,57 @@ const router         = express.Router();
 const { QueryTypes } = require('sequelize');
 const sequelize      = require('../config/database');
 const { protect }    = require('../middleware/auth');
+const { generate }   = require('../services/ai');
 
 let awardXP = () => {};
 try { awardXP = require('../middleware/xpMiddleware').awardXP; } catch {}
+
+// ── buildExaminerFeedback ─────────────────────────────────────────────────
+// BUG FIX: examiner_recommendation used to be one of three hardcoded
+// sentences picked purely by accuracy_pct bucket (>=70 / >=50 / below) —
+// not personalized to the student, not aware of which questions they
+// actually missed, and not AI-generated despite the field name implying it
+// was. Now generates real, personalized feedback via the same central
+// Gemini hub used elsewhere (services/ai.js), addressed to the student by
+// name, in flowing prose paragraphs — same register as the working
+// personalized-feedback prompt in routes/aiRoutes.js's POST /ai/explain.
+// Falls back to the original bucketed sentence if Gemini isn't configured
+// or the call fails, so results never fail to return.
+async function buildExaminerFeedback({ studentName, accuracyPct, topicName, missedQuestions, totalQuestions }) {
+  const fallback = accuracyPct >= 70
+    ? 'Excellent performance! You are well prepared for this topic.'
+    : accuracyPct >= 50
+    ? 'Good effort. Review the questions you missed and try again.'
+    : 'Keep practising. Focus on the explanations for incorrect answers.';
+
+  if (!process.env.GEMINI_API_KEY) return fallback;
+
+  try {
+    const missedList = (missedQuestions || []).slice(0, 5)
+      .map(q => `- ${q}`)
+      .join('\n');
+
+    const prompt = `You are a warm, encouraging Nigerian exam tutor (WAEC/JAMB/NECO standard), giving a student their overall result on a quiz they just completed${studentName ? ` — their name is ${studentName}` : ''}.
+
+Topic: ${topicName || 'this topic'}
+Score: ${accuracyPct}% (${totalQuestions ? `out of ${totalQuestions} questions` : ''})
+Questions they got wrong:
+${missedList || '(none — they got everything right)'}
+
+Write feedback as natural, flowing prose addressed directly to the student — use "you"${studentName ? ` and open with their name (${studentName})` : ''}, never "the student". Structure it as two to three short paragraphs, each separated by a blank line:
+1. Open by acknowledging their overall performance honestly and specifically — mention the score.
+2. If they missed questions, name the general concepts they should revisit based on the questions listed above (don't just say "review your mistakes" — be specific about what to study). Skip this paragraph if they got everything right.
+3. End with one encouraging, concrete next step.
+
+Do not use markdown formatting of any kind — no asterisks, no numbered lists, no headers. Write in plain, complete sentences only. Keep the whole response under 120 words and keep a warm, encouraging tutor tone throughout.`;
+
+    const feedback = await generate(prompt, 'remediation');
+    return feedback?.trim() || fallback;
+  } catch (err) {
+    console.error('[buildExaminerFeedback]', err.message);
+    return fallback;
+  }
+}
 
 // ── GET /api/quizzes/attempt-count ───────────────────────────────────────────
 router.get('/attempt-count', protect, async (req, res) => {
@@ -398,6 +446,33 @@ router.post('/attempt', protect, async (req, res) => {
       }
     }
 
+    // Resolve a display name for the topic (subtopic, or subject for a
+    // mock exam) to give the AI feedback something concrete to reference.
+    let topicName = null;
+    try {
+      if (subtopic_id) {
+        const stRows = await sequelize.query(
+          `SELECT st.name FROM subtopics st WHERE st.id = :id`,
+          { replacements: { id: subtopic_id }, type: QueryTypes.SELECT }
+        );
+        topicName = stRows[0]?.name || null;
+      } else if (subject_id) {
+        const sRows = await sequelize.query(
+          `SELECT name FROM subjects WHERE id = :id`,
+          { replacements: { id: subject_id }, type: QueryTypes.SELECT }
+        );
+        topicName = sRows[0]?.name || null;
+      }
+    } catch { /* non-fatal — feedback just falls back to "this topic" */ }
+
+    const examinerRecommendation = await buildExaminerFeedback({
+      studentName:     req.user?.first_name || null,
+      accuracyPct,
+      topicName,
+      missedQuestions: results.filter(r => r.is_correct === false).map(r => r.question_text),
+      totalQuestions:  results.length,
+    });
+
     return res.json({
       success:      true,
       attempt_id:   attemptId,
@@ -410,11 +485,7 @@ router.post('/attempt', protect, async (req, res) => {
         total_time_ms: total_time_ms || 0,
         passed:        accuracyPct >= 60,
         answers:       results,
-        examiner_recommendation: accuracyPct >= 70
-          ? 'Excellent performance! You are well prepared for this topic.'
-          : accuracyPct >= 50
-          ? 'Good effort. Review the questions you missed and try again.'
-          : 'Keep practising. Focus on the explanations for incorrect answers.',
+        examiner_recommendation: examinerRecommendation,
         benchmark,
       },
     });
@@ -554,6 +625,14 @@ router.get('/attempt/:attemptId', protect, async (req, res) => {
       }
     }
 
+    const examinerRecommendation = await buildExaminerFeedback({
+      studentName:     req.user?.first_name || null,
+      accuracyPct,
+      topicName:       subtopicName || null,
+      missedQuestions: answers.filter(a => a.is_correct === false).map(a => a.question_text),
+      totalQuestions:  answers.length,
+    });
+
     return res.json({
       success: true,
       data: {
@@ -568,11 +647,7 @@ router.get('/attempt/:attemptId', protect, async (req, res) => {
         },
         answers,
         benchmark,
-        examiner_recommendation:  accuracyPct >= 70
-          ? 'Excellent performance! You are well prepared for this topic.'
-          : accuracyPct >= 50
-          ? 'Good effort. Review the questions you missed and try again.'
-          : 'Keep practising. Focus on the explanations for incorrect answers.',
+        examiner_recommendation: examinerRecommendation,
       },
     });
   } catch (err) {
