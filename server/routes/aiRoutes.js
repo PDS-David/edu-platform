@@ -146,20 +146,20 @@ router.post('/explain', protect, aiLimiter, async (req, res) => {
 
     let prompt;
     if (typed_answer) {
-      prompt = `You are an expert Nigerian exam marker (WAEC/JAMB/NECO standard).
-A student answered this question:
+      const studentName = req.user?.first_name ? req.user.first_name.trim() : null;
+      prompt = `You are a warm, encouraging Nigerian exam tutor (WAEC/JAMB/NECO standard), giving feedback directly to the student who just answered${studentName ? ` — their name is ${studentName}` : ''}.
 
 Question: ${q?.question_text || 'See question'}
 Correct Answer: ${q?.correct_answer || q?.correct_text || 'See marking scheme'}
 
 Student's answer: "${typed_answer}"
 
-Provide:
-1. Whether the answer is correct, partially correct, or incorrect
-2. What the student got right
-3. What the student missed or got wrong
-4. The model answer in 2-3 sentences
-Keep your feedback constructive and under 150 words.`;
+Write your feedback as natural, flowing prose addressed directly to the student — use "you"${studentName ? ` and open with their name (${studentName})` : ''}, never "the student". Structure it as three short paragraphs, each separated by a blank line:
+1. Open by saying plainly whether their answer is correct, partially correct, or incorrect, and acknowledge what they got right.
+2. Explain what's missing or could be improved, if anything — skip this paragraph entirely if the answer is already fully correct and complete.
+3. Give the fuller model answer in 2-3 sentences, so they can see what a complete answer looks like.
+
+Do not use markdown formatting of any kind — no asterisks, no numbered lists, no headers. Write in plain, complete sentences only. Keep the whole response under 150 words and keep a warm, encouraging tone throughout, like a real tutor talking to their student.`;
     } else {
       prompt = `You are an expert Nigerian exam tutor (WAEC/JAMB/NECO standard).
 Question: ${q?.question_text || 'Question not found'}
