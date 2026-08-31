@@ -7,7 +7,7 @@ import {
   Plus, Pencil, Trash2, ChevronDown, ChevronRight,
   Loader2, X, Check, AlertTriangle, RefreshCw, GraduationCap,
   UserCheck, UserX, ChevronUp, Sparkles, Zap, Upload, CheckCircle, Shield, Mail,
-  Layers, Search, FileText,
+  Layers, Search, FileText, PenTool,
 } from 'lucide-react';
 import branding from '../config/branding';
 import { useCatalog } from '../hooks/useCatalog';
@@ -2311,6 +2311,7 @@ const AdminDashboard = () => {
     { key: 'aigenerate',          icon: Sparkles,   label: 'AI Generate'        },
     { key: 'bulkupload',          icon: Upload,     label: 'Bulk Upload'        },
     { key: 'pastpapers',          icon: BookOpen,   label: 'Past Papers'        },
+    { key: 'testbuilder',         icon: PenTool,    label: 'Test Builder', href: '/teacher/dashboard?tab=testbuilder' },
     { key: 'schools',             icon: School,     label: 'Schools', href: '/admin/schools' },
     { key: 'students',            icon: GraduationCap, label: 'Students', href: '/admin/students' },
     { key: 'settings',            icon: Settings,   label: 'Quick Links'        },

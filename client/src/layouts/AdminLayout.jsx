@@ -5,7 +5,7 @@ import PortalSidebar from "../components/PortalSidebar";
 import PortalMobileNav from "../components/PortalMobileNav";
 import {
   Zap, Shield, Users, BookOpen, GraduationCap, Layers, UserCheck,
-  Sparkles, Upload, School, Settings,
+  Sparkles, Upload, School, Settings, PenTool,
 } from "lucide-react";
 
 // Real shared shell for the whole /admin/* tree. Previously this was just
@@ -26,6 +26,14 @@ const ADMIN_NAV_ITEMS = [
   { id: "aigenerate", kind: "tab",  icon: Sparkles,      label: "AI Generate" },
   { id: "bulkupload", kind: "tab",  icon: Upload,        label: "Bulk Upload" },
   { id: "pastpapers", kind: "tab",  icon: BookOpen,      label: "Past Papers" },
+  // Deliberately a link to the existing /teacher/dashboard Test Builder tab,
+  // not a separate admin-only screen: /teacher/* already allows role='admin'
+  // (see App.jsx's PrivateRoute allowedRoles=["teacher","admin"]), and every
+  // backend route TestBuilderTab calls (/teacher/tests, /teacher/questions,
+  // /teacher/tests/:id/*) already permits admin via teacherOnly middleware
+  // (['teacher','admin'].includes(role)). Building a parallel screen would
+  // duplicate ~400 lines and risk the two drifting out of sync over time.
+  { id: "testbuilder", kind: "link", icon: PenTool, label: "Test Builder", link: "/teacher/dashboard?tab=testbuilder" },
   { id: "schools",    kind: "link", icon: School,        label: "Schools",    link: "/admin/schools"  },
   { id: "students",   kind: "link", icon: GraduationCap, label: "Students",   link: "/admin/students" },
   { id: "settings",   kind: "tab",  icon: Settings,      label: "Quick Links" },

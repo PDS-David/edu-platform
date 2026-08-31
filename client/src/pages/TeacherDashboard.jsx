@@ -649,6 +649,24 @@ function NudgeButton({ studentId }) {
 /* ── Test Builder Tab ────────────────────────────────────────────────────── */
 function TestBuilderTab() {
   const navigate = useNavigate();
+  const { user }  = useAuth();
+  // Assign-to-individual-student mode. GET /users (the search this needs)
+  // is admin-only (authorize('admin') in userRoutes.js) — a regular teacher
+  // hitting it would just get a 403, so this mode is only ever offered to
+  // App Admin. Teachers keep the original class-only assign flow, unchanged.
+  // This is what actually makes Test Builder usable for App Admin: they
+  // already have full access to every other action here (create, edit,
+  // publish, attach questions — teacherOnly permits role 'admin' throughout
+  // this file's backend routes), but GET /teacher/classes is scoped to
+  // `WHERE teacher_id = req.user.id`, so an admin — who owns no classes —
+  // would always see an empty class dropdown and have no way to assign a
+  // test to anyone at all without this.
+  const isAdmin = user?.role === 'admin';
+  const [assignMode,       setAssignMode]       = useState(isAdmin ? 'student' : 'class');
+  const [studentQuery,     setStudentQuery]     = useState('');
+  const [studentResults,   setStudentResults]   = useState([]);
+  const [searchingStudents,setSearchingStudents]= useState(false);
+  const [selectedStudents, setSelectedStudents] = useState([]); // [{id, first_name, last_name}]
   const [tests,      setTests]      = useState([]);
   const [classes,    setClasses]    = useState([]);
   const [loading,    setLoading]    = useState(true);
@@ -746,7 +764,36 @@ function TestBuilderTab() {
     finally { setSaving(false); }
   };
 
+  const searchStudents = async (q) => {
+    setStudentQuery(q);
+    if (!q.trim()) { setStudentResults([]); return; }
+    setSearchingStudents(true);
+    try {
+      const res = await api.get('/users', { params: { search: q.trim(), role: 'student', limit: 8 } });
+      setStudentResults(Array.isArray(res?.data) ? res.data : []);
+    } catch {
+      setStudentResults([]);
+    } finally {
+      setSearchingStudents(false);
+    }
+  };
+
+  const toggleSelectedStudent = (s) => {
+    setSelectedStudents(prev =>
+      prev.some(p => p.id === s.id) ? prev.filter(p => p.id !== s.id) : [...prev, s]
+    );
+  };
+
   const assignTest = async testId => {
+    if (assignMode === 'student') {
+      if (selectedStudents.length === 0) { showToast('Select at least one student first.', 'error'); return; }
+      try {
+        await api.post(`/teacher/tests/${testId}/assign`, { student_ids: selectedStudents.map(s => s.id) });
+        showToast(`Assigned to ${selectedStudents.length} student${selectedStudents.length !== 1 ? 's' : ''}!`);
+        setAssigning(null); setSelectedStudents([]); setStudentQuery(''); setStudentResults([]);
+      } catch (err) { showToast(err?.message || 'Failed.', 'error'); }
+      return;
+    }
     if (!assignClass) { showToast('Select a class first.', 'error'); return; }
     try { await api.post(`/teacher/tests/${testId}/assign`, { class_id: assignClass }); showToast('Assigned!'); setAssigning(null); setAssignClass(''); }
     catch (err) { showToast(err?.message || 'Failed.', 'error'); }
@@ -941,14 +988,76 @@ function TestBuilderTab() {
                 </div>
               )}
               {assigning === t.id && (
-                <div className="border-t border-gray-100 bg-violet-50 px-4 py-3 flex items-center gap-2">
-                  <select value={assignClass} onChange={e => setAssignClass(e.target.value)}
-                    className="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-700 focus:outline-none focus:border-violet-400">
-                    <option value="">Select class…</option>
-                    {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
-                  <button onClick={() => assignTest(t.id)} className="bg-violet-600 text-white text-xs font-semibold px-3 py-2 rounded-lg">Assign</button>
-                  <button onClick={() => setAssigning(null)} className="text-gray-400 hover:text-gray-600"><X size={14} /></button>
+                <div className="border-t border-gray-100 bg-violet-50 px-4 py-3 space-y-2.5">
+                  {isAdmin && (
+                    <div className="flex gap-1.5">
+                      <button onClick={() => setAssignMode('student')}
+                        className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-colors ${
+                          assignMode === 'student' ? 'bg-violet-600 border-violet-600 text-white' : 'bg-white border-gray-200 text-gray-500'
+                        }`}>
+                        By student
+                      </button>
+                      <button onClick={() => setAssignMode('class')}
+                        className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-colors ${
+                          assignMode === 'class' ? 'bg-violet-600 border-violet-600 text-white' : 'bg-white border-gray-200 text-gray-500'
+                        }`}>
+                        By class
+                      </button>
+                    </div>
+                  )}
+
+                  {assignMode === 'student' ? (
+                    <div className="space-y-2">
+                      {selectedStudents.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {selectedStudents.map(s => (
+                            <span key={s.id} className="flex items-center gap-1 text-[11px] bg-white border border-violet-200 text-violet-700 font-semibold pl-2 pr-1 py-1 rounded-lg">
+                              {s.first_name} {s.last_name}
+                              <button onClick={() => toggleSelectedStudent(s)} className="text-violet-300 hover:text-violet-600"><X size={11} /></button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <div className="relative">
+                        <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-300" />
+                        <input
+                          value={studentQuery}
+                          onChange={e => searchStudents(e.target.value)}
+                          placeholder="Search students by name or email…"
+                          className="w-full bg-white border border-gray-200 rounded-lg pl-8 pr-3 py-2 text-xs text-gray-700 focus:outline-none focus:border-violet-400"
+                        />
+                      </div>
+                      {searchingStudents && <Loader2 size={13} className="animate-spin text-violet-400" />}
+                      {studentResults.length > 0 && (
+                        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden max-h-40 overflow-y-auto">
+                          {studentResults.map(s => {
+                            const sel = selectedStudents.some(p => p.id === s.id);
+                            return (
+                              <button key={s.id} onClick={() => toggleSelectedStudent(s)}
+                                className={`w-full flex items-center justify-between text-left text-xs px-3 py-2 border-b last:border-b-0 border-gray-50 hover:bg-violet-50 ${sel ? 'bg-violet-50' : ''}`}>
+                                <span className="text-gray-700">{s.first_name} {s.last_name} <span className="text-gray-400">· {s.email}</span></span>
+                                {sel && <Check size={12} className="text-violet-500 shrink-0" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <button onClick={() => assignTest(t.id)} className="bg-violet-600 text-white text-xs font-semibold px-3 py-2 rounded-lg">Assign</button>
+                        <button onClick={() => { setAssigning(null); setSelectedStudents([]); setStudentQuery(''); setStudentResults([]); }} className="text-gray-400 hover:text-gray-600"><X size={14} /></button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <select value={assignClass} onChange={e => setAssignClass(e.target.value)}
+                        className="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-700 focus:outline-none focus:border-violet-400">
+                        <option value="">Select class…</option>
+                        {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                      <button onClick={() => assignTest(t.id)} className="bg-violet-600 text-white text-xs font-semibold px-3 py-2 rounded-lg">Assign</button>
+                      <button onClick={() => setAssigning(null)} className="text-gray-400 hover:text-gray-600"><X size={14} /></button>
+                    </div>
+                  )}
                 </div>
               )}
               {editingQ === t.id && (
