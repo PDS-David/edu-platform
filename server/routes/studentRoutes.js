@@ -15,7 +15,7 @@ const router         = express.Router();
 const { QueryTypes } = require('sequelize');
 const sequelize      = require('../config/database');
 const { protect }    = require('../middleware/auth');
-const { generate }   = require('../services/ai');
+const { generate, buildEssayFeedbackPrompt } = require('../services/ai');
 const { ENROLLMENT_SOURCE, ENROLLMENT_STATUS } = require('../constants/enrollmentConstants');
 
 const UUID_REGEX  = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -441,7 +441,15 @@ router.post('/test/:testId/submit', protect, studentOnly, async (req, res) => {
         // use elsewhere, scaled to this test's marks_allocated.
         if (process.env.GEMINI_API_KEY && essayText.trim()) {
           try {
-            const prompt = `You are a Nigerian exam marker. Question: "${question.question_text}". Max marks: ${markValue}. Model answer: "${question.correct_answer || 'Not specified'}". Student answer: "${essayText.trim()}". Return ONLY JSON: {"marks_awarded": N, "feedback": "...", "is_correct": true/false}`;
+            // Shared prompt (services/ai.js) — personalized, paragraph-style
+            // feedback instead of an unstructured one-line generic response.
+            const prompt = buildEssayFeedbackPrompt({
+              studentName:   req.user?.first_name || null,
+              questionText:  question.question_text,
+              maxMarks:      markValue,
+              modelAnswer:   question.correct_answer,
+              studentAnswer: essayText.trim(),
+            });
             const raw    = await generate(prompt, 'essay-mark');
             const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
             marksAwarded = Math.min(Math.max(parsed.marks_awarded || 0, 0), markValue);

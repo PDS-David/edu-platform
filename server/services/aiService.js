@@ -232,6 +232,7 @@ async function markImage({
   subject = 'General',
   examBoard = 'WAEC',
   totalMarks = 10,
+  studentName = null,
 }) {
   if (!process.env.GEMINI_API_KEY) {
     console.error('[markImage] GEMINI_API_KEY not configured');
@@ -245,8 +246,17 @@ async function markImage({
     ? `\nMark Scheme:\n${markScheme}`
     : '\n(No mark scheme provided — use your expert judgment.)';
 
+  // BUG FIX: `feedback` previously asked for only "2-3 sentence overall
+  // feedback" with no personalization or paragraph guidance, so it often
+  // came back as a single generic clause rather than something addressed to
+  // the student. strengths/improvements stay as short bullet arrays — the
+  // frontend (ImageMarkingPage.jsx) renders those as bullet lists by design,
+  // that's intentionally separate from the main feedback — but `feedback`
+  // itself now explicitly has to be personalized, flowing paragraph prose,
+  // matching the register used elsewhere (see buildEssayFeedbackPrompt in
+  // services/ai.js and routes/aiRoutes.js's POST /ai/explain).
   const prompt = `
-You are an experienced ${examBoard} examiner marking a student's handwritten answer.
+You are an experienced ${examBoard} examiner marking a student's handwritten answer${studentName ? ` — their name is ${studentName}` : ''}.
 
 Subject: ${subject}
 Question: ${questionText}
@@ -257,7 +267,7 @@ Look at the student's handwritten answer in the image and:
 1. Award marks out of ${totalMarks}
 2. Identify strengths in the answer
 3. Identify what is missing or incorrect
-4. Give constructive feedback
+4. Give personalized, encouraging overall feedback, written directly to the student
 5. Provide a brief model answer
 
 Respond ONLY with valid JSON in this exact format (no markdown, no extra text):
@@ -265,9 +275,9 @@ Respond ONLY with valid JSON in this exact format (no markdown, no extra text):
   "marks_awarded": <number 0-${totalMarks}>,
   "total_marks": ${totalMarks},
   "percentage": <integer 0-100>,
-  "feedback": "<2-3 sentence overall feedback>",
-  "strengths": ["<strength point>", "<strength point>"],
-  "improvements": ["<improvement point>", "<improvement point>"],
+  "feedback": "<personalized overall feedback, written as natural flowing prose addressed directly to the student using \\"you\\"${studentName ? ` (open with their name, ${studentName})` : ''} — never \\"the student\\". One or two short paragraphs separated by a blank line, no markdown, no bullet points, no numbered lists, under 100 words, warm and encouraging tone.>",
+  "strengths": ["<short strength point>", "<short strength point>"],
+  "improvements": ["<short improvement point>", "<short improvement point>"],
   "model_answer": "<concise model answer or key points, 2-4 sentences>",
   "readability_note": "<optional: note if handwriting was hard to read, or null>"
 }

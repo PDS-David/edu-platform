@@ -392,6 +392,7 @@ router.post('/mark-image', protect, aiLimiter, (req, res) => {
         subject,
         examBoard,
         totalMarks,
+        studentName: req.user?.first_name || null,
       });
 
       // Normalise to the shape the frontend expects
