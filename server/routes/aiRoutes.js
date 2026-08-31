@@ -107,7 +107,7 @@ Give concise, curriculum-aligned answers suited for WAEC/JAMB/NECO preparation.`
 
 // ── POST /api/ai/explain ──────────────────────────────────────────────────────
 router.post('/explain', protect, aiLimiter, async (req, res) => {
-  const { question_id, selected_option_id, typed_answer } = req.body;
+  const { question_id, typed_answer } = req.body;
 
   if (!question_id) {
     return res.status(400).json({ success: false, error: 'question_id is required' });
@@ -115,18 +115,11 @@ router.post('/explain', protect, aiLimiter, async (req, res) => {
 
   try {
     const questions = await sequelize.query(
-      `SELECT q.question_text, q.explanation, q.correct_answer,
-              ao.option_text AS selected_text,
-              ao.is_correct  AS selected_is_correct,
-              q.correct_answer AS correct_text
+      `SELECT q.question_text, q.explanation, q.correct_answer
        FROM questions q
-       LEFT JOIN answer_options ao ON ao.id = :selectedOptionId
        WHERE q.id = :questionId`,
       {
-        replacements: {
-          questionId:       question_id,
-          selectedOptionId: selected_option_id || null,
-        },
+        replacements: { questionId: question_id },
         type: QueryTypes.SELECT,
       }
     );
@@ -150,7 +143,7 @@ router.post('/explain', protect, aiLimiter, async (req, res) => {
       prompt = `You are a warm, encouraging Nigerian exam tutor (WAEC/JAMB/NECO standard), giving feedback directly to the student who just answered${studentName ? ` — their name is ${studentName}` : ''}.
 
 Question: ${q?.question_text || 'See question'}
-Correct Answer: ${q?.correct_answer || q?.correct_text || 'See marking scheme'}
+Correct Answer: ${q?.correct_answer || 'See marking scheme'}
 
 Student's answer: "${typed_answer}"
 
@@ -161,11 +154,26 @@ Write your feedback as natural, flowing prose addressed directly to the student 
 
 Do not use markdown formatting of any kind — no asterisks, no numbered lists, no headers. Write in plain, complete sentences only. Keep the whole response under 150 words and keep a warm, encouraging tone throughout, like a real tutor talking to their student.`;
     } else {
+      // No typed_answer given — this branch generates (and, below, caches
+      // onto questions.explanation) a general explanation of the correct
+      // answer, not personalized feedback on a specific student response.
+      // FIX: this previously also claimed to know what the student picked
+      // and whether they were right ("Student selected: X" / "Was student
+      // correct: YES/NO"), sourced from a LEFT JOIN against answer_options
+      // keyed on selected_option_id. That table isn't populated by this
+      // app's real question-creation/answering flow (options live in
+      // questions.options JSONB — see questionsRoutes.js), and no caller of
+      // this endpoint ever actually provided a real answer_options.id
+      // through that parameter (confirmed via a full grep of every /explain
+      // caller), so selected_text/selected_is_correct always resolved to
+      // null/undefined — meaning this branch always told Gemini the student
+      // "Did not answer" and was wrong ("NO"), regardless of reality,
+      // whenever it ran with no stored explanation yet to short-circuit on.
+      // Removed the join and the false claim rather than leave a prompt
+      // that lies to the model about what happened.
       prompt = `You are an expert Nigerian exam tutor (WAEC/JAMB/NECO standard).
 Question: ${q?.question_text || 'Question not found'}
-Correct answer: ${q?.correct_answer || q?.correct_text || 'Not available'}
-Student selected: ${q?.selected_text || 'Did not answer'}
-Was student correct: ${q?.selected_is_correct ? 'YES' : 'NO'}
+Correct answer: ${q?.correct_answer || 'Not available'}
 
 Explain in 2-3 sentences why the correct answer is right and briefly why the other options are wrong.
 Be concise and curriculum-aligned.`;
