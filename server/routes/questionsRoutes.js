@@ -12,7 +12,7 @@ const { QueryTypes } = require('sequelize');
 const sequelize      = require('../config/database');
 const { protect }    = require('../middleware/auth');
 // v2: route essay marking through central AI hub
-const { generate }   = require('../services/ai');
+const { generate, buildEssayFeedbackPrompt } = require('../services/ai');
 
 let awardXP = () => Promise.resolve();
 try { awardXP = require('../middleware/xpMiddleware').awardXP; } catch {}
@@ -381,7 +381,18 @@ router.post('/:id/answer', protect, async (req, res) => {
       // Essay — AI marking via central hub (services/ai.js)
       if (process.env.GEMINI_API_KEY && essay_response?.trim()) {
         try {
-          const prompt = `You are a Nigerian exam marker. Question: "${question.question_text}". Max marks: ${question.marks || 3}. Model answer: "${question.correct_answer || 'Not specified'}". Student answer: "${essay_response.trim()}". Return ONLY JSON: {"marks_awarded": N, "feedback": "...", "is_correct": true/false}`;
+          // BUG FIX: previously an unstructured one-line prompt with no
+          // personalization or paragraph guidance — see buildEssayFeedbackPrompt
+          // in services/ai.js for the full rationale. Now shared across every
+          // essay-marking call site so feedback is consistently personalized,
+          // paragraph-style prose instead of a single generic sentence.
+          const prompt = buildEssayFeedbackPrompt({
+            studentName:   req.user?.first_name || null,
+            questionText:  question.question_text,
+            maxMarks:      question.marks || 3,
+            modelAnswer:   question.correct_answer,
+            studentAnswer: essay_response.trim(),
+          });
           // v2: routes through ai.js instead of calling Gemini directly
           const raw    = await generate(prompt, 'essay-mark');
           const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());

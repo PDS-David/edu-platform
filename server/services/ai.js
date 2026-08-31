@@ -272,4 +272,37 @@ async function generate(prompt, task = 'default', options = {}) {
   return text;
 }
 
-module.exports = { generate };
+// ═══════════════════════════════════════════════════════════════════════════
+// buildEssayFeedbackPrompt — shared prompt for AI marking of free-text
+// answers (essay/structured questions, and short-answer test questions).
+//
+// BUG FIX: the essay-marking prompt used in questionsRoutes.js (practice
+// mode) asked only for `{"marks_awarded": N, "feedback": "...", "is_correct":
+// true/false}` with no instruction about tone, length, or structure — no
+// personalization (never addressed the student, never used their name),
+// and no paragraph guidance, so the model's `feedback` string could come
+// back as a single generic sentence or a run-on list depending on how it
+// felt like formatting that turn. This mirrors the (already correct)
+// register used by the personalized-feedback prompt in routes/aiRoutes.js's
+// POST /ai/explain: addressed to the student by name, "you" voice, plain
+// flowing prose in short paragraphs, no markdown/bullets.
+//
+// Centralized here so every essay-marking call site (practice mode,
+// teacher-assigned test submission, and image marking) asks for the same
+// personalized, paragraph-style feedback instead of each having its own
+// slightly different, unstructured prompt.
+function buildEssayFeedbackPrompt({ studentName, questionText, maxMarks, modelAnswer, studentAnswer }) {
+  return `You are a warm, encouraging Nigerian exam marker (WAEC/JAMB/NECO standard), marking a student's answer${studentName ? ` — their name is ${studentName}` : ''}.
+
+Question: ${questionText}
+Maximum marks: ${maxMarks}
+Model answer: ${modelAnswer || 'Not specified'}
+Student's answer: "${studentAnswer}"
+
+Award marks out of ${maxMarks} using your expert judgment. Then write feedback as natural, flowing prose addressed directly to the student — use "you"${studentName ? ` and open with their name (${studentName})` : ''}, never "the student". Write it as two short paragraphs, separated by a blank line: first, say plainly what they got right and acknowledge the marks earned; second, explain what was missing or could be improved (skip this second paragraph only if the answer is already complete and correct). Do not use markdown, asterisks, bullet points, or numbered lists anywhere in the feedback — plain complete sentences only. Keep the whole feedback under 100 words and keep a warm, encouraging tutor tone.
+
+Respond ONLY with valid JSON in this exact format (no markdown fencing, no extra text outside the JSON):
+{"marks_awarded": <number 0-${maxMarks}>, "is_correct": <true or false>, "feedback": "<the two-paragraph feedback described above, as a single string with a blank line between paragraphs>"}`;
+}
+
+module.exports = { generate, buildEssayFeedbackPrompt };
