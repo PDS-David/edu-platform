@@ -291,7 +291,8 @@ router.post('/:id/answer', protect, async (req, res) => {
     // essay_response set — but they must NOT trigger Gemini AI marking,
     // same as short_answer today. Excluding by type first means this stays
     // correct regardless of which field name the frontend posts.
-    const isEssay  = question.type !== 'structured' && (question.type === 'essay' || !!essay_response);
+    const isStructured = question.type === 'structured';
+    const isEssay  = !isStructured && (question.type === 'essay' || !!essay_response);
 
     let isCorrect    = false;
     let marksAwarded = 0;
@@ -302,7 +303,32 @@ router.post('/:id/answer', protect, async (req, res) => {
     // re-derive it from a fragile independent text comparison.
     let correctOptionText = question.correct_answer;
 
-    if (!isEssay) {
+    if (isStructured) {
+      // BUG FIX: before this branch existed, isStructured questions had no
+      // dedicated handling at all and fell straight into the MCQ branch
+      // below. Structured questions have no `options` array and the
+      // frontend posts `essay_response` (not `selected_answer`) for them,
+      // so that branch always left isCorrect=false, marksAwarded=0, and
+      // feedback=null with no acknowledgement the student's answer was
+      // even received — every structured-question submission silently
+      // scored zero with no feedback, regardless of what was typed.
+      //
+      // Per the Question model's Phase 5 comment, structured questions are
+      // NOT routed through AI marking (unlike essay) — there's no reliable
+      // automated way to grade free text without AI here, so this is a
+      // self-assessment flow: show the model answer/explanation so the
+      // student can compare it against what they wrote, same as PracticeMode.jsx's
+      // existing "Feedback" + "Model Answer" UI already expects (that UI
+      // was already built and shipped, just never actually reachable for
+      // this question type until now). isCorrect stays null rather than
+      // false — the frontend already falls back to
+      // `result.is_correct ?? (result.marks_awarded > 0)`, so null
+      // correctly signals "not machine-graded" instead of falsely
+      // reporting the answer as wrong.
+      isCorrect = null;
+      marksAwarded = 0;
+      feedback = question.explanation || 'Compare your answer with the model answer below.';
+    } else if (!isEssay) {
       // MCQ — grade against options[].is_correct (the authoritative flag set
       // at insert time), NOT a fresh text comparison against correct_answer.
       //
@@ -399,6 +425,14 @@ router.post('/:id/answer', protect, async (req, res) => {
       // options[].is_correct when available, falls back to correct_answer.
       // Frontend should prefer this over correct_answer for matching.
       correct_option_text: correctOptionText,
+      // BUG FIX: PracticeMode.jsx already renders a "Model Answer" box for
+      // essay/structured questions when `result.model_answer` is present
+      // (`{result.model_answer && (...)}`), but this endpoint never sent
+      // that field — the UI was shipped and has simply never been
+      // reachable. Only meaningful for free-text types; harmless to
+      // include for mcq too, since the frontend only reads it inside its
+      // isFreeText branch.
+      model_answer:        (isStructured || isEssay) ? (question.correct_answer || null) : undefined,
       explanation:         question.explanation || null,
       marks_awarded:       marksAwarded,
       max_marks:           question.marks || 1,
