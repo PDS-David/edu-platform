@@ -10,7 +10,7 @@ import {
   ArrowLeft, Pencil, Clock, ChevronLeft, ChevronRight,
   X, Flag, Upload, Sigma, Lightbulb, Sparkles,
   Trophy, Target, ThumbsUp, RotateCcw, CheckCircle2,
-  ChevronDown, ChevronUp, AlertCircle
+  ChevronDown, ChevronUp, AlertCircle, Loader2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -975,72 +975,78 @@ function ResultsScreen({ subtopicId, subtopic, attemptId, submitError, onRevise,
 }
 
 // ── Detailed Marking Scheme (expands inside left column) ───────────────────────
+// Personalized paragraph feedback, same specification as SubtopicPage.jsx's
+// AI feedback (server/routes/aiRoutes.js POST /ai/explain): addressed
+// directly to the student by name, flowing prose in short paragraphs, no
+// bullet points. Previously this just repackaged the question's static
+// stored `explanation` field as fake "AI marking" (quizzes.js's
+// ai_marking_scheme was never actually AI-generated — same flat
+// explanation text for every student regardless of what they answered).
+// Now calls the real, already-correct /ai/explain endpoint on demand —
+// this component only mounts when the student expands "Detailed Marking
+// Scheme" for a question, so this doesn't add an AI call to every question
+// in a submission, only the ones a student actually chooses to review.
+//
+// Routed through `typed_answer` (not `selected_option_id`) for BOTH MCQ
+// and free-text questions: selected_option_id's backend path joins against
+// an `answer_options` table that the rest of this app's question-answering
+// flow doesn't populate (options live in questions.options JSONB
+// everywhere else), so it would silently resolve to "Did not answer"
+// regardless of what the student picked. Passing the student's answer TEXT
+// as typed_answer works correctly for both cases and the prompt doesn't
+// require it to literally be free-text.
 function MarkingScheme({ qData }) {
-  // NOTE: the attempt-detail API (routes/quizzes.js) sends this data under
-  // `ai_marking_scheme` as { status, whyExplanation, markingPoints }. This
-  // component previously looked for `qData.ai_explanation` (a flat string,
-  // so none of the .verdict/.why/.steps/.model_answer reads below could
-  // ever resolve), then `qData.marking_scheme` (a key the backend never
-  // sends at all), then `qData.explanation` (flat string again) — meaning
-  // the placeholder showed unconditionally, regardless of whether data
-  // existed. `qData.ai_marking_scheme` is the field that's actually
-  // populated; `marking_scheme` is also accepted for forward-compat with any
-  // future endpoint that sends the richer verdict/steps/model_answer shape.
+  const [aiText, setAiText] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setAiText(null);
+
+    const questionId = qData.question_id || qData.id;
+    const studentAnswer = qData.student_answer || qData.answer || qData.selected_option_text || '';
+
+    if (!questionId) { setLoading(false); return; }
+
+    api.post('/ai/explain', {
+      question_id:  questionId,
+      typed_answer: studentAnswer || 'No answer given',
+    })
+      .then(r => {
+        if (cancelled) return;
+        const text = r.data?.explanation ?? r.explanation;
+        if (text) setAiText(text);
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false); });
+
+    return () => { cancelled = true; };
+  }, [qData.question_id, qData.id]);
+
+  // Fallback if the AI call returns nothing (e.g. GEMINI_API_KEY not
+  // configured in this environment) — same graceful-degradation approach
+  // used elsewhere (SubtopicPage.jsx's "AI marking not available. Continue
+  // to next question."), using whatever static explanation already exists
+  // rather than showing nothing.
   const ai = qData.ai_marking_scheme || qData.marking_scheme || {};
-  const why = ai.verdict || ai.why || ai.whyExplanation;
-  const steps = ai.steps || ai.step_by_step || ai.markingPoints || [];
-  const bullets = Array.isArray(steps) ? steps : typeof steps === 'string' ? steps.split('\n').filter(Boolean) : [];
+  const fallbackText = ai.whyExplanation || ai.why || ai.verdict || qData.explanation || qData.ai_explanation;
+  const feedbackText = aiText || fallbackText;
 
   return (
     <div className="mt-2 bg-white/5 border border-white/10 rounded-xl p-4 space-y-3 text-sm text-white/80">
-      {/* Why right/wrong */}
-      {why && (
-        <div>
-          <p className="font-bold text-white text-xs mb-1">Why your answer is {ai.status || (qData.is_correct ? 'correct' : 'incorrect')}?</p>
-          <ul className="space-y-1 text-xs">
-            {ai.status && (
-              <li>• <strong>Status:</strong> {ai.status}</li>
-            )}
-            {why && (
-              <li className="leading-relaxed"><BoldMarkdown text={why} /></li>
-            )}
-          </ul>
+      {loading ? (
+        <div className="flex items-center justify-center gap-2 py-4 text-white/40 text-xs">
+          <Loader2 size={14} className="animate-spin" /> Getting personalized feedback…
         </div>
-      )}
-
-      {/* Step-by-step */}
-      {bullets.length > 0 && (
+      ) : feedbackText ? (
         <div>
-          <p className="font-bold text-white text-xs mb-1">Step-by-step reasoning</p>
-          <ul className="space-y-1">
-            {bullets.map((s, i) => (
-              <li key={i} className="flex gap-1.5 text-xs leading-relaxed">
-                <span className="text-blue-400 shrink-0">•</span>
-                <BoldMarkdown text={s} />
-              </li>
-            ))}
-          </ul>
+          <p className="font-bold text-white text-xs mb-2">
+            Why your answer is {qData.is_correct ? 'correct' : 'incorrect'}
+          </p>
+          <p className="text-xs leading-relaxed whitespace-pre-line">{feedbackText}</p>
         </div>
-      )}
-
-      {/* Examiner requirement */}
-      {ai.examiner_requirement && (
-        <div>
-          <p className="font-bold text-white text-xs mb-1">Examiner's requirement</p>
-          <p className="text-xs leading-relaxed"><BoldMarkdown text={ai.examiner_requirement} /></p>
-        </div>
-      )}
-
-      {/* Model answer */}
-      {ai.model_answer && (
-        <div>
-          <p className="font-bold text-white text-xs mb-1">Model Answer</p>
-          <p className="text-blue-300 font-bold text-xs leading-relaxed">{ai.model_answer}</p>
-        </div>
-      )}
-
-      {/* If no AI data yet */}
-      {!why && bullets.length === 0 && !ai.model_answer && (
+      ) : (
         <p className="text-white/40 text-xs italic text-center py-2">
           Detailed marking scheme will appear here once generated.
         </p>
