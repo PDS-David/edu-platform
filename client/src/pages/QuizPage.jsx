@@ -59,8 +59,27 @@ function QuizQuestion({ question, questionNumber, submitRef, onAnswered }) {
       setResult(res.data);
 
       // Fire AI explanation in background — non-blocking
+      // BUG FIX: was `selected_option_id: selected` — selected is the raw
+      // option TEXT (see the comment on POST /:id/answer above: "option
+      // text — matches correct_answer in DB"), not a real answer_options.id.
+      // aiRoutes.js's POST /explain selected_option_id path does
+      // `LEFT JOIN answer_options ao ON ao.id = :selectedOptionId`, and this
+      // app's actual question-answering flow doesn't populate that table
+      // for questions created through the normal insert paths (confirmed:
+      // grading everywhere else, including this same component's own
+      // /:id/answer call above, works entirely off questions.options JSONB
+      // and option text — see questionsRoutes.js POST /:id/answer's own
+      // comment, "Accept selected_answer (option text) OR selected_option_id
+      // (same — option text in JSONB schema)"). So the join here never
+      // matched anything, selected_text/selected_is_correct always resolved
+      // to null, and the generated explanation silently treated every
+      // answer as "Did not answer" regardless of what the student actually
+      // picked. Routed through typed_answer instead — the same fix already
+      // applied to QuizTab.jsx's MarkingScheme component (commit 1cfec87),
+      // which reuses the already-correct, already-personalized
+      // paragraph-feedback path instead of this broken one.
       setExplainLoad(true);
-      api.post('/ai/explain', { question_id: question.id, selected_option_id: selected })
+      api.post('/ai/explain', { question_id: question.id, typed_answer: selected })
         .then(r => { if (r.success) setAiExplain(r.data?.explanation ?? r.explanation); })
         .catch(() => {})
         .finally(() => setExplainLoad(false));
@@ -183,8 +202,12 @@ function QuizQuestion({ question, questionNumber, submitRef, onAnswered }) {
               </p>
               {explainLoad
                 ? <div className="flex items-center gap-2 text-xs text-blue-400"><Loader2 size={12} className="animate-spin" /> Generating…</div>
-                : <p className="text-xs text-blue-700 leading-relaxed">{aiExplain || result.explanation || 'No explanation available.'}</p>
-              }
+                // Now that this calls typed_answer (see fix above), the
+                // response can be multi-paragraph prose (blank-line-
+                // separated, per aiRoutes.js's spec) — whitespace-pre-line
+                // matches the identical rendering already used for this
+                // exact prompt shape in SubtopicPage.jsx and QuizTab.jsx.
+                : <p className="text-xs text-blue-700 leading-relaxed whitespace-pre-line">{aiExplain || result.explanation || 'No explanation available.'}</p>}
             </div>
           </>
         )}
