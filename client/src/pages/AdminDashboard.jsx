@@ -1839,7 +1839,7 @@ const UserManagementPanel = () => {
           studentId={assigningStudent.id}
           studentName={`${assigningStudent.first_name} ${assigningStudent.last_name}`}
           onClose={() => setAssigningStudent(null)}
-          onAssigned={fetchUsers}
+          onAssigned={() => { showToast(`Exam type assigned to ${assigningStudent.first_name} ${assigningStudent.last_name}`); fetchUsers(); }}
         />
       )}
     </div>
