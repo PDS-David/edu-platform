@@ -103,15 +103,55 @@ If a real curriculum-browsing feature is ever built to replace it, build it with
 a single JOIN/`json_agg` query (or 4 flat queries assembled in JS) from the
 start — not by resurrecting this file's nested-loop approach.
 
-### PERF-2 — Not yet audited: other `for...of` + `await` patterns
-The following files have loop-with-await patterns that were not individually
-traced for severity in this pass (time-boxed): `adminRoutes.js` (lines ~540, 844,
-855, 1214), `aiChatRoute.js` (~362), `aiRoutes.js` (~585, 598), `catalogRoutes.js`
-(~429), `englishMasterclassRoutes.js` (~200). Most of these loop over small,
-bounded arrays (`.slice(0, 5)`, single-digit subject counts) so are likely fine,
-but each should get a 2-minute sanity check for whether the loop bound is
-user-controlled and unbounded.
-**Severity:** Unknown — flagged for someone else to triage quickly.
+### PERF-2 — `for...of` + `await` patterns, triaged
+Individually checked every site flagged in the original pass (locations had
+shifted since other commits landed — re-found each by content, not line
+number):
+
+- **`adminRoutes.js` question-generation loop** — bounded, `count` is
+  clamped server-side to `Math.min(Math.max(parseInt(rawCount) || 10, 1), 15)`
+  before the loop runs. Max 15 sequential inserts. Fine as-is.
+- **`adminRoutes.js` health-check loops (4 of them)** — all iterate
+  hardcoded literal arrays (11 tables, 1 table, 5 columns, 2 tables, 3
+  tables) with zero user input involved. This is a diagnostics/health-check
+  endpoint, not a hot path. Fine as-is.
+- **`adminRoutes.js` `/admin/migrate-to-r2`** — iterates every
+  not-yet-migrated resource row. Technically unbounded by row count, but
+  this is a deliberate, rare, admin-triggered one-time bulk migration
+  utility (moving local uploads to R2) — sequential processing here is the
+  *safer* choice (avoids parallel-upload memory pressure / R2 rate
+  limiting), not a bug. By design, not flagged further.
+- **`aiChatRoute.js` topic-extraction loop** — capped at `.slice(0, 5)`,
+  and the loop body has no `await` at all (synchronous `Set.add()` only).
+  Zero risk.
+- **`aiRoutes.js` two remediation-plan loops** — capped at `.slice(0, 3)`
+  and `.slice(0, 2)` respectively, both purely synchronous (building plain
+  objects, no `await`). Zero risk.
+- **`catalogRoutes.js` `POST /teachers/:teacherId/assign`** — **was a real
+  bug**: `subject_ids` came straight from `req.body` with no cap, 2
+  sequential awaited queries per element. Already fixed by a prior commit
+  (tagged `PERF-2 FIX` in the code) — capped at 100 with a 400 rejection
+  above that. Confirmed fixed on `main`; this doc just hadn't been updated
+  to reflect it until now.
+- **`englishMasterclassRoutes.js` `POST /sessions` per-word-progress
+  loop** — **was a real bug, now fixed**: `answers` came straight from
+  `req.body` with no length cap, 1 sequential awaited `INSERT ... ON
+  CONFLICT` per element. A student's client is expected to send one entry
+  per word practiced in a session, but nothing server-side enforced that.
+  Fixed the same way as the catalogRoutes.js instance above — capped at
+  200 with a 400 rejection above that.
+- **`englishMasterclassRoutes.js` `/admin/generate-words`** — bounded by
+  the AI generation prompt itself (`Math.min(count, 20)` baked into the
+  prompt text), and admin-only. Even if the model occasionally
+  over-generates, nowhere near the "thousands of round-trips" class of bug.
+  Fine as-is.
+
+**Status:** RESOLVED. Two genuine unbounded-loop bugs found and fixed
+(`catalogRoutes.js` — already fixed pre-existing; `englishMasterclassRoutes.js`
+— fixed in this pass). Everything else flagged in the original sweep is
+either hardcoded-bound, prompt-bound, `.slice()`-bound, synchronous (no
+`await` at all), or an intentional one-time admin utility where sequential
+processing is correct behavior, not a bug.
 
 ---
 

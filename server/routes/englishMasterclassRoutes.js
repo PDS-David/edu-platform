@@ -557,6 +557,19 @@ router.post('/sessions', async (req, res) => {
   const userId = req.user.id;
   const { category_id, category_name, total_words, correct_words, duration_secs, answers } = req.body;
 
+  // PERF-2 FIX: answers comes directly from req.body with no length cap.
+  // The loop below runs 1 sequential awaited DB query per element — an
+  // unbounded array here means an unbounded number of sequential
+  // round-trips on one request. A realistic practice session covers at
+  // most a category's word list (generated in batches of <=20 — see
+  // POST /admin/generate-words below); 200 is generous headroom for a
+  // session spanning a large, multiply-generated category, while still
+  // preventing a request from submitting a pathologically large array and
+  // tying up a connection for the duration.
+  if (Array.isArray(answers) && answers.length > 200) {
+    return res.status(400).json({ success: false, error: 'Too many answers in one session (max 200)' });
+  }
+
   if (!total_words || total_words < 1) {
     return res.status(400).json({ success: false, error: 'Invalid session data' });
   }
