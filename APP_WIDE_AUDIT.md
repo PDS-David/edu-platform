@@ -207,7 +207,101 @@ Listed so effort isn't duplicated:
 
 ---
 
-## 7. Honest Limitations of This Audit
+## 8. Additive-Assignment / State-Reconciliation Gaps (the "assign-exam-type" bug class)
+
+Triggered by the fix in `server/routes/schoolRoutes.js` `POST /students/:studentId/assign-exam-type`
+(commit `a46ea05`): re-assigning an already-assigned exam board was purely additive — the
+subject-count cap was checked against only the newly-submitted list, never against what
+the student already had active for that board, so a student could end up over the cap.
+Below is every other write endpoint in the codebase that shares the same shape (a caller
+submits "the set I want," an existing set may already be there, and the endpoint has to
+decide whether to add, replace, or reconcile) — checked one by one against real code, not
+assumed from the route name. Grouped by verified severity; nothing below has been fixed yet.
+
+### ASSIGN-1 — Teacher-subject assignment implemented 3 separate ways, one of them
+### silently drops a field the others rely on
+**Where:** `server/routes/adminRoutes.js` `POST /teacher-assignments` (line 880) and its alias
+`POST /teacher-subjects` (line 970); `server/routes/catalogRoutes.js` `POST /teachers/:teacherId/assign`
+(line 435); `server/routes/schoolRoutes.js` `POST /me/teachers/:teacherId/subjects` (line 1362).
+**What's wrong:** all four insert into the same `teacher_subjects` table with the same
+`ON CONFLICT (teacher_id, subject_id) DO UPDATE SET is_active = true` add-only pattern — that
+part is fine on its own, since `teacher_subjects` has no count cap (a teacher legitimately
+teaches an unbounded number of subjects), unlike `student_subjects`. The real problem is that
+`adminRoutes.js`'s two handlers (lines 886 and 975) `INSERT INTO teacher_subjects (teacher_id,
+subject_id, is_active)` — they never write `exam_board_id`, even though the `/teacher-subjects`
+handler destructures `exam_board_id` from the request body and then never uses it. Since
+`teacher_subjects.exam_board_id` is nullable, this silently succeeds and leaves the column
+NULL. `catalogRoutes.js`'s own `GET /teachers/:teacherId/subjects` listing (line ~415) joins
+`exam_boards` on `ts.exam_board_id` to show the board name — so a teacher assigned via the
+App Admin panel's `/teacher-assignments` or `/teacher-subjects` screens shows up with a
+missing/blank exam board in that listing, while the exact same assignment made via
+`catalogRoutes.js`'s own `/teachers/:teacherId/assign` or `schoolRoutes.js`'s
+`/me/teachers/:teacherId/subjects` (both of which correctly derive `exam_board_id` from the
+`subjects` row in the same query) displays correctly.
+**Verified:** read all four handlers directly; confirmed `teacher_subjects.exam_board_id` is
+`INTEGER, nullable` in `run_complete_migration.js`; grepped every read of
+`teacher_subjects.exam_board_id` across the codebase and found only `catalogRoutes.js`'s GET
+depends on it being populated.
+**Severity:** Medium. Not a crash and not an overflow like the exam-type bug, but a real,
+reproducible data-integrity gap (silently-NULL column) with a visible symptom, caused by
+having the same write duplicated across three files instead of one shared function. Fixing
+the missing field alone is a one-line change per handler; fixing it properly means
+consolidating to one implementation so this can't recur a fourth time.
+
+### ASSIGN-2 — Two different authorities can silently overwrite each other's class-membership changes
+**Where:** `server/routes/schoolRoutes.js` `POST /me/classes/:id/students` (line 983, school_admin)
+vs. `server/routes/teacherRoutes.js` `PUT /class/:classId/members` (line 566, teacher) — both
+write to `class_memberships` for what can be the same class.
+**What's wrong:** the school_admin route is additive-only (`INSERT ... ON CONFLICT DO NOTHING`,
+paired with a separate `DELETE /me/classes/:id/students/:studentId` for removing one student at
+a time) — that's a reasonable, safe design on its own. But the teacher route does a full
+`DELETE FROM class_memberships WHERE class_id = :cid` followed by re-inserting only the
+`student_ids` array the teacher's request happened to include. If a school_admin adds a student
+to a class, and a teacher's own UI still holds a stale member list (e.g. hadn't refreshed) and
+then calls `PUT .../members` with that stale list, the school_admin's addition is silently
+wiped — not because of a race condition exactly, but because one endpoint treats the collection
+as "add to whatever's there" and the other treats it as "this is now the complete, authoritative
+list," on the same table, with no version/timestamp check between them.
+**Verified:** read both handlers directly; confirmed the teacher route's unconditional
+`DELETE ... WHERE class_id = :cid` with no `is_active`/soft-delete distinction, and the
+school_admin route's `ON CONFLICT DO NOTHING` insert-only pattern.
+**Severity:** Medium. Requires a specific sequence (school_admin adds, then teacher pushes a
+stale full list) to manifest, so it's not "every reassignment breaks" the way the exam-type
+bug was — but the failure mode (a student silently vanishes from a class with no error to
+anyone) is the same shape and would be confusing to debug later without this note.
+
+### ASSIGN-3 — Dead self-service endpoints, kept in the additive-only style pre-dating the exam-type fix
+**Where:** `server/routes/studentRoutes.js` `POST /subjects` (line 724) and
+`POST /exam-types/:examTypeId/join` (line 573).
+**What's wrong:** not a live bug — both routes immediately return 403 for any `student` role
+caller, and `studentOnly` middleware means only students can reach them at all, so they're
+fully dead code (deliberately, per their own "Phase 3 Step 4: self-service lockdown" comments,
+left in place for an easy rollback rather than deleted). Flagging only because if anyone ever
+reverts that lockdown, `POST /subjects` is worth using as the reference implementation instead
+of copying the pre-fix `assign-exam-type` pattern — it already does the correct thing (counts
+the student's *current* active subjects for the board before allowing one more, rather than
+only checking the size of what's being added).
+**Verified:** read both handlers; confirmed the 403 guard is unconditional and matches the
+`studentOnly` middleware exactly, and manually compared the counting logic in `POST /subjects`
+(lines 767-798) against the pre-fix version of `assign-exam-type`.
+**Severity:** None (no live behavior to fix) — informational only, so nobody re-introduces the
+additive bug if this code is ever reactivated.
+
+### ASSIGN-4 — Confirmed correct, listed for completeness
+- `resourceRoutes.js` `PUT /:id/assign-users` (resource push to students/classes) — inserts use
+  `ON CONFLICT DO NOTHING` against `resource_assignments`, so re-pushing the same resource to
+  the same student/class never duplicates a row. No count cap applies to resource pushes, so
+  there's no overflow class of bug here to begin with. (The separate subject-leak issue
+  originally found in this same route — resources pushed to a class reaching students outside
+  the resource's subject — was already fixed in commit `0446a17`, "fix(resources):
+  subject-mismatched resources leaking via class push".)
+- `teacherRoutes.js` `POST /tests/:id/assign` (line 892) — add-only (`ON CONFLICT DO NOTHING`)
+  against `test_assignments`, no cap concept applies (a test can be assigned to any number of
+  students), so additive-only is the correct behavior here, not a gap.
+
+---
+
+## 9. Honest Limitations of This Audit
 
 To be transparent about what this pass did **not** cover, given time constraints:
 
