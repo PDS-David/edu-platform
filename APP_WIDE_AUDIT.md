@@ -38,6 +38,11 @@ own definition line — zero matches for all three.
 **Severity:** Low. `TopicsModal.jsx` in particular looks like it was meant to be
 the student-facing topic browser before `SubjectPage.jsx` took over that role —
 worth a quick check that nothing references it by a different name before deleting.
+**Status:** RESOLVED — all three deleted (commit `ca38483`), which explicitly
+re-checked the `TopicsModal.jsx` caveat above (confirmed zero references under
+any name) before removing it. Re-verified again independently just now: none
+of the three files exist on disk anymore, and a repo-wide grep for each name
+returns zero hits.
 
 ### DEAD-4 — `server/routes/curriculumRoutes.js` is mounted but never called
 The route is registered (`app.use('/api/curriculum', protect, curriculumRoutes)`)
@@ -169,6 +174,14 @@ here is a real support burden.
 **Suggested fix:** Add `submitting` state to disable the button during the
 request, and an `error` state rendered in the form to replace the
 `console.error`-only catch block.
+**Status:** RESOLVED — re-verified against current `main`: `submitting` state
+now guards the button (disabled, shows "Resetting…") and both inputs; `error`
+state renders visibly in the form instead of only logging to console. Found
+further, unflagged fixes bundled into the same change: a real payload-key
+mismatch bug (client sent `newPassword`, server expected `new_password`,
+silently 400ing on every single attempt before this) is also fixed, and a
+"Request a new reset link" recovery path was added for the previously
+dead-end missing/expired-token case.
 
 ---
 
