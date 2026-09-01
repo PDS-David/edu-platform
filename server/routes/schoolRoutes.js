@@ -1239,10 +1239,17 @@ router.post('/students/:studentId/assign-exam-type', protect, requireSchoolAdmin
       );
 
       if (toDeactivate.length) {
+        // BUG FIX: this used to only flip is_active, but every read path for
+        // student_subjects across the app (studentRoutes.js GET /my-subjects,
+        // pastPaperRoutes.js, topicsRoutes.js, subtopicRoutes.js,
+        // analyticsRoutes.js) filters on status = 'approved', not is_active —
+        // so a subject "deactivated" this way never actually disappeared from
+        // the student's portal. Matches the already-correct pattern in
+        // studentRoutes.js's own DELETE /students/subjects/:subjectId.
         await sequelize.query(
-          `UPDATE student_subjects SET is_active = false
+          `UPDATE student_subjects SET is_active = false, status = $3
             WHERE student_id = $1 AND subject_id = ANY($2::int[])`,
-          { bind: [studentId, toDeactivate], type: sequelize.QueryTypes.UPDATE, transaction: t }
+          { bind: [studentId, toDeactivate, ENROLLMENT_STATUS.DEACTIVATED], type: sequelize.QueryTypes.UPDATE, transaction: t }
         );
       }
 
@@ -1313,6 +1320,85 @@ router.get('/students/:studentId/exam-types/:examBoardId/subjects', protect, req
   } catch (err) {
     console.error('[schools] GET /students/:studentId/exam-types/:examBoardId/subjects', err.message);
     return res.status(500).json({ success: false, error: 'Could not load current subjects' });
+  }
+});
+
+// ─── GET /api/schools/students/:studentId/exam-types ────────────────────────
+// Lightweight list of exam board IDs a student is currently (actively)
+// enrolled in — powers AssignExamTypeModal.jsx Step 1's "Enrolled" badge and
+// its per-board Remove action, without needing a separate admin screen.
+// Same ownership checks as the sibling endpoints above.
+router.get('/students/:studentId/exam-types', protect, requireSchoolAdminOrAppAdmin, async (req, res) => {
+  const { studentId } = req.params;
+  try {
+    const studentRows = await q(`SELECT id, school_id FROM users WHERE id = $1 AND role = 'student'`, [studentId]);
+    if (!studentRows.length) {
+      return res.status(404).json({ success: false, error: 'Student not found' });
+    }
+    if (req.user.role === 'school_admin' && studentRows[0].school_id !== req.user.school_id) {
+      return res.status(403).json({ success: false, error: 'That student is not in your school' });
+    }
+
+    const rows = await q(
+      `SELECT exam_board_id FROM student_exam_types
+        WHERE student_id = $1 AND is_active = true AND status = $2`,
+      [studentId, ENROLLMENT_STATUS.APPROVED]
+    );
+    return res.json({ success: true, data: rows.map(r => r.exam_board_id) });
+  } catch (err) {
+    console.error('[schools] GET /students/:studentId/exam-types', err.message);
+    return res.status(500).json({ success: false, error: 'Could not load exam types' });
+  }
+});
+
+// ─── DELETE /api/schools/students/:studentId/exam-types/:examBoardId ────────
+// Removes one exam board from a student — deactivates the board itself AND
+// cascades to every subject the student holds under that board, using the
+// same is_active + status = 'deactivated' pair the (now-fixed) subject
+// deactivation above uses, so this actually disappears from the student's
+// portal (my-boards, my-subjects, past papers, topics, subtopics, analytics
+// — every one of those reads status = 'approved', not is_active alone).
+// Boards are otherwise independent (a student can hold several at once —
+// e.g. JAMB + WAEC), so this only ever touches the one board requested.
+router.delete('/students/:studentId/exam-types/:examBoardId', protect, requireSchoolAdminOrAppAdmin, async (req, res) => {
+  const { studentId, examBoardId } = req.params;
+  try {
+    const studentRows = await q(`SELECT id, school_id FROM users WHERE id = $1 AND role = 'student'`, [studentId]);
+    if (!studentRows.length) {
+      return res.status(404).json({ success: false, error: 'Student not found' });
+    }
+    if (req.user.role === 'school_admin' && studentRows[0].school_id !== req.user.school_id) {
+      return res.status(403).json({ success: false, error: 'That student is not in your school' });
+    }
+
+    const t = await sequelize.transaction();
+    try {
+      await sequelize.query(
+        `UPDATE student_exam_types SET is_active = false, status = $3
+          WHERE student_id = $1 AND exam_board_id = $2`,
+        { bind: [studentId, examBoardId, ENROLLMENT_STATUS.DEACTIVATED], type: sequelize.QueryTypes.UPDATE, transaction: t }
+      );
+
+      const deactivated = await sequelize.query(
+        `UPDATE student_subjects ss SET is_active = false, status = $3
+           FROM subjects s
+          WHERE ss.subject_id = s.id AND ss.student_id = $1 AND s.exam_board_id = $2 AND ss.is_active = true
+          RETURNING ss.subject_id`,
+        { bind: [studentId, examBoardId, ENROLLMENT_STATUS.DEACTIVATED], type: sequelize.QueryTypes.SELECT, transaction: t }
+      );
+
+      await t.commit();
+      return res.json({
+        success: true,
+        data: { student_id: studentId, exam_board_id: examBoardId, deactivated_subject_ids: deactivated.map(r => r.subject_id) },
+      });
+    } catch (err) {
+      await t.rollback();
+      throw err;
+    }
+  } catch (err) {
+    console.error('[schools] DELETE /students/:studentId/exam-types/:examBoardId', err.message);
+    return res.status(500).json({ success: false, error: 'Could not remove exam type' });
   }
 });
 

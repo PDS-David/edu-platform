@@ -13,8 +13,8 @@
 // and reuses the existing modal shell (max-w-md, rounded-2xl, X close
 // button) already used by CreateClassModal in SchoolAdminDashboard.jsx.
 
-import { useState, useMemo } from 'react';
-import { Loader2, X, AlertCircle, CheckCircle2, Lock } from 'lucide-react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { Loader2, X, AlertCircle, CheckCircle2, Lock, Trash2 } from 'lucide-react';
 import { useCatalog } from '../hooks/useCatalog';
 import api from '../services/apiClient';
 
@@ -28,6 +28,36 @@ export default function AssignExamTypeModal({ studentId, studentName, onClose, o
   const [loadingSubjects, setLoadingSubjects]  = useState(false);
   const [submitting,      setSubmitting]       = useState(false);
   const [error,           setError]            = useState('');
+
+  // Step 1's "Enrolled" badge + Remove action — which boards this student is
+  // currently active in. A student can hold several boards at once (e.g.
+  // JAMB + WAEC), so this is just informational, not a single-select state.
+  const [enrolledBoardIds, setEnrolledBoardIds] = useState(new Set());
+  const [removingBoardId,  setRemovingBoardId]  = useState(null);
+
+  const loadEnrolledBoards = useCallback(() => {
+    api.get(`/schools/students/${studentId}/exam-types`)
+      .then(res => setEnrolledBoardIds(new Set(res?.data || [])))
+      .catch(() => {}); // best-effort — badges just won't show if this fails
+  }, [studentId]);
+
+  useEffect(() => { loadEnrolledBoards(); }, [loadEnrolledBoards]);
+
+  const handleRemoveBoard = async (board, e) => {
+    e.stopPropagation(); // don't trigger the row's own onClick (goToSubjects)
+    if (!window.confirm(`Remove ${board.name} from ${studentName || 'this student'}? This also removes their subjects under it.`)) return;
+    setRemovingBoardId(board.id);
+    setError('');
+    try {
+      await api.delete(`/schools/students/${studentId}/exam-types/${board.id}`);
+      setEnrolledBoardIds(prev => { const next = new Set(prev); next.delete(board.id); return next; });
+      onAssigned?.({ removedBoard: board.name });
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || `Could not remove ${board.name}.`);
+    } finally {
+      setRemovingBoardId(null);
+    }
+  };
 
   const requiresAllSubjects = !!selectedBoard?.requires_all_subjects;
   const maxSubjects = selectedBoard?.max_subjects ?? null;
@@ -173,30 +203,49 @@ export default function AssignExamTypeModal({ studentId, studentName, onClose, o
             </p>
           ) : (
             <div className="space-y-1.5 max-h-96 overflow-y-auto">
-              {examTypes.filter(t => t.is_active !== false).map(board => (
-                <button
-                  key={board.id}
-                  onClick={() => goToSubjects(board)}
-                  disabled={loadingSubjects}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-gray-100 hover:border-indigo-300 hover:bg-indigo-50 transition-colors text-left disabled:opacity-50">
-                  <span className="text-lg shrink-0 w-6">{board.icon_emoji || '📋'}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-800 truncate">{board.name}</p>
-                    {board.full_name && (
-                      <p className="text-xs text-gray-400 truncate">{board.full_name}</p>
+              {examTypes.filter(t => t.is_active !== false).map(board => {
+                const enrolled = enrolledBoardIds.has(board.id);
+                return (
+                  <button
+                    key={board.id}
+                    onClick={() => goToSubjects(board)}
+                    disabled={loadingSubjects}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-gray-100 hover:border-indigo-300 hover:bg-indigo-50 transition-colors text-left disabled:opacity-50">
+                    <span className="text-lg shrink-0 w-6">{board.icon_emoji || '📋'}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm font-semibold text-gray-800 truncate">{board.name}</p>
+                        {enrolled && (
+                          <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full shrink-0">Enrolled</span>
+                        )}
+                      </div>
+                      {board.full_name && (
+                        <p className="text-xs text-gray-400 truncate">{board.full_name}</p>
+                      )}
+                    </div>
+                    {board.requires_all_subjects ? (
+                      <span className="text-[10px] font-semibold text-gray-400 shrink-0">All subjects</span>
+                    ) : board.min_subjects != null && board.max_subjects != null ? (
+                      <span className="text-[10px] font-semibold text-gray-400 shrink-0">
+                        {board.min_subjects === board.max_subjects ? `Exactly ${board.max_subjects}` : `${board.min_subjects}–${board.max_subjects}`}
+                      </span>
+                    ) : board.max_subjects != null ? (
+                      <span className="text-[10px] font-semibold text-gray-400 shrink-0">Max {board.max_subjects}</span>
+                    ) : null}
+                    {enrolled && (
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => handleRemoveBoard(board, e)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleRemoveBoard(board, e); }}
+                        title={`Remove ${board.name}`}
+                        className="shrink-0 p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors">
+                        {removingBoardId === board.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                      </span>
                     )}
-                  </div>
-                  {board.requires_all_subjects ? (
-                    <span className="text-[10px] font-semibold text-gray-400 shrink-0">All subjects</span>
-                  ) : board.min_subjects != null && board.max_subjects != null ? (
-                    <span className="text-[10px] font-semibold text-gray-400 shrink-0">
-                      {board.min_subjects === board.max_subjects ? `Exactly ${board.max_subjects}` : `${board.min_subjects}–${board.max_subjects}`}
-                    </span>
-                  ) : board.max_subjects != null ? (
-                    <span className="text-[10px] font-semibold text-gray-400 shrink-0">Max {board.max_subjects}</span>
-                  ) : null}
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           )
         )}
