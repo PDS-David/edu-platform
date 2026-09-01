@@ -10,7 +10,8 @@ const compression = require('compression');
 
 const { success, error } = require('./utils/response');
 
-const { aiLimiter, globalLimiter } = require('./middleware/rateLimiter');
+const { aiLimiter, globalLimiter, agentServiceLimiter } = require('./middleware/rateLimiter');
+const agentServiceAuth = require('./middleware/agentServiceAuth');
 const logger = require('./config/logger');
 const requestId = require('./middleware/requestId');
 const requestLogger = require('./middleware/requestLogger');
@@ -277,6 +278,7 @@ const aiQuestionGenRoutes = safeRequire('./routes/aiQuestionGenerationRoutes');
 const engineValidationRoutes = safeRequire('./routes/engineValidationRoutes');
 const examIntelligenceRoutes = safeRequire('./routes/examIntelligenceRoutes');
 const explanationRoutes = safeRequire('./routes/explanationRoute');
+const agentServiceRoutes = safeRequire('./routes/agentServiceRoutes');
 
 // MOUNT ROUTES
 if (authRoutes) app.use('/api/auth', authRoutes);
@@ -331,6 +333,11 @@ if (aiQuestionGenRoutes) app.use('/api/ai-question-gen', protect, aiQuestionGenR
 if (engineValidationRoutes) app.use('/api/engine', protect, engineValidationRoutes);
 if (examIntelligenceRoutes) app.use('/api/exam-intelligence', protect, examIntelligenceRoutes);
 if (explanationRoutes) app.use('/api/explanations', protect, explanationRoutes);
+// Mounted at /agent, NOT /api — this is a server-to-server trust boundary
+// (other backends, e.g. sts-school-app), not a school-user-facing route, so
+// it deliberately does not use `protect` (JWT). agentServiceAuth checks a
+// shared X-Api-Key instead. See agentServiceRoutes.js for the full contract.
+if (agentServiceRoutes) app.use('/agent', agentServiceAuth, agentServiceLimiter, agentServiceRoutes);
 
 // HEALTH
 app.get('/', (_req, res) => {
