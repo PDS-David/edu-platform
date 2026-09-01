@@ -19,7 +19,7 @@ import { useCatalog } from '../hooks/useCatalog';
 import api from '../services/apiClient';
 
 export default function AssignExamTypeModal({ studentId, studentName, onClose, onAssigned }) {
-  const { examTypes, loadingTypes, fetchSubjectsForType } = useCatalog();
+  const { examTypes, loadingTypes, typesError, fetchSubjectsForType } = useCatalog();
 
   const [step,            setStep]            = useState(1); // 1: pick board, 2: pick subjects
   const [selectedBoard,   setSelectedBoard]    = useState(null);
@@ -124,6 +124,27 @@ export default function AssignExamTypeModal({ studentId, studentName, onClose, o
             <div className="flex justify-center py-10">
               <Loader2 size={20} className="animate-spin text-indigo-400" />
             </div>
+          ) : typesError ? (
+            // BUG FIX: previously a failed /catalog/types fetch rendered
+            // nothing here at all — see useCatalog.js's typesError comment
+            // for the full story. Reuses the same error-banner styling
+            // already used below for submit errors, plus a retry button
+            // since a transient network failure is the most likely cause.
+            <div className="p-3 rounded-xl bg-red-50 border border-red-200 flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm text-red-700">{typesError}</p>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="mt-2 text-xs font-semibold text-red-600 hover:text-red-800 underline">
+                  Reload and try again
+                </button>
+              </div>
+            </div>
+          ) : examTypes.filter(t => t.is_active !== false).length === 0 ? (
+            <p className="text-xs text-gray-400 text-center py-6">
+              No exam types have been set up yet. Ask an admin to add one first.
+            </p>
           ) : (
             <div className="space-y-1.5 max-h-96 overflow-y-auto">
               {examTypes.filter(t => t.is_active !== false).map(board => (
