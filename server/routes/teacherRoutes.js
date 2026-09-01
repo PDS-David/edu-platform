@@ -563,16 +563,34 @@ router.get('/students-directory', protect, teacherOnly, async (req, res) => {
 // ── PUT /api/teacher/class/:classId/members ───────────────────────────────────
 // Replace the full member list of a class with student_ids[].
 // Used by the "Manage" panel on the teacher dashboard.
+//
+// STALENESS CHECK (APP_WIDE_AUDIT.md ASSIGN-2): this endpoint treats its
+// payload as "the complete, authoritative list" and does a full delete +
+// reinsert — but server/routes/schoolRoutes.js's POST /me/classes/:id/students
+// (school_admin) writes to this same table additively (ON CONFLICT DO
+// NOTHING). If a school_admin adds a student to this class while a
+// teacher's UI still holds an older member list, the teacher's Save used
+// to silently wipe the admin's addition with no error to anyone.
+// known_member_ids (required) is the member list the teacher's client had
+// when it last loaded — compared against a fresh SELECT right before the
+// destructive delete+reinsert. If the actual current membership has
+// drifted from what the teacher last saw, reject with 409 instead of
+// overwriting; if it matches, proceed exactly as before. No schema change.
 router.put('/class/:classId/members', protect, teacherOnly, async (req, res) => {
   await ensureClassTables();
   const { classId } = req.params;
-  const { student_ids = [] } = req.body || {};
+  const { student_ids = [], known_member_ids } = req.body || {};
   if (!UUID_REGEX.test(classId)) {
     return res.status(400).json({ success: false, error: 'Invalid class id' });
+  }
+  if (!Array.isArray(known_member_ids)) {
+    return res.status(400).json({ success: false, error: 'known_member_ids is required — refresh and try again.' });
   }
   const cleanIds = Array.isArray(student_ids)
     ? student_ids.filter((id) => typeof id === 'string' && UUID_REGEX.test(id))
     : [];
+  const cleanKnownIds = known_member_ids
+    .filter((id) => typeof id === 'string' && UUID_REGEX.test(id));
 
   try {
     const owns = await sequelize.query(
@@ -581,6 +599,24 @@ router.put('/class/:classId/members', protect, teacherOnly, async (req, res) => 
     );
     if (!owns.length) {
       return res.status(403).json({ success: false, error: 'Not your class' });
+    }
+
+    const currentRows = await sequelize.query(
+      `SELECT student_id FROM class_memberships WHERE class_id = :cid`,
+      { replacements: { cid: classId }, type: QueryTypes.SELECT }
+    );
+    const currentIds = currentRows.map((r) => r.student_id).sort();
+    const knownIdsSorted = [...cleanKnownIds].sort();
+    const driftDetected =
+      currentIds.length !== knownIdsSorted.length ||
+      currentIds.some((id, i) => id !== knownIdsSorted[i]);
+
+    if (driftDetected) {
+      return res.status(409).json({
+        success: false,
+        error: "This class's roster changed since you opened this — refresh and try again.",
+        data: { current_member_ids: currentIds },
+      });
     }
 
     await sequelize.query(
