@@ -2536,6 +2536,25 @@ async function run() {
   await exec('languages: confirm Arabic is_rtl = true', `
     UPDATE languages SET is_rtl = true WHERE code = 'arabic'`);
 
+  // ── Reconcile stale deactivation status (migration_027) ──────────────────
+  // Folded in as a permanent, idempotent safeguard rather than relying on
+  // migration_027_reconcile_stale_deactivation_status.sql being run by hand
+  // once — same reasoning as the language-unification fold-in above: a
+  // loose script that's only ever run manually is a script that eventually
+  // doesn't get run. This corrects any student_subjects/student_exam_types
+  // row left at is_active = false, status = 'approved' by the pre-fix
+  // reassignment bug (see commit 9e63170) — every student-facing read
+  // filters on status, not is_active, so such a row is invisible to admin
+  // but still shows on the student's own portal. Safe to re-run: once a row
+  // is corrected to status = 'deactivated' it no longer matches this WHERE
+  // clause, so this is a true no-op on every subsequent deploy.
+  await exec('student_subjects: reconcile stale is_active/status mismatch', `
+    UPDATE student_subjects SET status = 'deactivated'
+     WHERE is_active = false AND status = 'approved'`);
+  await exec('student_exam_types: reconcile stale is_active/status mismatch', `
+    UPDATE student_exam_types SET status = 'deactivated'
+     WHERE is_active = false AND status = 'approved'`);
+
   console.log('\n✅ Migration complete.\n');
   await pool.end();
 }
