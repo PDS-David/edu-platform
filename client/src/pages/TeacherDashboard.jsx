@@ -124,24 +124,56 @@ function ManageClassModal({ cls, onClose, onSaved, showToast }) {
   const [selected, setSelected] = useState(new Set());
   const [loading,  setLoading]  = useState(true);
   const [saving,   setSaving]   = useState(false);
+  // ASSIGN-2 fix: the member list as last fetched from the server — sent
+  // back on Save so the backend can detect if a school_admin added/removed
+  // someone in the meantime. Deliberately kept separate from `selected`
+  // (which the teacher may have since edited) so a stale-roster retry can
+  // refresh this without discarding the teacher's in-progress checkbox
+  // changes for anyone they were already looking at.
+  const [knownMemberIds, setKnownMemberIds] = useState([]);
 
-  useEffect(() => {
+  const loadMembers = () => {
     setLoading(true);
-    api.get(`/teacher/class/${cls.id}/members`)
-      .then(r => setSelected(new Set((r?.data || []).map(s => s.id))))
+    return api.get(`/teacher/class/${cls.id}/members`)
+      .then(r => {
+        const ids = (r?.data || []).map(s => s.id);
+        setSelected(new Set(ids));
+        setKnownMemberIds(ids);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadMembers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cls.id]);
 
   const save = async () => {
     setSaving(true);
     try {
-      await api.put(`/teacher/class/${cls.id}/members`, { student_ids: [...selected] });
+      await api.put(`/teacher/class/${cls.id}/members`, {
+        student_ids: [...selected],
+        known_member_ids: knownMemberIds,
+      });
       showToast(`Updated "${cls.name}" — ${selected.size} student${selected.size !== 1 ? 's' : ''}.`);
       onSaved();
       onClose();
     } catch (err) {
-      showToast(err?.message || 'Failed to update members.', 'error');
+      if (err?.status === 409) {
+        // Someone else (a school_admin) changed this class's roster since
+        // we loaded it. Re-fetch the real current list and tell the
+        // teacher plainly, rather than silently overwriting their change —
+        // this is the whole point of the fix, so don't reduce it to a
+        // generic error banner. NOTE: apiClient.js's response interceptor
+        // rejects with a flattened { message, status, raw } object, not
+        // the raw axios error — status lives at err.status directly, not
+        // err.response.status.
+        await loadMembers();
+        showToast("This class's roster changed since you opened this — refreshed with the latest list. Please review and save again.", 'error');
+      } else {
+        showToast(err?.message || 'Failed to update members.', 'error');
+      }
     } finally {
       setSaving(false);
     }
