@@ -69,7 +69,18 @@ and skip an actual mount-line check in `server.js` because of it.
 kind of deployment-safety check to actually exist, it needs to be wired into
 `server.js`'s own route-mounting logic to do anything, not live as a separate,
 never-imported list.)
-**Status:** Deferred — added here first per explicit instruction, not deleted yet.
+**Status:** RESOLVED — deleted. Re-verified independently before deleting:
+zero requires of it anywhere in the codebase (including no dynamic
+`require(path...)`/template-string patterns in `server.js` that might
+reference it indirectly), and found further corroborating evidence the
+list was never maintained — `schoolRoutes.js`, one of the most actively
+developed route files in the app, isn't listed in it at all, despite the
+file's own claim that "every API route MUST be declared here." The
+`examBoardsRoutes` (plural) vs. real `examBoardRoutes.js` (singular)
+mismatch flagged above was also re-confirmed still present at deletion
+time. No other entries were stale (`users.js`, `courses.js`,
+`enrollments.js` etc. all exist under the names listed) — this file just
+was, and always had been, dead weight with a misleading comment.
 
 ---
 
