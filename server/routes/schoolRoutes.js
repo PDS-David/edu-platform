@@ -1207,6 +1207,26 @@ router.post('/students/:studentId/assign-exam-type', protect, requireSchoolAdmin
       }
     }
 
+    // BUG FIX: re-assigning an already-assigned board used to be purely
+    // additive — the max/min checks above only ever validated the length of
+    // the newly-submitted subjectIds, never against what the student was
+    // already actively enrolled in for this board. So a student at a board's
+    // max_subjects cap who was re-assigned a different subject selection
+    // ended up with BOTH sets active, silently exceeding the cap. Fixed by
+    // treating this endpoint as a full replace of the student's subject set
+    // for this board: anything currently active under this board that isn't
+    // in the new selection gets deactivated first, in the same transaction,
+    // so the student can never end up above the board's max_subjects.
+    const currentlyActive = await q(
+      `SELECT ss.subject_id
+         FROM student_subjects ss
+         JOIN subjects s ON s.id = ss.subject_id
+        WHERE ss.student_id = $1 AND ss.is_active = true AND s.exam_board_id = $2`,
+      [studentId, board.id]
+    );
+    const currentlyActiveIds = currentlyActive.map(r => r.subject_id);
+    const toDeactivate = currentlyActiveIds.filter(id => !subjectIds.includes(id));
+
     const t = await sequelize.transaction();
     try {
       // Same ON CONFLICT pattern as studentRoutes.js's POST /subjects, with
@@ -1217,6 +1237,14 @@ router.post('/students/:studentId/assign-exam-type', protect, requireSchoolAdmin
          ON CONFLICT (student_id, exam_board_id) DO UPDATE SET is_active = true, status = $3`,
         { bind: [studentId, board.id, ENROLLMENT_STATUS.APPROVED], type: sequelize.QueryTypes.INSERT, transaction: t }
       );
+
+      if (toDeactivate.length) {
+        await sequelize.query(
+          `UPDATE student_subjects SET is_active = false
+            WHERE student_id = $1 AND subject_id = ANY($2::int[])`,
+          { bind: [studentId, toDeactivate], type: sequelize.QueryTypes.UPDATE, transaction: t }
+        );
+      }
 
       for (const subjectId of subjectIds) {
         await sequelize.query(
@@ -1241,11 +1269,50 @@ router.post('/students/:studentId/assign-exam-type', protect, requireSchoolAdmin
 
     return res.status(200).json({
       success: true,
-      data: { student_id: studentId, exam_board_id: board.id, subject_ids: subjectIds },
+      data: {
+        student_id: studentId,
+        exam_board_id: board.id,
+        subject_ids: subjectIds,
+        deactivated_subject_ids: toDeactivate,
+      },
     });
   } catch (err) {
     console.error('[schools] POST /students/:studentId/assign-exam-type', err.message);
     return res.status(500).json({ success: false, error: 'Could not assign exam type' });
+  }
+});
+
+// ─── GET /api/schools/students/:studentId/exam-types/:examBoardId/subjects ─
+// Lets AssignExamTypeModal.jsx prefill Step 2 with the student's CURRENT
+// active subjects for this board, instead of opening empty every time.
+// Needed because POST .../assign-exam-type above now replaces the subject
+// set for a board on every call (see the BUG FIX comment there) — without
+// this, an admin re-opening the modal just to check what's assigned, then
+// submitting without re-checking everything, would silently deactivate
+// subjects they meant to keep. Same ownership checks as the POST route:
+// school_admin scoped to their own school, App Admin unrestricted.
+router.get('/students/:studentId/exam-types/:examBoardId/subjects', protect, requireSchoolAdminOrAppAdmin, async (req, res) => {
+  const { studentId, examBoardId } = req.params;
+  try {
+    const studentRows = await q(`SELECT id, school_id FROM users WHERE id = $1 AND role = 'student'`, [studentId]);
+    if (!studentRows.length) {
+      return res.status(404).json({ success: false, error: 'Student not found' });
+    }
+    if (req.user.role === 'school_admin' && studentRows[0].school_id !== req.user.school_id) {
+      return res.status(403).json({ success: false, error: 'That student is not in your school' });
+    }
+
+    const rows = await q(
+      `SELECT ss.subject_id
+         FROM student_subjects ss
+         JOIN subjects s ON s.id = ss.subject_id
+        WHERE ss.student_id = $1 AND ss.is_active = true AND s.exam_board_id = $2`,
+      [studentId, examBoardId]
+    );
+    return res.json({ success: true, data: rows.map(r => r.subject_id) });
+  } catch (err) {
+    console.error('[schools] GET /students/:studentId/exam-types/:examBoardId/subjects', err.message);
+    return res.status(500).json({ success: false, error: 'Could not load current subjects' });
   }
 });
 
