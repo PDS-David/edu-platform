@@ -46,6 +46,30 @@ anywhere in the codebase.
 **Verified:** `grep -rn "'/curriculum'" client/src/` → zero results.
 **Severity:** Low if truly unused — but see **PERF-1** below, since this file also
 has a real performance bug that would matter if it's ever wired up.
+**Status:** RESOLVED — deleted (see commit `ca38483`), which also made PERF-1 moot
+(no code left to have the bug). Its require/mount lines in `server.js` were removed
+too. Surfaced DEAD-5 (below) while cleaning this one up.
+
+### DEAD-5 — `server/config/routeRegistry.js` is itself dead, and misleading about it
+File declares itself as `CENTRAL ROUTE REGISTRY — Every API route MUST be declared
+here. This prevents silent deployment breakage.` — but nothing in the codebase
+actually `require()`s this file at all, so it provides zero real protection despite
+what its own header comment promises. It's also already stale/wrong independent of
+that: it lists `'../routes/examBoardsRoutes'` (plural), a file that doesn't exist —
+the real file is `examBoardRoutes.js` (singular) — meaning even if something did
+start requiring this file today, at least one entry would break immediately.
+**Verified:** `grep -rln "routeRegistry" server/` (excluding its own file) → zero
+results. Cross-checked the `examBoardsRoutes` entry against the real filename on
+disk (`server/routes/examBoardRoutes.js`) → mismatch confirmed.
+**Severity:** Low (dead, so no live behavior to fix) but worth prioritizing over
+typical dead-code cleanup — a comment actively promising a safety guarantee it
+doesn't provide is worse than no comment at all; someone could reasonably trust it
+and skip an actual mount-line check in `server.js` because of it.
+**Suggested fix:** Confirmed unused — delete the whole file. (If anyone wants this
+kind of deployment-safety check to actually exist, it needs to be wired into
+`server.js`'s own route-mounting logic to do anything, not live as a separate,
+never-imported list.)
+**Status:** Deferred — added here first per explicit instruction, not deleted yet.
 
 ---
 
