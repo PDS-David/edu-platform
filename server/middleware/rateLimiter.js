@@ -126,4 +126,20 @@ const schoolJoinLimiter = rateLimit({
   message: { success: false, error: 'Too many school-join attempts, please try again later.' },
 });
 
-module.exports = { globalLimiter, aiLimiter, analyticsLimiter, authLimiter, streamingLimiter, adminActionLimiter, pronunciationLimiter, schoolJoinLimiter };
+// ── Shared agent-service limiter ──────────────────────────────────────────────
+// Applied to POST /agent/generate — the server-to-server endpoint that lets
+// sts-school-app (and any future consumer) call this hub's generate() over
+// HTTP. There's no req.user here (the caller is another backend, not a
+// logged-in school user via `protect`), so this keys on IP rather than user
+// ID — acceptable since the caller is a small, known set of trusted backends
+// rather than many end users behind a shared NAT. Generous ceiling: this
+// fronts every AI feature for a whole other app, not one student's usage.
+const agentServiceLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 60,              // matches sts-school-app's own local rate limit (20/min per user; a handful of concurrent users easily reaches this)
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'Shared agent service rate limit exceeded. Please try again shortly.' },
+});
+
+module.exports = { globalLimiter, aiLimiter, analyticsLimiter, authLimiter, streamingLimiter, adminActionLimiter, pronunciationLimiter, schoolJoinLimiter, agentServiceLimiter };

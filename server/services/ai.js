@@ -24,8 +24,19 @@
 //        Removed @anthropic-ai/sdk dependency entirely.
 // v16 — Fixed fallback chain pointing at retired/stale models (see below).
 //
-// Public API (signature unchanged):
+// v17 — Added OpenAI as a second provider. Not a genuinely "free" API (no
+//        ongoing free tier from OpenAI — a new account gets a small one-time
+//        trial credit, then it's pay-per-token like any other API), but
+//        wired the same way regardless: an OPENAI_API_KEY env var, same
+//        generate() signature, opt-in via a new `provider` option so every
+//        existing call site (which never passes `provider`) keeps routing
+//        to Gemini unchanged. Uses gpt-4o-mini, OpenAI's cheapest current
+//        chat model, called via native fetch (Node 22 has it built in) —
+//        no new npm dependency for a single REST call.
+//
+// Public API (signature EXTENDED, backward compatible):
 //   generate(prompt, task, options?) → Promise<string>
+//   options.provider: 'gemini' (default, unchanged) | 'openai'
 // ─────────────────────────────────────────────────────────────────────────────
 
 const { GoogleGenAI } = require('@google/genai');
@@ -178,6 +189,93 @@ async function _callGemini(prompt, task) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// OPENAI PROVIDER (v17)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Same routing-key shape as GEMINI_MODEL_MAP, one model for every task —
+// gpt-4o-mini is OpenAI's cheapest current chat-completions model and is
+// more than capable for this app's tasks (explanations, feedback, question
+// generation). Kept as its own map (not reusing GEMINI_MODEL_MAP) since the
+// two providers' model catalogs are unrelated — a future task-specific
+// upgrade on one provider shouldn't have to touch the other's routing.
+const OPENAI_MODEL_MAP = {
+  'generate-questions': 'gpt-4o-mini',
+  'chat':               'gpt-4o-mini',
+  'explain':            'gpt-4o-mini',
+  'hint':               'gpt-4o-mini',
+  'notes':              'gpt-4o-mini',
+  'remediation':        'gpt-4o-mini',
+  'essay-mark':         'gpt-4o-mini',
+  'complex_reasoning':  'gpt-4o-mini',
+  'default':            'gpt-4o-mini',
+};
+
+const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
+
+// ── OpenAI call — single model, no fallback chain ──────────────────────────
+// Deliberately simpler than _callGemini: OpenAI doesn't need a same-provider
+// fallback chain the way Gemini does here (that chain exists specifically
+// because Gemini model names get deprecated/retired under this app, per the
+// v9-v16 history above) — a single stable model id is enough for a second
+// provider whose main job is being an alternative to Gemini itself, not
+// needing its own internal fallback too. If gpt-4o-mini itself becomes
+// unavailable, generate() callers can retry with provider: 'gemini' instead
+// of this function retrying within OpenAI.
+async function _callOpenAI(prompt, task) {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('OPENAI_API_KEY is not configured');
+  }
+
+  const model = OPENAI_MODEL_MAP[task] || OPENAI_MODEL_MAP.default;
+
+  let response;
+  try {
+    response = await fetch(OPENAI_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+  } catch (err) {
+    // Network-level failure (DNS, timeout, connection refused) — no HTTP
+    // status to inspect at all.
+    throw Object.assign(
+      new Error('AI is temporarily busy. Please try again in a moment.'),
+      { statusCode: 503 }
+    );
+  }
+
+  if (!response.ok) {
+    const status = response.status;
+    let bodyText = '';
+    try { bodyText = (await response.text()).slice(0, 200); } catch {}
+    console.error(`[ai.js] OpenAI request failed. Status: ${status}. Body: ${bodyText}`);
+
+    const isRetryable = status === 429 || status === 503 || status >= 500;
+    throw Object.assign(
+      new Error(isRetryable
+        ? 'AI is temporarily busy. Please try again in a moment.'
+        : 'AI request failed. Please try again.'),
+      { statusCode: isRetryable ? 503 : 500 }
+    );
+  }
+
+  const data = await response.json();
+  const text = data?.choices?.[0]?.message?.content;
+
+  if (!text?.trim()) {
+    throw new Error('Empty response from model');
+  }
+
+  return text.trim();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // v7 — REDIS RATE LIMITING
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -249,14 +347,17 @@ function _logUsage({ task, provider, prompt, response, userId }) {
  * generate(prompt, task, options?) → Promise<string>
  *
  * @param {string} prompt           Full prompt text
- * @param {string} task             Routing key (see GEMINI_MODEL_MAP)
+ * @param {string} task             Routing key (see GEMINI_MODEL_MAP / OPENAI_MODEL_MAP)
  * @param {object} [options={}]
- * @param {string} [options.userId] For rate limiting + usage logging
- * @param {string} [options.role]   'admin' bypasses rate limit
- * @returns {Promise<string>}       Trimmed text from Gemini
+ * @param {string} [options.userId]   For rate limiting + usage logging
+ * @param {string} [options.role]     'admin' bypasses rate limit
+ * @param {string} [options.provider] 'gemini' (default) | 'openai'. Every
+ *   existing call site omits this and is completely unaffected — added in
+ *   v17 as an opt-in second provider, not a replacement for the default.
+ * @returns {Promise<string>}       Trimmed text from the selected provider
  */
 async function generate(prompt, task = 'default', options = {}) {
-  const { userId, role } = options;
+  const { userId, role, provider = 'gemini' } = options;
 
   const rateCheck = await _checkRateLimit(userId, role);
   if (!rateCheck.allowed) {
@@ -265,9 +366,10 @@ async function generate(prompt, task = 'default', options = {}) {
     throw err;
   }
 
-  const text = await _callGemini(prompt, task);
+  const useOpenAI = provider === 'openai' || provider === 'chatgpt';
+  const text = useOpenAI ? await _callOpenAI(prompt, task) : await _callGemini(prompt, task);
 
-  _logUsage({ task, provider: 'gemini', prompt, response: text, userId });
+  _logUsage({ task, provider: useOpenAI ? 'openai' : 'gemini', prompt, response: text, userId });
 
   return text;
 }
