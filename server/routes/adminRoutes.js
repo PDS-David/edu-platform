@@ -882,11 +882,24 @@ router.post('/teacher-assignments', protect, adminOnly, async (req, res) => {
   if (!teacher_id || !subject_id) return error(res, 'teacher_id and subject_id required', 400);
 
   try {
+    // ASSIGN-1 fix: this used to insert teacher_id/subject_id only, leaving
+    // teacher_subjects.exam_board_id NULL — catalogRoutes.js's own
+    // GET /teachers/:teacherId/subjects joins on that column to show the
+    // board name, so an assignment made here showed up with a blank exam
+    // board while the exact same assignment made via
+    // catalogRoutes.js POST /teachers/:teacherId/assign (which already
+    // looks this up) displayed correctly. Same lookup, copied from there.
+    const sub = await sequelize.query(
+      `SELECT exam_board_id FROM subjects WHERE id = :id`,
+      { replacements: { id: subject_id }, type: QueryTypes.SELECT }
+    );
+    if (!sub.length) return error(res, 'Subject not found', 404);
+
     await sequelize.query(
-      `INSERT INTO teacher_subjects (teacher_id, subject_id, is_active)
-       VALUES (:t, :s, true)
-       ON CONFLICT (teacher_id, subject_id) DO UPDATE SET is_active = true`,
-      { replacements: { t: teacher_id, s: subject_id }, type: QueryTypes.INSERT }
+      `INSERT INTO teacher_subjects (teacher_id, subject_id, exam_board_id, is_active)
+       VALUES (:t, :s, :examBoardId, true)
+       ON CONFLICT (teacher_id, subject_id) DO UPDATE SET is_active = true, exam_board_id = EXCLUDED.exam_board_id`,
+      { replacements: { t: teacher_id, s: subject_id, examBoardId: sub[0].exam_board_id || null }, type: QueryTypes.INSERT }
     );
     return success(res, { message: 'Assignment saved' });
   } catch (err) {
@@ -934,9 +947,22 @@ router.put('/teacher-assignments/:id', protect, adminOnly, async (req, res) => {
     );
     if (dup.length) return error(res, 'This teacher is already assigned to that subject', 409);
 
+    // Same fix as ASSIGN-1 above, found while reading this file: swapping
+    // subject_id here without also updating exam_board_id would leave the
+    // column pointing at the OLD subject's board (or NULL) after the swap —
+    // same missing-column symptom as the two POST handlers, just triggered
+    // by an edit instead of a fresh assignment. Not called out by name in
+    // the audit's ASSIGN-1 write-up (which only listed the two POST
+    // handlers), but same table, same column, same root cause.
+    const sub = await sequelize.query(
+      `SELECT exam_board_id FROM subjects WHERE id = :id`,
+      { replacements: { id: subject_id }, type: QueryTypes.SELECT }
+    );
+    if (!sub.length) return error(res, 'Subject not found', 404);
+
     await sequelize.query(
-      `UPDATE teacher_subjects SET subject_id = :subjectId, is_active = true WHERE id = :id`,
-      { replacements: { subjectId: subject_id, id }, type: QueryTypes.UPDATE }
+      `UPDATE teacher_subjects SET subject_id = :subjectId, exam_board_id = :examBoardId, is_active = true WHERE id = :id`,
+      { replacements: { subjectId: subject_id, examBoardId: sub[0].exam_board_id || null, id }, type: QueryTypes.UPDATE }
     );
     return success(res, { message: 'Assignment updated' });
   } catch (err) {
@@ -968,14 +994,27 @@ router.get('/teacher-subjects', protect, adminOnly, async (req, res) => {
 });
 
 router.post('/teacher-subjects', protect, adminOnly, async (req, res) => {
-  const { teacher_id, subject_id, exam_board_id } = req.body;
+  const { teacher_id, subject_id } = req.body;
   if (!teacher_id || !subject_id) return error(res, 'teacher_id and subject_id required', 400);
   try {
+    // ASSIGN-1 fix: same issue and same fix as POST /teacher-assignments
+    // above — this used to leave exam_board_id NULL. This handler used to
+    // also read exam_board_id out of req.body but never actually use it
+    // anywhere; deriving it from the subjects table here instead (like the
+    // other three working implementations already do) is more reliable
+    // than trusting a client-supplied value that could be wrong or missing,
+    // and keeps all four assignment endpoints consistent with each other.
+    const sub = await sequelize.query(
+      `SELECT exam_board_id FROM subjects WHERE id = :id`,
+      { replacements: { id: subject_id }, type: QueryTypes.SELECT }
+    );
+    if (!sub.length) return error(res, 'Subject not found', 404);
+
     await sequelize.query(
-      `INSERT INTO teacher_subjects (teacher_id, subject_id, is_active)
-       VALUES (:t, :s, true)
-       ON CONFLICT (teacher_id, subject_id) DO UPDATE SET is_active = true`,
-      { replacements: { t: teacher_id, s: subject_id }, type: QueryTypes.INSERT }
+      `INSERT INTO teacher_subjects (teacher_id, subject_id, exam_board_id, is_active)
+       VALUES (:t, :s, :examBoardId, true)
+       ON CONFLICT (teacher_id, subject_id) DO UPDATE SET is_active = true, exam_board_id = EXCLUDED.exam_board_id`,
+      { replacements: { t: teacher_id, s: subject_id, examBoardId: sub[0].exam_board_id || null }, type: QueryTypes.INSERT }
     );
     return success(res, { message: 'Assignment saved' });
   } catch (err) {
