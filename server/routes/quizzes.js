@@ -9,7 +9,7 @@ const router         = express.Router();
 const { QueryTypes } = require('sequelize');
 const sequelize      = require('../config/database');
 const { protect }    = require('../middleware/auth');
-const { generate }   = require('../services/ai');
+const { generate, buildEssayFeedbackPrompt } = require('../services/ai');
 
 let awardXP = () => {};
 try { awardXP = require('../middleware/xpMiddleware').awardXP; } catch {}
@@ -218,33 +218,64 @@ router.post('/attempt', protect, async (req, res) => {
           .trim()
           .toLowerCase();
 
-      // BUG FIX: 'structured' questions (free-response, no options array)
-      // previously had no dedicated handling here and fell straight into
-      // the MCQ branch below — which found no matching option, then fell
-      // back to comparing the student's free-typed text verbatim against
-      // correct_answer, so a structured question in a mixed-type quiz
-      // scored wrong essentially every time regardless of what was typed.
-      // Match the self-assessment treatment questionsRoutes.js already
-      // gives structured questions elsewhere: not machine-graded (is_correct
-      // stays null, same signal PracticeMode.jsx already reads as "not
-      // graded" rather than "wrong"), model answer shown for comparison,
-      // and excluded from the score denominator so an ungraded free-response
-      // question can't silently drag down the quiz's accuracy_pct.
+      // FIX (reverses the design note below): structured questions used to
+      // intentionally skip grading — is_correct stayed null, no AI call was
+      // made, and the question was excluded from maxScore/totalScore so it
+      // couldn't affect accuracy_pct. That design is now reversed: they're
+      // graded through the exact same AI-marking path essay-type questions
+      // use elsewhere in this app (buildEssayFeedbackPrompt + generate(),
+      // both in services/ai.js — see questionsRoutes.js's POST /:id/answer
+      // and studentRoutes.js's POST /test/:testId/submit for the same
+      // pattern), and now DO count toward the quiz's score like every other
+      // graded question type.
       if (question.type === 'structured') {
-        const answerText = answer.essay_response ?? submittedAnswer ?? '';
+        const answerText = (answer.essay_response ?? submittedAnswer ?? '').toString();
+
+        maxScore += markValue;
+
+        let isCorrect    = false;
+        let marksAwarded = 0;
+        let feedback     = null;
+
+        if (process.env.GEMINI_API_KEY && answerText.trim()) {
+          try {
+            const prompt = buildEssayFeedbackPrompt({
+              studentName:   req.user?.first_name || null,
+              questionText:  question.question_text,
+              maxMarks:      markValue,
+              modelAnswer:   question.correct_answer,
+              studentAnswer: answerText.trim(),
+            });
+            const raw    = await generate(prompt, 'essay-mark');
+            const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
+            marksAwarded = Math.min(Math.max(parsed.marks_awarded || 0, 0), markValue);
+            isCorrect    = parsed.is_correct ?? (marksAwarded >= markValue * 0.5);
+            feedback     = parsed.feedback || null;
+          } catch (err) {
+            console.error('[POST /quizzes/attempt] structured AI marking failed:', err.message);
+            feedback = question.explanation || 'Submitted for review — automated marking was unavailable.';
+          }
+        } else if (!answerText.trim()) {
+          feedback = 'No answer submitted.';
+        } else {
+          feedback = question.explanation || 'Submitted for review.';
+        }
+
+        totalScore += marksAwarded;
+
         results.push({
           question_id:          answer.question_id,
           question_text:        question.question_text,
           selected_option_text: answerText || null,
           correct_answer:       question.correct_answer,
           correct_options:      [],
-          is_correct:           null,
-          marks_awarded:        0,
+          is_correct:           isCorrect,
+          marks_awarded:        marksAwarded,
           max_marks:            markValue,
           model_answer:         question.correct_answer || null,
-          explanation:          question.explanation || 'Compare your answer with the model answer above.',
-          ai_explanation:       question.explanation || '',
-          ai_marking_scheme:    {},
+          explanation:          feedback || question.explanation || 'Compare your answer with the model answer above.',
+          ai_explanation:       feedback || question.explanation || '',
+          ai_marking_scheme:    feedback ? { status: isCorrect ? 'correct' : 'incorrect', whyExplanation: feedback, markingPoints: [] } : {},
           options:              question.options,
         });
 
@@ -256,7 +287,7 @@ router.post('/attempt', protect, async (req, res) => {
             replacements: {
               studentId:    req.user.id,
               questionId:   answer.question_id,
-              isCorrect:    false,
+              isCorrect,
               timeTaken:    parseInt(answer.time_taken_seconds ?? (answer.time_taken_ms / 1000)) || 0,
               selectedText: answerText || null,
               paperType:    paper_type || 'quiz',
