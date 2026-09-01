@@ -1839,7 +1839,15 @@ const UserManagementPanel = () => {
           studentId={assigningStudent.id}
           studentName={`${assigningStudent.first_name} ${assigningStudent.last_name}`}
           onClose={() => setAssigningStudent(null)}
-          onAssigned={() => { showToast(`Exam type assigned to ${assigningStudent.first_name} ${assigningStudent.last_name}`); fetchUsers(); }}
+          onAssigned={({ deactivatedCount } = {}) => {
+            const name = `${assigningStudent.first_name} ${assigningStudent.last_name}`;
+            showToast(
+              deactivatedCount > 0
+                ? `Exam type updated for ${name} — ${deactivatedCount} previous subject${deactivatedCount === 1 ? '' : 's'} removed`
+                : `Exam type assigned to ${name}`
+            );
+            fetchUsers();
+          }}
         />
       )}
     </div>

@@ -55,7 +55,28 @@ export default function AssignExamTypeModal({ studentId, studentName, onClose, o
       // under exam_board_id=5 ("GCE A' Levels").
       const assignableSubs = subs.filter(s => s.is_active !== false);
       setAllSubs(assignableSubs);
-      setSubjectIds(board.requires_all_subjects ? assignableSubs.map(s => s.id) : []);
+
+      // PREFILL FIX: the backend now replaces the student's subject set for
+      // this board on every submit (see the BUG FIX comment on POST
+      // .../assign-exam-type in schoolRoutes.js) instead of only ever
+      // adding to it. Without prefilling here, an admin re-opening this
+      // modal for a student who already has subjects under this board would
+      // start from an empty checklist and, on submit, silently deactivate
+      // every subject they didn't happen to re-check. Best-effort: if this
+      // lookup fails, fall through to an empty selection rather than
+      // blocking the modal — the admin still sees every assignable subject
+      // and can pick from scratch, same as before this fix existed.
+      let preselected = [];
+      if (!board.requires_all_subjects) {
+        try {
+          const res = await api.get(`/schools/students/${studentId}/exam-types/${board.id}/subjects`);
+          const currentIds = new Set(res?.data || []);
+          preselected = assignableSubs.filter(s => currentIds.has(s.id)).map(s => s.id);
+        } catch {
+          preselected = [];
+        }
+      }
+      setSubjectIds(board.requires_all_subjects ? assignableSubs.map(s => s.id) : preselected);
       setStep(2);
     } catch {
       setError('Could not load subjects for that exam type. Please try again.');
@@ -86,11 +107,16 @@ export default function AssignExamTypeModal({ studentId, studentName, onClose, o
     setSubmitting(true);
     setError('');
     try {
-      await api.post(`/schools/students/${studentId}/assign-exam-type`, {
+      const res = await api.post(`/schools/students/${studentId}/assign-exam-type`, {
         exam_board_id: selectedBoard.id,
         subject_ids: subjectIds,
       });
-      onAssigned?.();
+      // deactivated_subject_ids: subjects this call replaced (see BUG FIX
+      // comment on POST .../assign-exam-type) — passed through so the
+      // caller's toast can actually tell the admin something changed under
+      // the hood, instead of a generic "assigned" message that reads the
+      // same whether this was a first assignment or a silent replacement.
+      onAssigned?.({ deactivatedCount: res?.data?.deactivated_subject_ids?.length || 0 });
       onClose();
     } catch (err) {
       setError(err?.response?.data?.error || err?.message || 'Could not assign exam type.');
