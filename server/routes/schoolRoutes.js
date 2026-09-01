@@ -1151,9 +1151,11 @@ router.post('/students/:studentId/assign-exam-type', protect, requireSchoolAdmin
     }
 
     // Look up the board's limit config — same columns Step 2 taught
-    // studentRoutes.js's POST /subjects to read from.
+    // studentRoutes.js's POST /subjects to read from, plus min_subjects
+    // (migration_026_exam_board_subject_count_standards.sql) — previously
+    // only a maximum was ever enforced anywhere in the app.
     const boardRows = await q(
-      `SELECT id, name, max_subjects, requires_all_subjects
+      `SELECT id, name, min_subjects, max_subjects, requires_all_subjects
          FROM exam_boards WHERE id = $1 AND is_active = true`,
       [exam_board_id]
     );
@@ -1182,6 +1184,15 @@ router.post('/students/:studentId/assign-exam-type', protect, requireSchoolAdmin
           error: `You can only assign ${board.max_subjects} subjects for ${board.name}. You have reached the limit.`,
           code: 'SUBJECT_LIMIT_REACHED',
           limit: board.max_subjects,
+          current: subjectIds.length,
+        });
+      }
+      if (board.min_subjects !== null && subjectIds.length < board.min_subjects) {
+        return res.status(400).json({
+          success: false,
+          error: `${board.name} requires at least ${board.min_subjects} subjects. You have only selected ${subjectIds.length}.`,
+          code: 'SUBJECT_MINIMUM_NOT_MET',
+          minimum: board.min_subjects,
           current: subjectIds.length,
         });
       }
