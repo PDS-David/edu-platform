@@ -94,6 +94,14 @@ kind of code that gets "quickly" reused later without anyone re-checking it).
 **Suggested fix:** Replace with a single query using JOINs and a GROUP BY/json_agg
 to build the nested structure in one round-trip, or fetch all 4 tables in 4 flat
 queries and assemble the tree in JS.
+**Status:** RESOLVED — moot as of commit `ca38483`: `curriculumRoutes.js` (DEAD-4)
+was deleted rather than fixed in place, since it was confirmed unused and the
+dead route was the entire reason this bug had zero real-world consumers to hit
+it. No buggy code remains to fix. Re-verified before closing this out: the file
+is still absent on `main` as of this check, nothing resurrected it.
+If a real curriculum-browsing feature is ever built to replace it, build it with
+a single JOIN/`json_agg` query (or 4 flat queries assembled in JS) from the
+start — not by resurrecting this file's nested-loop approach.
 
 ### PERF-2 — Not yet audited: other `for...of` + `await` patterns
 The following files have loop-with-await patterns that were not individually
