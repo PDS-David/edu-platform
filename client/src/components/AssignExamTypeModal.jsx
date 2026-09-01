@@ -31,6 +31,7 @@ export default function AssignExamTypeModal({ studentId, studentName, onClose, o
 
   const requiresAllSubjects = !!selectedBoard?.requires_all_subjects;
   const maxSubjects = selectedBoard?.max_subjects ?? null;
+  const minSubjects = selectedBoard?.min_subjects ?? null;
 
   const goToSubjects = async (board) => {
     setSelectedBoard(board);
@@ -75,8 +76,10 @@ export default function AssignExamTypeModal({ studentId, studentName, onClose, o
   const canSubmit = useMemo(() => {
     if (!selectedBoard) return false;
     if (requiresAllSubjects) return allSubs.length > 0;
-    return subjectIds.length > 0;
-  }, [selectedBoard, requiresAllSubjects, allSubs.length, subjectIds.length]);
+    if (subjectIds.length === 0) return false;
+    if (minSubjects !== null && subjectIds.length < minSubjects) return false;
+    return true;
+  }, [selectedBoard, requiresAllSubjects, allSubs.length, subjectIds.length, minSubjects]);
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
@@ -138,6 +141,10 @@ export default function AssignExamTypeModal({ studentId, studentName, onClose, o
                   </div>
                   {board.requires_all_subjects ? (
                     <span className="text-[10px] font-semibold text-gray-400 shrink-0">All subjects</span>
+                  ) : board.min_subjects != null && board.max_subjects != null ? (
+                    <span className="text-[10px] font-semibold text-gray-400 shrink-0">
+                      {board.min_subjects === board.max_subjects ? `Exactly ${board.max_subjects}` : `${board.min_subjects}–${board.max_subjects}`}
+                    </span>
                   ) : board.max_subjects != null ? (
                     <span className="text-[10px] font-semibold text-gray-400 shrink-0">Max {board.max_subjects}</span>
                   ) : null}
@@ -161,12 +168,23 @@ export default function AssignExamTypeModal({ studentId, studentName, onClose, o
                 Every subject is required for {selectedBoard.name} — no selection needed.
               </div>
             ) : (
-              <div className="mb-3 flex items-center justify-between text-xs">
-                <span className="text-gray-500">Select subjects</span>
-                {maxSubjects != null && (
-                  <span className={`font-semibold ${subjectIds.length >= maxSubjects ? 'text-red-500' : 'text-gray-400'}`}>
-                    {subjectIds.length}/{maxSubjects}
-                  </span>
+              <div className="mb-3">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-500">Select subjects</span>
+                  {maxSubjects != null && (
+                    <span className={`font-semibold ${
+                      minSubjects !== null && subjectIds.length < minSubjects ? 'text-amber-500'
+                      : subjectIds.length >= maxSubjects ? 'text-red-500'
+                      : 'text-gray-400'
+                    }`}>
+                      {subjectIds.length}/{maxSubjects}
+                    </span>
+                  )}
+                </div>
+                {minSubjects !== null && subjectIds.length < minSubjects && (
+                  <p className="text-[11px] text-amber-600 mt-1">
+                    {selectedBoard.name} requires at least {minSubjects} subject{minSubjects === 1 ? '' : 's'} — select {minSubjects - subjectIds.length} more.
+                  </p>
                 )}
               </div>
             )}
