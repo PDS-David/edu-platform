@@ -1044,10 +1044,12 @@ export default function SchoolAdminDashboard() {
           studentId={assigningStudent.id}
           studentName={`${assigningStudent.first_name} ${assigningStudent.last_name}`}
           onClose={() => setAssigningStudent(null)}
-          onAssigned={({ deactivatedCount } = {}) => {
+          onAssigned={({ deactivatedCount, removedBoard } = {}) => {
             const name = `${assigningStudent.first_name} ${assigningStudent.last_name}`;
             showToast(
-              deactivatedCount > 0
+              removedBoard
+                ? `${removedBoard} removed from ${name}`
+                : deactivatedCount > 0
                 ? `Exam type updated for ${name} — ${deactivatedCount} previous subject${deactivatedCount === 1 ? '' : 's'} removed`
                 : `Exam type assigned to ${name}`
             );
