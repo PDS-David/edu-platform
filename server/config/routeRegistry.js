@@ -9,7 +9,6 @@
 module.exports = [
   { path: '/api/auth', file: '../routes/authRoutes' },
   { path: '/api/exam-boards', file: '../routes/examBoardsRoutes' },
-  { path: '/api/curriculum', file: '../routes/curriculumRoutes' },
 
   { path: '/api/ai', file: '../routes/aiRoutes' },
 
