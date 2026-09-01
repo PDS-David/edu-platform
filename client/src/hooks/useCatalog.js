@@ -9,6 +9,16 @@ const _inFlight = new Set();
 export function useCatalog() {
   const [examTypes, setExamTypes] = useState(_examTypesCache || []);
   const [loadingTypes, setLoadingTypes] = useState(_examTypesCache === null);
+  // BUG FIX: the exam-types fetch below used to swallow any failure
+  // completely — no error state exposed to callers, not even a
+  // console.error — so a failed or empty /catalog/types request left
+  // AssignExamTypeModal.jsx's Step 1 rendering nothing at all below the
+  // header: no spinner (loadingTypes correctly flips to false), no error,
+  // no "nothing here" message. From the user's side this looked like a
+  // completely broken, empty modal with zero indication of what went
+  // wrong. Now exposed as `typesError` so callers can actually show
+  // something.
+  const [typesError, setTypesError] = useState(null);
   const [subjectCache, setSubjectCache] = useState({ ..._subjectCache });
 
   const mounted = useRef(true);
@@ -42,10 +52,16 @@ export function useCatalog() {
         if (mounted.current) {
           setExamTypes(list);
           setLoadingTypes(false);
+          setTypesError(null);
         }
       } catch (err) {
-        _examTypesCache = [];
-        setLoadingTypes(false);
+        console.error('[useCatalog] failed to load /catalog/types:', err?.response?.data?.error || err.message);
+        _examTypesCache = null; // don't cache a failure as "confirmed empty" — retry next mount
+        if (mounted.current) {
+          setExamTypes([]);
+          setLoadingTypes(false);
+          setTypesError(err?.response?.data?.error || err.message || 'Could not load exam types.');
+        }
       }
     })();
   }, []);
@@ -110,6 +126,7 @@ export function useCatalog() {
   return {
     examTypes,
     loadingTypes,
+    typesError,
     subjectCache,
     fetchSubjectsForType,
     invalidateCache,
