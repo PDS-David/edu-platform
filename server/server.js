@@ -269,7 +269,6 @@ const learningEventRoutes = safeRequire('./routes/learningEventRoutes');
 const studyPlannerRoutes = safeRequire('./routes/studyPlannerRoute');
 const enrollmentRoutes = safeRequire('./routes/enrollments');
 const courseRoutes = safeRequire('./routes/courses');
-const curriculumRoutes = safeRequire('./routes/curriculumRoutes');
 const replayRoutes = safeRequire('./routes/eventReplayRoutes');
 const englishMasterclassRoutes = safeRequire('./routes/englishMasterclassRoutes');
 const languageMasterclassRoutes = safeRequire('./routes/languageMasterclassRoutes');
@@ -316,7 +315,6 @@ if (learningEventRoutes) app.use('/api/learning-events', protect, learningEventR
 if (studyPlannerRoutes) app.use('/api/study-planner', protect, studyPlannerRoutes);
 if (enrollmentRoutes) app.use('/api/enrollments', protect, enrollmentRoutes);
 if (courseRoutes) app.use('/api/courses', courseRoutes);
-if (curriculumRoutes) app.use('/api/curriculum', protect, curriculumRoutes);
 if (studentRoutes) app.use('/api/students', protect, studentRoutes);
 if (teacherRoutes) app.use('/api/teacher', protect, teacherRoutes);
 if (adminRoutes) app.use('/api/admin', protect, ...(ipWhitelist ? [ipWhitelist] : []), adminRoutes);

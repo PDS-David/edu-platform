@@ -8,9 +8,16 @@
  *   ReferenceError: React is not defined
  *
  * Dynamic import defers the load until initRealtime() is first called
- * (which only happens from useRealtimeSync, used only in DashboardHome,
- * which is an orphaned route not reachable from the main app navigation).
- * React is fully initialised by that point.
+ * (which only happens from useRealtimeSync). As of the DEAD-2 cleanup,
+ * useRealtimeSync's only caller (Dashboard/DashboardHome.jsx, an orphaned
+ * route never reachable from the main app navigation) has been deleted —
+ * useRealtimeSync.js and this file are consequently also unused right now.
+ * Left in place rather than deleted in the same pass: unlike the dead page
+ * component itself, this is real, working realtime infrastructure that
+ * looks intended for future use, not an abandoned prototype — worth a
+ * decision from whoever owns that roadmap rather than deleting on sight.
+ * React is fully initialised by the time any future caller would reach
+ * this point.
  *
  * Public API (identical to the old native-WebSocket version):
  *   initRealtime() — connect (idempotent, async)
