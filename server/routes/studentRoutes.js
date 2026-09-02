@@ -445,11 +445,17 @@ router.post('/test/:testId/submit', protect, studentOnly, async (req, res) => {
       let marksAwarded = 0;
       let feedback     = null;
 
-      if (question.type === 'essay' || question.type === 'structured') {
+      if (question.type === 'essay' || question.type === 'structured' || question.type === 'short_answer') {
         // Assigned tests need an actual mark (unlike ad-hoc practice mode,
-        // where 'structured' is intentionally left as self-assessment) —
-        // route both through the same AI marking essay questions already
-        // use elsewhere, scaled to this test's marks_allocated.
+        // where 'structured'/'short_answer' were previously left as
+        // self-assessment or plain text-match) — route all three through
+        // the same AI marking essay questions already use elsewhere,
+        // scaled to this test's marks_allocated. short_answer in
+        // particular benefits from this: a short factual answer phrased
+        // differently from the stored correct_answer text (e.g. "Because
+        // wants exceed resources" vs "resources are limited") would fail a
+        // literal text-match despite being substantively correct — AI
+        // marking judges the content, not the exact wording.
         if (process.env.GEMINI_API_KEY && essayText.trim()) {
           try {
             // Shared prompt (services/ai.js) — personalized, paragraph-style

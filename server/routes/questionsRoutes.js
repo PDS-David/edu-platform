@@ -286,13 +286,20 @@ router.post('/:id/answer', protect, async (req, res) => {
     }
 
     const question = questions[0];
-    // Phase 5: 'structured' questions render with a free-text textarea on
-    // the frontend (same as essay), so they may also arrive here with
-    // essay_response set — but they must NOT trigger Gemini AI marking,
-    // same as short_answer today. Excluding by type first means this stays
-    // correct regardless of which field name the frontend posts.
-    const isStructured = question.type === 'structured';
-    const isEssay  = !isStructured && (question.type === 'essay' || !!essay_response);
+    // ASSIGN-marking-consistency fix (repo-wide audit): structured and
+    // short_answer previously got weaker treatment here than essay —
+    // structured was self-assessment-only (model answer shown, never
+    // machine-graded) and short_answer fell through to a bare text
+    // comparison against correct_answer with no tolerance for valid
+    // rephrasing. Assigned tests (studentRoutes.js) already AI-marked
+    // essay AND structured together; short_answer was ungraded-by-AI
+    // everywhere. Now all three route through the same AI marking, here
+    // and in studentRoutes.js and quizzes.js, so a student gets the same
+    // quality of feedback regardless of which of the three practice
+    // surfaces they used.
+    const isStructured  = question.type === 'structured';
+    const isShortAnswer = question.type === 'short_answer';
+    const isAIMarked    = isStructured || isShortAnswer || question.type === 'essay' || !!essay_response;
 
     let isCorrect    = false;
     let marksAwarded = 0;
@@ -303,32 +310,7 @@ router.post('/:id/answer', protect, async (req, res) => {
     // re-derive it from a fragile independent text comparison.
     let correctOptionText = question.correct_answer;
 
-    if (isStructured) {
-      // BUG FIX: before this branch existed, isStructured questions had no
-      // dedicated handling at all and fell straight into the MCQ branch
-      // below. Structured questions have no `options` array and the
-      // frontend posts `essay_response` (not `selected_answer`) for them,
-      // so that branch always left isCorrect=false, marksAwarded=0, and
-      // feedback=null with no acknowledgement the student's answer was
-      // even received — every structured-question submission silently
-      // scored zero with no feedback, regardless of what was typed.
-      //
-      // Per the Question model's Phase 5 comment, structured questions are
-      // NOT routed through AI marking (unlike essay) — there's no reliable
-      // automated way to grade free text without AI here, so this is a
-      // self-assessment flow: show the model answer/explanation so the
-      // student can compare it against what they wrote, same as PracticeMode.jsx's
-      // existing "Feedback" + "Model Answer" UI already expects (that UI
-      // was already built and shipped, just never actually reachable for
-      // this question type until now). isCorrect stays null rather than
-      // false — the frontend already falls back to
-      // `result.is_correct ?? (result.marks_awarded > 0)`, so null
-      // correctly signals "not machine-graded" instead of falsely
-      // reporting the answer as wrong.
-      isCorrect = null;
-      marksAwarded = 0;
-      feedback = question.explanation || 'Compare your answer with the model answer below.';
-    } else if (!isEssay) {
+    if (!isAIMarked) {
       // MCQ — grade against options[].is_correct (the authoritative flag set
       // at insert time), NOT a fresh text comparison against correct_answer.
       //
@@ -378,8 +360,14 @@ router.post('/:id/answer', protect, async (req, res) => {
       }
       marksAwarded = isCorrect ? (question.marks || 1) : 0;
     } else {
-      // Essay — AI marking via central hub (services/ai.js)
-      if (process.env.GEMINI_API_KEY && essay_response?.trim()) {
+      // essay / structured / short_answer — AI marking via central hub
+      // (services/ai.js). structured and short_answer may arrive via
+      // essay_response (same free-text textarea essay uses) or via
+      // selected_answer (short_answer's simpler single-line input) —
+      // accept either, matching the fallback already used for these two
+      // types in studentRoutes.js and quizzes.js.
+      const answerText = (essay_response ?? selected_answer ?? '').toString().trim();
+      if (process.env.GEMINI_API_KEY && answerText) {
         try {
           // BUG FIX: previously an unstructured one-line prompt with no
           // personalization or paragraph guidance — see buildEssayFeedbackPrompt
@@ -391,7 +379,7 @@ router.post('/:id/answer', protect, async (req, res) => {
             questionText:  question.question_text,
             maxMarks:      question.marks || 3,
             modelAnswer:   question.correct_answer,
-            studentAnswer: essay_response.trim(),
+            studentAnswer: answerText,
           });
           // v2: routes through ai.js instead of calling Gemini directly
           const raw    = await generate(prompt, 'essay-mark');
@@ -402,6 +390,20 @@ router.post('/:id/answer', protect, async (req, res) => {
         } catch {
           feedback = question.explanation || 'Submitted for review.';
         }
+      } else if (!answerText) {
+        // BUG FIX carried over from the old isStructured-only branch: a
+        // student who submitted nothing (or whitespace) previously got
+        // isCorrect=false/marksAwarded=0 with feedback staying null —
+        // no acknowledgement their submission was even received.
+        isCorrect = null;
+        feedback  = 'No answer submitted.';
+      } else {
+        // Answer text present but no GEMINI_API_KEY configured — same
+        // self-assessment fallback the old structured-only branch used,
+        // now applied consistently to essay/short_answer too when AI
+        // marking is unavailable, instead of silently returning nothing.
+        isCorrect = null;
+        feedback  = question.explanation || 'Compare your answer with the model answer below.';
       }
     }
 
@@ -443,7 +445,7 @@ router.post('/:id/answer', protect, async (req, res) => {
       // reachable. Only meaningful for free-text types; harmless to
       // include for mcq too, since the frontend only reads it inside its
       // isFreeText branch.
-      model_answer:        (isStructured || isEssay) ? (question.correct_answer || null) : undefined,
+      model_answer:        isAIMarked ? (question.correct_answer || null) : undefined,
       explanation:         question.explanation || null,
       marks_awarded:       marksAwarded,
       max_marks:           question.marks || 1,
