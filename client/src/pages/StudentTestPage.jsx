@@ -173,6 +173,17 @@ export default function StudentTestPage() {
   // student assigned a test containing one saw an empty answer area with
   // no way to respond. Matches the same isFreeText convention already used
   // in PracticeMode.jsx.
+  //
+  // GRADE-2 FIX: 'short_answer' needs the same kind of text input
+  // essay/structured get (no options array to render as MCQ buttons), but
+  // must keep submitting through the selected_answer path isFreeText
+  // already sends it through above — matches studentRoutes.js's POST
+  // /test/:testId/submit, which groups 'short_answer' with mcq/true_false
+  // for exact-text grading, NOT the AI marking essay/structured get.
+  // Handled below via a three-way branch on isFreeText / q.type directly
+  // rather than a separate flag, since answers[q.id] is already a single
+  // generic string slot shared by every question type here — no new state
+  // needed, just which input renders and which badge shows.
   const isFreeText = q.type === 'essay' || q.type === 'structured';
 
   return (
@@ -208,6 +219,11 @@ export default function StudentTestPage() {
                 {q.type === 'essay' ? 'ESSAY' : 'STRUCTURED'}
               </span>
             )}
+            {q.type === 'short_answer' && (
+              <span className="text-xs text-white font-bold px-2.5 py-1 rounded-full bg-teal-500">
+                SHORT ANSWER
+              </span>
+            )}
           </div>
           <div className="px-5 py-4">
             <p className="text-gray-900 text-sm leading-relaxed">{q.question_text}</p>
@@ -224,6 +240,22 @@ export default function StudentTestPage() {
               {q.marks && (
                 <p className="text-xs text-gray-400 mt-1.5">{q.marks} mark{q.marks !== 1 ? 's' : ''} available</p>
               )}
+            </div>
+          ) : q.type === 'short_answer' ? (
+            /* GRADE-2 FIX: single-line input, distinct from the essay/
+               structured textarea above — "short answer" implies a brief,
+               direct response. Binds to the same answers[q.id] slot every
+               other type already uses, so submitTest()'s existing payload
+               logic (selected_answer for this type, unchanged) needs no
+               further changes. */
+            <div className="px-5 pb-5">
+              <input
+                type="text"
+                value={answers[q.id] || ''}
+                onChange={e => setAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
+                placeholder="Type your answer here…"
+                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 focus:outline-none focus:border-blue-400"
+              />
             </div>
           ) : (
             <div className="px-5 pb-5 space-y-2">
