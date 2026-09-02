@@ -2,7 +2,7 @@ import { getToken } from '../utils/token';
 // client/src/pages/SubtopicPage.jsx
 // AI Buddy subtopic page — exact replica
 // URL: /student/subtopic/:subtopicId?tab=resources|practice|quiz
-// Three tabs: Resources | Practice Questions (MCQ/Smart Answers/Structured) | Quiz
+// Three tabs: Resources | Practice Questions (MCQ/Short Questions/Structured) | Quiz
 //
 // FIX v1.1: Replaced raw axios with api instance from services/api.js
 // FIX v1.2 (BUG 2): Removed localStorage from PracticeTab — blocked in sandbox.
@@ -329,7 +329,13 @@ function PracticeTab({ subtopicId, subjectId, onComplete }) {
 
   const subTabs = [
     { id: 'mcq',        label: 'MCQ Questions',        ai: false },
-    { id: 'smart',      label: 'Smart Answers',         ai: true  },
+    // Label renamed Smart Answers -> Short Questions (matches
+    // TestYourselfPage.jsx's tile for the same underlying question type).
+    // id stays 'smart' — GRADE-6's fix in questionsRoutes.js
+    // (QUESTION_SUB_TYPE_ALIASES = { smart: 'short_answer' }) keys off this
+    // exact string; renaming it here without updating that alias would
+    // silently break this tab's filtering again.
+    { id: 'smart',      label: 'Short Questions',      ai: true  },
     { id: 'structured', label: 'Structured Questions',  ai: true  },
   ];
 
@@ -353,7 +359,7 @@ function PracticeTab({ subtopicId, subjectId, onComplete }) {
         <div className="bg-white rounded-2xl border border-gray-100 p-6 text-center shadow-sm">
           <div className="text-4xl mb-3">📭</div>
           <p className="text-sm font-semibold text-gray-700 mb-1">
-            No {subTab === "mcq" ? "MCQ" : subTab === "smart" ? "smart answer" : "structured"} questions yet
+            No {subTab === "mcq" ? "MCQ" : subTab === "smart" ? "short" : "structured"} questions yet
           </p>
           <p className="text-xs text-gray-400 mb-4 leading-relaxed">
             Questions for this subtopic haven't been added yet.<br />
@@ -571,7 +577,7 @@ function MCQQuestion({ question, questionNumber, totalQuestions, onAnswer, onPre
   );
 }
 
-// ─── Open Answer (Smart Answers) ───────────────────────────────────────────────
+// ─── Open Answer (Short Questions) ───────────────────────────────────────────────
 function OpenAnswerQuestion({ question, questionNumber, totalQuestions, dismissed, onDismiss, onNext, onPrev }) {
   const [answer,  setAnswer]  = useState('');
   const [result,  setResult]  = useState(null);
@@ -649,7 +655,7 @@ function StructuredQuestion({ question, questionNumber, totalQuestions, onNext, 
   // "Submit" just called onNext directly, discarding every typed answer
   // with no marking and no feedback ever shown. There's no per-sub-part
   // correct-answer data modeled anywhere (question.sub_parts only carries
-  // label/text/marks), so — matching how OpenAnswerQuestion (Smart Answers)
+  // label/text/marks), so — matching how OpenAnswerQuestion (Short Questions)
   // already marks a single free-text answer via the same endpoint — every
   // part's answer is combined into one typed_answer string and marked as
   // one submission against the parent question.
