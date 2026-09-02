@@ -452,6 +452,13 @@ function AnalyticsTab() {
   // D6: subject-assigned students when teacher has no classes
   const [subjectStudents,    setSubjectStudents]    = useState([]);
   const [subjectStudentsLoaded, setSubjectStudentsLoaded] = useState(false);
+  // GAP-1 fix: NudgeButton used to fail with zero feedback in either
+  // direction on error. Same local Toast + showToast pattern already used
+  // by ClassesTab/ManageClassModal above in this file (see the Toast
+  // component defined at the top of this file) — threaded down through
+  // StudentTable to NudgeButton.
+  const [toast, setToast] = useState(null);
+  const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
 
   useEffect(() => {
     api.get('/teacher/classes').then(r => {
@@ -532,7 +539,9 @@ function AnalyticsTab() {
           openDrill={openDrill}
           setDrillStudent={setDrillStudent}
           setDrillData={setDrillData}
+          showToast={showToast}
         />
+        {toast && <Toast {...toast} onClose={() => setToast(null)} />}
       </div>
     );
   }
@@ -562,14 +571,16 @@ function AnalyticsTab() {
           openDrill={openDrill}
           setDrillStudent={setDrillStudent}
           setDrillData={setDrillData}
+          showToast={showToast}
         />
       )}
+      {toast && <Toast {...toast} onClose={() => setToast(null)} />}
     </div>
   );
 }
 
 // ── Shared student analytics table ───────────────────────────────────────────
-function StudentTable({ analytics, classLabel, drillStudent, drillData, drillLoading, openDrill, setDrillStudent, setDrillData }) {
+function StudentTable({ analytics, classLabel, drillStudent, drillData, drillLoading, openDrill, setDrillStudent, setDrillData, showToast }) {
   if (!analytics || analytics.students?.length === 0) return (
     <div className="text-center py-8 text-gray-400 text-sm border border-dashed border-gray-200 rounded-xl">No student data yet.</div>
   );
@@ -602,7 +613,7 @@ function StudentTable({ analytics, classLabel, drillStudent, drillData, drillLoa
               </div>
               <div className="col-span-2 text-center text-sm text-gray-600 font-mono">{s.attempts ?? 0}</div>
               <div className="col-span-2 text-center hidden sm:block text-sm text-amber-500 font-mono">{s.streak ?? 0}</div>
-              <div className="col-span-2 text-center" onClick={e => e.stopPropagation()}><NudgeButton studentId={s.id} /></div>
+              <div className="col-span-2 text-center" onClick={e => e.stopPropagation()}><NudgeButton studentId={s.id} showToast={showToast} /></div>
             </div>
 
             {/* Topic drill-down panel — this is also the printable/downloadable report */}
@@ -660,13 +671,21 @@ function StudentTable({ analytics, classLabel, drillStudent, drillData, drillLoa
   );
 }
 
-function NudgeButton({ studentId }) {
+function NudgeButton({ studentId, showToast }) {
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const nudge = async () => {
     setBusy(true);
-    try { const r = await api.post(`/teacher/nudge/${studentId}`); setSent(true); setTimeout(() => setSent(false), 3000); }
-    catch {} finally { setBusy(false); }
+    try {
+      await api.post(`/teacher/nudge/${studentId}`);
+      setSent(true);
+      setTimeout(() => setSent(false), 3000);
+    } catch (err) {
+      console.error('[NudgeButton]', err);
+      showToast?.(err?.message || 'Could not send nudge. Please try again.', 'error');
+    } finally {
+      setBusy(false);
+    }
   };
   return (
     <button onClick={nudge} disabled={busy || sent}
