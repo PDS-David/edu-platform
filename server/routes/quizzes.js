@@ -9,7 +9,7 @@ const router         = express.Router();
 const { QueryTypes } = require('sequelize');
 const sequelize      = require('../config/database');
 const { protect }    = require('../middleware/auth');
-const { generate }   = require('../services/ai');
+const { generate, buildEssayFeedbackPrompt } = require('../services/ai');
 
 let awardXP = () => {};
 try { awardXP = require('../middleware/xpMiddleware').awardXP; } catch {}
@@ -224,26 +224,55 @@ router.post('/attempt', protect, async (req, res) => {
       // back to comparing the student's free-typed text verbatim against
       // correct_answer, so a structured question in a mixed-type quiz
       // scored wrong essentially every time regardless of what was typed.
-      // Match the self-assessment treatment questionsRoutes.js already
-      // gives structured questions elsewhere: not machine-graded (is_correct
-      // stays null, same signal PracticeMode.jsx already reads as "not
-      // graded" rather than "wrong"), model answer shown for comparison,
-      // and excluded from the score denominator so an ungraded free-response
-      // question can't silently drag down the quiz's accuracy_pct.
-      if (question.type === 'structured') {
-        const answerText = answer.essay_response ?? submittedAnswer ?? '';
+      // 'short_answer' and 'essay' had the exact same gap (essay had no
+      // handling in this file at all until now). Per explicit decision,
+      // all three free-response types are now AI-marked consistently here
+      // too, matching questionsRoutes.js (Practice Mode) and
+      // studentRoutes.js (assigned tests) rather than left as
+      // self-assessment or graded by brittle exact-text-match.
+      if (['structured', 'short_answer', 'essay'].includes(question.type)) {
+        const answerText = (answer.essay_response ?? submittedAnswer ?? '').trim();
+        let isCorrect    = false;
+        let marksAwarded = 0;
+        let feedback     = question.explanation || 'Submitted for review.';
+
+        if (process.env.GEMINI_API_KEY && answerText) {
+          try {
+            const prompt = buildEssayFeedbackPrompt({
+              studentName:   req.user?.first_name || null,
+              questionText:  question.question_text,
+              maxMarks:      markValue,
+              modelAnswer:   question.correct_answer,
+              studentAnswer: answerText,
+            });
+            const raw    = await generate(prompt, 'essay-mark');
+            const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
+            marksAwarded = Math.min(Math.max(parsed.marks_awarded || 0, 0), markValue);
+            isCorrect    = parsed.is_correct ?? (marksAwarded >= markValue * 0.5);
+            feedback     = parsed.feedback || feedback;
+          } catch (aiErr) {
+            console.error(`[quizzes] AI marking failed for question ${answer.question_id}:`, aiErr.message);
+            feedback = 'Submitted for manual review — automated marking was unavailable.';
+          }
+        } else if (!answerText) {
+          feedback = 'No answer submitted.';
+        }
+
+        totalScore += marksAwarded;
+        maxScore   += markValue;
+
         results.push({
           question_id:          answer.question_id,
           question_text:        question.question_text,
           selected_option_text: answerText || null,
           correct_answer:       question.correct_answer,
           correct_options:      [],
-          is_correct:           null,
-          marks_awarded:        0,
+          is_correct:           isCorrect,
+          marks_awarded:        marksAwarded,
           max_marks:            markValue,
           model_answer:         question.correct_answer || null,
-          explanation:          question.explanation || 'Compare your answer with the model answer above.',
-          ai_explanation:       question.explanation || '',
+          explanation:          feedback,
+          ai_explanation:       feedback,
           ai_marking_scheme:    {},
           options:              question.options,
         });
@@ -256,7 +285,7 @@ router.post('/attempt', protect, async (req, res) => {
             replacements: {
               studentId:    req.user.id,
               questionId:   answer.question_id,
-              isCorrect:    false,
+              isCorrect,
               timeTaken:    parseInt(answer.time_taken_seconds ?? (answer.time_taken_ms / 1000)) || 0,
               selectedText: answerText || null,
               paperType:    paper_type || 'quiz',

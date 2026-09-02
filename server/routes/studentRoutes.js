@@ -445,11 +445,17 @@ router.post('/test/:testId/submit', protect, studentOnly, async (req, res) => {
       let marksAwarded = 0;
       let feedback     = null;
 
-      if (question.type === 'essay' || question.type === 'structured') {
+      if (question.type === 'essay' || question.type === 'structured' || question.type === 'short_answer') {
         // Assigned tests need an actual mark (unlike ad-hoc practice mode,
-        // where 'structured' is intentionally left as self-assessment) —
+        // where 'structured' was previously left as self-assessment) —
         // route both through the same AI marking essay questions already
         // use elsewhere, scaled to this test's marks_allocated.
+        // short_answer added here too (previously fell into the mcq-style
+        // branch below via a raw correct_answer text comparison, which
+        // rarely matches genuine free-typed wording verbatim) — per
+        // explicit decision, every free-response type is now AI-marked
+        // consistently across this route, questionsRoutes.js (Practice
+        // Mode), and quizzes.js (Quiz mode).
         if (process.env.GEMINI_API_KEY && essayText.trim()) {
           try {
             // Shared prompt (services/ai.js) — personalized, paragraph-style
@@ -476,8 +482,8 @@ router.post('/test/:testId/submit', protect, studentOnly, async (req, res) => {
           feedback = 'Submitted for manual review.';
         }
       } else {
-        // mcq / true_false / short_answer — grade against options[].is_correct
-        // first (authoritative, set at question creation/review time); only
+        // mcq / true_false — grade against options[].is_correct first
+        // (authoritative, set at question creation/review time); only
         // fall back to a raw correct_answer text comparison when there's no
         // usable options array to grade against.
         let opts = question.options;

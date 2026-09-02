@@ -26,20 +26,32 @@ const LABELS = ['01', '02', '03', '04', '05'];
 // ── Quiz MCQ card ─────────────────────────────────────────────────────────────
 function QuizQuestion({ question, questionNumber, submitRef, onAnswered }) {
   const [selected,    setSelected]    = useState(null);
+  const [essayText,   setEssayText]   = useState('');
   const [result,      setResult]      = useState(null);
   const [submitting,  setSubmitting]  = useState(false);
   const [aiExplain,   setAiExplain]   = useState('');
   const [explainLoad, setExplainLoad] = useState(false);
   const startTime = useRef(Date.now());
 
+  // Structured/essay/short_answer questions have no options array to render
+  // as MCQ buttons — the paper=structured quiz mode (see URL comment above)
+  // means EVERY question here can be one of these types, so without this
+  // the whole quiz would render an empty answer area with no way to
+  // respond. Matches the same isFreeText convention used in
+  // PracticeMode.jsx/StudentTestPage.jsx, and the backend's /questions/:id/answer
+  // (questionsRoutes.js) already AI-marks all three consistently.
+  const qType = question.question_type ?? question.type;
+  const isFreeText = qType === 'essay' || qType === 'structured' || qType === 'short_answer';
+
   useEffect(() => {
-    setSelected(null); setResult(null);
+    setSelected(null); setEssayText(''); setResult(null);
     setAiExplain(''); setExplainLoad(false);
     startTime.current = Date.now();
   }, [question?.id]);
 
   const handleSubmit = useCallback(async () => {
-    if (!selected || submitting || result) return;
+    const answerValue = isFreeText ? essayText.trim() : selected;
+    if (!answerValue || submitting || result) return;
     setSubmitting(true);
     try {
       const timeTaken = Date.now() - startTime.current;
@@ -53,7 +65,9 @@ function QuizQuestion({ question, questionNumber, submitRef, onAnswered }) {
       // undefined, regardless of what the backend actually graded — every
       // answer showed as incorrect with no correct-answer text available.
       const res = await api.post(`/questions/${question.id}/answer`, {
-        selected_answer: selected,   // option text — matches correct_answer in DB
+        ...(isFreeText
+          ? { essay_response: essayText.trim() }
+          : { selected_answer: selected }),   // option text — matches correct_answer in DB
         time_taken_ms:   timeTaken,
       });
       setResult(res.data);
@@ -79,22 +93,24 @@ function QuizQuestion({ question, questionNumber, submitRef, onAnswered }) {
       // which reuses the already-correct, already-personalized
       // paragraph-feedback path instead of this broken one.
       setExplainLoad(true);
-      api.post('/ai/explain', { question_id: question.id, typed_answer: selected })
+      api.post('/ai/explain', { question_id: question.id, typed_answer: answerValue })
         .then(r => { if (r.success) setAiExplain(r.data?.explanation ?? r.explanation); })
         .catch(() => {})
         .finally(() => setExplainLoad(false));
 
       onAnswered({
-        question_id:     question.id,
-        selected_answer: selected,    // option text
-        time_taken_ms:   timeTaken,
+        question_id: question.id,
+        ...(isFreeText
+          ? { essay_response: essayText.trim() }
+          : { selected_answer: selected }),   // option text
+        time_taken_ms: timeTaken,
       });
     } catch {
       alert('Failed to submit answer. Please try again.');
     } finally {
       setSubmitting(false);
     }
-  }, [selected, submitting, result, question, onAnswered]);
+  }, [selected, essayText, isFreeText, submitting, result, question, onAnswered]);
 
   useEffect(() => { submitRef.current = handleSubmit; }, [handleSubmit, submitRef]);
 
@@ -148,28 +164,41 @@ function QuizQuestion({ question, questionNumber, submitRef, onAnswered }) {
           <p className="text-gray-900 text-sm leading-relaxed">{question.question_text}</p>
         </div>
 
-        <div className="px-5 pb-4 space-y-2">
-          {question.options?.map((opt, i) => {
-            const optText   = typeof opt === 'string' ? opt : (opt.option_text || '');
-            const isCorrect = result && normalizeForCompare(optText) === normalizeForCompare(result.correct_answer);
-            const isSel     = selected === optText;
-            return (
-              <button
-                key={i}
-                onClick={() => !result && setSelected(optText)}
-                disabled={!!result}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${optStyle(optText)}`}
-              >
-                <span className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 bg-gray-100 text-gray-500">
-                  {LABELS[i]}
-                </span>
-                <span className="text-sm text-gray-800 flex-1">{optText}</span>
-                {result && isCorrect && <CheckCircle size={14} className="text-blue-500 shrink-0" />}
-                {result && isSel && !isCorrect && <XCircle size={14} className="text-red-400 shrink-0" />}
-              </button>
-            );
-          })}
-        </div>
+        {isFreeText ? (
+          <div className="px-5 pb-4">
+            <textarea
+              value={essayText}
+              onChange={e => !result && setEssayText(e.target.value)}
+              disabled={!!result}
+              rows={6}
+              placeholder="Type your answer here…"
+              className="w-full text-sm text-gray-800 border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all disabled:bg-gray-50 disabled:text-gray-500"
+            />
+          </div>
+        ) : (
+          <div className="px-5 pb-4 space-y-2">
+            {question.options?.map((opt, i) => {
+              const optText   = typeof opt === 'string' ? opt : (opt.option_text || '');
+              const isCorrect = result && normalizeForCompare(optText) === normalizeForCompare(result.correct_answer);
+              const isSel     = selected === optText;
+              return (
+                <button
+                  key={i}
+                  onClick={() => !result && setSelected(optText)}
+                  disabled={!!result}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${optStyle(optText)}`}
+                >
+                  <span className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 bg-gray-100 text-gray-500">
+                    {LABELS[i]}
+                  </span>
+                  <span className="text-sm text-gray-800 flex-1">{optText}</span>
+                  {result && isCorrect && <CheckCircle size={14} className="text-blue-500 shrink-0" />}
+                  {result && isSel && !isCorrect && <XCircle size={14} className="text-red-400 shrink-0" />}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {result && (
           <>

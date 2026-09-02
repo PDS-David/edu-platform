@@ -120,7 +120,7 @@ export default function StudentTestPage() {
     setSubmitting(true);
     try {
       const answersArray = (test?.questions || []).map(q => {
-        const isFreeText = q.type === 'essay' || q.type === 'structured';
+        const isFreeText = q.type === 'essay' || q.type === 'structured' || q.type === 'short_answer';
         return {
           question_id: q.id,
           // Free-text questions send essay_response explicitly; MCQ/other
@@ -169,11 +169,13 @@ export default function StudentTestPage() {
 
   const q = test.questions[current];
   // BUG FIX: this page only ever rendered q.options?.map(...) as clickable
-  // buttons — structured/essay questions have no options array, so a
-  // student assigned a test containing one saw an empty answer area with
-  // no way to respond. Matches the same isFreeText convention already used
-  // in PracticeMode.jsx.
-  const isFreeText = q.type === 'essay' || q.type === 'structured';
+  // buttons — structured/essay/short_answer questions have no options
+  // array, so a student assigned a test containing one saw an empty
+  // answer area with no way to respond. short_answer added alongside
+  // essay/structured (previously missing here too) now that all three
+  // free-response types are AI-marked consistently. Matches the same
+  // isFreeText convention already used in PracticeMode.jsx.
+  const isFreeText = q.type === 'essay' || q.type === 'structured' || q.type === 'short_answer';
 
   return (
     <div className="min-h-screen bg-[#f9f7f4]">

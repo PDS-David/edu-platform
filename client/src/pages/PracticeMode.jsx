@@ -64,13 +64,15 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
   // name so this keeps working regardless of which key a given insert path uses.
   const qType = question.question_type ?? question.type;
   const isEssay = qType === 'essay';
-  // Phase 5: 'structured' questions get the same free-text textarea as
-  // essay questions (no options array to render as MCQ), but are NOT
-  // AI-marked — the backend's isEssay gate excludes 'structured'
-  // explicitly regardless of which field this posts. isFreeText controls
-  // input rendering + submit dispatch; isEssay stays narrow (essay only)
-  // for anything that should stay essay-specific.
-  const isFreeText = isEssay || qType === 'structured';
+  // Phase 5: 'structured' and 'short_answer' questions get the same
+  // free-text textarea as essay questions (no options array to render as
+  // MCQ). All three free-response types are now AI-marked consistently
+  // (previously 'structured' was self-assessment-only and 'short_answer'
+  // wasn't handled as free-text here at all, silently rendering as a
+  // broken MCQ with no options). isFreeText controls input rendering +
+  // submit dispatch; isEssay stays narrow (essay only) for anything that
+  // should stay essay-specific.
+  const isFreeText = isEssay || qType === 'structured' || qType === 'short_answer';
 
   useEffect(() => {
     setSelected(null);
