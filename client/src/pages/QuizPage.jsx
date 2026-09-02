@@ -26,20 +26,49 @@ const LABELS = ['01', '02', '03', '04', '05'];
 // ── Quiz MCQ card ─────────────────────────────────────────────────────────────
 function QuizQuestion({ question, questionNumber, submitRef, onAnswered }) {
   const [selected,    setSelected]    = useState(null);
+  const [essayText,   setEssayText]   = useState('');
   const [result,      setResult]      = useState(null);
   const [submitting,  setSubmitting]  = useState(false);
   const [aiExplain,   setAiExplain]   = useState('');
   const [explainLoad, setExplainLoad] = useState(false);
   const startTime = useRef(Date.now());
 
+  // GRADE-3 FIX: this component previously assumed every question was MCQ —
+  // unconditionally rendered `question.options?.map(...)` with no type
+  // branching anywhere in the file. Quiz's "Structured Questions" paper
+  // pulls `structured`-type questions (no `options` array), and any
+  // `essay`/`short_answer` question that reaches this page hits the same
+  // gap: nothing renders, `selected` never gets set, and the submit button
+  // (`if (!selected...) return`) silently does nothing — zero way to
+  // answer, zero grade, ever. Same convention as PracticeMode.jsx's
+  // GRADE-1 fix: essay/structured get a textarea + AI-marking submit path
+  // (POST /:id/answer already grades both via services/ai.js — see commit
+  // a064061 for structured), short_answer gets a single-line input that
+  // stays on the exact-text-match `selected_answer` path (it must NOT be
+  // added to isFreeText — that would wrongly route it through essay AI
+  // marking instead of the exact-match grading the backend actually uses
+  // for this type).
+  const qType         = question.type;
+  const isEssay        = qType === 'essay';
+  const isStructured   = qType === 'structured';
+  const isFreeText     = isEssay || isStructured;
+  const isShortAnswer  = qType === 'short_answer';
+  const hasTextInput   = isFreeText || isShortAnswer;
+
   useEffect(() => {
-    setSelected(null); setResult(null);
+    setSelected(null); setEssayText(''); setResult(null);
     setAiExplain(''); setExplainLoad(false);
     startTime.current = Date.now();
   }, [question?.id]);
 
   const handleSubmit = useCallback(async () => {
-    if (!selected || submitting || result) return;
+    // GRADE-3 FIX: previously always `if (!selected...) return` — for
+    // essay/structured the answer lives in essayText, not selected, so this
+    // guard blocked submission unconditionally for those types even after
+    // adding the textarea below. short_answer stays on `selected`, matching
+    // the payload it needs to send (selected_answer, not essay_response).
+    const answerValue = isFreeText ? essayText.trim() : selected;
+    if (!answerValue || submitting || result) return;
     setSubmitting(true);
     try {
       const timeTaken = Date.now() - startTime.current;
@@ -52,49 +81,65 @@ function QuizQuestion({ question, questionNumber, submitRef, onAnswered }) {
       // (as this code previously did via setResult(res)) always returned
       // undefined, regardless of what the backend actually graded — every
       // answer showed as incorrect with no correct-answer text available.
-      const res = await api.post(`/questions/${question.id}/answer`, {
-        selected_answer: selected,   // option text — matches correct_answer in DB
-        time_taken_ms:   timeTaken,
-      });
+      const res = await api.post(`/questions/${question.id}/answer`, isFreeText
+        // essay/structured — questionsRoutes.js POST /:id/answer reads
+        // essay_response for these types (see the field-name confirmation
+        // in that file's own destructuring), not selected_answer.
+        ? { essay_response: essayText.trim(), time_taken_ms: timeTaken }
+        : { selected_answer: selected, time_taken_ms: timeTaken }); // option text — matches correct_answer in DB
       setResult(res.data);
 
-      // Fire AI explanation in background — non-blocking
-      // BUG FIX: was `selected_option_id: selected` — selected is the raw
-      // option TEXT (see the comment on POST /:id/answer above: "option
-      // text — matches correct_answer in DB"), not a real answer_options.id.
-      // aiRoutes.js's POST /explain selected_option_id path does
-      // `LEFT JOIN answer_options ao ON ao.id = :selectedOptionId`, and this
-      // app's actual question-answering flow doesn't populate that table
-      // for questions created through the normal insert paths (confirmed:
-      // grading everywhere else, including this same component's own
-      // /:id/answer call above, works entirely off questions.options JSONB
-      // and option text — see questionsRoutes.js POST /:id/answer's own
-      // comment, "Accept selected_answer (option text) OR selected_option_id
-      // (same — option text in JSONB schema)"). So the join here never
-      // matched anything, selected_text/selected_is_correct always resolved
-      // to null, and the generated explanation silently treated every
-      // answer as "Did not answer" regardless of what the student actually
-      // picked. Routed through typed_answer instead — the same fix already
-      // applied to QuizTab.jsx's MarkingScheme component (commit 1cfec87),
-      // which reuses the already-correct, already-personalized
-      // paragraph-feedback path instead of this broken one.
-      setExplainLoad(true);
-      api.post('/ai/explain', { question_id: question.id, typed_answer: selected })
-        .then(r => { if (r.success) setAiExplain(r.data?.explanation ?? r.explanation); })
-        .catch(() => {})
-        .finally(() => setExplainLoad(false));
+      // Fire AI explanation in background — non-blocking. GRADE-3 FIX:
+      // gated to !isFreeText, matching PracticeMode.jsx's handleSubmitEssay
+      // — essay/structured already get personalized AI marking feedback
+      // directly in res.data.feedback (shown in the new result block
+      // below), so a second, separate /ai/explain call here would be
+      // redundant, wastes an AI call, and would show a confusing second
+      // "explanation" box that doesn't relate to the actual mark awarded.
+      if (!isFreeText) {
+        // BUG FIX: was `selected_option_id: selected` — selected is the raw
+        // option TEXT (see the comment on POST /:id/answer above: "option
+        // text — matches correct_answer in DB"), not a real answer_options.id.
+        // aiRoutes.js's POST /explain selected_option_id path does
+        // `LEFT JOIN answer_options ao ON ao.id = :selectedOptionId`, and this
+        // app's actual question-answering flow doesn't populate that table
+        // for questions created through the normal insert paths (confirmed:
+        // grading everywhere else, including this same component's own
+        // /:id/answer call above, works entirely off questions.options JSONB
+        // and option text — see questionsRoutes.js POST /:id/answer's own
+        // comment, "Accept selected_answer (option text) OR selected_option_id
+        // (same — option text in JSONB schema)"). So the join here never
+        // matched anything, selected_text/selected_is_correct always resolved
+        // to null, and the generated explanation silently treated every
+        // answer as "Did not answer" regardless of what the student actually
+        // picked. Routed through typed_answer instead — the same fix already
+        // applied to QuizTab.jsx's MarkingScheme component (commit 1cfec87),
+        // which reuses the already-correct, already-personalized
+        // paragraph-feedback path instead of this broken one.
+        setExplainLoad(true);
+        api.post('/ai/explain', { question_id: question.id, typed_answer: selected })
+          .then(r => { if (r.success) setAiExplain(r.data?.explanation ?? r.explanation); })
+          .catch(() => {})
+          .finally(() => setExplainLoad(false));
+      }
 
-      onAnswered({
-        question_id:     question.id,
-        selected_answer: selected,    // option text
-        time_taken_ms:   timeTaken,
-      });
+      // GRADE-3 FIX: onAnswered feeds answersRef.current, which becomes the
+      // `answers` array in the final POST /quizzes/attempt batch call
+      // (handleNext, below). quizzes.js's structured branch reads
+      // `answer.essay_response ?? answer.selected_answer` (see commit
+      // e60c79d) — sending essay_response here keeps that batch call
+      // correctly graded too, not just this immediate per-question call.
+      // (essay in the batch call still falls through to plain text
+      // comparison — GRADE-5, deliberately deferred, not this fix's scope.)
+      onAnswered(isFreeText
+        ? { question_id: question.id, essay_response: essayText.trim(), time_taken_ms: timeTaken }
+        : { question_id: question.id, selected_answer: selected, time_taken_ms: timeTaken }); // option text
     } catch {
       alert('Failed to submit answer. Please try again.');
     } finally {
       setSubmitting(false);
     }
-  }, [selected, submitting, result, question, onAnswered]);
+  }, [selected, essayText, isFreeText, submitting, result, question, onAnswered]);
 
   useEffect(() => { submitRef.current = handleSubmit; }, [handleSubmit, submitRef]);
 
@@ -142,36 +187,100 @@ function QuizQuestion({ question, questionNumber, submitRef, onAnswered }) {
               {question.marks} Mark(s)
             </span>
           )}
+          {isEssay && (
+            <span className="text-xs text-white font-bold px-2.5 py-1 rounded-full bg-blue-500">Essay</span>
+          )}
+          {isStructured && (
+            <span className="text-xs text-white font-bold px-2.5 py-1 rounded-full bg-blue-500">Structured</span>
+          )}
+          {isShortAnswer && (
+            <span className="text-xs text-white font-bold px-2.5 py-1 rounded-full bg-teal-500">Short Answer</span>
+          )}
         </div>
 
         <div className="px-5 py-4">
           <p className="text-gray-900 text-sm leading-relaxed">{question.question_text}</p>
         </div>
 
-        <div className="px-5 pb-4 space-y-2">
-          {question.options?.map((opt, i) => {
-            const optText   = typeof opt === 'string' ? opt : (opt.option_text || '');
-            const isCorrect = result && normalizeForCompare(optText) === normalizeForCompare(result.correct_answer);
-            const isSel     = selected === optText;
-            return (
-              <button
-                key={i}
-                onClick={() => !result && setSelected(optText)}
-                disabled={!!result}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${optStyle(optText)}`}
-              >
-                <span className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 bg-gray-100 text-gray-500">
-                  {LABELS[i]}
-                </span>
-                <span className="text-sm text-gray-800 flex-1">{optText}</span>
-                {result && isCorrect && <CheckCircle size={14} className="text-blue-500 shrink-0" />}
-                {result && isSel && !isCorrect && <XCircle size={14} className="text-red-400 shrink-0" />}
-              </button>
-            );
-          })}
-        </div>
+        {/* ── GRADE-3 FIX: gated on !hasTextInput — see PracticeMode.jsx's
+            identical GRADE-1 gating for the reasoning. Previously
+            unconditional, so essay/structured/short_answer questions (no
+            `options` array) rendered nothing here at all. ── */}
+        {!hasTextInput && (
+          <div className="px-5 pb-4 space-y-2">
+            {question.options?.map((opt, i) => {
+              const optText   = typeof opt === 'string' ? opt : (opt.option_text || '');
+              const isCorrect = result && normalizeForCompare(optText) === normalizeForCompare(result.correct_answer);
+              const isSel     = selected === optText;
+              return (
+                <button
+                  key={i}
+                  onClick={() => !result && setSelected(optText)}
+                  disabled={!!result}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${optStyle(optText)}`}
+                >
+                  <span className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 bg-gray-100 text-gray-500">
+                    {LABELS[i]}
+                  </span>
+                  <span className="text-sm text-gray-800 flex-1">{optText}</span>
+                  {result && isCorrect && <CheckCircle size={14} className="text-blue-500 shrink-0" />}
+                  {result && isSel && !isCorrect && <XCircle size={14} className="text-red-400 shrink-0" />}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
-        {result && (
+        {/* ── GRADE-3 FIX: Short Answer — single-line <input>, deliberately
+            NOT the essay/structured <textarea> below. Binds to `selected`
+            (not `essayText`) so it stays on the existing selected_answer /
+            exact-text-match grading path, same convention as
+            PracticeMode.jsx's GRADE-1 fix. ── */}
+        {isShortAnswer && (
+          <div className="px-5 pb-4">
+            <input
+              type="text"
+              value={selected || ''}
+              onChange={e => !result && setSelected(e.target.value)}
+              disabled={!!result}
+              placeholder="Type your answer here…"
+              className={`w-full px-4 py-3 rounded-xl border-2 text-sm text-gray-800 focus:outline-none transition-all disabled:bg-gray-50 disabled:text-gray-500 ${
+                result
+                  ? (result.is_correct ? 'border-green-400 bg-green-50' : 'border-red-400 bg-red-50')
+                  : 'border-gray-200 focus:border-blue-400'
+              }`}
+            />
+          </div>
+        )}
+
+        {/* ── GRADE-3 FIX: Essay/Structured textarea — AI-marked via
+            POST /:id/answer's essay_response path (already correctly wired
+            in questionsRoutes.js for both types — see commit a064061 for
+            structured). ── */}
+        {isFreeText && (
+          <div className="px-5 pb-4">
+            <textarea
+              value={essayText}
+              onChange={e => !result && setEssayText(e.target.value)}
+              disabled={!!result}
+              rows={6}
+              placeholder="Write your answer here…"
+              className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 focus:outline-none focus:border-blue-400 resize-y disabled:bg-gray-50 disabled:text-gray-500"
+            />
+            {question.marks && (
+              <p className="text-xs text-gray-400 mt-1.5">{question.marks} mark{question.marks !== 1 ? 's' : ''} available</p>
+            )}
+          </div>
+        )}
+
+        {/* ── GRADE-3 FIX: gated on !isFreeText. Previously unconditional —
+            for essay/structured this banner's is_correct/correct_answer
+            reasoning doesn't apply (AI marking returns marks_awarded/
+            feedback/model_answer instead, shown in the block below), and
+            the separate "AI Explanation" box here duplicated/confused
+            against the actual marking feedback. Matches PracticeMode.jsx's
+            identical gating. ── */}
+        {result && !isFreeText && (
           <>
             <div className={`mx-5 mb-3 rounded-xl px-3 py-2.5 text-xs ${
               result.is_correct
@@ -210,6 +319,35 @@ function QuizQuestion({ question, questionNumber, submitRef, onAnswered }) {
                 : <p className="text-xs text-blue-700 leading-relaxed whitespace-pre-line">{aiExplain || result.explanation || 'No explanation available.'}</p>}
             </div>
           </>
+        )}
+
+        {/* ── GRADE-3 FIX: Essay/Structured result — AI marking feedback +
+            model answer, matching PracticeMode.jsx's identical block. No
+            single "correct answer" concept applies here (it's a mark out
+            of maxMarks, not a binary match), so this replaces the banner
+            above entirely for these two types rather than supplementing it. ── */}
+        {result && isFreeText && (
+          <div className="mx-5 mb-4 space-y-3">
+            <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+              <p className="text-xs font-semibold text-blue-700 mb-1">
+                {isEssay ? 'AI Marking Feedback' : 'Feedback'}
+              </p>
+              <p className="text-xs text-blue-600 leading-relaxed">
+                {result.feedback || result.explanation || 'Your answer has been submitted for review.'}
+              </p>
+              {result.marks_awarded !== undefined && result.max_marks !== undefined && (
+                <p className="text-xs font-bold text-blue-700 mt-2">
+                  Score: {result.marks_awarded} / {result.max_marks} marks
+                </p>
+              )}
+            </div>
+            {result.model_answer && (
+              <div className="bg-green-50 border border-green-100 rounded-xl p-3">
+                <p className="text-xs font-semibold text-green-700 mb-1">Model Answer</p>
+                <p className="text-xs text-green-700 leading-relaxed">{result.model_answer}</p>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>
