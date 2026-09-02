@@ -43,6 +43,37 @@ function Timer({ secondsLeft }) {
 function ExamQuestion({ question, questionNumber, selected, onSelect }) {
   const diffBadge = { easy: 'bg-green-500', medium: 'bg-amber-500', hard: 'bg-red-500' };
 
+  // GRADE-4 FIX: this component unconditionally rendered
+  // `question.options?.map(...)` with no branching on question.type
+  // anywhere in the file — the same blank-render bug as GRADE-3
+  // (QuizPage.jsx), an independent implementation of the identical gap.
+  // Mock Exam declares itself "MCQ only" (question_sub_type: 'mcq' in the
+  // fetch below), but that param is currently a no-op server-side
+  // (GRADE-6, documented separately, deliberately deferred) — so
+  // structured/essay/short_answer questions can and do reach this page
+  // right now, not just hypothetically once GRADE-6 is fixed. For any of
+  // them, nothing rendered, onSelect never fired, and answers[q.id] stayed
+  // undefined forever — that question submitted as selected_answer: null,
+  // guaranteed zero marks with no way to have answered it.
+  //
+  // Unlike QuizPage.jsx's per-question immediate-submit design, this page
+  // has no per-question result state at all (by design — "No AI feedback
+  // during exam", see file header) and submits everything in one batch at
+  // the end via POST /quizzes/attempt. That endpoint's structured-grading
+  // branch already accepts selected_answer as a fallback when
+  // essay_response is absent (`answer.essay_response ?? submittedAnswer`,
+  // quizzes.js), and essay's still-deferred (GRADE-5) exact-match
+  // fallthrough reads selected_answer too — so no submission-payload
+  // change is needed here, only rendering. Reusing the existing
+  // `selected`/`onSelect` string prop for typed text works identically to
+  // how it already works for a clicked option's text.
+  const qType         = question.type;
+  const isEssay        = qType === 'essay';
+  const isStructured   = qType === 'structured';
+  const isFreeText     = isEssay || isStructured;
+  const isShortAnswer  = qType === 'short_answer';
+  const hasTextInput   = isFreeText || isShortAnswer;
+
   return (
     <div className="pb-20">
       <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
@@ -60,39 +91,83 @@ function ExamQuestion({ question, questionNumber, selected, onSelect }) {
               {question.marks} Mark(s)
             </span>
           )}
+          {isEssay && (
+            <span className="text-xs text-white font-bold px-2.5 py-1 rounded-full bg-blue-500">Essay</span>
+          )}
+          {isStructured && (
+            <span className="text-xs text-white font-bold px-2.5 py-1 rounded-full bg-blue-500">Structured</span>
+          )}
+          {isShortAnswer && (
+            <span className="text-xs text-white font-bold px-2.5 py-1 rounded-full bg-teal-500">Short Answer</span>
+          )}
         </div>
 
         <div className="px-5 py-4">
           <p className="text-gray-900 text-sm leading-relaxed">{question.question_text}</p>
         </div>
 
-        <div className="px-5 pb-5 space-y-2">
-          {question.options?.map((opt, i) => {
-            const optText = opt.option_text || opt.text || String(opt.id ?? '');
-            const isSelected = selected === optText;
-            return (
-              <button
-                key={opt.id}
-                onClick={() => onSelect(optText)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${
-                  isSelected
-                    ? 'border-blue-400 bg-blue-50'
-                    : 'border-gray-200 hover:border-blue-300 cursor-pointer'
-                }`}
-              >
-                <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-                  isSelected ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-500'
-                }`}>
-                  {LABELS[i]}
-                </span>
-                <span className="text-sm text-gray-800 flex-1">{opt.option_text}</span>
-                {isSelected && (
-                  <CheckCircle2 className="w-4 h-4 text-blue-500 shrink-0" aria-hidden="true" />
-                )}
-              </button>
-            );
-          })}
-        </div>
+        {!hasTextInput && (
+          <div className="px-5 pb-5 space-y-2">
+            {question.options?.map((opt, i) => {
+              const optText = opt.option_text || opt.text || String(opt.id ?? '');
+              const isSelected = selected === optText;
+              return (
+                <button
+                  key={opt.id}
+                  onClick={() => onSelect(optText)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${
+                    isSelected
+                      ? 'border-blue-400 bg-blue-50'
+                      : 'border-gray-200 hover:border-blue-300 cursor-pointer'
+                  }`}
+                >
+                  <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                    isSelected ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-500'
+                  }`}>
+                    {LABELS[i]}
+                  </span>
+                  <span className="text-sm text-gray-800 flex-1">{opt.option_text}</span>
+                  {isSelected && (
+                    <CheckCircle2 className="w-4 h-4 text-blue-500 shrink-0" aria-hidden="true" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── GRADE-4 FIX: Short Answer — single-line <input>. Reuses the
+            same `selected`/`onSelect` prop pair the MCQ options above use,
+            since answers[q.id] is already a plain string in this page's
+            design regardless of question type. ── */}
+        {isShortAnswer && (
+          <div className="px-5 pb-5">
+            <input
+              type="text"
+              value={selected || ''}
+              onChange={e => onSelect(e.target.value)}
+              placeholder="Type your answer here…"
+              className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 text-sm text-gray-800 focus:outline-none focus:border-blue-400 transition-all"
+            />
+          </div>
+        )}
+
+        {/* ── GRADE-4 FIX: Essay/Structured — <textarea>, same reuse of
+            selected/onSelect as short_answer above. ── */}
+        {isFreeText && (
+          <div className="px-5 pb-5">
+            <textarea
+              value={selected || ''}
+              onChange={e => onSelect(e.target.value)}
+              rows={6}
+              placeholder="Write your answer here…"
+              className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 focus:outline-none focus:border-blue-400 resize-y"
+            />
+            {question.marks && (
+              <p className="text-xs text-gray-400 mt-1.5">{question.marks} mark{question.marks !== 1 ? 's' : ''} available</p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
