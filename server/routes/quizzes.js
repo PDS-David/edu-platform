@@ -218,17 +218,29 @@ router.post('/attempt', protect, async (req, res) => {
           .trim()
           .toLowerCase();
 
-      // FIX (reverses the design note below): structured questions used to
-      // intentionally skip grading — is_correct stayed null, no AI call was
-      // made, and the question was excluded from maxScore/totalScore so it
-      // couldn't affect accuracy_pct. That design is now reversed: they're
-      // graded through the exact same AI-marking path essay-type questions
-      // use elsewhere in this app (buildEssayFeedbackPrompt + generate(),
-      // both in services/ai.js — see questionsRoutes.js's POST /:id/answer
-      // and studentRoutes.js's POST /test/:testId/submit for the same
-      // pattern), and now DO count toward the quiz's score like every other
-      // graded question type.
-      if (question.type === 'structured') {
+      // FIX (GRADE-5, extends the note below): this branch originally only
+      // covered 'structured' — 'essay' still fell through to the plain
+      // exact-text comparison below, which near-always graded an essay
+      // answer as wrong regardless of content, since a full written answer
+      // essentially never matches question.correct_answer verbatim. Now
+      // both free-text types share this branch, same as the merged
+      // isStructured/isEssay handling in questionsRoutes.js's POST
+      // /:id/answer (commit a064061) and studentRoutes.js's POST
+      // /test/:testId/submit — the AI-marking logic itself doesn't care
+      // which of the two types it's grading, both share question_text/
+      // correct_answer/marks/answer-text, so one shared branch serves both
+      // instead of duplicating the same code a third time in this file.
+      //
+      // Original note (structured-only fix, now superseded by the above):
+      // structured questions used to intentionally skip grading —
+      // is_correct stayed null, no AI call was made, and the question was
+      // excluded from maxScore/totalScore so it couldn't affect
+      // accuracy_pct. That design is now reversed: they're graded through
+      // the exact same AI-marking path essay-type questions use elsewhere
+      // in this app (buildEssayFeedbackPrompt + generate(), both in
+      // services/ai.js), and now DO count toward the quiz's score like
+      // every other graded question type.
+      if (question.type === 'structured' || question.type === 'essay') {
         const answerText = (answer.essay_response ?? submittedAnswer ?? '').toString();
 
         maxScore += markValue;
@@ -252,7 +264,7 @@ router.post('/attempt', protect, async (req, res) => {
             isCorrect    = parsed.is_correct ?? (marksAwarded >= markValue * 0.5);
             feedback     = parsed.feedback || null;
           } catch (err) {
-            console.error('[POST /quizzes/attempt] structured AI marking failed:', err.message);
+            console.error('[POST /quizzes/attempt] essay/structured AI marking failed:', err.message);
             feedback = question.explanation || 'Submitted for review — automated marking was unavailable.';
           }
         } else if (!answerText.trim()) {
