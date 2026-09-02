@@ -436,12 +436,12 @@ My Tests. Triaged by whether the student can get **any** grade at all
 short-answer questions don't have — nothing renders, submit button
 (`handleSubmitMCQ`) requires `selected` to be truthy, which is never set.
 **Severity:** App-breaking — zero way to answer, zero grade, ever.
-**Status:** MUST-FIX — in progress.
+**Status:** FIXED — commit `6ed0a18`, merged (PR #42).
 
 ### GRADE-2 — `StudentTestPage.jsx` (My Tests): identical `short_answer` gap
 Same pattern, two usage sites (payload-building + rendering/badge logic).
 **Severity:** App-breaking, same as GRADE-1.
-**Status:** MUST-FIX — in progress.
+**Status:** FIXED — commit `2e4b271`, merged (PR #43).
 
 ### GRADE-3 — `QuizPage.jsx`: zero type branching at all
 Unconditionally renders `question.options?.map(...)` regardless of question
@@ -449,14 +449,16 @@ type, no `<textarea>` anywhere in the file. Quiz's "Structured Questions"
 paper choice pulls `structured`-type questions (no `options` array) —
 renders completely blank, unanswerable.
 **Severity:** App-breaking.
-**Status:** MUST-FIX — in progress.
+**Status:** FIXED — commit `d79401d`, merged (PR #44).
 
 ### GRADE-4 — `MockExamPage.jsx`: same blank-render bug, separate implementation
 Own, independent rendering logic from `QuizPage.jsx` — same
 unconditional-options-render bug.
 **Severity:** App-breaking (once GRADE-6 below is fixed, non-MCQ types become
-reachable here).
-**Status:** MUST-FIX — in progress.
+reachable here — though note this was already live-reachable even with
+GRADE-6 unfixed, since `question_sub_type` being ignored server-side meant
+non-MCQ types could already leak through regardless).
+**Status:** FIXED — commit `72dec40`, merged (PR #45).
 
 ### GRADE-5 — `quizzes.js` (`POST /attempt`): no AI-marking branch for `essay`
 `structured` was just fixed to route through real AI marking (commits
@@ -466,8 +468,20 @@ essay answer as wrong regardless of content.
 **Severity:** Not app-breaking — a grade IS produced (just an unfair one) once
 GRADE-3/GRADE-4 make essay answers submittable at all. A student sees a
 mark, it's just wrong.
-**Status:** DEFERRED, deliberately — not blocking, documented here so it
-isn't silently forgotten or re-discovered from scratch by a future session.
+**Status:** FIXED — the `'structured'` branch was extended to also cover
+`'essay'` (`if (question.type === 'structured' || question.type === 'essay')`),
+reusing the exact same AI-marking logic rather than duplicating it — the
+grading code itself doesn't care which of the two types it's marking, both
+share question_text/correct_answer/marks/answer-text. Verified via isolated
+branch-logic trace (no live GEMINI_API_KEY available in this sandbox — see
+PR description for what could/couldn't be verified live): both types now
+route into AI marking with identical fallback behavior across all three
+answer states (has-answer+key, has-answer+no-key, no-answer);
+mcq/true_false/short_answer are byte-identical to before; `maxScore`/
+`totalScore` accumulate correctly with no double-counting (confirmed via
+the existing `continue` after the branch); `buildExaminerFeedback`'s
+missed-questions filter (`r.is_correct === false`) required no change,
+already correctly includes real `false` values from essay's new AI grade.
 
 ### GRADE-6 — `questionsRoutes.js` (`GET /random`): `question_sub_type` param unread
 `MockExamPage.jsx`/`QuizPage.jsx` send `question_sub_type`; the handler only
