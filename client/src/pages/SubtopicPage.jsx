@@ -94,6 +94,7 @@ function ResourcesTab({ subtopicId, subtopic, subtopicName, onComplete }) {
   const [activeRes,    setActiveRes]    = useState(null);
   const [notes,        setNotes]        = useState(null);
   const [notesLoading, setNotesLoading] = useState(false);
+  const [notesError,   setNotesError]   = useState(null);
 
   // Fetch stored notes on mount
   useEffect(() => {
@@ -106,13 +107,19 @@ function ResourcesTab({ subtopicId, subtopic, subtopicName, onComplete }) {
 
   const handleGenerateNotes = async () => {
     setNotesLoading(true);
+    setNotesError(null);
     try {
       const r = await api.post('/ai/notes/generate', {
         subject_id: subtopic?.subject_id,
         topic_name: subtopicName,
       });
       setNotes(r.notes);
-    } catch {} finally { setNotesLoading(false); }
+    } catch (err) {
+      console.error('[SubtopicPage] Generate notes failed:', err);
+      setNotesError(err?.message || 'Could not generate notes right now. Please try again.');
+    } finally {
+      setNotesLoading(false);
+    }
   };
 
   // #7 — Fetch both topic-linked resources AND assigned lecture materials,
@@ -183,6 +190,12 @@ function ResourcesTab({ subtopicId, subtopic, subtopicName, onComplete }) {
           className="flex items-center gap-2 text-sm text-blue-600 border border-blue-300 px-4 py-2 rounded-xl hover:bg-blue-50 mb-4">
           <Sparkles size={14} /> Generate AI Revision Notes
         </button>
+      )}
+      {notesError && !notesLoading && (
+        <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-2.5 mb-4">
+          <XCircle size={14} className="shrink-0" />
+          <span className="flex-1">{notesError}</span>
+        </div>
       )}
       {notes && (
         <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 mb-4 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
