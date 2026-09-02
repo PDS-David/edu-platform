@@ -70,7 +70,7 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
   // explicitly regardless of which field this posts. isFreeText controls
   // input rendering + submit dispatch; isEssay stays narrow (essay only)
   // for anything that should stay essay-specific.
-  const isFreeText = isEssay || qType === 'structured';
+  const isFreeText = isEssay || qType === 'structured' || qType === 'short_answer';
 
   useEffect(() => {
     setSelected(null);
@@ -231,6 +231,11 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
             {qType === 'structured' && (
               <span className="px-2.5 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
                 Structured
+              </span>
+            )}
+            {qType === 'short_answer' && (
+              <span className="px-2.5 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
+                Short Answer
               </span>
             )}
           </div>

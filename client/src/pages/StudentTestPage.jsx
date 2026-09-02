@@ -120,7 +120,7 @@ export default function StudentTestPage() {
     setSubmitting(true);
     try {
       const answersArray = (test?.questions || []).map(q => {
-        const isFreeText = q.type === 'essay' || q.type === 'structured';
+        const isFreeText = q.type === 'essay' || q.type === 'structured' || q.type === 'short_answer';
         return {
           question_id: q.id,
           // Free-text questions send essay_response explicitly; MCQ/other
@@ -173,7 +173,7 @@ export default function StudentTestPage() {
   // student assigned a test containing one saw an empty answer area with
   // no way to respond. Matches the same isFreeText convention already used
   // in PracticeMode.jsx.
-  const isFreeText = q.type === 'essay' || q.type === 'structured';
+  const isFreeText = q.type === 'essay' || q.type === 'structured' || q.type === 'short_answer';
 
   return (
     <div className="min-h-screen bg-[#f9f7f4]">
@@ -205,7 +205,7 @@ export default function StudentTestPage() {
             {q.difficulty && <span className={`text-xs text-white font-bold px-2.5 py-1 rounded-full ${q.difficulty === 'easy' ? 'bg-green-500' : q.difficulty === 'hard' ? 'bg-red-500' : 'bg-amber-500'}`}>{q.difficulty.toUpperCase()}</span>}
             {isFreeText && (
               <span className="text-xs text-white font-bold px-2.5 py-1 rounded-full bg-blue-500">
-                {q.type === 'essay' ? 'ESSAY' : 'STRUCTURED'}
+                {q.type === 'essay' ? 'ESSAY' : q.type === 'structured' ? 'STRUCTURED' : 'SHORT ANSWER'}
               </span>
             )}
           </div>

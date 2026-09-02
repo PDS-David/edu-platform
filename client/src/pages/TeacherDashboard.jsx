@@ -1020,7 +1020,7 @@ function TestBuilderTab() {
                                   {on && <Check size={10} className="text-white" />}
                                 </span>
                                 <span className="line-clamp-2 flex-1">{q.question_text}</span>
-                                {(q.type === 'essay' || q.type === 'structured') && (
+                                {(q.type === 'essay' || q.type === 'structured' || q.type === 'short_answer') && (
                                   <span className="shrink-0 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
                                     {q.type}
                                   </span>

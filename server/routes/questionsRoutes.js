@@ -286,15 +286,20 @@ router.post('/:id/answer', protect, async (req, res) => {
     }
 
     const question = questions[0];
-    // 'structured' questions render with a free-text textarea on the
-    // frontend (same as essay), so they arrive here with essay_response
-    // set. They now DO trigger AI marking, same as essay — see the fix
-    // note below at the branch that handles this. isStructured is kept as
-    // its own flag (rather than folding into isEssay) purely so the
-    // response payload and any future type-specific behavior can still
-    // distinguish the two; grading itself treats them identically.
-    const isStructured = question.type === 'structured';
-    const isEssay  = !isStructured && (question.type === 'essay' || !!essay_response);
+    // 'structured' and 'short_answer' questions render with a free-text
+    // textarea on the frontend (same as essay), so they arrive here with
+    // essay_response set once PracticeMode.jsx's isFreeText check is
+    // extended to include short_answer (see that file's own fix). Falling
+    // back to selected_answer here too covers any client that hasn't
+    // picked up that frontend change yet. They now DO trigger AI marking,
+    // same as essay — see the fix note below at the branch that handles
+    // this. isStructured/isShortAnswer are kept as their own flags (rather
+    // than folding into isEssay) purely so the response payload and any
+    // future type-specific behavior can still distinguish the three;
+    // grading itself treats them identically.
+    const isStructured  = question.type === 'structured';
+    const isShortAnswer = !isStructured && question.type === 'short_answer';
+    const isEssay        = !isStructured && !isShortAnswer && (question.type === 'essay' || !!essay_response);
 
     let isCorrect    = false;
     let marksAwarded = 0;
@@ -313,7 +318,7 @@ router.post('/:id/answer', protect, async (req, res) => {
     // AI-marking path essay questions already use below
     // (buildEssayFeedbackPrompt + generate(), services/ai.js) — see the
     // `else` branch below, shared by both types.
-    if (!isStructured && !isEssay) {
+    if (!isStructured && !isShortAnswer && !isEssay) {
       // MCQ — grade against options[].is_correct (the authoritative flag set
       // at insert time), NOT a fresh text comparison against correct_answer.
       //
@@ -363,12 +368,16 @@ router.post('/:id/answer', protect, async (req, res) => {
       }
       marksAwarded = isCorrect ? (question.marks || 1) : 0;
     } else {
-      // Essay / structured — AI marking via central hub (services/ai.js).
-      // Structured questions reach this branch as of the fix above; the
-      // logic itself doesn't need to know which of the two types it's
-      // grading — both share question_text/correct_answer/marks/
-      // essay_response, so one path serves both.
-      if (process.env.GEMINI_API_KEY && essay_response?.trim()) {
+      // Essay / structured / short_answer — AI marking via central hub
+      // (services/ai.js). All three reach this branch; the logic itself
+      // doesn't need to know which it's grading — they share
+      // question_text/correct_answer/marks, and the answer text below
+      // accepts either essay_response (the shared free-text textarea) or
+      // selected_answer (short_answer's older, simpler single-line input,
+      // kept as a fallback for any client not yet sending essay_response
+      // for this type).
+      const answerText = (essay_response ?? selected_answer ?? '').toString();
+      if (process.env.GEMINI_API_KEY && answerText.trim()) {
         try {
           // BUG FIX: previously an unstructured one-line prompt with no
           // personalization or paragraph guidance — see buildEssayFeedbackPrompt
@@ -380,7 +389,7 @@ router.post('/:id/answer', protect, async (req, res) => {
             questionText:  question.question_text,
             maxMarks:      question.marks || 3,
             modelAnswer:   question.correct_answer,
-            studentAnswer: essay_response.trim(),
+            studentAnswer: answerText.trim(),
           });
           // v2: routes through ai.js instead of calling Gemini directly
           const raw    = await generate(prompt, 'essay-mark');
@@ -392,7 +401,7 @@ router.post('/:id/answer', protect, async (req, res) => {
           console.error(`[POST /questions/${id}/answer] AI marking failed:`, err.message);
           feedback = question.explanation || 'Submitted for review — automated marking was unavailable.';
         }
-      } else if (!essay_response?.trim()) {
+      } else if (!answerText.trim()) {
         // No answer submitted at all — don't silently report is_correct:
         // false (implies "wrong"); this is "nothing to grade" instead.
         feedback = 'No answer submitted.';

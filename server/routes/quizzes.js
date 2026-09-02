@@ -218,17 +218,19 @@ router.post('/attempt', protect, async (req, res) => {
           .trim()
           .toLowerCase();
 
-      // FIX (reverses the design note below): structured questions used to
-      // intentionally skip grading — is_correct stayed null, no AI call was
-      // made, and the question was excluded from maxScore/totalScore so it
-      // couldn't affect accuracy_pct. That design is now reversed: they're
-      // graded through the exact same AI-marking path essay-type questions
-      // use elsewhere in this app (buildEssayFeedbackPrompt + generate(),
-      // both in services/ai.js — see questionsRoutes.js's POST /:id/answer
-      // and studentRoutes.js's POST /test/:testId/submit for the same
-      // pattern), and now DO count toward the quiz's score like every other
-      // graded question type.
-      if (question.type === 'structured') {
+      // FIX (reverses the design note below): structured/short_answer
+      // questions used to intentionally skip grading (structured) or fall
+      // into plain text-comparison against MCQ options (short_answer) —
+      // is_correct stayed null or was graded with no tolerance for a
+      // differently-worded correct answer, and structured was excluded
+      // from maxScore/totalScore so it couldn't affect accuracy_pct. That
+      // design is now reversed for both: they're graded through the exact
+      // same AI-marking path essay-type questions use elsewhere in this
+      // app (buildEssayFeedbackPrompt + generate(), both in services/ai.js
+      // — see questionsRoutes.js's POST /:id/answer and studentRoutes.js's
+      // POST /test/:testId/submit for the same pattern), and now DO count
+      // toward the quiz's score like every other graded question type.
+      if (question.type === 'structured' || question.type === 'short_answer') {
         const answerText = (answer.essay_response ?? submittedAnswer ?? '').toString();
 
         maxScore += markValue;
