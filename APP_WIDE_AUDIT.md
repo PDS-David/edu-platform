@@ -419,3 +419,63 @@ To be transparent about what this pass did **not** cover, given time constraints
   document that other agents are actively working through in parallel commits
   — this audit is meant to surface *additional* findings beyond that list, not
   duplicate it.
+
+---
+
+## 6. Assessment grading gaps
+
+A separate pass, triggered by "list every assessment where AI is not
+marking," turned up six concrete issues across Quiz/Mock Exam/Test-Yourself/
+My Tests. Triaged by whether the student can get **any** grade at all
+(app-breaking, must-fix) vs. gets a grade that's just imperfect
+(deferrable — doesn't break the app, fixable later).
+
+### GRADE-1 — `PracticeMode.jsx` (Test-Yourself): `short_answer` renders nothing
+`isFreeText = isEssay || qType === 'structured'` has no branch for
+`short_answer`. Falls into the MCQ branch, which needs an `options` array
+short-answer questions don't have — nothing renders, submit button
+(`handleSubmitMCQ`) requires `selected` to be truthy, which is never set.
+**Severity:** App-breaking — zero way to answer, zero grade, ever.
+**Status:** MUST-FIX — in progress.
+
+### GRADE-2 — `StudentTestPage.jsx` (My Tests): identical `short_answer` gap
+Same pattern, two usage sites (payload-building + rendering/badge logic).
+**Severity:** App-breaking, same as GRADE-1.
+**Status:** MUST-FIX — in progress.
+
+### GRADE-3 — `QuizPage.jsx`: zero type branching at all
+Unconditionally renders `question.options?.map(...)` regardless of question
+type, no `<textarea>` anywhere in the file. Quiz's "Structured Questions"
+paper choice pulls `structured`-type questions (no `options` array) —
+renders completely blank, unanswerable.
+**Severity:** App-breaking.
+**Status:** MUST-FIX — in progress.
+
+### GRADE-4 — `MockExamPage.jsx`: same blank-render bug, separate implementation
+Own, independent rendering logic from `QuizPage.jsx` — same
+unconditional-options-render bug.
+**Severity:** App-breaking (once GRADE-6 below is fixed, non-MCQ types become
+reachable here).
+**Status:** MUST-FIX — in progress.
+
+### GRADE-5 — `quizzes.js` (`POST /attempt`): no AI-marking branch for `essay`
+`structured` was just fixed to route through real AI marking (commits
+`a064061`, `e60c79d`) — `essay` was not included in that fix and still falls
+through to plain exact-text comparison, which will near-always grade an
+essay answer as wrong regardless of content.
+**Severity:** Not app-breaking — a grade IS produced (just an unfair one) once
+GRADE-3/GRADE-4 make essay answers submittable at all. A student sees a
+mark, it's just wrong.
+**Status:** DEFERRED, deliberately — not blocking, documented here so it
+isn't silently forgotten or re-discovered from scratch by a future session.
+
+### GRADE-6 — `questionsRoutes.js` (`GET /random`): `question_sub_type` param unread
+`MockExamPage.jsx`/`QuizPage.jsx` send `question_sub_type`; the handler only
+reads `type`. Already self-documented in the code's own comment. Net effect:
+Mock Exam's "MCQ-only" and Quiz's per-paper type filters are currently
+no-ops — both pull an unfiltered mix of every type in the subject's bank.
+**Severity:** Not app-breaking on its own — a data-scoping/hygiene issue,
+not a missing-grade issue. Once GRADE-3/GRADE-4 correctly render whatever
+type shows up, a student can still answer and get graded regardless of
+whether the filter is doing what the page intends.
+**Status:** DEFERRED, deliberately — same reasoning as GRADE-5.
