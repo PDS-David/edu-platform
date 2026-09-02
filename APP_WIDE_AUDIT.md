@@ -483,13 +483,32 @@ the existing `continue` after the branch); `buildExaminerFeedback`'s
 missed-questions filter (`r.is_correct === false`) required no change,
 already correctly includes real `false` values from essay's new AI grade.
 
-### GRADE-6 — `questionsRoutes.js` (`GET /random`): `question_sub_type` param unread
+### GRADE-6 — `questionsRoutes.js` (`GET /random`): `question_sub_type` param unread — FIXED
 `MockExamPage.jsx`/`QuizPage.jsx` send `question_sub_type`; the handler only
-reads `type`. Already self-documented in the code's own comment. Net effect:
-Mock Exam's "MCQ-only" and Quiz's per-paper type filters are currently
-no-ops — both pull an unfiltered mix of every type in the subject's bank.
-**Severity:** Not app-breaking on its own — a data-scoping/hygiene issue,
-not a missing-grade issue. Once GRADE-3/GRADE-4 correctly render whatever
-type shows up, a student can still answer and get graded regardless of
-whether the filter is doing what the page intends.
-**Status:** DEFERRED, deliberately — same reasoning as GRADE-5.
+read `type`. A third caller not originally accounted for here,
+`SubtopicPage.jsx`, also sends it — discovered while fixing this, via the
+grep-every-caller step this fix required.
+
+**Fix:** `question_sub_type` is now read and applied as its own filter,
+independent of the existing `type` param. `'mcq'` maps to `type IN (mcq,
+true_false)` — deliberately NOT the broader (mcq, true_false, short_answer)
+grouping used elsewhere in this codebase for `isFreeText` checks, because
+`SubtopicPage.jsx` has a separate `'smart'` ("Smart Answers") tab
+specifically for `short_answer`, distinct from its `'mcq'` tab — including
+`short_answer` in the `'mcq'` group would have leaked those questions into
+the wrong tab with no textarea to answer them. Real exam-paper structure
+backs the same call: JAMB/WAEC objective papers are pure MCQ, never mixed
+with short-answer/theory content, so `MockExamPage.jsx`'s "MCQ only" paper
+shouldn't unexpectedly include `short_answer` either. `'smart'` is aliased
+to `short_answer` (not a real `questions.type` value on its own —
+`SubtopicPage.jsx`'s own UI label). `'structured'` is an exact literal
+match, needing no grouping.
+
+**Verified:** all 5 real caller call-sites' exact param values traced
+through the actual filter-building logic in isolation (no DB access in
+this environment) — every one resolves to the intended `WHERE`
+condition/replacement values. Uses the same proven-safe `IN (:param)`
+array-binding pattern already used correctly elsewhere in this codebase
+(`pastPaperRoutes.js`, `users.js`) — not the broken `ANY(:param)` pattern
+fixed earlier this session.
+**Status:** RESOLVED.

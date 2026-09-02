@@ -19,7 +19,7 @@ try { awardXP = require('../middleware/xpMiddleware').awardXP; } catch {}
 
 // ── GET /api/questions/random ─────────────────────────────────────────────────
 router.get('/random', protect, async (req, res) => {
-  const { count = '10', subject_id, subtopic_id, board, difficulty, type } = req.query;
+  const { count = '10', subject_id, subtopic_id, board, difficulty, type, question_sub_type } = req.query;
   const limit = Math.min(Math.max(parseInt(count) || 10, 1), 50);
 
   // Phase 5: whitelist against the actual questions.type enum values.
@@ -33,9 +33,10 @@ router.get('/random', protect, async (req, res) => {
   // filters") preserves that exact behavior for 'all'/'paper1' — the
   // filter only activates for `type=structured` (and any other real enum
   // value), so QuizTab's "Structured Questions" option starts working
-  // correctly for the first time, without touching its other two options
-  // or MockExamPage/QuizPage's separate (still-unread) question_sub_type
-  // param.
+  // correctly for the first time, without touching its other two options.
+  // MockExamPage.jsx/QuizPage.jsx/SubtopicPage.jsx's separate
+  // question_sub_type param (GRADE-6) is handled below, independently of
+  // this whitelist.
   const VALID_QUESTION_TYPES = ['mcq', 'true_false', 'short_answer', 'essay', 'structured'];
 
   // Enrollment check: a student requesting questions for a specific subject
@@ -97,6 +98,53 @@ router.get('/random', protect, async (req, res) => {
   if (type && VALID_QUESTION_TYPES.includes(type)) {
     filters.push('q.type = :type');
     replacements.type = type;
+  }
+
+  // GRADE-6 fix: question_sub_type was received from MockExamPage.jsx,
+  // QuizPage.jsx, and (discovered while fixing this — not one of the two
+  // originally known callers) SubtopicPage.jsx, but never read at all, so
+  // Mock Exam's declared "MCQ only" and Quiz's per-paper filter were both
+  // no-ops pulling an unfiltered mix of every type.
+  //
+  // 'mcq' does NOT map to a literal type='mcq' filter — question.type has
+  // no single value covering every non-free-text question, and a literal
+  // match would silently drop true_false questions from every 'mcq' pull.
+  // It also does NOT expand to the broader (mcq, true_false, short_answer)
+  // grouping used elsewhere in this codebase (e.g. isFreeText checks in
+  // PracticeMode.jsx/StudentTestPage.jsx/QuizPage.jsx) — SubtopicPage.jsx's
+  // own tab structure rules that out: it has a SEPARATE 'smart' ("Smart
+  // Answers") tab specifically for short_answer questions, distinct from
+  // its 'mcq' tab. If 'mcq' pulled in short_answer here, questions meant
+  // for the dedicated Smart Answers tab would also appear (ungraded as
+  // MCQ, no textarea) under the MCQ tab. Real exam-paper structure backs
+  // this the same way: JAMB/WAEC objective papers are pure MCQ, never
+  // mixed with short-answer/theory content — so MockExamPage.jsx's "MCQ
+  // only" mock exam paper shouldn't unexpectedly include short_answer
+  // either. 'mcq' therefore means exactly (mcq, true_false) — the two
+  // click-an-option types — nothing wider.
+  //
+  // 'smart' is SubtopicPage.jsx's own UI label for short_answer (its tab
+  // list literally reads { id: 'smart', label: 'Smart Answers' }) — not a
+  // real questions.type value, so it needs an explicit alias rather than
+  // falling through to VALID_QUESTION_TYPES.includes().
+  //
+  // 'structured' (sent by both QuizPage.jsx and SubtopicPage.jsx) is a
+  // literal, exact type match — no grouping needed, already a real enum
+  // value.
+  if (question_sub_type) {
+    const QUESTION_SUB_TYPE_ALIASES = { smart: 'short_answer' };
+    const resolvedSubType = QUESTION_SUB_TYPE_ALIASES[question_sub_type] || question_sub_type;
+
+    if (resolvedSubType === 'mcq') {
+      filters.push('q.type IN (:mcqGroupTypes)');
+      replacements.mcqGroupTypes = ['mcq', 'true_false'];
+    } else if (VALID_QUESTION_TYPES.includes(resolvedSubType)) {
+      filters.push('q.type = :subType');
+      replacements.subType = resolvedSubType;
+    }
+    // Unrecognized value: ignored, same fail-open behaviour the existing
+    // `type` param already has for its own unrecognized values (e.g.
+    // QuizTab.jsx's 'all'/'paper1') — no error, just no extra filtering.
   }
 
   let boardJoin = '';
