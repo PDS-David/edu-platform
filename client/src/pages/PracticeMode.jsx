@@ -65,12 +65,35 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
   const qType = question.question_type ?? question.type;
   const isEssay = qType === 'essay';
   // Phase 5: 'structured' questions get the same free-text textarea as
-  // essay questions (no options array to render as MCQ), but are NOT
-  // AI-marked — the backend's isEssay gate excludes 'structured'
-  // explicitly regardless of which field this posts. isFreeText controls
-  // input rendering + submit dispatch; isEssay stays narrow (essay only)
-  // for anything that should stay essay-specific.
+  // essay questions (no options array to render as MCQ). isFreeText
+  // controls essay-specific UI: which submit handler runs
+  // (handleSubmitEssay, posting essay_response), the AI-marking feedback
+  // box after submission, and the "Essay"/"Structured" badge label.
+  //
+  // STALE COMMENT FIX: this used to say structured questions "are NOT
+  // AI-marked" — that was true when this comment was written, but is now
+  // backwards. The backend (questionsRoutes.js POST /:id/answer) was
+  // changed to route 'structured' through the same real AI-marking path
+  // essay questions use (see that file's own history) — both types are
+  // now graded by Gemini, not left as ungraded self-assessment. isFreeText
+  // itself doesn't need to change for that — it already groups essay and
+  // structured together for the exact same UI treatment, which is what
+  // the backend now expects.
   const isFreeText = isEssay || qType === 'structured';
+  // GRADE-1 FIX: 'short_answer' is a genuinely distinct case from
+  // essay/structured — the backend groups it with mcq/true_false for
+  // exact-text grading (NOT AI marking), so it must submit via
+  // selected_answer through handleSubmitMCQ, not essay_response through
+  // handleSubmitEssay. But like essay/structured, it still has no
+  // `options` array to render as MCQ buttons — it needs a text input too,
+  // just a single-line one, and it must NOT be added to isFreeText (doing
+  // so would wrongly route it into AI marking and the essay feedback UI).
+  // hasTextInput is purely about "does this type need typed text instead
+  // of clickable options" — isFreeText stays the narrow "is this
+  // AI-marked" flag, unchanged everywhere else it's already used
+  // (submit dispatch, badge, result feedback box all stay keyed on
+  // isFreeText exactly as before).
+  const hasTextInput = isFreeText || qType === 'short_answer';
 
   useEffect(() => {
     setSelected(null);
@@ -233,6 +256,11 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
                 Structured
               </span>
             )}
+            {qType === 'short_answer' && (
+              <span className="px-2.5 py-1 bg-teal-100 text-teal-700 rounded-full text-xs font-semibold">
+                Short Answer
+              </span>
+            )}
           </div>
 
           {/* Question */}
@@ -249,7 +277,7 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
           </div>
 
           {/* ── MCQ Options ── */}
-          {!isFreeText && (
+          {!hasTextInput && (
             <div className="px-5 pb-4 space-y-2.5">
               {question.options?.map((opt, i) => {
                 const optText = typeof opt === 'string' ? opt : (opt.option_text || '');
@@ -275,6 +303,31 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
                 </button>
                 );
               })}
+            </div>
+          )}
+
+          {/* ── GRADE-1 FIX: Short Answer text input ──
+              Deliberately a single-line <input>, not the essay/structured
+              <textarea> below — "short answer" implies a brief, direct
+              response, and this must bind to `selected` (not `essayText`)
+              so the existing handleSubmitMCQ / selected_answer path (exact-
+              text grading on the backend, unchanged) works with zero other
+              changes. isFreeText stays false for this type, so this
+              renders instead of, never alongside, the textarea below. */}
+          {qType === 'short_answer' && (
+            <div className="px-5 pb-4">
+              <input
+                type="text"
+                value={selected || ''}
+                onChange={e => setSelected(e.target.value)}
+                disabled={!!result}
+                placeholder="Type your answer here…"
+                className={`w-full px-4 py-3 rounded-xl border-2 text-sm text-gray-800 focus:outline-none transition-all disabled:bg-gray-50 disabled:text-gray-500 ${
+                  result
+                    ? (result.is_correct ? 'border-green-400 bg-green-50' : 'border-red-400 bg-red-50')
+                    : 'border-gray-200 focus:border-indigo-400'
+                }`}
+              />
             </div>
           )}
 
