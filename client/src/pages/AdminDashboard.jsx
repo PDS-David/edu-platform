@@ -2326,14 +2326,28 @@ const AdminDashboard = () => {
     { key: 'settings',            icon: Settings,   label: 'Quick Links'        },
   ];
 
-  // Read ?panel= from the URL on mount, same "N2 fix" pattern already
-  // proven in TeacherDashboard.jsx's ?tab= handling — lets
-  // layouts/AdminLayout.jsx's sidebar navigate here with a panel
-  // pre-selected from any other admin page, not just from this dashboard.
+  // Read ?panel= from the URL and activate the matching panel — not just on
+  // mount, but every time the panel query param actually changes.
+  //
+  // BUG FIX: previously `[]` (mount-only). Navigating from
+  // /admin/dashboard?panel=A to /admin/dashboard?panel=B is a same-route,
+  // search-param-only change — React Router does NOT remount this
+  // component for that, so a mount-only effect never re-fires. The
+  // sidebar (layouts/AdminLayout.jsx -> PortalSidebar.jsx) always
+  // navigates to `${dashboardPath}?panel=${id}` for every tab-kind item
+  // regardless of current page, so this correctly picked up the panel on
+  // the FIRST navigation into the dashboard from elsewhere, but clicking
+  // any OTHER tab-kind sidebar item while already on the dashboard did
+  // nothing at all — exactly the reported "some pages do not load when
+  // the link from the left sidebar is selected" symptom, and only for
+  // tab-kind items (schools/students are kind:'link', real routes,
+  // unaffected by this). Depending on searchParams.get('panel') directly
+  // (not the whole searchParams object) avoids re-running on unrelated
+  // query-string changes.
+  const panelParam = searchParams.get('panel');
   useEffect(() => {
-    const panelParam = searchParams.get('panel');
     if (panelParam) setActivePanel(panelParam);
-  }, []); // run once on mount only
+  }, [panelParam]);
 
   const Panel = ({ children }) => (
     <div className="bg-white border border-gray-100 rounded-2xl mt-4 overflow-hidden shadow-sm">
