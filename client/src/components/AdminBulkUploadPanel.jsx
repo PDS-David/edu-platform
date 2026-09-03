@@ -604,7 +604,7 @@ function ResourceLibrarySection() {
 
   const filtered = resources.filter(r =>
     !r.is_staged &&
-    `${r.title} ${r.subject_name || ''} ${r.resource_type || ''}`.toLowerCase().includes(search.toLowerCase())
+    `${r.title} ${r.subject_name || ''} ${r.resource_type || ''} ${r.school_name || ''}`.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -629,7 +629,7 @@ function ResourceLibrarySection() {
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search by title, subject or type…"
+            placeholder="Search by title, subject, school or type…"
             className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
           />
 
@@ -656,6 +656,22 @@ function ResourceLibrarySection() {
                         {file.push_type && (
                           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-600">
                             {file.push_type}
+                          </span>
+                        )}
+                        {/* Source attribution: school_id NULL means an App
+                            Admin upload (global/shared with every school by
+                            design — see Da's decision in
+                            run_complete_migration.js). Showing "Global"
+                            explicitly rather than omitting the badge, so it
+                            reads as "attribution confirmed: none" rather
+                            than looking like missing/broken data. */}
+                        {file.school_name ? (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-teal-100 text-teal-700">
+                            🏫 From: {file.school_name}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500">
+                            🌐 Global
                           </span>
                         )}
                         {file.content_kind === 'question_bank' && (
