@@ -66,6 +66,18 @@ jobs:
             find .git/refs -name "*.lock" -delete 2>/dev/null || true
             find .git -name "*.lock" -delete 2>/dev/null || true
 
+            echo "▶ Fixing Git directory ownership (recovery guard)..."
+            # chmod below only fixes permission bits — it can't fix an
+            # owner mismatch. If anything (a manual root login, a stray
+            # root-owned process, etc.) ever leaves .git owned by a
+            # different user than DEPLOY_USER, git's own safety check
+            # ("detected dubious ownership in repository") refuses to
+            # touch the repo at all, and chmod alone won't clear that.
+            # This has already been hit and fixed by hand on the server
+            # once; folding it in here means the next occurrence recovers
+            # automatically instead of needing another manual fix.
+            chown -R "$(id -u):$(id -g)" .git 2>/dev/null || true
+
             echo "▶ Fixing Git directory permissions..."
             chmod -R u+w .git 2>/dev/null || true
 
