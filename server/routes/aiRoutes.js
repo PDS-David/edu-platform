@@ -176,7 +176,7 @@ Question: ${q?.question_text || 'Question not found'}
 Correct answer: ${q?.correct_answer || 'Not available'}
 
 Explain in 2-3 sentences why the correct answer is right and briefly why the other options are wrong.
-Be concise and curriculum-aligned.`;
+Be concise and curriculum-aligned. Do not use markdown formatting of any kind — no asterisks, no bold, no numbered lists, no headers. Plain, complete sentences only, since this is rendered as plain text on the frontend, not parsed as markdown.`;
     }
 
     const explanation = await generate(prompt, 'explain');
@@ -285,9 +285,40 @@ router.post('/notes/generate', protect, aiLimiter, async (req, res) => {
       }
     }
 
+    // BUG FIX (severity: this may be the actual root cause of "Failed to
+    // generate notes" reports, not the Gemini model cutoff this route
+    // shares with everything else): this SELECT/INSERT pair queried a
+    // table called `notes`, which does not exist anywhere in this
+    // codebase's schema — migration_003.sql's own header comment lists
+    // every one of the 28 tables it creates, and `notes` isn't among them;
+    // only `revision_notes` exists (see that migration, item #22), and its
+    // real schema has no student_id column at all, a NOT NULL title column
+    // this code never supplied, and no unique constraint the old
+    // `ON CONFLICT (student_id, subtopic_id)` clause could ever have
+    // matched even against the right table. A SELECT against a genuinely
+    // nonexistent table throws a real Postgres "relation does not exist"
+    // error — and unlike the INSERT below (already silently swallowed via
+    // .catch(() => {})), this SELECT sits inside the route's main try
+    // block, so that error propagated straight to the outer catch and
+    // returned exactly the literal 'Failed to generate notes' message
+    // reported by students, on every single request, regardless of
+    // whether the underlying AI call would have succeeded.
+    //
+    // Now points at the real revision_notes table. That table has no
+    // per-student column — it was designed for teacher-authored notes
+    // shared across every student viewing a subtopic (see its own
+    // migration comment), which is actually the right shape for this
+    // AI-generated content too: the prompt below is generic per-topic, not
+    // personalized to the requesting student, so caching one shared row
+    // per subtopic (not one per student) avoids redundant identical AI
+    // calls from every student who visits the same subtopic. created_by is
+    // repurposed to record which student's request triggered the first
+    // generation — informational only, not an access-control field.
     if (subtopic_id) {
       const existing = await sequelize.query(
-        `SELECT content_html FROM notes WHERE subtopic_id = :subtopicId LIMIT 1`,
+        `SELECT content_html FROM revision_notes
+         WHERE subtopic_id = :subtopicId AND content_html IS NOT NULL
+         ORDER BY updated_at DESC LIMIT 1`,
         { replacements: { subtopicId: subtopic_id }, type: QueryTypes.SELECT }
       );
       if (existing[0]?.content_html) {
@@ -314,15 +345,30 @@ Total length: under 300 words. Plain text only — no markdown, no headers with 
     const notes = await generate(prompt, 'notes');
 
     if (subtopic_id && notes) {
+      // No unique constraint exists on revision_notes.subtopic_id (it was
+      // designed for teachers to author, who don't hit this race the same
+      // way), so two students requesting notes for the same
+      // never-yet-generated subtopic at almost the same moment could each
+      // insert their own row rather than one updating the other. Accepted
+      // as a known, low-impact edge case for now — the SELECT above
+      // already takes the most recently updated row if duplicates ever
+      // occur, so the symptom is "one redundant AI call," not incorrect
+      // content shown to anyone.
       sequelize.query(
-        `INSERT INTO notes (id, student_id, subtopic_id, content_html, created_at, updated_at)
-         VALUES (:studentId, :subtopicId, :content, NOW(), NOW())
-         ON CONFLICT (student_id, subtopic_id) DO UPDATE SET content_html = :content, updated_at = NOW()`,
+        `INSERT INTO revision_notes (subtopic_id, title, content_html, created_by, created_at, updated_at)
+         VALUES (:subtopicId, :title, :content, :createdBy, NOW(), NOW())`,
         {
-          replacements: { studentId: req.user.id, subtopicId: subtopic_id, content: notes },
+          replacements: {
+            subtopicId: subtopic_id,
+            title:      `${topic_name} — AI Revision Notes`,
+            content:    notes,
+            createdBy:  req.user.id,
+          },
           type: QueryTypes.INSERT,
         }
-      ).catch(() => {});
+      ).catch((err) => {
+        console.error('[POST /ai/notes/generate] failed to cache generated notes:', err.message);
+      });
     }
 
     return res.status(200).json({ success: true, notes });
