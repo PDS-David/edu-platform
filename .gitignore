@@ -83,7 +83,8 @@ coverage/
 *.bak
 *.swp
 
-!ai-ready-dump.txtapi.env
+!ai-ready-dump.txt
+api.env
 
 # ── Secrets & credentials ──────────────────────────────
 *credentials*.txt
