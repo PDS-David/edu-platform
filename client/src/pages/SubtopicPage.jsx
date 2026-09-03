@@ -451,7 +451,20 @@ function MCQQuestion({ question, questionNumber, totalQuestions, onAnswer, onPre
       // with no correct-answer text available, regardless of grading.
       setResult(res.data);
       setExplainLoad(true);
-      api.post('/ai/explain', { question_id: question.id })
+      // BUG FIX: this call never sent the student's actual answer at all —
+      // `selected` (in scope right here) was simply omitted. Backend's
+      // POST /ai/explain only builds a personalized response when
+      // typed_answer is present (see aiRoutes.js: `if (q?.explanation &&
+      // !typed_answer) return early with the flat stored explanation` —
+      // with no typed_answer AND no stored explanation on the question,
+      // there was nothing for the prompt to reference, so aiExplain never
+      // got set and the page fell through to the "No explanation
+      // available." placeholder regardless of what the student answered.
+      // Same fix already applied to QuizPage.jsx / QuizTab.jsx this
+      // session — typed_answer works identically for an MCQ selection's
+      // text as genuine free text, the prompt doesn't require literal
+      // free-text input.
+      api.post('/ai/explain', { question_id: question.id, typed_answer: selected })
         .then(r => { if (r.success) setAiExplain(r.data?.explanation ?? r.explanation); })
         .catch(() => {})
         .finally(() => setExplainLoad(false));
