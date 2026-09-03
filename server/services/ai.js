@@ -50,7 +50,34 @@
 //        cost/latency-optimized sibling. This does not touch the
 //        complex_reasoning/OpenAI routing added in v17.
 //
-// Public API (signature EXTENDED, backward compatible):
+// v19 — Automatic cross-provider fallback: if the caller didn't explicitly
+//        request a provider and Gemini's own retry+fallback chain (see
+//        _callGemini above) is fully exhausted, generate() now tries OpenAI
+//        once before giving up, instead of surfacing the Gemini failure
+//        straight to the user. This is what actually makes v17's OpenAI
+//        wiring useful in practice — until this change, OPENAI_API_KEY and
+//        _callOpenAI existed but nothing in the app ever called them; every
+//        feature still failed outright the moment Gemini's own chain was
+//        exhausted (this is what the "Failed to generate notes" / "No
+//        explanation available" reports were — Gemini genuinely failing,
+//        with nothing to catch it).
+//
+//        Deliberately safe to ship before OPENAI_API_KEY exists on the
+//        server: if the key isn't configured, _callOpenAI's own
+//        "OPENAI_API_KEY is not configured" error is caught here and the
+//        ORIGINAL Gemini error is re-thrown instead — meaning behavior is
+//        byte-for-byte unchanged from today until someone actually adds the
+//        key, at which point this starts working with no further code
+//        changes or deploy needed beyond that.
+//
+//        Explicit provider: 'openai' calls are unaffected — no fallback
+//        loops back to Gemini for those; this is one-directional
+//        (Gemini → OpenAI) since Gemini remains the default/primary
+//        provider for cost and existing-behavior reasons, not because a
+//        reverse fallback wouldn't also be reasonable — just not what was
+//        asked for here.
+//
+// Public API (signature UNCHANGED from v17):
 //   generate(prompt, task, options?) → Promise<string>
 //   options.provider: 'gemini' (default, unchanged) | 'openai'
 // ─────────────────────────────────────────────────────────────────────────────
@@ -359,10 +386,15 @@ function _logUsage({ task, provider, prompt, response, userId }) {
  * @param {object} [options={}]
  * @param {string} [options.userId]   For rate limiting + usage logging
  * @param {string} [options.role]     'admin' bypasses rate limit
- * @param {string} [options.provider] 'gemini' (default) | 'openai'. Every
- *   existing call site omits this and is completely unaffected — added in
- *   v17 as an opt-in second provider, not a replacement for the default.
- * @returns {Promise<string>}       Trimmed text from the selected provider
+ * @param {string} [options.provider] 'gemini' (default) | 'openai'. Omitted
+ *   (the vast majority of call sites) means: try Gemini first, and if its
+ *   own internal retry+fallback chain is fully exhausted, automatically try
+ *   OpenAI once before failing (v19) — silently a no-op fallback today if
+ *   OPENAI_API_KEY isn't configured yet, surfacing the original Gemini
+ *   error unchanged in that case. Passing 'openai' explicitly skips Gemini
+ *   entirely and calls OpenAI directly, with no fallback of its own.
+ * @returns {Promise<string>}       Trimmed text from whichever provider
+ *   actually served the request
  */
 async function generate(prompt, task = 'default', options = {}) {
   const { userId, role, provider = 'gemini' } = options;
@@ -374,12 +406,38 @@ async function generate(prompt, task = 'default', options = {}) {
     throw err;
   }
 
-  const useOpenAI = provider === 'openai' || provider === 'chatgpt';
-  const text = useOpenAI ? await _callOpenAI(prompt, task) : await _callGemini(prompt, task);
+  const explicitOpenAI = provider === 'openai' || provider === 'chatgpt';
 
-  _logUsage({ task, provider: useOpenAI ? 'openai' : 'gemini', prompt, response: text, userId });
+  if (explicitOpenAI) {
+    const text = await _callOpenAI(prompt, task);
+    _logUsage({ task, provider: 'openai', prompt, response: text, userId });
+    return text;
+  }
 
-  return text;
+  // Default path: Gemini primary, automatic OpenAI fallback on exhaustion.
+  try {
+    const text = await _callGemini(prompt, task);
+    _logUsage({ task, provider: 'gemini', prompt, response: text, userId });
+    return text;
+  } catch (geminiErr) {
+    try {
+      const text = await _callOpenAI(prompt, task);
+      console.warn(`[ai.js] Gemini exhausted for task="${task}" — served by OpenAI fallback instead.`);
+      _logUsage({ task, provider: 'openai-fallback', prompt, response: text, userId });
+      return text;
+    } catch (openaiErr) {
+      if ((openaiErr.message || '').includes('OPENAI_API_KEY is not configured')) {
+        // No fallback available at all — surface the real (Gemini) failure,
+        // not a confusing "second provider isn't set up either" message.
+        throw geminiErr;
+      }
+      console.error(
+        `[ai.js] Both providers failed for task="${task}". ` +
+        `Gemini: ${geminiErr.message}. OpenAI: ${openaiErr.message}.`
+      );
+      throw geminiErr;
+    }
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
