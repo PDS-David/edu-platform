@@ -304,7 +304,7 @@ router.post('/:language/audio', async (req, res) => {
     const label = LANGUAGE_LABEL[language];
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.5-flash',
       contents: [{
         parts: [{
           text: `You are a ${label} language tutor. Speak the following ${label} word or phrase clearly, ` +
@@ -382,7 +382,7 @@ Respond in this exact JSON format, no markdown, no extra text:
 }`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.5-flash',
       contents: [{
         parts: [
           { text: prompt },
