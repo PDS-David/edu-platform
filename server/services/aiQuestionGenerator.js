@@ -164,7 +164,7 @@ Respond ONLY with a valid JSON object in this exact format (no markdown, no extr
        :subjectId,
        :examBoardId,
        TRUE,
-       'gemini-2.5-flash',
+       'gemini-3.5-flash',
        :conceptHint,
        'pending',
        'admin_import',

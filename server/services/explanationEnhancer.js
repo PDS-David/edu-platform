@@ -112,7 +112,7 @@ async function enhanceExplanation({ topic_id, subtopic_id, force_refresh = false
         key_points, source_question_count, model_used, created_at, updated_at)
      VALUES
        (:topicId, :subtopicId, :original, :simplified, :keyPoints::jsonb,
-        :qCount, 'gemini-2.5-flash', NOW(), NOW())
+        :qCount, 'gemini-3.5-flash', NOW(), NOW())
      ON CONFLICT (${scope === 'topic' ? 'topic_id' : 'subtopic_id'})
      DO UPDATE SET
        original_explanation    = EXCLUDED.original_explanation,

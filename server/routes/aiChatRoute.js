@@ -300,6 +300,15 @@ router.post('/chat/stream', protect, subscriptionGuard, aiLimiter, async (req, r
     ]);
 
     // v2: new @google/genai SDK streaming
+    // v3 HOTFIX (2026-09): model was still gemini-2.0-flash, which this
+    // codebase's own comments elsewhere (server/services/ai.js) already
+    // confirm was retired by Google on June 1, 2026 — this call site was
+    // apparently missed when everything else got migrated off it and has
+    // been broken since then, independent of today's separate 2.5-generation
+    // cutoff incident. Migrated straight to gemini-3.5-flash (skipping 2.5
+    // entirely, since 2.5 is itself now cut off for this key — see ai.js's
+    // v18 note) rather than fixing forward through an already-dead
+    // generation.
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
     const systemContext = memoryContext.formatted
@@ -307,7 +316,7 @@ router.post('/chat/stream', protect, subscriptionGuard, aiLimiter, async (req, r
       : 'You are AISchoolonair, a friendly AI tutor for Nigerian secondary school students.';
 
     const streamResult = await ai.models.generateContentStream({
-      model:    'gemini-2.0-flash',
+      model:    'gemini-3.5-flash',
       contents: `${systemContext}\n\nStudent: ${message}\nAISchoolonair:`,
     });
 
