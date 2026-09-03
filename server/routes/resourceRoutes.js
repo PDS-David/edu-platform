@@ -429,19 +429,31 @@ router.get('/', async (req, res) => {
       where += ` AND r.uploaded_by = :user_id`;
     }
 
+    // role === 'admin' (App Admin) intentionally gets no additional WHERE
+    // clause here — this was already true before school_id/school_name
+    // were added to the SELECT below, and it's correct, not an oversight:
+    // auth.js documents App Admin as deliberately global/unscoped ("App
+    // Admin manages every school and must never be scoped to one"), unlike
+    // school_admin's explicit same-school-only isolation elsewhere in the
+    // app. School attribution (school_id, school_name) is now returned so
+    // the frontend can label which school each resource came from — the
+    // access itself was never restricted, only the attribution was missing.
+
     const rows = await sequelize.query(
       `SELECT r.id, r.title, r.resource_type, r.file_url, r.file_size_bytes,
               r.original_filename, r.mime_type, r.is_staged, r.is_active,
               r.uploaded_by, r.subject_id, r.topic_id, r.subtopic_id, r.push_type,
               r.content_kind, r.questions_extracted_at, r.created_at, r.updated_at,
+              r.school_id, sch.name AS school_name,
               s.name AS subject_name, t.name AS topic_name, st.name AS subtopic_name,
               TRIM(COALESCE(u.first_name,'') || ' ' || COALESCE(u.last_name,'')) AS uploader_name,
               u.role AS uploader_role
          FROM resources r
-         LEFT JOIN subjects  s ON s.id = r.subject_id
-         LEFT JOIN topics    t ON t.id = r.topic_id
-         LEFT JOIN subtopics st ON st.id = r.subtopic_id
-         LEFT JOIN users     u  ON u.id  = r.uploaded_by
+         LEFT JOIN subjects  s   ON s.id   = r.subject_id
+         LEFT JOIN topics    t   ON t.id   = r.topic_id
+         LEFT JOIN subtopics st  ON st.id  = r.subtopic_id
+         LEFT JOIN users     u   ON u.id   = r.uploaded_by
+         LEFT JOIN schools   sch ON sch.id = r.school_id
          ${where}
         ORDER BY r.created_at DESC LIMIT 1000`,
       { replacements, type: QueryTypes.SELECT }
