@@ -23,7 +23,7 @@ const { generateAIQuestion: _generateAIQuestion } =
   require('./aiQuestionGenerator');                                   // ← canonical impl
 
 if (process.env.NODE_ENV !== 'production') {
-  console.log('[aiService] Loaded — routing through ai.js hub (gemini-2.5-flash)');
+  console.log('[aiService] Loaded — routing through ai.js hub (gemini-3.5-flash)');
 }
 
 const FALLBACK_REPLY =
@@ -286,8 +286,11 @@ Respond ONLY with valid JSON in this exact format (no markdown, no extra text):
   // v3 (2026-06): gemini-2.0-flash was retired by Google — this call had no
   // fallback at all, so AI Marking failed outright once the model was
   // shut down. Now uses the same primary + one fallback as the central hub.
+  // v4 (2026-09) HOTFIX: gemini-2.5-* cut off for new API keys/projects —
+  // see server/services/ai.js's v18 note for the full incident writeup.
+  // Migrated to the same 3.5-generation primary+fallback as the hub.
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  const candidateModels = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+  const candidateModels = ['gemini-3.5-flash', 'gemini-3.5-flash-lite'];
   let lastErr = null;
 
   for (const model of candidateModels) {
