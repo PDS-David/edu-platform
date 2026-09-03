@@ -425,11 +425,20 @@ function MCQQuestion({ question, questionNumber, totalQuestions, onAnswer, onPre
   const [shownHints,  setShownHints]  = useState(0);
   const [aiExplain,   setAiExplain]   = useState('');
   const [explainLoad, setExplainLoad] = useState(false);
+  // Issue 1 fix: distinguish "the explain call actually failed" from
+  // "it succeeded but genuinely had nothing to add" — both previously
+  // collapsed into the identical 'No explanation available.' fallback
+  // text (this one client-side, plus an equally-generic one server-side
+  // in aiRoutes.js POST /explain when GEMINI_API_KEY is unset), making a
+  // real outage indistinguishable from an authored question that simply
+  // has no explanation yet. Pattern copied from this same file's
+  // handleGenerateNotes/notesError (see commit 8acd340).
+  const [explainError, setExplainError] = useState(null);
   const startTime = useRef(Date.now());
 
   useEffect(() => {
     setSelected(null); setResult(null);
-    setShownHints(0); setAiExplain('');
+    setShownHints(0); setAiExplain(''); setExplainError(null);
     startTime.current = Date.now();
   }, [question?.id]);
 
@@ -451,9 +460,19 @@ function MCQQuestion({ question, questionNumber, totalQuestions, onAnswer, onPre
       // with no correct-answer text available, regardless of grading.
       setResult(res.data);
       setExplainLoad(true);
+      setExplainError(null);
       api.post('/ai/explain', { question_id: question.id })
-        .then(r => { if (r.success) setAiExplain(r.data?.explanation ?? r.explanation); })
-        .catch(() => {})
+        .then(r => {
+          if (r.success) {
+            setAiExplain(r.data?.explanation ?? r.explanation);
+          } else {
+            // HTTP 200 but success:false — the backend rejected the
+            // request for some reason (e.g. missing question_id). Treat
+            // the same as a network failure below, not silence.
+            setExplainError("Couldn't load an explanation right now — try again in a moment.");
+          }
+        })
+        .catch(() => setExplainError("Couldn't load an explanation right now — try again in a moment."))
         .finally(() => setExplainLoad(false));
     } catch { alert('Failed to submit. Try again.'); }
     finally  { setSubmitting(false); }
@@ -561,6 +580,8 @@ function MCQQuestion({ question, questionNumber, totalQuestions, onAnswer, onPre
               <p className="text-xs font-semibold text-blue-700 mb-1.5 flex items-center gap-1.5"><Sparkles size={12} /> AI Explanation</p>
               {explainLoad
                 ? <div className="flex items-center gap-2 text-xs text-blue-400"><Loader2 size={12} className="animate-spin" /> Generating explanation…</div>
+                : explainError
+                ? <p className="text-xs text-red-600">{explainError}</p>
                 : <p className="text-xs text-blue-700 leading-relaxed">{aiExplain || result.explanation || 'No explanation available.'}</p>}
             </div>
           </>
