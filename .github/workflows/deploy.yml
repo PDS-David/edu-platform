@@ -11,6 +11,29 @@
 
 name: Deploy to Production
 
+# Root cause of the 5a65d73 double-deploy incident (run #626 vs #627,
+# both created at the same second, both genuine 'push' events -- not a
+# manual re-run, which would show as a second *attempt* on one run id,
+# not two separate run ids): GitHub delivered a duplicate webhook for a
+# single push, firing two independent runs with no guard between them.
+# Both SSHed into the same production server and ran `docker compose up`
+# in overlapping windows; Compose's recreate cycle for aischool_api was
+# mid-rename in one process exactly when the other tried to claim that
+# same container name, so Docker's daemon rejected it:
+#   "Error when allocating new name: Conflict. The container name
+#    /aischool_api is already in use by container ..."
+#   Process exited with status 1.
+# The `concurrency` block below fixes the actual constraint that was
+# missing: at most one deploy against this production server at a time,
+# regardless of how many push/workflow_dispatch events land close
+# together. cancel-in-progress is deliberately false -- killing a deploy
+# mid `docker compose up` would risk leaving containers in a half
+# recreated state, which is worse than the queued run just waiting a
+# minute for the first one to finish cleanly.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
 on:
   push:
     branches: [main]
