@@ -180,11 +180,21 @@ export default function QuestionReview() {
         {!loading && questions.length > 0 && (
           <div className="space-y-4">
             {questions.map(q => {
-              // BUG FIX: computed once per card so both the options display
-              // and the Approve button below can react to it — previously
-              // this was calculated inline only for rendering options, so
-              // the Approve button had no way to know a question was broken
-              // and stayed clickable regardless.
+              // FEATURE: question_type support (see adminRoutes.js's
+              // POST /generate-questions for the full rationale). This
+              // review queue's own isBroken/options-required check is
+              // only meaningful for mcq-shaped questions — a
+              // short_answer/structured question has no options array by
+              // design (options: NULL, see the INSERT in
+              // adminRoutes.js), so applying the same "needs 2+ options
+              // with one correct" rule to them would permanently block
+              // approval of every question of those types, regardless of
+              // how good the AI-generated content actually was. q.type
+              // may be absent on older rows inserted before this field
+              // was added to the SELECT — treat missing/undefined the
+              // same as 'mcq' for backward compatibility.
+              const isFreeText = q.type === 'short_answer' || q.type === 'structured';
+
               const validOptions = (q.options || []).filter(opt => {
                 const text = typeof opt === 'string' ? opt : opt?.option_text;
                 return text && String(text).trim();
@@ -207,7 +217,13 @@ export default function QuestionReview() {
                 typeof opt === 'object' ? !!opt.is_correct
                   : normalizeForCompare(opt) === normalizeForCompare(q.correct_answer)
               );
-              const isBroken = validOptions.length < 2 || !hasCorrect;
+              // For short_answer/structured, the only thing that makes a
+              // question "broken" is a missing model/expected answer —
+              // options never apply. For mcq, unchanged: needs 2+ usable
+              // options with one flagged correct.
+              const isBroken = isFreeText
+                ? !String(q.correct_answer || '').trim()
+                : (validOptions.length < 2 || !hasCorrect);
 
               return (
               <div key={q.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -231,6 +247,11 @@ export default function QuestionReview() {
                       {q.difficulty.charAt(0).toUpperCase() + q.difficulty.slice(1)}
                     </span>
                   )}
+                  {isFreeText && (
+                    <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
+                      {q.type === 'structured' ? 'Structured' : 'Short Answer'}
+                    </span>
+                  )}
                   <span className="ml-auto text-xs text-gray-400 flex items-center gap-1">
                     <User className="w-3 h-3" />
                     {q.first_name} {q.last_name}
@@ -243,16 +264,13 @@ export default function QuestionReview() {
                   <p className="text-gray-900 font-medium leading-relaxed">{q.question_text}</p>
                 </div>
 
-                {/* Options */}
-                {/* BUG FIX: a question can reach the review queue with a
-                    missing or malformed options array (e.g. the AI returned
-                    an unexpected shape for one item in a batch). Previously
-                    this rendered as an empty grid with no indication
-                    anything was wrong — an admin could approve it without
-                    noticing, and the student would later see a question
-                    with zero answer choices. Now shown as an explicit
-                    warning instead of silently rendering nothing. */}
-                {isBroken ? (
+                {/* Options — only meaningful for mcq; short_answer/structured
+                    have no options by design (see isFreeText above), so this
+                    whole section is skipped for them rather than falling
+                    through to render an accidentally-empty grid. Their
+                    expected/model answer is shown in the "Correct Answer"
+                    box below instead, same as it already is for mcq. */}
+                {isFreeText ? null : isBroken ? (
                   <div className="px-6 pb-4">
                     <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl p-3">
                       <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
@@ -298,7 +316,9 @@ export default function QuestionReview() {
                       <div className="flex items-start gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
                         <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
                         <div>
-                          <p className="text-xs font-semibold text-green-700 mb-0.5">Correct Answer</p>
+                          <p className="text-xs font-semibold text-green-700 mb-0.5">
+                            {q.type === 'structured' ? 'Model Answer' : 'Correct Answer'}
+                          </p>
                           <p className="text-sm text-green-900">{q.correct_answer}</p>
                         </div>
                       </div>

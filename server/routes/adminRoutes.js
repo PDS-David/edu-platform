@@ -429,7 +429,7 @@ router.get('/questions/pending', protect, adminOnly, async (req, res) => {
 
     const rows = await sequelize.query(
       `SELECT
-         q.id, q.question_text, q.options, q.correct_answer,
+         q.id, q.question_text, q.type, q.options, q.correct_answer,
          q.difficulty, q.explanation, q.status, q.is_ai_generated,
          q.created_at,
          u.first_name, u.last_name, u.email AS submitted_by_email,
@@ -676,6 +676,22 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
   const count = Math.min(Math.max(parseInt(rawCount) || 10, 1), 15);
   const { subject_id, topic, subtopic_id, difficulty = 'medium' } = req.body;
 
+  // FEATURE: question_type support. Previously this endpoint (and the
+  // 'mcq' literal hardcoded into its INSERT below) could only ever produce
+  // multiple-choice questions — confirmed via full-codebase audit that this
+  // was true of every question-creation path in the app (this admin
+  // generator, the teacher manual-authoring form, and the community
+  // submission endpoint), which is why zero short_answer/structured
+  // questions existed anywhere in the database despite every downstream
+  // grading/display feature for those types (GRADE-1 through GRADE-6, this
+  // session) already being correctly built and waiting for content that
+  // had no way to exist. This is the first of those three paths extended.
+  const ALLOWED_QUESTION_TYPES = ['mcq', 'short_answer', 'structured'];
+  const question_type = ALLOWED_QUESTION_TYPES.includes(req.body.question_type)
+    ? req.body.question_type
+    : 'mcq';
+  const isFreeText = question_type !== 'mcq';
+
   if (!subject_id || !topic) {
     return error(res, 'subject_id and topic are required', 400);
   }
@@ -704,7 +720,18 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
       resolvedSubtopicId = stRows[0]?.id || null;
     }
 
-    const prompt = `Generate ${count} ${difficulty} multiple-choice questions on the topic "${topic}" for the subject "${subjectRows[0].name}". Return ONLY a valid JSON array, no markdown. Each object must have: question_text (string), options (array of 4 strings), correct_answer (string matching one option exactly), explanation (string).`;
+    // Prompt varies by question_type: mcq needs 4 discrete options with one
+    // flagged correct; short_answer/structured are free-response, so instead
+    // of options they need a single expected/model answer for AI marking to
+    // grade against later (see buildEssayFeedbackPrompt in services/ai.js —
+    // that's what reads this same correct_answer column as "Model answer"
+    // for these two types at grading time, same as every other question-
+    // creation path that already produces essay-marked content).
+    const prompt = question_type === 'mcq'
+      ? `Generate ${count} ${difficulty} multiple-choice questions on the topic "${topic}" for the subject "${subjectRows[0].name}". Return ONLY a valid JSON array, no markdown. Each object must have: question_text (string), options (array of 4 strings), correct_answer (string matching one option exactly), explanation (string).`
+      : question_type === 'short_answer'
+      ? `Generate ${count} ${difficulty} short-answer questions on the topic "${topic}" for the subject "${subjectRows[0].name}". Each question must have ONE brief, unambiguous correct answer — a single word, number, or short phrase (not a sentence or paragraph) — since these are graded by exact-text matching, not by an examiner's judgment. Return ONLY a valid JSON array, no markdown. Each object must have: question_text (string), correct_answer (the brief expected answer, string), explanation (string).`
+      : `Generate ${count} ${difficulty} structured (free-response) questions on the topic "${topic}" for the subject "${subjectRows[0].name}", suitable for WAEC/JAMB/NECO-style exams. These require a written answer of a few sentences, not a single word. Return ONLY a valid JSON array, no markdown. Each object must have: question_text (string), correct_answer (a full model answer of 2-5 sentences, string), explanation (string, may briefly restate key marking points).`;
 
     const raw     = await generate(prompt, 'generate-questions');
     const cleaned = raw.replace(/```json|```/g, '').trim();
@@ -750,6 +777,52 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
 
     for (const q of questions) {
       if (!q.question_text) { skipped++; continue; }
+
+      if (isFreeText) {
+        // short_answer/structured: no options array to validate — instead
+        // require a usable correct_answer (the expected answer / model
+        // answer, same column the mcq branch also writes to, just with
+        // different semantics per type, exactly matching every other
+        // question-type-aware code path already built this session).
+        const modelAnswer = (q.correct_answer || '').toString().trim();
+        if (!modelAnswer) {
+          skipped++;
+          skippedReasons.push(`"${q.question_text.slice(0, 60)}..." — no correct_answer provided`);
+          continue;
+        }
+        // Structured answers are meant to be full sentences; short_answer's
+        // own prompt explicitly asks for brevity, so only structured gets a
+        // minimum-length sanity check (catches Gemini occasionally
+        // collapsing a "model answer" down to a single word despite the
+        // prompt's instruction, which would otherwise silently insert a
+        // structured question no more graded than a short_answer one).
+        if (question_type === 'structured' && modelAnswer.length < 20) {
+          skipped++;
+          skippedReasons.push(`"${q.question_text.slice(0, 60)}..." — model answer too short for a structured question`);
+          continue;
+        }
+
+        await sequelize.query(
+          `INSERT INTO questions
+             (question_text, options, correct_answer, explanation, difficulty,
+              subtopic_id, type, is_active, is_ai_generated, status, created_at, updated_at)
+           VALUES (:q, NULL, :c, :e, :d,
+                   :subtopicId, :type, true, true, 'pending', NOW(), NOW())`,
+          {
+            replacements: {
+              q: q.question_text,
+              c: modelAnswer,
+              e: q.explanation || null,
+              d: difficulty,
+              subtopicId: resolvedSubtopicId,
+              type: question_type,
+            },
+            type: QueryTypes.INSERT,
+          }
+        );
+        inserted++;
+        continue;
+      }
 
       const rawOptions = Array.isArray(q.options) ? q.options : [];
       const normOptions = rawOptions.map(opt => {
@@ -810,7 +883,7 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
            (question_text, options, correct_answer, explanation, difficulty,
             subtopic_id, type, is_active, is_ai_generated, status, created_at, updated_at)
          VALUES (:q, :o::jsonb, :c, :e, :d,
-                 :subtopicId, 'mcq', true, true, 'pending', NOW(), NOW())`,
+                 :subtopicId, :type, true, true, 'pending', NOW(), NOW())`,
         {
           replacements: {
             q: q.question_text,
@@ -819,6 +892,7 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
             e: q.explanation     || null,
             d: difficulty,
             subtopicId: resolvedSubtopicId,
+            type: question_type,
           },
           type: QueryTypes.INSERT,
         }
