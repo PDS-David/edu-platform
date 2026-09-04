@@ -1210,6 +1210,7 @@ const AIGeneratePanel = ({ setActivePanel }) => {
   const [form, setForm] = useState({
     exam_type_id: '', subject_id: '', topic_id: '', topic: '',
     subtopic_id: '', exam_board: '', count: 10, difficulty: 'medium',
+    question_type: 'mcq',
   });
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState(null);
@@ -1290,12 +1291,13 @@ const AIGeneratePanel = ({ setActivePanel }) => {
     setError(''); setResult(null); setPreviewQuestions([]); setGenerating(true);
     try {
       const res = await api.post('/admin/generate-questions', {
-        subject_id:  form.subject_id,
-        topic:       form.topic,
-        subtopic_id: form.subtopic_id || undefined,
-        exam_board:  form.exam_board,
-        count:       form.count,
-        difficulty:  form.difficulty,
+        subject_id:    form.subject_id,
+        topic:         form.topic,
+        subtopic_id:   form.subtopic_id || undefined,
+        exam_board:    form.exam_board,
+        count:         form.count,
+        difficulty:    form.difficulty,
+        question_type: form.question_type,
       }, { timeout: TIMEOUT_AI_GENERATE });
       setResult(res);
       const qs = res?.data?.questions ?? res?.questions ?? [];
@@ -1396,6 +1398,7 @@ const AIGeneratePanel = ({ setActivePanel }) => {
         )}
 
         <div className="grid grid-cols-2 gap-3">
+          <div><label className="block text-xs font-semibold text-gray-600 mb-1">Question Type</label><select value={form.question_type} onChange={e => setForm(f => ({ ...f, question_type: e.target.value }))} className={inputCls}><option value="mcq">Multiple Choice</option><option value="short_answer">Short Answer</option><option value="structured">Structured</option></select></div>
           <div><label className="block text-xs font-semibold text-gray-600 mb-1">Difficulty</label><select value={form.difficulty} onChange={e => setForm(f => ({ ...f, difficulty: e.target.value }))} className={inputCls}><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option></select></div>
           <div><label className="block text-xs font-semibold text-gray-600 mb-1">Count</label><select value={form.count} onChange={e => setForm(f => ({ ...f, count: Number(e.target.value) }))} className={inputCls}><option value={5}>5</option><option value={10}>10</option><option value={15}>15</option></select></div>
         </div>
