@@ -109,11 +109,35 @@ function ResourcesTab({ subtopicId, subtopic, subtopicName, onComplete }) {
     setNotesLoading(true);
     setNotesError(null);
     try {
+      // BUG FIX 1: subtopic_id was never sent here, even though
+      // POST /ai/notes/generate's entire caching/persistence mechanism
+      // (added in e3bd0a3, alongside fixing that route's nonexistent-table
+      // crash) is gated on `if (subtopic_id) {...}` for both the
+      // check-cache-first SELECT and the save-for-next-time INSERT. Without
+      // it, that whole mechanism was unreachable dead code — every click
+      // called Gemini fresh, and nothing was ever persisted to
+      // revision_notes, silently defeating the exact optimization that fix
+      // was written to add. `subtopicId` is already in scope here (used
+      // two lines above, in the GET /notes fetch-on-mount effect).
       const r = await api.post('/ai/notes/generate', {
-        subject_id: subtopic?.subject_id,
-        topic_name: subtopicName,
+        subject_id:  subtopic?.subject_id,
+        topic_name:  subtopicName,
+        subtopic_id: subtopicId,
       });
-      setNotes(r.notes);
+      // BUG FIX 2: apiClient's response interceptor only hoists a fixed
+      // allowlist of fields to the top level (success, message, total,
+      // count, meta, sent, inserted, already_exists, unread_count,
+      // approval_status, httpStatus — see apiClient.js) — 'notes' isn't
+      // one of them, so r.notes was always undefined even on a genuinely
+      // successful call. Because this backend route returns
+      // { success: true, notes } with no .data wrapper, apiClient's own
+      // fallback (`data = raw.data !== undefined ? raw.data : raw`) means
+      // the whole raw response — including notes — ends up at r.data
+      // instead. Net effect before this fix: clicking the button showed
+      // no error (the request genuinely succeeded) but also never
+      // displayed anything — a silent no-op, arguably harder to notice
+      // and report than the original crash this masked.
+      setNotes(r.data?.notes);
     } catch (err) {
       console.error('[SubtopicPage] Generate notes failed:', err);
       setNotesError(err?.message || 'Could not generate notes right now. Please try again.');
