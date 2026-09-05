@@ -272,6 +272,46 @@ the exact question ID/text and (b) Practice Mode vs Quiz mode, then re-run the
 same byte-level comparison against `quizzes.js`'s grading path specifically if
 it's the Quiz flow.
 
+**Status: RESOLVED — confirmed via code-level verification, not live DB
+access** (no Supabase/production DB connection available this pass, so this
+picks up specifically the "next step" above rather than re-querying question
+123's row).
+
+Checked all three of the app's independent grading code paths for the exact
+bug class described — a student marked wrong regardless of selection when
+`correct_answer` and `options[].option_text` drift out of sync — not just
+re-confirming one question's data:
+
+- `questionsRoutes.js` (Practice Mode / Test-Yourself, `POST /:id/answer`):
+  already fixed, tagged `BUG FIX (grading-always-wrong)`. Grades against
+  `options[].is_correct` (the flag set at question creation/review time) via
+  a matched, normalized option; only falls back to a raw `correct_answer`
+  text comparison when there's no usable `options` array at all.
+- `quizzes.js` (Quiz + Mock Exam, `POST /quizzes/attempt`): **independently
+  verified to have the identical fix**, same `grading-always-wrong` tag, same
+  is-correct-as-source-of-truth logic, same fallback condition. This directly
+  answers explanation #3 above — the Quiz flow's separate comparison logic
+  was the one thing the original pass didn't re-check, and it is not
+  divergent or buggy; it has the same protection.
+- `studentRoutes.js` (Test, `POST /test/:testId/submit`): also independently
+  verified to have the same logic (`matchedOpt.is_correct` preferred,
+  `typeof === 'boolean'` guarded, same raw-text fallback for questions with
+  no usable options).
+
+The `normalize()`/`normalizeAnswer()` Unicode-cleanup function itself
+(smart-quote and non-breaking-space normalization, whitespace collapsing,
+case-folding) is **byte-for-byte identical** across all three files — checked
+by direct comparison, not assumption.
+
+Net effect: this is not a one-row fix that happens to cover the originally
+reported question — it's a systemic, structural fix present consistently
+across every assessment surface in the app (Practice Mode, Test-Yourself,
+Quiz, Mock Exam, Test), so any future question row where `correct_answer`
+and `options[].option_text` drift is already protected against this exact
+failure mode, regardless of which mode a student uses. The original report's
+question could still be confirmed against the live DB if the exact ID is
+ever supplied, but the underlying bug class is closed on the code side.
+
 ---
 
 ## 6. Areas Checked and Found Clean (no action needed)
