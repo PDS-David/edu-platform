@@ -427,19 +427,29 @@ router.get('/questions/pending', protect, adminOnly, async (req, res) => {
     const limit  = Math.min(parseInt(req.query.limit  || '10', 10), 100);
     const offset = parseInt(req.query.offset || '0', 10);
 
+    // ORDER-1: question bank sorted first by exam type, then subject, then
+    // topic (per explicit request) -- previously created_at DESC only,
+    // which gave no consistent grouping at all for browsing/reviewing a
+    // batch. NULLS LAST on each level so a question missing subtopic_id
+    // (see the /questions/orphaned surface above for that separate issue)
+    // still appears, grouped at the end rather than disappearing or
+    // sorting unpredictably first.
     const rows = await sequelize.query(
       `SELECT
          q.id, q.question_text, q.type, q.options, q.correct_answer,
          q.difficulty, q.explanation, q.status, q.is_ai_generated,
          q.created_at,
          u.first_name, u.last_name, u.email AS submitted_by_email,
-         s.name AS subject_name, st.name AS subtopic_name
+         s.name AS subject_name, st.name AS subtopic_name,
+         t.name AS topic_name, eb.name AS exam_type_name
        FROM questions q
        LEFT JOIN users      u  ON q.submitted_by  = u.id
        LEFT JOIN subtopics  st ON q.subtopic_id   = st.id
        LEFT JOIN subjects   s  ON st.subject_id   = s.id
+       LEFT JOIN topics     t  ON st.topic_id     = t.id
+       LEFT JOIN exam_boards eb ON s.exam_board_id = eb.id
        WHERE COALESCE(q.status, 'pending') NOT IN ('approved', 'active', 'rejected')
-       ORDER BY q.created_at DESC
+       ORDER BY eb.name NULLS LAST, s.name NULLS LAST, t.name NULLS LAST, q.created_at DESC
        LIMIT :limit OFFSET :offset`,
       { replacements: { limit, offset }, type: QueryTypes.SELECT }
     );
