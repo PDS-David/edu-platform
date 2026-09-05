@@ -586,3 +586,183 @@ array-binding pattern already used correctly elsewhere in this codebase
 (`pastPaperRoutes.js`, `users.js`) — not the broken `ANY(:param)` pattern
 fixed earlier this session.
 **Status:** RESOLVED.
+
+---
+
+## 10. Payments — Intentionally Out of Scope
+
+**Product decision, confirmed directly by the project owner:** payments are
+intentionally left out of this project for now. The app is currently open
+to all users — no subscription gate is enforced as a matter of product
+policy, not because the payment code is broken.
+
+Context for whoever picks this up later: `paymentRoutes.js`'s core
+mechanics were independently verified this session and are sound —
+Paystack webhook signature verification is correctly implemented
+(constant-time HMAC-SHA512 comparison, idempotency check against
+already-processed transactions), and the charge amount is looked up
+server-side from `subscription_plans`, never trusted from the client (no
+amount-tampering vector).
+
+One real bug was found and independently confirmed against live production
+data before this note was added, so it doesn't get lost if payments are
+ever turned back on: `POST /initialize` charges `plan.price_monthly ??
+plan.price_yearly` (prefers monthly whenever set), while `GET /verify`
+grants subscription duration via `if (price_monthly && !price_yearly) → 1
+month; else → 1 year`. If any single plan ever has *both* prices
+populated, this pair of independently-written checks disagree — a user
+would be charged the monthly price but granted a full year of access.
+**Confirmed currently dormant** — live query against production:
+```sql
+SELECT plan_code, plan_name, price_monthly, price_yearly
+FROM subscription_plans
+WHERE price_monthly IS NOT NULL AND price_yearly IS NOT NULL;
+-- returned 0 rows, 2026-09-04
+```
+No plan currently has both prices set, so this cannot fire today. Still
+worth fixing before payments are re-enabled, since it's a landmine for the
+next plan anyone configures with both a monthly and yearly price — likely
+fix: compute amount and duration from one shared source (e.g. an explicit
+`billing_cycle` param, defaulting to whichever single price is actually
+set) instead of two separately-derived `??`/`if` expressions that can drift
+apart, the same bug shape found repeatedly elsewhere in this codebase this
+session (grading-comparison drift, table-name mismatch).
+
+Also noted, not a bug: no frontend path anywhere sends a `billing_cycle`
+param or references `price_yearly` — yearly billing appears to be dead,
+unreachable capability today regardless of the above.
+
+---
+
+## 11. Whole-App Audit Pass (this session) — Scope, Method, and New Findings
+
+Requested explicitly as a full app-wide audit, with the instruction that
+this document itself must be treated as a reference for comparison, never
+as the yardstick — every claim below was independently verified against
+the actual current code, not copied from prior audit passes.
+
+### 11.1 — Confirmed clean (verified, not assumed)
+
+- **`progressSummaryBulk.js` / `subtopicProgressRoutes.js`** — both
+  reference `req.user` with no `protect` call anywhere in the file itself,
+  which looked like an auth gap at first grep. Confirmed both are protected
+  at the mount level instead (`app.use('/api/...', protect, router)` in
+  `server.js`) — a valid, deliberate convention, not a bug.
+- **Resource deletion cascade** (`resourceRoutes.js` `DELETE /:id`) — two
+  explicit cleanup deletes (`resource_assignments`, `resource_user_
+  assignments`) are wrapped in `.catch(() => {})`, which looked like a
+  silent-failure risk matching the exact pattern that hid the
+  `revision_notes` table-name bug and the notes-caching bug earlier this
+  session. Confirmed harmless: both tables' `resource_id` column has
+  `REFERENCES resources(id) ON DELETE CASCADE` in the schema — the database
+  itself guarantees cleanup the instant the resource row is deleted,
+  regardless of whether these two explicit (redundant) deletes succeed.
+- **7 empty `catch {}` blocks across `server/routes/`** — swept and
+  categorized individually rather than assumed dangerous as a group. 6 of
+  7 are the safe "optional dependency" pattern (`try { X = require(...) }
+  catch {}` at module load time, for genuinely optional features —
+  `subscriptionGuard`, `awardXP`, welcome email). 1 (`videosRoutes.js`,
+  video-duration ffmpeg probe) silently drops non-critical display
+  metadata on failure — cosmetic only, not a functional break.
+- **`teacherRoutes.js`'s inline schema-migration statement** (`ALTER TABLE
+  classes ALTER COLUMN join_code DROP NOT NULL`, wrapped in `.catch(() =>
+  {})`) — a deliberate idempotent self-healing-schema pattern, not hiding a
+  functional bug.
+
+### 11.2 — New bug found, not previously documented anywhere
+
+**`teacherRoutes.js`, `POST /tests/:id/assign` (assign a test to a class or
+individual students):**
+```js
+for (const { studentId, classId } of targets) {
+  await sequelize.query(`INSERT INTO test_assignments ...`, {...}).catch(() => {});
+  count++;   // <-- runs unconditionally, even if the INSERT above just failed
+}
+```
+`count` increments for every target attempted, regardless of whether the
+`INSERT` actually succeeded — any silently-caught failure (a stale
+`class_memberships` row pointing at a since-removed student, a genuine DB
+hiccup, anything other than the intentional `ON CONFLICT DO NOTHING` no-op)
+still gets counted as a success. The teacher sees "Test assigned to 30
+students" in the response even if some of those 30 inserts silently
+failed — with zero indication which student(s) didn't actually receive the
+test, and no way for the teacher to know without a student separately
+reporting "I don't see this test."
+**Status:** confirmed via code read, not yet fixed — flagging here per this
+pass's scope (audit only, not action) pending direction on priority.
+
+### 11.3 — Confirmed still-open items, cross-checked against this document's own prior entries (see section 12 below for what these actually imply)
+
+- **`SEC-1`** (`examBoardRoutes.js` fully public) — this session did not
+  re-verify this claim; carried forward from the prior pass as-is,
+  explicitly unconfirmed by this pass.
+- **`GRADE-5`'s "FIXED" status is incomplete in what it implies** — only
+  `quizzes.js`'s `POST /attempt` was extended to AI-mark `essay`. The two
+  other question-*creation* paths (teacher manual-authoring form,
+  community submission endpoint) remain hardcoded `mcq`-only, confirmed via
+  direct code read this session (`options.length >= 2` required
+  unconditionally, `'mcq'` literal hardcoded into both INSERTs, no `type`
+  field accepted from either). Only the admin AI generator was extended to
+  support `short_answer`/`structured` question *creation* this session.
+
+### 11.4 — Explicit remaining blind spots after this pass
+
+Time-boxed, not silently skipped: of 48 route files, this session's total
+combined audit work (across this pass and everything fixed earlier) has
+now substantively read or pattern-swept the majority, but the following
+still have not received a real line-by-line read, only confirmed absent
+from earlier greps: `adaptiveRoutes.js`, `agentServiceRoutes.js`,
+`aiQuestionGenerationRoutes.js`, `analytics.js`/`analyticsRoutes.js`,
+`auditRoutes.js`, `authRoutes.js` (partial only — module-load fallback
+checked, reset-token/session logic not read), `conceptRoutes.js`,
+`dashboardRoutes.js`, `engineValidationRoutes.js`, `eventReplayRoutes.js`,
+`examIntelligenceRoutes.js`, `explanationRoute.js`,
+`languageMasterclassRoutes.js`, `learningEventRoutes.js`, `notesRoutes.js`,
+`notificationsRoutes.js` (endpoint count only, logic unread),
+`progressRoutes.js`, `recommendationRoutes.js`, `sessionRoutes.js`,
+`subjectsRoutes.js`, `subtopicRoutes.js`, `topicsRoutes.js`,
+`userRoutes.js`, `videosRoutes.js` (one catch block checked, rest unread),
+`weakTopicRoutes.js`.
+
+---
+
+## 12. What the Confirmed-Open Gaps Actually Imply
+
+Plain-language read of what each open item in sections 4-6 and 11.3 above
+actually means for the app in its current state, not just that it exists:
+
+- **`SEC-1` (`examBoardRoutes.js` fully public, unverified this pass)** — if
+  accurate as documented, this endpoint likely only exposes read-only exam
+  board metadata (names, codes, subject-count standards — the kind of data
+  already shown to logged-out visitors on public marketing pages). The
+  practical risk is narrow: an unauthenticated caller could enumerate exam
+  board configuration data, not student records or credentials. Still
+  worth closing since "fully public with no `protect` at all" is an easy
+  habit to accidentally extend to a less benign route later in the same
+  file — but this isn't a data-breach-severity item as currently described.
+- **`GRADE-5`'s incomplete scope (2 of 3 content-creation paths still
+  MCQ-only)** — the practical implication is narrower than it sounds:
+  students can *already* answer and get fairly graded on `short_answer`/
+  `structured` questions everywhere they appear (GRADE-1 through GRADE-4),
+  and the admin generator can *already* produce that content in bulk. The
+  gap only affects two specific creation paths (an individual teacher
+  hand-writing one question, or a student submitting one via the community
+  endpoint) — a content-authoring convenience gap for two specific
+  workflows, not a student-facing correctness or grading problem.
+- **The new `teacherRoutes.js` assign-count bug (11.2)** — this is the one
+  with a real, direct student-impact implication: a teacher can believe a
+  test reached every selected student when it silently didn't reach all of
+  them, with no error surfaced anywhere. A student who never received an
+  assigned test has no way to know one was intended for them, and the
+  teacher has no way to know their count was wrong unless a student happens
+  to ask. This is a trust/reliability gap in a core teacher workflow, not
+  a security issue — worth prioritizing above `SEC-1` if forced to choose,
+  precisely because it fails silently rather than loudly.
+- **The unread blind-spot files (11.4)** — the honest implication is that
+  this audit's "clean" findings only cover what was actually read. Areas
+  like payment (now out of scope per section 10), grading, and
+  auth-at-the-route-file-level were deliberately prioritized as the
+  highest-stakes surfaces to verify first; the remaining ~24 files are
+  genuinely unknown quantities, not confirmed either way — treating their
+  absence from this document as "probably fine" would be exactly the
+  mistake this document's own opening instruction warns against.
