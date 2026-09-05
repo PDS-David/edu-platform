@@ -1677,6 +1677,21 @@ router.get('/questions/pending', protect, teacherOnly, async (req, res) => {
     const limit  = Math.min(parseInt(req.query.limit  || '10', 10), 100);
     const offset = parseInt(req.query.offset || '0', 10);
 
+    // FEATURE: same staged exam-type -> subject -> topic filtering as
+    // adminRoutes.js's mirror of this endpoint (shared frontend,
+    // QuestionReview.jsx, calls both under the same param names via
+    // apiBase). All three optional at the SQL layer for the same reason
+    // noted on the admin version — the staged requirement itself is
+    // enforced by the frontend never calling this until all three are
+    // picked, not by this endpoint refusing partial input.
+    const { exam_type_id, subject_id, topic_id } = req.query;
+    const filterClauses = [];
+    const filterReplacements = {};
+    if (exam_type_id) { filterClauses.push('eb.id = :examTypeId'); filterReplacements.examTypeId = exam_type_id; }
+    if (subject_id)   { filterClauses.push('s.id = :subjectId');   filterReplacements.subjectId   = subject_id; }
+    if (topic_id)     { filterClauses.push('t.id = :topicId');     filterReplacements.topicId     = topic_id; }
+    const filterSql = filterClauses.length ? `AND ${filterClauses.join(' AND ')}` : '';
+
     // ORDER-1: same exam-type -> subject -> topic sort as admin's own
     // question bank listing (adminRoutes.js GET /questions/pending) --
     // subject/topic are non-nullable here since the JOINs to reach
@@ -1698,19 +1713,27 @@ router.get('/questions/pending', protect, teacherOnly, async (req, res) => {
        LEFT JOIN exam_boards eb ON s.exam_board_id = eb.id
        JOIN      teacher_subjects ts ON ts.subject_id = s.id AND ts.teacher_id = :teacherId AND ts.is_active = true
        WHERE COALESCE(q.status, 'pending') NOT IN ('approved', 'active', 'rejected')
+       ${filterSql}
        ORDER BY eb.name NULLS LAST, s.name, t.name, q.created_at DESC
        LIMIT :limit OFFSET :offset`,
-      { replacements: { teacherId: req.user.id, limit, offset }, type: QueryTypes.SELECT }
+      { replacements: { teacherId: req.user.id, limit, offset, ...filterReplacements }, type: QueryTypes.SELECT }
     );
 
+    // Mirrors admin's own version: this count reflects the SAME filters as
+    // the row query above (once staged, the per-selection count) — not the
+    // teacher's site-wide pending total, which stays whatever separate
+    // pending-count endpoint/badge already exists, untouched by this change.
     const [countRow] = await sequelize.query(
       `SELECT COUNT(*)::INTEGER AS count
        FROM questions q
        JOIN subtopics st ON q.subtopic_id = st.id
        JOIN subjects  s  ON st.subject_id = s.id
+       JOIN topics    t  ON st.topic_id   = t.id
+       LEFT JOIN exam_boards eb ON s.exam_board_id = eb.id
        JOIN teacher_subjects ts ON ts.subject_id = s.id AND ts.teacher_id = :teacherId AND ts.is_active = true
-       WHERE COALESCE(q.status, 'pending') NOT IN ('approved', 'active', 'rejected')`,
-      { replacements: { teacherId: req.user.id }, type: QueryTypes.SELECT }
+       WHERE COALESCE(q.status, 'pending') NOT IN ('approved', 'active', 'rejected')
+       ${filterSql}`,
+      { replacements: { teacherId: req.user.id, ...filterReplacements }, type: QueryTypes.SELECT }
     );
 
     return res.json({ success: true, data: rows, total: countRow?.count || 0 });
