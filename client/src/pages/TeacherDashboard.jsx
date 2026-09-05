@@ -1448,7 +1448,18 @@ export default function TeacherDashboard() {
   // query-string changes.
   const tabParam = searchParams.get('tab');
   useEffect(() => {
-    const INLINE_TABS = ['classes', 'analytics', 'testbuilder'];
+    // BUG FIX: 'aigenerate' was added as a sidebar nav item, a render
+    // condition ({activeTab === 'aigenerate' && <AIGenerateTab />}), and a
+    // real AIGenerateTab component — but never added here. Since
+    // PortalSidebar.jsx is a separate component with no access to this
+    // component's local activeTab state, clicking the sidebar item can
+    // only navigate via URL (?tab=aigenerate) and rely on this allowlist
+    // to sync it into state. Without this entry, the URL changes and the
+    // sidebar highlights correctly, but the content area silently stays
+    // on whatever tab was previously active — reproducing the exact
+    // "AI Generate highlighted, Classes content shown" bug this feature
+    // was supposed to fix.
+    const INLINE_TABS = ['classes', 'analytics', 'testbuilder', 'aigenerate'];
     if (tabParam && INLINE_TABS.includes(tabParam)) {
       setActiveTab(tabParam);
     }
