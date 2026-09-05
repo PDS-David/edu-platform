@@ -32,6 +32,15 @@ export default function QuestionReview() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const dashboardPath = user?.role === 'admin' ? '/admin/dashboard' : '/teacher/dashboard';
+  // TEACH-REVIEW-1: this page was already role-aware for navigation
+  // (dashboardPath above) but its two API calls were hardcoded to
+  // /admin/questions regardless -- a teacher opening this page would have
+  // hit adminOnly-gated routes and gotten a 403 on both. Teachers now have
+  // their own scoped mirrors (teacherRoutes.js GET /questions/pending and
+  // PUT /questions/:id/review, restricted to their assigned subjects via
+  // teacher_subjects) -- this just picks the right base path, the rest of
+  // the component's logic is identical for both roles.
+  const apiBase = user?.role === 'admin' ? '/admin' : '/teacher';
   const [questions, setQuestions] = useState([]);
   const [total,     setTotal]     = useState(0);
   const [offset,    setOffset]    = useState(0);
@@ -50,7 +59,7 @@ export default function QuestionReview() {
     setLoading(true);
     setError(null);
     try {
-      const data = await api.get(`/admin/questions/pending?limit=${PAGE_SIZE}&offset=${off}`);
+      const data = await api.get(`${apiBase}/questions/pending?limit=${PAGE_SIZE}&offset=${off}`);
       setQuestions(data.data || []);
       setTotal(data.total || 0);
       setOffset(off);
@@ -70,7 +79,7 @@ export default function QuestionReview() {
     setSubmitting(true);
     try {
       const data = await api.put(
-        `/admin/questions/${reviewing.id}/review`,
+        `${apiBase}/questions/${reviewing.id}/review`,
         { action, feedback: feedback.trim() || undefined }
       );
       if (data.success) {

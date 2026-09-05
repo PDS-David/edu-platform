@@ -11,6 +11,9 @@ const { QueryTypes } = require('sequelize');
 const sequelize      = require('../config/database');
 const { protect }    = require('../middleware/auth');
 const { requireTeacherClassOwnership } = require('../middleware/teacherScope');
+const { generate } = require('../services/ai');
+const { success, error } = require('../utils/response');
+const { adminActionLimiter } = require('../middleware/rateLimiter');
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -1392,4 +1395,391 @@ router.delete('/questions/:id', protect, teacherOnly, async (req, res) => {
 });
 
 // ── GET /api/teacher/students ─────────────────────────────────────────────────
+
+// ─── TEACH-GEN-1/TEACH-REVIEW-1: teacher AI question generation + scoped
+// review ──────────────────────────────────────────────────────────────────
+// A teacher can now do, for their own assigned subject(s) only, what only an
+// admin could do before: AI-generate questions, and vet (approve/reject)
+// AI-generated questions in the question bank. Scoping is via
+// teacher_subjects (teacher_id, subject_id, exam_board_id, is_active) — the
+// same table school_admin uses to assign subjects to teachers, and the same
+// table pastPaperRoutes.js already scopes teacher visibility by.
+
+router.post('/generate-questions', protect, teacherOnly, async (req, res) => {
+  const rawCount = req.body.count;
+  const count = Math.min(Math.max(parseInt(rawCount) || 10, 1), 15);
+  const { subject_id, topic, subtopic_id, difficulty = 'medium' } = req.body;
+
+  // FEATURE: question_type support. Previously this endpoint (and the
+  // 'mcq' literal hardcoded into its INSERT below) could only ever produce
+  // multiple-choice questions — confirmed via full-codebase audit that this
+  // was true of every question-creation path in the app (this admin
+  // generator, the teacher manual-authoring form, and the community
+  // submission endpoint), which is why zero short_answer/structured
+  // questions existed anywhere in the database despite every downstream
+  // grading/display feature for those types (GRADE-1 through GRADE-6, this
+  // session) already being correctly built and waiting for content that
+  // had no way to exist. This is the first of those three paths extended.
+  const ALLOWED_QUESTION_TYPES = ['mcq', 'short_answer', 'structured'];
+  const question_type = ALLOWED_QUESTION_TYPES.includes(req.body.question_type)
+    ? req.body.question_type
+    : 'mcq';
+  const isFreeText = question_type !== 'mcq';
+
+  if (!subject_id || !topic) {
+    return error(res, 'subject_id and topic are required', 400);
+  }
+
+  try {
+    const subjectRows = await sequelize.query(
+      `SELECT name FROM subjects WHERE id = :id`,
+      { replacements: { id: subject_id }, type: QueryTypes.SELECT }
+    );
+
+    if (!subjectRows.length) return error(res, 'Subject not found', 404);
+
+    // TEACH-GEN-1: a teacher may only AI-generate questions for a subject
+    // they've actually been assigned (teacher_subjects, same table
+    // school_admin uses to assign subjects to teachers, and the same table
+    // pastPaperRoutes.js already scopes teacher visibility by). Mirrors the
+    // admin version's behavior exactly otherwise — this is deliberately a
+    // narrow, additive scoping check on top of that same logic, not a
+    // parallel reimplementation.
+    const assignedSubjects = await sequelize.query(
+      `SELECT 1 FROM teacher_subjects WHERE teacher_id = :teacherId AND subject_id = :subjectId AND is_active = true LIMIT 1`,
+      { replacements: { teacherId: req.user.id, subjectId: subject_id }, type: QueryTypes.SELECT }
+    );
+    if (!assignedSubjects.length) {
+      return error(res, 'You are not assigned to this subject', 403);
+    }
+
+    // Resolve subtopic_id: if none provided, try to find a subtopic whose
+    // name matches the typed topic text so AI-generated questions are
+    // discoverable on the student quiz page (which JOINs on subtopic_id).
+    let resolvedSubtopicId = subtopic_id || null;
+    if (!resolvedSubtopicId && topic.trim()) {
+      const stRows = await sequelize.query(
+        `SELECT st.id FROM subtopics st
+           JOIN topics t ON t.id = st.topic_id
+          WHERE t.subject_id = :subjectId
+            AND LOWER(st.name) = LOWER(:name)
+          LIMIT 1`,
+        { replacements: { subjectId: subject_id, name: topic.trim() }, type: QueryTypes.SELECT }
+      ).catch(() => []);
+      resolvedSubtopicId = stRows[0]?.id || null;
+    }
+
+    // Prompt varies by question_type: mcq needs 4 discrete options with one
+    // flagged correct; short_answer/structured are free-response, so instead
+    // of options they need a single expected/model answer for AI marking to
+    // grade against later (see buildEssayFeedbackPrompt in services/ai.js —
+    // that's what reads this same correct_answer column as "Model answer"
+    // for these two types at grading time, same as every other question-
+    // creation path that already produces essay-marked content).
+    const prompt = question_type === 'mcq'
+      ? `Generate ${count} ${difficulty} multiple-choice questions on the topic "${topic}" for the subject "${subjectRows[0].name}". Return ONLY a valid JSON array, no markdown. Each object must have: question_text (string), options (array of 4 strings), correct_answer (string matching one option exactly), explanation (string).`
+      : question_type === 'short_answer'
+      ? `Generate ${count} ${difficulty} short-answer questions on the topic "${topic}" for the subject "${subjectRows[0].name}". Each question must have ONE brief, unambiguous correct answer — a single word, number, or short phrase (not a sentence or paragraph) — since these are graded by exact-text matching, not by an examiner's judgment. Return ONLY a valid JSON array, no markdown. Each object must have: question_text (string), correct_answer (the brief expected answer, string), explanation (string).`
+      : `Generate ${count} ${difficulty} structured (free-response) questions on the topic "${topic}" for the subject "${subjectRows[0].name}", suitable for WAEC/JAMB/NECO-style exams. These require a written answer of a few sentences, not a single word. Return ONLY a valid JSON array, no markdown. Each object must have: question_text (string), correct_answer (a full model answer of 2-5 sentences, string), explanation (string, may briefly restate key marking points).`;
+
+    const raw     = await generate(prompt, 'generate-questions');
+    const cleaned = raw.replace(/```json|```/g, '').trim();
+
+    // BUG FIX: Gemini occasionally emits raw, unescaped control characters
+    // (literal newlines/tabs/carriage returns) inside JSON string values —
+    // e.g. when writing a multi-line explanation or a stacked equation. The
+    // JSON spec requires these to be escaped as \n/\t inside strings;
+    // JSON.parse throws "Bad control character in string literal" and the
+    // ENTIRE batch generation fails, even though only one field in one
+    // question is malformed. sanitizeAiJson() only escapes control
+    // characters that fall INSIDE a quoted JSON string — structural
+    // whitespace between tokens (which a naive global regex previously
+    // corrupted) is left untouched.
+    const sanitized = sanitizeAiJson(cleaned);
+
+    let questions;
+    try {
+      questions = JSON.parse(sanitized);
+    } catch (parseErr) {
+      // Sanitization couldn't fix it — give the admin a clearer error than
+      // a raw JSON.parse stack trace with a byte offset.
+      return error(res, `AI returned malformed data and could not be parsed: ${parseErr.message}. Try generating again or reduce the question count.`, 502);
+    }
+
+    let inserted = 0;
+    let skipped  = 0;
+    const skippedReasons = [];
+
+    // Same Unicode-aware normalization used by the grading endpoints
+    // (questionsRoutes.js POST /:id/answer, quizzes.js POST /attempt) so
+    // that is_correct is flagged using the identical comparison that will
+    // later be used to grade against it — eliminates the class of bug where
+    // insert-time matching and grading-time matching disagree.
+    const normalizeForMatch = (s) =>
+      String(s ?? '')
+        .replace(/[\u2018\u2019\u201B]/g, "'")
+        .replace(/[\u201C\u201D\u201F]/g, '"')
+        .replace(/[\u00A0\u2007\u202F]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
+
+    for (const q of questions) {
+      if (!q.question_text) { skipped++; continue; }
+
+      if (isFreeText) {
+        // short_answer/structured: no options array to validate — instead
+        // require a usable correct_answer (the expected answer / model
+        // answer, same column the mcq branch also writes to, just with
+        // different semantics per type, exactly matching every other
+        // question-type-aware code path already built this session).
+        const modelAnswer = (q.correct_answer || '').toString().trim();
+        if (!modelAnswer) {
+          skipped++;
+          skippedReasons.push(`"${q.question_text.slice(0, 60)}..." — no correct_answer provided`);
+          continue;
+        }
+        // Structured answers are meant to be full sentences; short_answer's
+        // own prompt explicitly asks for brevity, so only structured gets a
+        // minimum-length sanity check (catches Gemini occasionally
+        // collapsing a "model answer" down to a single word despite the
+        // prompt's instruction, which would otherwise silently insert a
+        // structured question no more graded than a short_answer one).
+        if (question_type === 'structured' && modelAnswer.length < 20) {
+          skipped++;
+          skippedReasons.push(`"${q.question_text.slice(0, 60)}..." — model answer too short for a structured question`);
+          continue;
+        }
+
+        await sequelize.query(
+          `INSERT INTO questions
+             (question_text, options, correct_answer, explanation, difficulty,
+              subtopic_id, type, is_active, is_ai_generated, status, created_at, updated_at)
+           VALUES (:q, NULL, :c, :e, :d,
+                   :subtopicId, :type, true, true, 'pending', NOW(), NOW())`,
+          {
+            replacements: {
+              q: q.question_text,
+              c: modelAnswer,
+              e: q.explanation || null,
+              d: difficulty,
+              subtopicId: resolvedSubtopicId,
+              type: question_type,
+            },
+            type: QueryTypes.INSERT,
+          }
+        );
+        inserted++;
+        continue;
+      }
+
+      const rawOptions = Array.isArray(q.options) ? q.options : [];
+      const normOptions = rawOptions.map(opt => {
+        if (typeof opt === 'string') {
+          return {
+            option_text: opt,
+            is_correct:  normalizeForMatch(opt) === normalizeForMatch(q.correct_answer || ''),
+          };
+        }
+        return { option_text: opt.option_text || opt.text || String(opt), is_correct: !!opt.is_correct };
+      }).filter(o => o.option_text && o.option_text.trim()); // drop blank/garbage entries
+
+      const anyCorrect = normOptions.some(o => o.is_correct);
+      if (!anyCorrect && q.correct_answer) {
+        normOptions.forEach(o => {
+          o.is_correct = normalizeForMatch(o.option_text) === normalizeForMatch(q.correct_answer);
+        });
+      }
+
+      // BUG FIX: Gemini occasionally omits/malforms the options array for a
+      // question in a batch (wrong key name, fewer than 4, no option marked
+      // correct). The old code silently inserted these with options: [] —
+      // they passed validation (only question_text was checked), reached
+      // 'pending', and an admin could approve them in the Review Queue
+      // without any visual warning (the review UI also just renders an
+      // empty grid for zero options). Students then hit a question with no
+      // answer choices at all. Now: skip and report instead of saving
+      // broken data. The admin sees exactly how many were skipped and can
+      // retry generation for that slot.
+      if (normOptions.length < 2) {
+        skipped++;
+        skippedReasons.push(`"${q.question_text.slice(0, 60)}..." — only ${normOptions.length} usable option(s)`);
+        continue;
+      }
+      if (!normOptions.some(o => o.is_correct)) {
+        skipped++;
+        skippedReasons.push(`"${q.question_text.slice(0, 60)}..." — no correct option identified`);
+        continue;
+      }
+
+      // POLICY: AI-generated questions always require admin review before
+      // reaching students — status='pending', not 'approved', even when an
+      // admin is the one triggering generation. A prior commit (194383c)
+      // changed this to 'approved' to work around questions being invisible
+      // on the student quiz page, but the actual cause was twofold: (1) no
+      // subtopic_id was being saved, so the hard JOIN in /questions/random
+      // excluded them entirely — now fixed above (resolvedSubtopicId); and
+      // (2) the review queue wasn't being used at all. Skipping review was
+      // the wrong fix for that visibility bug. The real fix is: save
+      // subtopic_id correctly (kept), and have the admin actually approve
+      // generated batches from the Question Review Queue — which takes one
+      // click per question and is the explicit, audited record that this
+      // admin reviewed and approved this specific content before students
+      // see it, exactly like every other AI-generated question in the
+      // system (quiz fallback, remediation engine, etc).
+      await sequelize.query(
+        `INSERT INTO questions
+           (question_text, options, correct_answer, explanation, difficulty,
+            subtopic_id, type, is_active, is_ai_generated, status, created_at, updated_at)
+         VALUES (:q, :o::jsonb, :c, :e, :d,
+                 :subtopicId, :type, true, true, 'pending', NOW(), NOW())`,
+        {
+          replacements: {
+            q: q.question_text,
+            o: JSON.stringify(normOptions),
+            c: q.correct_answer  || null,
+            e: q.explanation     || null,
+            d: difficulty,
+            subtopicId: resolvedSubtopicId,
+            type: question_type,
+          },
+          type: QueryTypes.INSERT,
+        }
+      );
+      inserted++;
+    }
+
+    return success(res, {
+      generated: questions.length,
+      inserted,
+      skipped,
+      skipped_reasons: skippedReasons,
+      questions,
+      subtopic_id: resolvedSubtopicId,
+      message: skipped > 0
+        ? `${inserted} question(s) saved for review, ${skipped} skipped due to missing/invalid options.`
+        : `${inserted} question(s) saved for review.`,
+    });
+  } catch (err) {
+    console.error('[teacher.generate]', err.message);
+    return error(res, 'AI generation failed: ' + err.message);
+  }
+});
+
+
+// ── GET /api/teacher/questions/pending — list AI-generated/submitted
+// questions awaiting review, scoped to this teacher's assigned subjects
+// only (teacher_subjects, is_active). Mirrors admin's own
+// GET /admin/questions/pending, INNER JOINed down to teacher_subjects so a
+// question outside every subject this teacher is assigned to never appears.
+router.get('/questions/pending', protect, teacherOnly, async (req, res) => {
+  try {
+    const limit  = Math.min(parseInt(req.query.limit  || '10', 10), 100);
+    const offset = parseInt(req.query.offset || '0', 10);
+
+    // ORDER-1: same exam-type -> subject -> topic sort as admin's own
+    // question bank listing (adminRoutes.js GET /questions/pending) --
+    // subject/topic are non-nullable here since the JOINs to reach
+    // teacher_subjects are already INNER JOINs, so NULLS LAST isn't needed
+    // the way it is on the admin (LEFT JOIN) version.
+    const rows = await sequelize.query(
+      `SELECT
+         q.id, q.question_text, q.type, q.options, q.correct_answer,
+         q.difficulty, q.explanation, q.status, q.is_ai_generated,
+         q.created_at,
+         u.first_name, u.last_name, u.email AS submitted_by_email,
+         s.name AS subject_name, st.name AS subtopic_name,
+         t.name AS topic_name, eb.name AS exam_type_name
+       FROM questions q
+       LEFT JOIN users      u  ON q.submitted_by  = u.id
+       JOIN      subtopics  st ON q.subtopic_id   = st.id
+       JOIN      subjects   s  ON st.subject_id   = s.id
+       JOIN      topics     t  ON st.topic_id     = t.id
+       LEFT JOIN exam_boards eb ON s.exam_board_id = eb.id
+       JOIN      teacher_subjects ts ON ts.subject_id = s.id AND ts.teacher_id = :teacherId AND ts.is_active = true
+       WHERE COALESCE(q.status, 'pending') NOT IN ('approved', 'active', 'rejected')
+       ORDER BY eb.name NULLS LAST, s.name, t.name, q.created_at DESC
+       LIMIT :limit OFFSET :offset`,
+      { replacements: { teacherId: req.user.id, limit, offset }, type: QueryTypes.SELECT }
+    );
+
+    const [countRow] = await sequelize.query(
+      `SELECT COUNT(*)::INTEGER AS count
+       FROM questions q
+       JOIN subtopics st ON q.subtopic_id = st.id
+       JOIN subjects  s  ON st.subject_id = s.id
+       JOIN teacher_subjects ts ON ts.subject_id = s.id AND ts.teacher_id = :teacherId AND ts.is_active = true
+       WHERE COALESCE(q.status, 'pending') NOT IN ('approved', 'active', 'rejected')`,
+      { replacements: { teacherId: req.user.id }, type: QueryTypes.SELECT }
+    );
+
+    return res.json({ success: true, data: rows, total: countRow?.count || 0 });
+  } catch (err) {
+    console.error('[GET /teacher/questions/pending]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── PUT /api/teacher/questions/:id/review — approve or reject a question,
+// only if it belongs to one of this teacher's assigned subjects (verified
+// by ownership JOIN below, same pattern as Phase 2 classes/past-papers
+// scoping this session — never trust the :id alone, always re-verify
+// against teacher_subjects before allowing the write).
+router.put('/questions/:id/review', protect, teacherOnly, adminActionLimiter, async (req, res) => {
+  try {
+    const { action, feedback } = req.body;
+    if (!['approve', 'reject'].includes(action)) {
+      return res.status(400).json({ success: false, error: 'action must be "approve" or "reject"' });
+    }
+
+    const owned = await sequelize.query(
+      `SELECT q.id FROM questions q
+         JOIN subtopics st ON q.subtopic_id = st.id
+         JOIN subjects  s  ON st.subject_id = s.id
+         JOIN teacher_subjects ts ON ts.subject_id = s.id AND ts.teacher_id = :teacherId AND ts.is_active = true
+        WHERE q.id = :id`,
+      { replacements: { teacherId: req.user.id, id: req.params.id }, type: QueryTypes.SELECT }
+    );
+    if (!owned.length) {
+      return res.status(404).json({ success: false, error: 'Question not found in your assigned subjects' });
+    }
+
+    const newStatus = action === 'approve' ? 'approved' : 'rejected';
+
+    try {
+      await sequelize.query(
+        `UPDATE questions
+         SET status = :status,
+             review_feedback = :feedback,
+             reviewed_by = :reviewer,
+             reviewed_at = NOW(),
+             updated_at  = NOW()
+         WHERE id = :id`,
+        {
+          replacements: {
+            status:   newStatus,
+            feedback: feedback?.trim() || null,
+            reviewer: req.user.id,
+            id:       req.params.id,
+          },
+          type: QueryTypes.UPDATE,
+        }
+      );
+    } catch (colErr) {
+      // Same defensive fallback as admin's own review endpoint — the
+      // optional review_feedback/reviewed_by/reviewed_at columns might not
+      // exist on some deployments yet.
+      await sequelize.query(
+        `UPDATE questions SET status = :status, updated_at = NOW() WHERE id = :id`,
+        { replacements: { status: newStatus, id: req.params.id }, type: QueryTypes.UPDATE }
+      );
+    }
+
+    return res.json({ success: true, status: newStatus });
+  } catch (err) {
+    console.error('[PUT /teacher/questions/:id/review]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;
