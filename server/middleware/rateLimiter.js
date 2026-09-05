@@ -28,6 +28,35 @@ const aiLimiter = rateLimit({
   message: { success: false, error: 'AI request limit exceeded' },
 });
 
+// ── Explain limiter ──────────────────────────────────────────────────────────
+// BUG FIX: POST /ai/explain (aiRoutes.js) was on the standard aiLimiter
+// (20/15min) same as every other AI route — but unlike those, this one
+// fires AUTOMATICALLY on every single question answered (MCQ, short_answer,
+// structured, essay), across SubtopicPage.jsx/QuizPage.jsx/PracticeMode.jsx,
+// not on deliberate user-initiated action. A normal practice session well
+// under abusive levels (20+ questions in 15 minutes is completely ordinary
+// for a student working through Test-Yourself) exhausted the limit purely
+// from auto-fired calls, silently losing explanations for the rest of the
+// session — reported live as "No explanation available" appearing for
+// genuinely-answered questions.
+// This endpoint is also naturally cost-bounded in a way the others aren't:
+// once any student triggers a real Gemini call for a given question, the
+// result is cached onto questions.explanation and every subsequent request
+// for that same question (any student, any session, forever after) is
+// served from that cache before ever reaching Gemini again — so a higher
+// ceiling here doesn't scale cost the way it would on genuinely
+// per-request AI features like chat or hint. Sized generously for heavy
+// legitimate practice while still bounding genuine scripted abuse (e.g. a
+// script blasting distinct question_ids to force fresh, uncached Gemini
+// calls).
+const explainLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'AI request limit exceeded' },
+});
+
 // ── Analytics limiter ─────────────────────────────────────────────────────────
 const analyticsLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -142,4 +171,4 @@ const agentServiceLimiter = rateLimit({
   message: { success: false, error: 'Shared agent service rate limit exceeded. Please try again shortly.' },
 });
 
-module.exports = { globalLimiter, aiLimiter, analyticsLimiter, authLimiter, streamingLimiter, adminActionLimiter, pronunciationLimiter, schoolJoinLimiter, agentServiceLimiter };
+module.exports = { globalLimiter, aiLimiter, explainLimiter, analyticsLimiter, authLimiter, streamingLimiter, adminActionLimiter, pronunciationLimiter, schoolJoinLimiter, agentServiceLimiter };

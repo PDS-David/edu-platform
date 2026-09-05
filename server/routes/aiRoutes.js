@@ -18,7 +18,7 @@ const express  = require('express');
 const multer   = require('multer');
 const router   = express.Router();
 const { protect }            = require('../middleware/auth');
-const { aiLimiter }          = require('../middleware/rateLimiter');
+const { aiLimiter, explainLimiter } = require('../middleware/rateLimiter');
 const { QueryTypes }         = require('sequelize');
 const sequelize              = require('../config/database');
 const { generate }           = require('../services/ai');
@@ -106,7 +106,10 @@ Give concise, curriculum-aligned answers suited for WAEC/JAMB/NECO preparation.`
 });
 
 // ── POST /api/ai/explain ──────────────────────────────────────────────────────
-router.post('/explain', protect, aiLimiter, async (req, res) => {
+// explainLimiter, not the standard aiLimiter — see the limiter's own
+// comment in middleware/rateLimiter.js for why: this fires automatically
+// on every answer, across multiple pages, unlike every other AI route.
+router.post('/explain', protect, explainLimiter, async (req, res) => {
   const { question_id, typed_answer } = req.body;
 
   if (!question_id) {
