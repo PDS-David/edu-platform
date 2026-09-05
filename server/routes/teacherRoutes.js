@@ -1764,7 +1764,16 @@ router.put('/questions/:id/review', protect, teacherOnly, adminActionLimiter, as
       { replacements: { teacherId: req.user.id, id: req.params.id }, type: QueryTypes.SELECT }
     );
     if (!owned.length) {
-      return res.status(404).json({ success: false, error: 'Question not found in your assigned subjects' });
+      // ASSIGN-3 (APP_WIDE_AUDIT.md follow-up, approved by Da): was 404
+      // "Question not found in your assigned subjects". Every other
+      // subject-scoping check in this file (my-subjects, topics, subtopics,
+      // question generation, etc.) returns 403 "Not assigned to this
+      // subject" for the identical kind of check — this was the one
+      // outlier. Confirmed safe to change: QuestionReview.jsx's
+      // submitReview() only ever displays the response's `error` string in
+      // a plain alert(), it does not branch on status code, so this is a
+      // pure consistency fix with no frontend behavior change.
+      return res.status(403).json({ success: false, error: 'Not assigned to this subject' });
     }
 
     const newStatus = action === 'approve' ? 'approved' : 'rejected';
