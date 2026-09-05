@@ -272,10 +272,8 @@ the exact question ID/text and (b) Practice Mode vs Quiz mode, then re-run the
 same byte-level comparison against `quizzes.js`'s grading path specifically if
 it's the Quiz flow.
 
-**Status: RESOLVED — confirmed via code-level verification, not live DB
-access** (no Supabase/production DB connection available this pass, so this
-picks up specifically the "next step" above rather than re-querying question
-123's row).
+**Status: RESOLVED — confirmed via code-level verification AND direct live
+production DB queries** (the user ran these; results below).
 
 Checked all three of the app's independent grading code paths for the exact
 bug class described — a student marked wrong regardless of selection when
@@ -293,6 +291,42 @@ re-confirming one question's data:
   answers explanation #3 above — the Quiz flow's separate comparison logic
   was the one thing the original pass didn't re-check, and it is not
   divergent or buggy; it has the same protection.
+- `studentRoutes.js` (Test, `POST /test/:testId/submit`): also independently
+  verified to have the same logic (`matchedOpt.is_correct` preferred,
+  `typeof === 'boolean'` guarded, same raw-text fallback for questions with
+  no usable options).
+
+**Live DB verification (question 123 and beyond):** re-pulled question 123
+directly — `correct_answer` and the matching option text are still
+byte-identical, confirming the original finding still holds. But this
+surfaced something neither pass had caught: question 123's `options` column
+is a **plain array of strings**, not `{option_text, is_correct}` objects —
+and the `is_correct`-based fix's `usableOpts` filter
+(`o => typeof o === 'object' && o.option_text`) silently produces an empty
+array for that shape, meaning the fix's protection never actually engages
+for it; it falls straight to the same raw-text fallback the original bug
+came from.
+
+Ran a full production query across the whole `questions` table to find the
+actual scope: **968 questions use the object format** (protected by the
+fix), **375 use the plain-string-array format** (not protected by it). A
+second query checked all 375 plain-string questions for a live
+`correct_answer`-vs-options mismatch — **zero found**. So no currently-live
+instance of the bug exists in either format.
+
+On reflection (worked through the actual boolean logic before proposing a
+code change — see PR discussion): the plain-string format isn't actually
+missing protection the way it first appeared. The original bug requires
+*two independently-stored signals* (`correct_answer` column and per-option
+`is_correct` flag) to drift apart — that's only possible where both signals
+exist separately, i.e. the object format. Plain-string options carry no
+second signal at all; the only thing that can determine correctness for
+them is "does `correct_answer` match one of the option strings," which is
+exactly what the existing raw-text fallback already checks — proposing to
+derive a synthetic per-option `is_correct` from string equality was shown
+algebraically to reduce to the exact same expression the fallback already
+computes, adding no real protection, only complexity. Not implemented, on
+purpose.
 - `studentRoutes.js` (Test, `POST /test/:testId/submit`): also independently
   verified to have the same logic (`matchedOpt.is_correct` preferred,
   `typeof === 'boolean'` guarded, same raw-text fallback for questions with
