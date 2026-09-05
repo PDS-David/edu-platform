@@ -427,6 +427,22 @@ router.get('/questions/pending', protect, adminOnly, async (req, res) => {
     const limit  = Math.min(parseInt(req.query.limit  || '10', 10), 100);
     const offset = parseInt(req.query.offset || '0', 10);
 
+    // FEATURE: staged exam-type -> subject -> topic filtering (per explicit
+    // request — "a user should pick an exam type, then a subject, then a
+    // topic, only then does it display questions"). All three optional at
+    // the SQL layer (each only applied when actually provided) so this
+    // endpoint stays independently testable/usable even if a future caller
+    // doesn't supply all three — the frontend (QuestionReview.jsx) is what
+    // enforces the actual staged requirement by simply never calling this
+    // endpoint until all three are selected.
+    const { exam_type_id, subject_id, topic_id } = req.query;
+    const filterClauses = [];
+    const filterReplacements = {};
+    if (exam_type_id) { filterClauses.push('eb.id = :examTypeId'); filterReplacements.examTypeId = exam_type_id; }
+    if (subject_id)   { filterClauses.push('s.id = :subjectId');   filterReplacements.subjectId   = subject_id; }
+    if (topic_id)     { filterClauses.push('t.id = :topicId');     filterReplacements.topicId     = topic_id; }
+    const filterSql = filterClauses.length ? `AND ${filterClauses.join(' AND ')}` : '';
+
     // ORDER-1: question bank sorted first by exam type, then subject, then
     // topic (per explicit request) -- previously created_at DESC only,
     // which gave no consistent grouping at all for browsing/reviewing a
@@ -449,16 +465,33 @@ router.get('/questions/pending', protect, adminOnly, async (req, res) => {
        LEFT JOIN topics     t  ON st.topic_id     = t.id
        LEFT JOIN exam_boards eb ON s.exam_board_id = eb.id
        WHERE COALESCE(q.status, 'pending') NOT IN ('approved', 'active', 'rejected')
+       ${filterSql}
        ORDER BY eb.name NULLS LAST, s.name NULLS LAST, t.name NULLS LAST, q.created_at DESC
        LIMIT :limit OFFSET :offset`,
-      { replacements: { limit, offset }, type: QueryTypes.SELECT }
+      { replacements: { limit, offset, ...filterReplacements }, type: QueryTypes.SELECT }
     );
 
+    // Total count deliberately mirrors the SAME filters as the row query
+    // above (not the unfiltered global count) — this is the per-selection
+    // count shown once the admin has actually staged into a specific
+    // exam-type/subject/topic combination, not the site-wide pending total.
+    // The site-wide badge elsewhere (GET /questions/pending-count, a
+    // separate endpoint) is intentionally untouched by this change — it
+    // must keep reflecting the true global total regardless of what any
+    // admin currently has selected on this page.
+    const countJoins = (exam_type_id || subject_id || topic_id)
+      ? `LEFT JOIN subtopics st ON q.subtopic_id = st.id
+         LEFT JOIN subjects  s  ON st.subject_id = s.id
+         LEFT JOIN exam_boards eb ON s.exam_board_id = eb.id
+         LEFT JOIN topics    t  ON st.topic_id   = t.id`
+      : '';
     const [countRow] = await sequelize.query(
       `SELECT COUNT(*)::INTEGER AS count
-       FROM questions
-       WHERE COALESCE(status, 'pending') NOT IN ('approved', 'active', 'rejected')`,
-      { type: QueryTypes.SELECT }
+       FROM questions q
+       ${countJoins}
+       WHERE COALESCE(q.status, 'pending') NOT IN ('approved', 'active', 'rejected')
+       ${filterSql}`,
+      { replacements: filterReplacements, type: QueryTypes.SELECT }
     );
 
     return res.json({ success: true, data: rows, total: countRow?.count || 0 });

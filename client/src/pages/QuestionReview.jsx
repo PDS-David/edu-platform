@@ -9,6 +9,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/apiClient';
 import { useAuth } from '../context/AuthContext';
+import { useCatalog } from '../hooks/useCatalog';
 import {
   CheckCircle, XCircle, Clock, ChevronLeft, ChevronRight,
   User, Calendar, BookOpen, Tag, Loader, RefreshCw, AlertCircle,
@@ -44,8 +45,86 @@ export default function QuestionReview() {
   const [questions, setQuestions] = useState([]);
   const [total,     setTotal]     = useState(0);
   const [offset,    setOffset]    = useState(0);
-  const [loading,   setLoading]   = useState(true);
+  // BUG FIX: initialized to true previously (correct when the page always
+  // fetched immediately on mount). Now that fetchPending returns early
+  // until all three stages are picked, an initial `true` here would show
+  // "Loading…" in the header indefinitely during the picker stages, since
+  // nothing would ever flip it to false until a real fetch actually starts.
+  const [loading,   setLoading]   = useState(false);
   const [error,     setError]     = useState(null);
+
+  // FEATURE: staged exam-type -> subject -> topic picker, replacing an
+  // immediate unfiltered pending-question list. Explicit request: "a user
+  // should pick an exam type, then a subject, then a topic, only then does
+  // it display questions relevant to the user's choice" — the point is
+  // reducing intimidation, so nothing below is fetched or shown until all
+  // three are picked, one decision revealed at a time rather than several
+  // dropdowns shown together over an already-visible list.
+  const { examTypes, loadingTypes, fetchSubjectsForType } = useCatalog();
+  const [selectedExamType, setSelectedExamType] = useState(null); // {id, name}
+  const [selectedSubject,  setSelectedSubject]  = useState(null); // {id, name}
+  const [selectedTopic,    setSelectedTopic]    = useState(null); // {id, name}
+  const [subjects,      setSubjects]      = useState([]);
+  const [loadingSubjects, setLoadingSubjects] = useState(false);
+  const [topics,         setTopics]         = useState([]);
+  const [loadingTopics,  setLoadingTopics]  = useState(false);
+
+  const handlePickExamType = async (et) => {
+    setSelectedExamType(et);
+    setSelectedSubject(null);
+    setSelectedTopic(null);
+    setSubjects([]);
+    setTopics([]);
+    setLoadingSubjects(true);
+    try {
+      const subs = await fetchSubjectsForType(et.id);
+      setSubjects(subs || []);
+    } catch {
+      setSubjects([]);
+    } finally {
+      setLoadingSubjects(false);
+    }
+  };
+
+  const handlePickSubject = async (sub) => {
+    setSelectedSubject(sub);
+    setSelectedTopic(null);
+    setTopics([]);
+    setLoadingTopics(true);
+    try {
+      // /teacher/topics already permits the admin role too (see
+      // AdminDashboard.jsx's own topic-management panel, which uses this
+      // same endpoint regardless of role) — no need for a separate
+      // /admin/topics variant.
+      const res = await api.get(`/teacher/topics?subject_id=${sub.id}`);
+      setTopics(res?.data || []);
+    } catch {
+      setTopics([]);
+    } finally {
+      setLoadingTopics(false);
+    }
+  };
+
+  const handlePickTopic = (topic) => setSelectedTopic(topic);
+
+  const resetToExamTypeStage = () => {
+    setSelectedExamType(null);
+    setSelectedSubject(null);
+    setSelectedTopic(null);
+    setSubjects([]);
+    setTopics([]);
+    setQuestions([]);
+  };
+  const resetToSubjectStage = () => {
+    setSelectedSubject(null);
+    setSelectedTopic(null);
+    setTopics([]);
+    setQuestions([]);
+  };
+  const resetToTopicStage = () => {
+    setSelectedTopic(null);
+    setQuestions([]);
+  };
 
   // Review modal state
   const [reviewing, setReviewing] = useState(null); // question object
@@ -56,10 +135,17 @@ export default function QuestionReview() {
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
   const fetchPending = useCallback(async (off = 0) => {
+    if (!selectedExamType || !selectedSubject || !selectedTopic) return;
     setLoading(true);
     setError(null);
     try {
-      const data = await api.get(`${apiBase}/questions/pending?limit=${PAGE_SIZE}&offset=${off}`);
+      const params = new URLSearchParams({
+        limit: PAGE_SIZE, offset: off,
+        exam_type_id: selectedExamType.id,
+        subject_id:   selectedSubject.id,
+        topic_id:     selectedTopic.id,
+      });
+      const data = await api.get(`${apiBase}/questions/pending?${params.toString()}`);
       setQuestions(data.data || []);
       setTotal(data.total || 0);
       setOffset(off);
@@ -68,9 +154,14 @@ export default function QuestionReview() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [apiBase, selectedExamType, selectedSubject, selectedTopic]);
 
-  useEffect(() => { fetchPending(0); }, [fetchPending]);
+  // Only fetch once all three stages are picked — deliberately not fetch-
+  // then-hide, since briefly showing an unfiltered list before narrowing it
+  // is exactly the intimidating experience this feature removes.
+  useEffect(() => {
+    if (selectedExamType && selectedSubject && selectedTopic) fetchPending(0);
+  }, [fetchPending, selectedExamType, selectedSubject, selectedTopic]);
 
   // ── Review submit ──────────────────────────────────────────────────────────
 
@@ -148,7 +239,11 @@ export default function QuestionReview() {
                 <Clock className="w-6 h-6 text-orange-500" /> Question Review Queue
               </h1>
               <p className="text-gray-500 text-sm mt-0.5">
-                {loading ? 'Loading…' : `${total} pending submission${total !== 1 ? 's' : ''}`}
+                {loading
+                  ? 'Loading…'
+                  : (selectedExamType && selectedSubject && selectedTopic)
+                    ? `${total} pending submission${total !== 1 ? 's' : ''}`
+                    : 'Pick an exam type, subject, and topic to see questions'}
               </p>
             </div>
           </div>
@@ -159,6 +254,91 @@ export default function QuestionReview() {
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
           </button>
+        </div>
+
+        {/* Staged exam-type -> subject -> topic picker. Nothing below this
+            fetches or renders until all three are picked — reduces
+            intimidation by surfacing one small decision at a time instead
+            of a big list or several dropdowns shown together up front. */}
+        {!(selectedExamType && selectedSubject && selectedTopic) && (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            {/* Breadcrumb of already-made picks, each clickable to jump back */}
+            {(selectedExamType || selectedSubject) && (
+              <div className="flex items-center gap-2 text-sm text-gray-500 mb-4 flex-wrap">
+                <button onClick={resetToExamTypeStage} className="hover:text-violet-600 font-medium underline">Exam Type</button>
+                {selectedExamType && (<><span>›</span><span className="font-semibold text-gray-700">{selectedExamType.name}</span></>)}
+                {selectedSubject && (<><span>›</span><button onClick={resetToSubjectStage} className="hover:text-violet-600 font-medium underline">{selectedSubject.name}</button></>)}
+              </div>
+            )}
+
+            {!selectedExamType && (
+              <>
+                <p className="text-sm font-semibold text-gray-700 mb-3">Step 1 of 3 — Choose an exam type</p>
+                {loadingTypes ? (
+                  <div className="flex items-center gap-2 text-gray-400 text-sm"><Loader className="w-4 h-4 animate-spin" /> Loading…</div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {examTypes.filter(et => et.is_active !== false).map(et => (
+                      <button key={et.id} onClick={() => handlePickExamType(et)}
+                        className="text-left px-4 py-3 rounded-xl border-2 border-gray-200 hover:border-violet-400 hover:bg-violet-50 transition-colors text-sm font-medium text-gray-800">
+                        {et.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
+            {selectedExamType && !selectedSubject && (
+              <>
+                <p className="text-sm font-semibold text-gray-700 mb-3">Step 2 of 3 — Choose a subject</p>
+                {loadingSubjects ? (
+                  <div className="flex items-center gap-2 text-gray-400 text-sm"><Loader className="w-4 h-4 animate-spin" /> Loading…</div>
+                ) : subjects.length === 0 ? (
+                  <p className="text-sm text-gray-400">No subjects found under this exam type.</p>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {subjects.map(s => (
+                      <button key={s.id} onClick={() => handlePickSubject(s)}
+                        className="text-left px-4 py-3 rounded-xl border-2 border-gray-200 hover:border-violet-400 hover:bg-violet-50 transition-colors text-sm font-medium text-gray-800">
+                        {s.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
+            {selectedExamType && selectedSubject && !selectedTopic && (
+              <>
+                <p className="text-sm font-semibold text-gray-700 mb-3">Step 3 of 3 — Choose a topic</p>
+                {loadingTopics ? (
+                  <div className="flex items-center gap-2 text-gray-400 text-sm"><Loader className="w-4 h-4 animate-spin" /> Loading…</div>
+                ) : topics.length === 0 ? (
+                  <p className="text-sm text-gray-400">No topics found under this subject.</p>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {topics.map(t => (
+                      <button key={t.id} onClick={() => handlePickTopic(t)}
+                        className="text-left px-4 py-3 rounded-xl border-2 border-gray-200 hover:border-violet-400 hover:bg-violet-50 transition-colors text-sm font-medium text-gray-800">
+                        {t.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {selectedExamType && selectedSubject && selectedTopic && (<>
+        {/* Breadcrumb once questions are showing, so the admin can still jump back */}
+        <div className="flex items-center gap-2 text-sm text-gray-500 mb-4 flex-wrap">
+          <button onClick={resetToExamTypeStage} className="hover:text-violet-600 font-medium underline">{selectedExamType.name}</button>
+          <span>›</span>
+          <button onClick={resetToSubjectStage} className="hover:text-violet-600 font-medium underline">{selectedSubject.name}</button>
+          <span>›</span>
+          <button onClick={resetToTopicStage} className="hover:text-violet-600 font-medium underline">{selectedTopic.name}</button>
         </div>
 
         {/* Error */}
@@ -387,6 +567,7 @@ export default function QuestionReview() {
             </button>
           </div>
         )}
+        </>)}
       </div>
 
       {/* ── Review Confirm Modal ─────────────────────────────────────────────── */}
