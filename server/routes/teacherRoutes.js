@@ -1439,17 +1439,13 @@ router.post('/generate-questions', protect, teacherOnly, async (req, res) => {
     if (!subjectRows.length) return error(res, 'Subject not found', 404);
 
     // TEACH-GEN-1: a teacher may only AI-generate questions for a subject
-    // they've actually been assigned (teacher_subjects, same table
-    // school_admin uses to assign subjects to teachers, and the same table
-    // pastPaperRoutes.js already scopes teacher visibility by). Mirrors the
-    // admin version's behavior exactly otherwise — this is deliberately a
-    // narrow, additive scoping check on top of that same logic, not a
-    // parallel reimplementation.
-    const assignedSubjects = await sequelize.query(
-      `SELECT 1 FROM teacher_subjects WHERE teacher_id = :teacherId AND subject_id = :subjectId AND is_active = true LIMIT 1`,
-      { replacements: { teacherId: req.user.id, subjectId: subject_id }, type: QueryTypes.SELECT }
-    );
-    if (!assignedSubjects.length) {
+    // they've actually been assigned. Reuses the same teacherOwnsSubject
+    // helper /teacher/topics already uses (defined at the top of this
+    // file), rather than a separate inline query, so there's exactly one
+    // implementation of "is this teacher assigned to this subject" to keep
+    // correct.
+    const owns = await teacherOwnsSubject(req.user.id, subject_id);
+    if (!owns) {
       return error(res, 'You are not assigned to this subject', 403);
     }
 
@@ -1676,12 +1672,20 @@ router.get('/questions/pending', protect, teacherOnly, async (req, res) => {
   try {
     const limit  = Math.min(parseInt(req.query.limit  || '10', 10), 100);
     const offset = parseInt(req.query.offset || '0', 10);
+    // REVIEW-FILTER-1: same optional topic_id narrowing as admin's mirror
+    // endpoint — see that one's comment for the full rationale.
+    const { topic_id } = req.query;
+    const topicFilter = topic_id ? 'AND t.id = :topicId' : '';
 
     // ORDER-1: same exam-type -> subject -> topic sort as admin's own
     // question bank listing (adminRoutes.js GET /questions/pending) --
     // subject/topic are non-nullable here since the JOINs to reach
     // teacher_subjects are already INNER JOINs, so NULLS LAST isn't needed
     // the way it is on the admin (LEFT JOIN) version.
+    //
+    // BUG FIX: same missing exam_board_code/exam_board_name/topic fields
+    // as admin's endpoint — added below, aliased to match what
+    // QuestionReview.jsx's card header actually reads.
     const rows = await sequelize.query(
       `SELECT
          q.id, q.question_text, q.type, q.options, q.correct_answer,
@@ -1689,7 +1693,7 @@ router.get('/questions/pending', protect, teacherOnly, async (req, res) => {
          q.created_at,
          u.first_name, u.last_name, u.email AS submitted_by_email,
          s.name AS subject_name, st.name AS subtopic_name,
-         t.name AS topic_name, eb.name AS exam_type_name
+         t.name AS topic, eb.code AS exam_board_code, eb.name AS exam_board_name
        FROM questions q
        LEFT JOIN users      u  ON q.submitted_by  = u.id
        JOIN      subtopics  st ON q.subtopic_id   = st.id
@@ -1698,9 +1702,10 @@ router.get('/questions/pending', protect, teacherOnly, async (req, res) => {
        LEFT JOIN exam_boards eb ON s.exam_board_id = eb.id
        JOIN      teacher_subjects ts ON ts.subject_id = s.id AND ts.teacher_id = :teacherId AND ts.is_active = true
        WHERE COALESCE(q.status, 'pending') NOT IN ('approved', 'active', 'rejected')
+         ${topicFilter}
        ORDER BY eb.name NULLS LAST, s.name, t.name, q.created_at DESC
        LIMIT :limit OFFSET :offset`,
-      { replacements: { teacherId: req.user.id, limit, offset }, type: QueryTypes.SELECT }
+      { replacements: { teacherId: req.user.id, limit, offset, topicId: topic_id || null }, type: QueryTypes.SELECT }
     );
 
     const [countRow] = await sequelize.query(
@@ -1708,9 +1713,11 @@ router.get('/questions/pending', protect, teacherOnly, async (req, res) => {
        FROM questions q
        JOIN subtopics st ON q.subtopic_id = st.id
        JOIN subjects  s  ON st.subject_id = s.id
+       JOIN topics    t  ON st.topic_id   = t.id
        JOIN teacher_subjects ts ON ts.subject_id = s.id AND ts.teacher_id = :teacherId AND ts.is_active = true
-       WHERE COALESCE(q.status, 'pending') NOT IN ('approved', 'active', 'rejected')`,
-      { replacements: { teacherId: req.user.id }, type: QueryTypes.SELECT }
+       WHERE COALESCE(q.status, 'pending') NOT IN ('approved', 'active', 'rejected')
+         ${topicFilter}`,
+      { replacements: { teacherId: req.user.id, topicId: topic_id || null }, type: QueryTypes.SELECT }
     );
 
     return res.json({ success: true, data: rows, total: countRow?.count || 0 });

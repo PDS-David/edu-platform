@@ -9,10 +9,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/apiClient';
 import { useAuth } from '../context/AuthContext';
+import { useCatalog } from '../hooks/useCatalog';
 import {
   CheckCircle, XCircle, Clock, ChevronLeft, ChevronRight,
   User, Calendar, BookOpen, Tag, Loader, RefreshCw, AlertCircle,
-  ArrowLeft,
+  ArrowLeft, Filter,
 } from 'lucide-react';
 
 
@@ -41,6 +42,86 @@ export default function QuestionReview() {
   // teacher_subjects) -- this just picks the right base path, the rest of
   // the component's logic is identical for both roles.
   const apiBase = user?.role === 'admin' ? '/admin' : '/teacher';
+  const isAdmin = user?.role === 'admin';
+
+  // ── FILTER-1: guided exam type -> subject -> topic picker ──────────────────
+  // Reported as intimidating: this page used to load every pending question
+  // at once with no way to narrow down. Nothing is fetched or shown until a
+  // topic is chosen — topic_id alone is sent to the backend, since a topic
+  // already uniquely implies its subject and exam board.
+  const { examTypes: adminExamTypes, loadingTypes: adminExamTypesLoading, fetchSubjectsForType } = useCatalog();
+  const [teacherSubjects,  setTeacherSubjects]  = useState(null); // null = still loading
+  const [examType,         setExamType]         = useState(null); // { code, name } either role
+  const [subjects,         setSubjects]         = useState([]);
+  const [subjectsLoading,  setSubjectsLoading]  = useState(false);
+  const [subjectId,        setSubjectId]        = useState('');
+  const [topics,           setTopics]           = useState([]);
+  const [topicsLoading,    setTopicsLoading]    = useState(false);
+  const [topicId,          setTopicId]          = useState('');
+  const [topicName,        setTopicName]        = useState('');
+
+  useEffect(() => {
+    if (isAdmin) return;
+    api.get('/teacher/my-subjects')
+      .then(r => setTeacherSubjects(r.data || []))
+      .catch(() => setTeacherSubjects([]));
+  }, [isAdmin]);
+
+  // For a teacher, exam types are derived from their own assigned subjects
+  // (deduplicated) rather than the full platform catalog — picking an exam
+  // type they have nothing assigned under would only ever lead to an empty
+  // subject list, so there's no reason to show it.
+  const examTypeOptions = isAdmin
+    ? adminExamTypes
+    : [...new Map((teacherSubjects || []).map(s => [s.exam_board_code, { code: s.exam_board_code, name: s.exam_board_name }])).values()];
+
+  const resetBelowExamType = () => { setSubjectId(''); setSubjects([]); setTopics([]); setTopicId(''); setTopicName(''); };
+  const resetBelowSubject  = () => { setTopics([]); setTopicId(''); setTopicName(''); };
+
+  const handleExamTypeChange = async (value) => {
+    resetBelowExamType();
+    if (!value) { setExamType(null); return; }
+    if (isAdmin) {
+      const chosen = adminExamTypes.find(et => String(et.id) === value);
+      setExamType(chosen || null);
+      if (!chosen) return;
+      setSubjectsLoading(true);
+      try {
+        const raw = await fetchSubjectsForType(chosen.id);
+        setSubjects([...new Map(raw.map(s => [s.id, s])).values()]);
+      } catch { setSubjects([]); }
+      finally { setSubjectsLoading(false); }
+    } else {
+      const chosen = examTypeOptions.find(et => et.code === value);
+      setExamType(chosen || null);
+      setSubjects((teacherSubjects || []).filter(s => s.exam_board_code === chosen?.code));
+    }
+  };
+
+  const handleSubjectChange = async (value) => {
+    resetBelowSubject();
+    setSubjectId(value);
+    if (!value) return;
+    setTopicsLoading(true);
+    try {
+      const res = await api.get(`/teacher/topics?subject_id=${value}`);
+      setTopics(res?.data || []);
+    } catch { setTopics([]); }
+    finally { setTopicsLoading(false); }
+  };
+
+  const handleTopicChange = (value) => {
+    setTopicId(value);
+    setTopicName(topics.find(t => String(t.id) === value)?.name || '');
+  };
+
+  const changeFilters = () => {
+    // Back to the picker, keeping nothing from the previous topic's results
+    // on screen while a new one is chosen.
+    setTopicId(''); setTopicName('');
+    setQuestions([]); setTotal(0); setOffset(0);
+  };
+
   const [questions, setQuestions] = useState([]);
   const [total,     setTotal]     = useState(0);
   const [offset,    setOffset]    = useState(0);
@@ -56,10 +137,11 @@ export default function QuestionReview() {
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
   const fetchPending = useCallback(async (off = 0) => {
+    if (!topicId) return; // FILTER-1: never fetch until a topic is chosen
     setLoading(true);
     setError(null);
     try {
-      const data = await api.get(`${apiBase}/questions/pending?limit=${PAGE_SIZE}&offset=${off}`);
+      const data = await api.get(`${apiBase}/questions/pending?limit=${PAGE_SIZE}&offset=${off}&topic_id=${topicId}`);
       setQuestions(data.data || []);
       setTotal(data.total || 0);
       setOffset(off);
@@ -68,9 +150,9 @@ export default function QuestionReview() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [apiBase, topicId]);
 
-  useEffect(() => { fetchPending(0); }, [fetchPending]);
+  useEffect(() => { if (topicId) fetchPending(0); }, [topicId, fetchPending]);
 
   // ── Review submit ──────────────────────────────────────────────────────────
 
@@ -104,6 +186,90 @@ export default function QuestionReview() {
 
   // ── Empty state ────────────────────────────────────────────────────────────
 
+  // ── Picker: nothing loads until exam type -> subject -> topic are chosen ──
+  if (!topicId) {
+    const examTypesReady = isAdmin ? !adminExamTypesLoading : teacherSubjects !== null;
+    return (
+      <div className="min-h-screen bg-gray-50 p-4">
+        <div className="max-w-lg mx-auto pt-8">
+          <button
+            onClick={() => navigate(dashboardPath)}
+            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 mb-6"
+          >
+            <ArrowLeft className="w-4 h-4" /> Dashboard
+          </button>
+          <div className="flex items-center gap-2 mb-2">
+            <Filter className="w-5 h-5 text-indigo-500" />
+            <h1 className="text-xl font-bold text-gray-900">Question Review Queue</h1>
+          </div>
+          <p className="text-gray-500 text-sm mb-6">
+            Pick an exam type, subject, and topic to see the questions waiting for review there.
+          </p>
+
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Exam Type</label>
+              {!examTypesReady ? (
+                <div className="text-sm text-gray-400 flex items-center gap-2"><Loader className="w-4 h-4 animate-spin" /> Loading…</div>
+              ) : examTypeOptions.length === 0 ? (
+                <p className="text-sm text-amber-600">No subjects assigned yet — contact admin to get assigned to exam types and subjects.</p>
+              ) : (
+                <select
+                  value={isAdmin ? (examType?.id ?? '') : (examType?.code ?? '')}
+                  onChange={e => handleExamTypeChange(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                >
+                  <option value="">Select exam type…</option>
+                  {examTypeOptions.map(et => (
+                    <option key={isAdmin ? et.id : et.code} value={isAdmin ? et.id : et.code}>{et.name}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {examType && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Subject</label>
+                {subjectsLoading ? (
+                  <div className="text-sm text-gray-400 flex items-center gap-2"><Loader className="w-4 h-4 animate-spin" /> Loading…</div>
+                ) : (
+                  <select
+                    value={subjectId}
+                    onChange={e => handleSubjectChange(e.target.value)}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                  >
+                    <option value="">Select subject…</option>
+                    {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                )}
+              </div>
+            )}
+
+            {subjectId && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Topic</label>
+                {topicsLoading ? (
+                  <div className="text-sm text-gray-400 flex items-center gap-2"><Loader className="w-4 h-4 animate-spin" /> Loading…</div>
+                ) : topics.length === 0 ? (
+                  <p className="text-sm text-gray-400">No topics found for this subject.</p>
+                ) : (
+                  <select
+                    value=""
+                    onChange={e => handleTopicChange(e.target.value)}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                  >
+                    <option value="">Select topic…</option>
+                    {topics.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!loading && !error && questions.length === 0 && offset === 0) {
     return (
       <>
@@ -113,10 +279,13 @@ export default function QuestionReview() {
               <CheckCircle className="w-8 h-8 text-green-500" />
             </div>
             <h2 className="text-xl font-bold text-gray-800 mb-2">All caught up!</h2>
-            <p className="text-gray-500 mb-6">No pending questions to review.</p>
+            <p className="text-gray-500 mb-6">No pending questions for {topicName || 'this topic'}.</p>
             <div className="flex items-center justify-center gap-4">
               <button onClick={() => navigate(dashboardPath)} className="flex items-center gap-2 text-gray-600 hover:text-gray-800 font-medium">
                 <ArrowLeft className="w-4 h-4" /> Dashboard
+              </button>
+              <button onClick={changeFilters} className="flex items-center gap-2 text-gray-600 hover:text-gray-800 font-medium">
+                <Filter className="w-4 h-4" /> Change filters
               </button>
               <button onClick={() => fetchPending(0)} className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-medium">
                 <RefreshCw className="w-4 h-4" /> Refresh
@@ -148,17 +317,25 @@ export default function QuestionReview() {
                 <Clock className="w-6 h-6 text-orange-500" /> Question Review Queue
               </h1>
               <p className="text-gray-500 text-sm mt-0.5">
-                {loading ? 'Loading…' : `${total} pending submission${total !== 1 ? 's' : ''}`}
+                {loading ? 'Loading…' : `${total} pending submission${total !== 1 ? 's' : ''}`} — {topicName}
               </p>
             </div>
           </div>
-          <button
-            onClick={() => fetchPending(offset)}
-            disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-xl text-gray-600 hover:bg-white transition-colors text-sm font-medium"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={changeFilters}
+              className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-xl text-gray-600 hover:bg-white transition-colors text-sm font-medium"
+            >
+              <Filter className="w-4 h-4" /> Change filters
+            </button>
+            <button
+              onClick={() => fetchPending(offset)}
+              disabled={loading}
+              className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-xl text-gray-600 hover:bg-white transition-colors text-sm font-medium"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
+            </button>
+          </div>
         </div>
 
         {/* Error */}

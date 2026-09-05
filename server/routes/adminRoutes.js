@@ -426,6 +426,15 @@ router.get('/questions/pending', protect, adminOnly, async (req, res) => {
   try {
     const limit  = Math.min(parseInt(req.query.limit  || '10', 10), 100);
     const offset = parseInt(req.query.offset || '0', 10);
+    // REVIEW-FILTER-1: the review queue previously always loaded every
+    // pending question platform-wide with no way to narrow it down —
+    // reported as "intimidating." topic_id is the one filter needed: a
+    // topic already uniquely implies its subject and exam board, so
+    // requiring the frontend to also send subject_id/exam_board_id would
+    // be redundant. Optional — omitting it keeps the old "show everything"
+    // behavior for any other caller.
+    const { topic_id } = req.query;
+    const topicFilter = topic_id ? 'AND t.id = :topicId' : '';
 
     // ORDER-1: question bank sorted first by exam type, then subject, then
     // topic (per explicit request) -- previously created_at DESC only,
@@ -434,6 +443,14 @@ router.get('/questions/pending', protect, adminOnly, async (req, res) => {
     // (see the /questions/orphaned surface above for that separate issue)
     // still appears, grouped at the end rather than disappearing or
     // sorting unpredictably first.
+    //
+    // BUG FIX: this SELECT never actually returned exam_board_code/
+    // exam_board_name or a topic name at all, despite QuestionReview.jsx's
+    // card header rendering `{q.exam_board_code} — {q.exam_board_name}` and
+    // a topic badge for `q.topic` — every card has always shown
+    // "undefined — undefined" with no topic badge, silently, since neither
+    // field was ever selected. Added eb.code/eb.name and t.name (aliased to
+    // match what the frontend already reads) below.
     const rows = await sequelize.query(
       `SELECT
          q.id, q.question_text, q.type, q.options, q.correct_answer,
@@ -441,7 +458,7 @@ router.get('/questions/pending', protect, adminOnly, async (req, res) => {
          q.created_at,
          u.first_name, u.last_name, u.email AS submitted_by_email,
          s.name AS subject_name, st.name AS subtopic_name,
-         t.name AS topic_name, eb.name AS exam_type_name
+         t.name AS topic, eb.code AS exam_board_code, eb.name AS exam_board_name
        FROM questions q
        LEFT JOIN users      u  ON q.submitted_by  = u.id
        LEFT JOIN subtopics  st ON q.subtopic_id   = st.id
@@ -449,16 +466,20 @@ router.get('/questions/pending', protect, adminOnly, async (req, res) => {
        LEFT JOIN topics     t  ON st.topic_id     = t.id
        LEFT JOIN exam_boards eb ON s.exam_board_id = eb.id
        WHERE COALESCE(q.status, 'pending') NOT IN ('approved', 'active', 'rejected')
+         ${topicFilter}
        ORDER BY eb.name NULLS LAST, s.name NULLS LAST, t.name NULLS LAST, q.created_at DESC
        LIMIT :limit OFFSET :offset`,
-      { replacements: { limit, offset }, type: QueryTypes.SELECT }
+      { replacements: { limit, offset, topicId: topic_id || null }, type: QueryTypes.SELECT }
     );
 
     const [countRow] = await sequelize.query(
       `SELECT COUNT(*)::INTEGER AS count
-       FROM questions
-       WHERE COALESCE(status, 'pending') NOT IN ('approved', 'active', 'rejected')`,
-      { type: QueryTypes.SELECT }
+       FROM questions q
+       LEFT JOIN subtopics st ON q.subtopic_id = st.id
+       LEFT JOIN topics    t  ON st.topic_id   = t.id
+       WHERE COALESCE(q.status, 'pending') NOT IN ('approved', 'active', 'rejected')
+         ${topicFilter}`,
+      { replacements: { topicId: topic_id || null }, type: QueryTypes.SELECT }
     );
 
     return res.json({ success: true, data: rows, total: countRow?.count || 0 });
