@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link, Outlet, useLocation, useSearchParams } from 'react-router-dom';
-import api from '../services/apiClient';
+import api, { TIMEOUT_AI_GENERATE } from '../services/apiClient';
 import {
   Users, Plus, CheckCircle, Loader2, AlertTriangle,
   BarChart2, X, PenTool, BookOpen, Upload, Send, FileText,
   ChevronDown, AlertCircle, Search, UserPlus, Settings, Check, Trash2, Pencil,
+  Sparkles, Zap,
 } from 'lucide-react';
 import PrintReportButton from '../components/PrintReportButton';
 import PrintableReportHeader from '../components/PrintableReportHeader';
@@ -698,6 +699,308 @@ function NudgeButton({ studentId, showToast }) {
 }
 
 /* ── Test Builder Tab ────────────────────────────────────────────────────── */
+// ─── AI Generate Tab ──────────────────────────────────────────────────────
+// The real gap: /teacher/generate-questions (backend), GET
+// /teacher/questions/pending + PUT /teacher/questions/:id/review (backend),
+// and QuestionReview.jsx (frontend, fixed to stop hardcoding /admin/... so
+// it actually works for a teacher) all already existed and worked — but
+// there was no teacher-facing generation FORM anywhere to call the
+// generate endpoint from. Only AdminDashboard.jsx's AIGeneratePanel had one.
+//
+// Deliberately NOT a copy of AIGeneratePanel's exam-type-first flow — a
+// teacher's access is scoped by teacher_subjects directly (verified
+// server-side in POST /teacher/generate-questions: 403 if the subject isn't
+// one of theirs), with no exam_type_id in that check at all. So this starts
+// straight from "pick one of YOUR assigned subjects" (GET
+// /teacher/my-subjects — already used elsewhere for a teacher's own scoped
+// views, e.g. TeacherPastPapersPage.jsx), then reuses the exact same
+// topic/subtopic cascade + inline-create endpoints TeacherAddQuestionPage.jsx
+// already uses for manual authoring (GET/POST /teacher/topics,
+// GET/POST /teacher/subtopics) — same backend, same shapes, so a topic or
+// subtopic created from either form immediately shows up in the other.
+function AIGenerateTab() {
+  const [subjects,      setSubjects]      = useState([]);
+  const [subjectsLoad,  setSubjectsLoad]  = useState(true);
+  const [topics,        setTopics]        = useState([]);
+  const [topicsLoad,    setTopicsLoad]    = useState(false);
+  const [subtopics,     setSubtopics]     = useState([]);
+  const [subtopicsLoad, setSubtopicsLoad] = useState(false);
+  const [pendingCount,  setPendingCount]  = useState(null);
+
+  const [form, setForm] = useState({
+    subject_id: '', topic_id: '', topic: '', subtopic_id: '',
+    count: 10, difficulty: 'medium', question_type: 'mcq',
+  });
+
+  const [creatingTopic,    setCreatingTopic]    = useState(false);
+  const [newTopicName,     setNewTopicName]     = useState('');
+  const [savingTopic,      setSavingTopic]      = useState(false);
+  const [topicError,       setTopicError]       = useState('');
+  const [creatingSubtopic, setCreatingSubtopic] = useState(false);
+  const [newSubtopicName,  setNewSubtopicName]  = useState('');
+  const [savingSubtopic,   setSavingSubtopic]   = useState(false);
+  const [subtopicError,    setSubtopicError]    = useState('');
+
+  const [generating, setGenerating] = useState(false);
+  const [result,     setResult]     = useState(null);
+  const [error,      setError]      = useState('');
+
+  useEffect(() => {
+    api.get('/teacher/my-subjects')
+      .then(r => setSubjects(r.data || []))
+      .catch(() => setSubjects([]))
+      .finally(() => setSubjectsLoad(false));
+    // limit=1: only the `total` count is needed here, not the rows — same
+    // lightweight-badge intent as admin's dedicated pending-count endpoint,
+    // teacher just doesn't have a separate one, so ask for the fewest rows.
+    api.get('/teacher/questions/pending?limit=1')
+      .then(r => setPendingCount(r.total ?? 0))
+      .catch(() => {});
+  }, []);
+
+  const handleSubjectChange = (subjectId) => {
+    setForm(f => ({ ...f, subject_id: subjectId, topic_id: '', topic: '', subtopic_id: '' }));
+    setTopics([]); setSubtopics([]); setCreatingTopic(false); setCreatingSubtopic(false);
+    if (!subjectId) return;
+    setTopicsLoad(true);
+    api.get(`/teacher/topics?subject_id=${subjectId}`)
+      .then(r => setTopics(r.data || []))
+      .catch(() => setTopics([]))
+      .finally(() => setTopicsLoad(false));
+  };
+
+  const handleTopicChange = (topicId) => {
+    const chosen = topics.find(t => String(t.id) === String(topicId));
+    setForm(f => ({ ...f, topic_id: topicId, topic: chosen?.name || '', subtopic_id: '' }));
+    setSubtopics([]); setCreatingSubtopic(false);
+    if (!topicId) return;
+    setSubtopicsLoad(true);
+    api.get(`/teacher/subtopics?topic_id=${topicId}`)
+      .then(r => setSubtopics(r.data || []))
+      .catch(() => setSubtopics([]))
+      .finally(() => setSubtopicsLoad(false));
+  };
+
+  const handleCreateTopic = async () => {
+    const name = newTopicName.trim();
+    if (!name) { setTopicError('Topic name is required.'); return; }
+    setSavingTopic(true); setTopicError('');
+    try {
+      const res = await api.post('/teacher/topics', { subject_id: form.subject_id, name });
+      const created = res.data;
+      setTopics(prev => [...prev, created]);
+      setForm(f => ({ ...f, topic_id: String(created.id), topic: name, subtopic_id: '' }));
+      setCreatingTopic(false); setNewTopicName('');
+    } catch (err) {
+      setTopicError(err.message || 'Failed to create topic.');
+    } finally {
+      setSavingTopic(false);
+    }
+  };
+
+  const handleCreateSubtopic = async () => {
+    const name = newSubtopicName.trim();
+    if (!name) { setSubtopicError('Subtopic name is required.'); return; }
+    setSavingSubtopic(true); setSubtopicError('');
+    try {
+      const res = await api.post('/teacher/subtopics', {
+        topic_id: form.topic_id, subject_id: form.subject_id, name,
+      });
+      const created = res.data;
+      setSubtopics(prev => [...prev, created]);
+      setForm(f => ({ ...f, subtopic_id: String(created.id) }));
+      setCreatingSubtopic(false); setNewSubtopicName('');
+    } catch (err) {
+      setSubtopicError(err.message || 'Failed to create subtopic.');
+    } finally {
+      setSavingSubtopic(false);
+    }
+  };
+
+  const handleGenerate = async (e) => {
+    e.preventDefault();
+    if (!form.subject_id)   { setError('Please select a subject.'); return; }
+    if (!form.topic.trim()) { setError('Please select or create a topic.'); return; }
+    setError(''); setResult(null); setGenerating(true);
+    try {
+      const res = await api.post('/teacher/generate-questions', {
+        subject_id:    form.subject_id,
+        topic:         form.topic,
+        subtopic_id:   form.subtopic_id || undefined,
+        count:         form.count,
+        difficulty:    form.difficulty,
+        question_type: form.question_type,
+      }, { timeout: TIMEOUT_AI_GENERATE });
+      setResult(res.data || res);
+      const inserted = res.data?.inserted ?? res.inserted ?? 0;
+      setPendingCount(c => (c || 0) + inserted);
+    } catch (err) {
+      setError(err?.message || 'Generation failed.');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  if (subjectsLoad) {
+    return <div className="flex justify-center py-16"><Loader2 size={20} className="animate-spin text-violet-400" /></div>;
+  }
+
+  if (subjects.length === 0) {
+    return (
+      <div className="text-center py-16 border-2 border-dashed border-gray-200 rounded-2xl">
+        <Sparkles size={28} className="text-gray-200 mx-auto mb-3" />
+        <p className="text-sm font-semibold text-gray-600 mb-1">No subjects assigned</p>
+        <p className="text-xs text-gray-400">Contact your admin to get assigned to a subject before generating questions.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2"><Sparkles size={18} className="text-violet-500" /><h3 className="font-bold text-gray-900">AI Question Generator</h3></div>
+        {pendingCount !== null && (
+          <Link to="/teacher/review" className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-100 px-3 py-1.5 rounded-full hover:bg-amber-200">
+            <Zap size={12} />{pendingCount} pending review
+          </Link>
+        )}
+      </div>
+
+      <form onSubmit={handleGenerate} className="space-y-4 max-w-lg">
+        {error && (
+          <div className="p-3 rounded-xl bg-red-50 border border-red-200 flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        )}
+
+        {/* Subject — scoped to this teacher's own assignments, no exam-type step needed */}
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Subject *</label>
+          <select value={form.subject_id} onChange={e => handleSubjectChange(e.target.value)} className={inp} required>
+            <option value="">Select subject…</option>
+            {subjects.map(s => (
+              <option key={s.id} value={s.id}>{s.name}{s.exam_board_code ? ` (${s.exam_board_code})` : ''}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Topic — cascades from Subject, with inline create (same as TeacherAddQuestionPage.jsx) */}
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Topic *</label>
+          {!form.subject_id ? (
+            <div className="border-2 border-dashed border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-400">Select a subject above</div>
+          ) : topicsLoad ? (
+            <div className={inp + ' text-gray-400'}>Loading topics…</div>
+          ) : creatingTopic ? (
+            <div className="space-y-2">
+              <input value={newTopicName} onChange={e => setNewTopicName(e.target.value)} placeholder="New topic name" className={inp} autoFocus />
+              {topicError && <p className="text-xs text-red-500">{topicError}</p>}
+              <div className="flex gap-2">
+                <button type="button" onClick={handleCreateTopic} disabled={savingTopic}
+                  className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-xs font-semibold px-3 py-2 rounded-lg">
+                  {savingTopic && <Loader2 size={12} className="animate-spin" />} Save Topic
+                </button>
+                <button type="button" onClick={() => { setCreatingTopic(false); setTopicError(''); }} className="text-xs text-gray-400 hover:text-gray-600 px-3 py-2">Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <select value={form.topic_id} onChange={e => handleTopicChange(e.target.value)} className={inp} required={!form.topic_id}>
+                <option value="">{topics.length === 0 ? 'No topics yet' : 'Select topic…'}</option>
+                {topics.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+              <button type="button" onClick={() => setCreatingTopic(true)}
+                className="shrink-0 flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-800 border border-violet-200 hover:border-violet-400 px-3 rounded-lg">
+                <Plus size={12} /> New
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Subtopic — optional, cascades from Topic, with inline create */}
+        {form.topic_id && (
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Subtopic (optional)</label>
+            {subtopicsLoad ? (
+              <div className={inp + ' text-gray-400'}>Loading subtopics…</div>
+            ) : creatingSubtopic ? (
+              <div className="space-y-2">
+                <input value={newSubtopicName} onChange={e => setNewSubtopicName(e.target.value)} placeholder="New subtopic name" className={inp} autoFocus />
+                {subtopicError && <p className="text-xs text-red-500">{subtopicError}</p>}
+                <div className="flex gap-2">
+                  <button type="button" onClick={handleCreateSubtopic} disabled={savingSubtopic}
+                    className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-xs font-semibold px-3 py-2 rounded-lg">
+                    {savingSubtopic && <Loader2 size={12} className="animate-spin" />} Save Subtopic
+                  </button>
+                  <button type="button" onClick={() => { setCreatingSubtopic(false); setSubtopicError(''); }} className="text-xs text-gray-400 hover:text-gray-600 px-3 py-2">Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <select value={form.subtopic_id} onChange={e => setForm(f => ({ ...f, subtopic_id: e.target.value }))} className={inp}>
+                  <option value="">{subtopics.length === 0 ? 'No subtopics yet — questions still work without one' : 'Select subtopic…'}</option>
+                  {subtopics.map(st => <option key={st.id} value={st.id}>{st.name}</option>)}
+                </select>
+                <button type="button" onClick={() => setCreatingSubtopic(true)}
+                  className="shrink-0 flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-800 border border-violet-200 hover:border-violet-400 px-3 rounded-lg">
+                  <Plus size={12} /> New
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Question type */}
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Question Type</label>
+          <select value={form.question_type} onChange={e => setForm(f => ({ ...f, question_type: e.target.value }))} className={inp}>
+            <option value="mcq">Multiple Choice</option>
+            <option value="short_answer">Short Answer</option>
+            <option value="structured">Structured (free-response)</option>
+          </select>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Difficulty</label>
+            <select value={form.difficulty} onChange={e => setForm(f => ({ ...f, difficulty: e.target.value }))} className={inp}>
+              <option value="easy">Easy</option>
+              <option value="medium">Medium</option>
+              <option value="hard">Hard</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Count (max 15)</label>
+            <input type="number" min={1} max={15} value={form.count}
+              onChange={e => setForm(f => ({ ...f, count: Math.min(Math.max(parseInt(e.target.value) || 1, 1), 15) }))}
+              className={inp} />
+          </div>
+        </div>
+
+        <button type="submit" disabled={generating}
+          className="w-full flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors">
+          {generating ? <><Loader2 size={14} className="animate-spin" /> Generating…</> : <><Sparkles size={14} /> Generate Questions</>}
+        </button>
+      </form>
+
+      {result && (
+        <div className="max-w-lg mt-5 p-4 rounded-xl bg-emerald-50 border border-emerald-200">
+          <p className="text-sm font-semibold text-emerald-800 flex items-center gap-1.5"><CheckCircle size={14} /> {result.message}</p>
+          {result.skipped > 0 && result.skipped_reasons?.length > 0 && (
+            <ul className="mt-2 space-y-1 text-xs text-amber-700 list-disc list-inside">
+              {result.skipped_reasons.map((r, i) => <li key={i}>{r}</li>)}
+            </ul>
+          )}
+          <Link to="/teacher/review" className="inline-flex items-center gap-1.5 mt-3 text-xs font-semibold text-violet-600 hover:text-violet-800">
+            Go to Review Queue <Zap size={12} />
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TestBuilderTab() {
   const navigate = useNavigate();
   const [tests,      setTests]      = useState([]);
@@ -1165,6 +1468,7 @@ export default function TeacherDashboard() {
     { id: 'classes',     label: 'Classes',   icon: Users    },
     { id: 'analytics',   label: 'Analytics', icon: BarChart2},
     { id: 'testbuilder', label: 'Tests',      icon: PenTool  },
+    { id: 'aigenerate',  label: 'AI Generate',icon: Sparkles },
     { id: 'content',     label: 'Content',    icon: BookOpen, link: '/teacher/content'      },
     { id: 'resources',   label: 'Resources',  icon: Upload,   link: '/teacher/resources'    },
     { id: 'addq',        label: 'Add Q',      icon: Plus,     link: '/teacher/questions/add' },
@@ -1244,6 +1548,7 @@ export default function TeacherDashboard() {
             {activeTab === 'classes'     && <ClassesTab />}
             {activeTab === 'analytics'   && <AnalyticsTab />}
             {activeTab === 'testbuilder' && <TestBuilderTab />}
+            {activeTab === 'aigenerate'  && <AIGenerateTab />}
           </div>
         </div>
     </div>

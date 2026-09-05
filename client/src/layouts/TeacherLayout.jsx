@@ -6,7 +6,7 @@ import TopNav from "../components/TopNav";
 import PortalSidebar from "../components/PortalSidebar";
 import PortalMobileNav from "../components/PortalMobileNav";
 import {
-  Users, BarChart2, PenTool, BookOpen, Upload, Plus, FileText, AlertCircle,
+  Users, BarChart2, PenTool, BookOpen, Upload, Plus, FileText, AlertCircle, Sparkles,
 } from "lucide-react";
 
 // Real shared shell for the whole /teacher/* tree -- same fix as
@@ -19,6 +19,7 @@ const TEACHER_NAV_ITEMS = [
   { id: "classes",     kind: "tab",  icon: Users,     label: "My Classes"      },
   { id: "analytics",   kind: "tab",  icon: BarChart2, label: "Analytics"       },
   { id: "testbuilder", kind: "tab",  icon: PenTool,   label: "Test Builder"    },
+  { id: "aigenerate",  kind: "tab",  icon: Sparkles,  label: "AI Generate"     },
   { id: "content",     kind: "link", icon: BookOpen,  label: "Content Manager", link: "/teacher/content"       },
   { id: "resources",   kind: "link", icon: Upload,    label: "Resources",      link: "/teacher/resources"     },
   { id: "addq",        kind: "link", icon: Plus,      label: "Add Question",   link: "/teacher/questions/add" },
