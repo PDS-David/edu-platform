@@ -950,19 +950,45 @@ router.post('/tests/:id/assign', protect, teacherOnly, async (req, res) => {
     }
 
     let count = 0;
+    const failedStudentIds = [];
     for (const { studentId, classId } of targets) {
-      await sequelize.query(
-        `INSERT INTO test_assignments (test_id, student_id, class_id, assigned_at)
-         VALUES (:testId, :studentId, :classId, NOW())
-         ON CONFLICT (test_id, student_id) DO NOTHING`,
-        {
-          replacements: { testId: req.params.id, studentId, classId: classId || null },
-          type: QueryTypes.INSERT,
-        }
-      ).catch(() => {});
-      count++;
+      try {
+        await sequelize.query(
+          `INSERT INTO test_assignments (test_id, student_id, class_id, assigned_at)
+           VALUES (:testId, :studentId, :classId, NOW())
+           ON CONFLICT (test_id, student_id) DO NOTHING`,
+          {
+            replacements: { testId: req.params.id, studentId, classId: classId || null },
+            type: QueryTypes.INSERT,
+          }
+        );
+        // BUG FIX: count previously incremented unconditionally on every
+        // loop iteration, even when the INSERT above threw and was
+        // silently caught elsewhere (the old `.catch(() => {})` chained
+        // directly on the query). A teacher could see "Test assigned to
+        // N students" when fewer than N actually received a row — e.g. a
+        // stale class_memberships row pointing at a since-removed student
+        // would violate the FK constraint on student_id, fail silently,
+        // and still be counted as a success. ON CONFLICT DO NOTHING does
+        // NOT throw (it's normal, successful SQL behavior — the student
+        // already had this test), so it's correctly still counted here;
+        // only a genuine failure now reaches the catch block below and is
+        // excluded from count.
+        count++;
+      } catch (err) {
+        console.error(`[POST /teacher/tests/${req.params.id}/assign] failed for student ${studentId}:`, err.message);
+        failedStudentIds.push(studentId);
+      }
     }
-    return res.json({ success: true, message: `Test assigned to ${count} student${count !== 1 ? 's' : ''}.`, count });
+    return res.json({
+      success: true,
+      message: failedStudentIds.length > 0
+        ? `Test assigned to ${count} student${count !== 1 ? 's' : ''}. ${failedStudentIds.length} failed and were not assigned.`
+        : `Test assigned to ${count} student${count !== 1 ? 's' : ''}.`,
+      count,
+      failed_count: failedStudentIds.length,
+      failed_student_ids: failedStudentIds,
+    });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
