@@ -669,27 +669,55 @@ the actual current code, not copied from prior audit passes.
   {})`) — a deliberate idempotent self-healing-schema pattern, not hiding a
   functional bug.
 
-### 11.2 — New bug found, not previously documented anywhere
+### 11.2 — Bug found and fixed this session
 
 **`teacherRoutes.js`, `POST /tests/:id/assign` (assign a test to a class or
-individual students):**
+individual students):** originally,
 ```js
 for (const { studentId, classId } of targets) {
   await sequelize.query(`INSERT INTO test_assignments ...`, {...}).catch(() => {});
-  count++;   // <-- runs unconditionally, even if the INSERT above just failed
+  count++;   // <-- ran unconditionally, even if the INSERT above just failed
 }
 ```
-`count` increments for every target attempted, regardless of whether the
+`count` incremented for every target attempted, regardless of whether the
 `INSERT` actually succeeded — any silently-caught failure (a stale
 `class_memberships` row pointing at a since-removed student, a genuine DB
 hiccup, anything other than the intentional `ON CONFLICT DO NOTHING` no-op)
-still gets counted as a success. The teacher sees "Test assigned to 30
-students" in the response even if some of those 30 inserts silently
-failed — with zero indication which student(s) didn't actually receive the
-test, and no way for the teacher to know without a student separately
-reporting "I don't see this test."
-**Status:** confirmed via code read, not yet fixed — flagging here per this
-pass's scope (audit only, not action) pending direction on priority.
+still got counted as a success, with the response's `count`/`message`
+fields silently wrong.
+
+**Status: fixed (commit `ab8cd06`).** The loop body now wraps each `INSERT`
+in its own `try/catch`: `count` only increments inside the `try` block, so
+it's tied to an actual successful outcome (a genuine new row, or the
+intentional `ON CONFLICT DO NOTHING` no-op for a student already assigned —
+that path doesn't throw, so it's correctly still counted). A genuine
+failure now lands in the `catch`, is logged server-side
+(`console.error(...)`), and the student id is collected into a new
+`failed_student_ids` array, with `failed_count` and an adjusted `message`
+returned alongside `count` in the response.
+
+**Correcting this section's own earlier framing of the impact:** the
+original write-up here said "The teacher sees 'Test assigned to N students'
+in the response... with no indication which student(s) didn't actually
+receive the test" — phrasing that implies a teacher actually read and
+trusted that inflated number somewhere in the UI. Checking the actual (and
+only) caller, `client/src/pages/TeacherDashboard.jsx`, shows that's not
+accurate:
+```js
+await api.post(`/teacher/tests/${testId}/assign`, { class_id: assignClass });
+showToast('Assigned!');
+```
+No destructuring, no field access — the response body was (and, unchanged
+by this fix, still is) never read at all; the UI shows a generic "Assigned!"
+toast regardless of the actual `count`/`message`/`success` values. So the
+bug was real at the data layer, but its practically visible impact before
+this fix was narrower than "a teacher reads and trusts a false number": it
+was inaccurate data sitting unused in an API response nobody currently
+displays. Fixing the underlying accuracy was still the right call
+independent of that — nothing about a teacher not currently seeing the
+count made a wrong count acceptable to keep computing, and any future UI
+work that does surface `count`/`failed_count` now has trustworthy data to
+show.
 
 ### 11.3 — Confirmed still-open items, cross-checked against this document's own prior entries (see section 12 below for what these actually imply)
 
@@ -749,15 +777,10 @@ actually means for the app in its current state, not just that it exists:
   hand-writing one question, or a student submitting one via the community
   endpoint) — a content-authoring convenience gap for two specific
   workflows, not a student-facing correctness or grading problem.
-- **The new `teacherRoutes.js` assign-count bug (11.2)** — this is the one
-  with a real, direct student-impact implication: a teacher can believe a
-  test reached every selected student when it silently didn't reach all of
-  them, with no error surfaced anywhere. A student who never received an
-  assigned test has no way to know one was intended for them, and the
-  teacher has no way to know their count was wrong unless a student happens
-  to ask. This is a trust/reliability gap in a core teacher workflow, not
-  a security issue — worth prioritizing above `SEC-1` if forced to choose,
-  precisely because it fails silently rather than loudly.
+- **The `teacherRoutes.js` assign-count bug, previously listed here as an
+  open gap (11.2)** — no longer belongs in this list; it's fixed
+  (`ab8cd06`), not merely narrower in scope. See the corrected 11.2 for
+  what its actual pre-fix impact was.
 - **The unread blind-spot files (11.4)** — the honest implication is that
   this audit's "clean" findings only cover what was actually read. Areas
   like payment (now out of scope per section 10), grading, and
