@@ -5,7 +5,7 @@ import PortalSidebar from "../components/PortalSidebar";
 import PortalMobileNav from "../components/PortalMobileNav";
 import {
   Zap, Shield, Users, BookOpen, GraduationCap, Layers, UserCheck,
-  Sparkles, Upload, School, Settings,
+  Sparkles, Upload, School, Settings, ClipboardCheck,
 } from "lucide-react";
 
 // Real shared shell for the whole /admin/* tree. Previously this was just
@@ -24,6 +24,7 @@ const ADMIN_NAV_ITEMS = [
   { id: "topics",     kind: "tab",  icon: Layers,        label: "Topics"      },
   { id: "teachers",   kind: "tab",  icon: UserCheck,     label: "Teachers"    },
   { id: "aigenerate", kind: "tab",  icon: Sparkles,      label: "AI Generate" },
+  { id: "review",     kind: "link", icon: ClipboardCheck, label: "Question Review", link: "/admin/questions/review" },
   { id: "bulkupload", kind: "tab",  icon: Upload,        label: "Bulk Upload" },
   { id: "pastpapers", kind: "tab",  icon: BookOpen,      label: "Past Papers" },
   { id: "schools",    kind: "link", icon: School,        label: "Schools",    link: "/admin/schools"  },
