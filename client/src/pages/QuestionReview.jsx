@@ -81,14 +81,25 @@ export default function QuestionReview() {
   // already fetches, matched by code since my-subjects doesn't expose the
   // numeric exam_board_id.
   const [teacherExamCodes, setTeacherExamCodes] = useState(null); // null = not loaded yet, Set once loaded
+  // GAP FIX: teacherExamCodes alone only scoped Step 1 (exam type). Step 2
+  // (subject) called fetchSubjectsForType(et.id) identically for both
+  // roles — the platform-wide, unrestricted "every subject under this exam
+  // type" list, regardless of which of those subjects the teacher is
+  // actually assigned to. A teacher whose one assigned WAEC subject is
+  // Chemistry would still see every other WAEC subject (Biology, Physics,
+  // Maths, ...) at Step 2. Same GET /teacher/my-subjects response already
+  // has each subject's id — just wasn't being kept, only the exam codes
+  // were extracted from it.
+  const [teacherSubjectIds, setTeacherSubjectIds] = useState(null);
   useEffect(() => {
     if (user?.role !== 'teacher') return;
     api.get('/teacher/my-subjects')
       .then(res => {
-        const codes = new Set((res?.data || []).map(s => s.exam_board_code).filter(Boolean));
-        setTeacherExamCodes(codes);
+        const rows = res?.data || [];
+        setTeacherExamCodes(new Set(rows.map(s => s.exam_board_code).filter(Boolean)));
+        setTeacherSubjectIds(new Set(rows.map(s => s.id)));
       })
-      .catch(() => setTeacherExamCodes(new Set()));
+      .catch(() => { setTeacherExamCodes(new Set()); setTeacherSubjectIds(new Set()); });
   }, [user?.role]);
 
   const visibleExamTypes = user?.role === 'teacher'
@@ -104,7 +115,16 @@ export default function QuestionReview() {
     setLoadingSubjects(true);
     try {
       const subs = await fetchSubjectsForType(et.id);
-      setSubjects(subs || []);
+      // GAP FIX: fetchSubjectsForType is the same unrestricted, platform-
+      // wide list for every role — narrow it to the teacher's own
+      // assigned subjects here, the same way visibleExamTypes already
+      // narrows Step 1. teacherSubjectIds is populated by the same
+      // GET /teacher/my-subjects call that already builds teacherExamCodes
+      // above.
+      const scoped = user?.role === 'teacher'
+        ? (subs || []).filter(s => teacherSubjectIds?.has(s.id))
+        : (subs || []);
+      setSubjects(scoped);
     } catch {
       setSubjects([]);
     } finally {
