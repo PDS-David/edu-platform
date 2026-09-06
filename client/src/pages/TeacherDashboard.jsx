@@ -1111,7 +1111,15 @@ function TestBuilderTab() {
     setEditingQ(testId);
     try {
       const [b, a] = await Promise.all([
-        api.get('/teacher/questions').catch(() => ({ data: [] })),
+        // FEATURE: scope=subject — this bank picker should show every
+        // question in this teacher's supervised subjects (per explicit
+        // request: subject/exam-type supervision, not authorship), not
+        // just questions they personally wrote. The default (unscoped)
+        // request below is still used by three OTHER pages that manage a
+        // teacher's own submitted questions with a Delete button — those
+        // are deliberately untouched, see the scope=subject comment in
+        // teacherRoutes.js's GET /questions for the full reasoning.
+        api.get('/teacher/questions?scope=subject').catch(() => ({ data: [] })),
         api.get(`/teacher/tests/${testId}/questions`).catch(() => ({ data: [] })),
       ]);
       setBank(Array.isArray(b?.data) ? b.data : []);
