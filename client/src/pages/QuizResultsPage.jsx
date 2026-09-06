@@ -251,7 +251,7 @@ export default function QuizResultsPage() {
           </button>
           <p className="text-white/70 text-sm font-medium flex-1 truncate">
             {attempt?.subtopic_name || subtopicName || 'Results'}
-            {isMock && <span className="ml-2 text-xs text-amber-400 font-semibold">Mock Exam</span>}
+            {isMock && <span className="ml-2 text-xs text-amber-400 font-semibold">Examination</span>}
           </p>
         </div>
       </div>

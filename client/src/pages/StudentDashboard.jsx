@@ -529,7 +529,7 @@ export function DashboardContent() {
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white border border-gray-100 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100 bg-gradient-to-r from-blue-500 to-blue-600">
-              <p className="text-white font-bold">Start Mock Exam</p>
+              <p className="text-white font-bold">Start Examination</p>
               <p className="text-white/70 text-xs mt-0.5">Choose a subject — 45-minute timed exam</p>
             </div>
             <div className="p-2 max-h-64 overflow-y-auto">
@@ -619,7 +619,7 @@ export default function StudentDashboard() {
         { label: "Resources",     icon: BookOpen,       path: "/student/resources" },
         { label: "Test-Yourself", icon: Zap,            path: "/student/practice"  },
         { label: "Past Papers",   icon: FileText,       path: "/student/past-papers" },
-        { label: "Mock Exam",     icon: ClipboardList,  path: null, onClick: () => setShowMockPicker(true) },
+        { label: "Examination",   icon: ClipboardList,  path: null, onClick: () => setShowMockPicker(true) },
       ],
     },
     { label: "Mock History", icon: History,        path: "/student/mock-history"  },
@@ -829,7 +829,7 @@ export default function StudentDashboard() {
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white border border-gray-100 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100 bg-gradient-to-r from-blue-500 to-blue-600">
-              <p className="text-white font-bold">Start Mock Exam</p>
+              <p className="text-white font-bold">Start Examination</p>
               <p className="text-white/70 text-xs mt-0.5">Choose a subject — 45-minute timed exam</p>
             </div>
             <div className="p-2 max-h-64 overflow-y-auto">

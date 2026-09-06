@@ -225,7 +225,7 @@ export default function MockExamPage() {
   const { subjectId } = useParams();
   const navigate      = useNavigate();
   const location      = useLocation();
-  const { subjectName = 'Mock Exam', examBoardName = 'JAMB' } = location.state || {};
+  const { subjectName = 'Examination', examBoardName = 'JAMB' } = location.state || {};
 
   const [questions,   setQuestions]   = useState([]);
   const [current,     setCurrent]     = useState(0);
