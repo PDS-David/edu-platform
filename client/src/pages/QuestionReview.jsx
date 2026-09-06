@@ -69,6 +69,32 @@ export default function QuestionReview() {
   const [topics,         setTopics]         = useState([]);
   const [loadingTopics,  setLoadingTopics]  = useState(false);
 
+  // Explicit request: "the teacher only has access to the questions related
+  // to the subject(s) and exam type(s) under his supervised care... admin
+  // [can access] all exam types". useCatalog()'s examTypes is the full,
+  // global, unrestricted catalog — fine as-is for admin, but a teacher
+  // picking Step 1 would otherwise see every exam type on the platform and
+  // only discover it's irrelevant after Step 2 comes back empty. Deriving
+  // the teacher's own set from GET /teacher/my-subjects (already returns
+  // exam_board_code per assigned subject) rather than adding a new backend
+  // endpoint — this is a client-side filter of data the catalog hook
+  // already fetches, matched by code since my-subjects doesn't expose the
+  // numeric exam_board_id.
+  const [teacherExamCodes, setTeacherExamCodes] = useState(null); // null = not loaded yet, Set once loaded
+  useEffect(() => {
+    if (user?.role !== 'teacher') return;
+    api.get('/teacher/my-subjects')
+      .then(res => {
+        const codes = new Set((res?.data || []).map(s => s.exam_board_code).filter(Boolean));
+        setTeacherExamCodes(codes);
+      })
+      .catch(() => setTeacherExamCodes(new Set()));
+  }, [user?.role]);
+
+  const visibleExamTypes = user?.role === 'teacher'
+    ? examTypes.filter(et => teacherExamCodes?.has(et.code))
+    : examTypes;
+
   const handlePickExamType = async (et) => {
     setSelectedExamType(et);
     setSelectedSubject(null);
@@ -274,11 +300,17 @@ export default function QuestionReview() {
             {!selectedExamType && (
               <>
                 <p className="text-sm font-semibold text-gray-700 mb-3">Step 1 of 3 — Choose an exam type</p>
-                {loadingTypes ? (
+                {loadingTypes || (user?.role === 'teacher' && teacherExamCodes === null) ? (
                   <div className="flex items-center gap-2 text-gray-400 text-sm"><Loader className="w-4 h-4 animate-spin" /> Loading…</div>
+                ) : visibleExamTypes.filter(et => et.is_active !== false).length === 0 ? (
+                  <p className="text-sm text-gray-400">
+                    {user?.role === 'teacher'
+                      ? 'No subjects assigned to you yet — contact your admin.'
+                      : 'No exam types found.'}
+                  </p>
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {examTypes.filter(et => et.is_active !== false).map(et => (
+                    {visibleExamTypes.filter(et => et.is_active !== false).map(et => (
                       <button key={et.id} onClick={() => handlePickExamType(et)}
                         className="text-left px-4 py-3 rounded-xl border-2 border-gray-200 hover:border-violet-400 hover:bg-violet-50 transition-colors text-sm font-medium text-gray-800">
                         {et.name}
