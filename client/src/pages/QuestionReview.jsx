@@ -220,8 +220,15 @@ export default function QuestionReview() {
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
 
   // ── Empty state ────────────────────────────────────────────────────────────
-
-  if (!loading && !error && questions.length === 0 && offset === 0) {
+  // BUG FIX: this condition never checked whether a topic had actually been
+  // selected. questions starts as [] and offset starts as 0 — both true on
+  // the very first render, before the picker below has even been shown, so
+  // this fired immediately every single time and permanently hid the entire
+  // exam-type -> subject -> topic picker (dead code from that point on,
+  // despite being correctly built) behind an "All caught up!" screen. Now
+  // only shows once a topic is actually selected and a fetch has genuinely
+  // come back empty.
+  if (!loading && !error && questions.length === 0 && offset === 0 && selectedExamType && selectedSubject && selectedTopic) {
     return (
       <>
         <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -230,10 +237,13 @@ export default function QuestionReview() {
               <CheckCircle className="w-8 h-8 text-green-500" />
             </div>
             <h2 className="text-xl font-bold text-gray-800 mb-2">All caught up!</h2>
-            <p className="text-gray-500 mb-6">No pending questions to review.</p>
+            <p className="text-gray-500 mb-6">No pending questions for {selectedTopic?.name || 'this topic'}.</p>
             <div className="flex items-center justify-center gap-4">
               <button onClick={() => navigate(dashboardPath)} className="flex items-center gap-2 text-gray-600 hover:text-gray-800 font-medium">
                 <ArrowLeft className="w-4 h-4" /> Dashboard
+              </button>
+              <button onClick={() => setSelectedTopic(null)} className="flex items-center gap-2 text-gray-600 hover:text-gray-800 font-medium">
+                <ChevronLeft className="w-4 h-4" /> Change topic
               </button>
               <button onClick={() => fetchPending(0)} className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-medium">
                 <RefreshCw className="w-4 h-4" /> Refresh
