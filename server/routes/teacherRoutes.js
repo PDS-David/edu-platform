@@ -1398,32 +1398,20 @@ router.post('/questions', protect, teacherOnly, async (req, res) => {
 });
 
 // ── DELETE /api/teacher/questions/:id ─────────────────────────────────────────
-// There was previously no way to remove a question from the bank at all —
-// only GET (list) and POST (create) existed. Soft-deletes via is_active =
-// false rather than a hard DELETE, matching the WHERE q.is_active = true
-// filter GET /questions above already relies on (and that GET /questions/random
-// in questionsRoutes.js also uses when serving students). This is
-// deliberately non-destructive: GET /tests/:id/questions joins test_questions
-// straight to questions with no is_active filter, so a question that's
-// already attached to a test (published or draft) keeps appearing there and
-// keeps working for any student mid-test — this only removes it from
-// showing up as available for *new* tests going forward.
+// RESTRICT-1: explicit request — "a teacher should be able to approve or
+// reject a question but should be restricted from deleting questions."
+// Deletion (even the soft is_active=false kind this used to do) is no
+// longer available to the teacher role at all: approve/reject via the
+// Question Review queue (PUT /teacher/questions/:id/review, already
+// scoped to a teacher's supervised subjects) is now the only way a
+// teacher acts on a question's standing. This route is kept in place
+// (rather than removed) so a stale client hitting it gets a clear,
+// explicit reason rather than a bare 404.
 router.delete('/questions/:id', protect, teacherOnly, async (req, res) => {
-  try {
-    const result = await sequelize.query(
-      `UPDATE questions SET is_active = false, updated_at = NOW()
-       WHERE id = :id AND submitted_by = :teacherId AND is_active = true
-       RETURNING id`,
-      { replacements: { id: req.params.id, teacherId: req.user.id }, type: QueryTypes.SELECT }
-    );
-    if (!result.length) {
-      return res.status(404).json({ success: false, error: 'Question not found, already removed, or not yours to delete.' });
-    }
-    return res.json({ success: true, message: 'Question removed from your bank.' });
-  } catch (err) {
-    console.error('[DELETE /teacher/questions/:id]', err.message);
-    return res.status(500).json({ success: false, error: err.message });
-  }
+  return res.status(403).json({
+    success: false,
+    error: 'Teachers cannot delete questions. Use approve or reject in the Question Review queue instead.',
+  });
 });
 
 // ── GET /api/teacher/students ─────────────────────────────────────────────────

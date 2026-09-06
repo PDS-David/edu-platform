@@ -922,7 +922,6 @@ function QuestionsTab({ showToast }) {
   // page).
   const [bank,       setBank]       = useState([]);
   const [bankLoading, setBankLoading] = useState(true);
-  const [deletingId,  setDeletingId]  = useState(null);
 
   const loadBank = useCallback(() => {
     setBankLoading(true);
@@ -933,20 +932,6 @@ function QuestionsTab({ showToast }) {
   }, []);
 
   useEffect(() => { loadBank(); }, [loadBank]);
-
-  const handleDeleteQuestion = async (id) => {
-    if (!window.confirm("Remove this question from your bank? It stays intact on any test it's already attached to — this only stops it from being picked for new tests.")) return;
-    setDeletingId(id);
-    try {
-      await api.delete(`/teacher/questions/${id}`);
-      setBank(prev => prev.filter(q => q.id !== id));
-      showToast('Question removed from your bank.');
-    } catch (err) {
-      showToast(err?.message || 'Failed to delete question.', 'error');
-    } finally {
-      setDeletingId(null);
-    }
-  };
 
   // Load assigned subjects
   useEffect(() => {
@@ -1201,14 +1186,6 @@ function QuestionsTab({ showToast }) {
                     }`}>{q.difficulty}</span>
                   </div>
                 </div>
-                <button
-                  onClick={() => handleDeleteQuestion(q.id)}
-                  disabled={deletingId === q.id}
-                  title="Remove from question bank"
-                  className="shrink-0 text-gray-300 hover:text-red-500 disabled:opacity-40 mt-1"
-                >
-                  {deletingId === q.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                </button>
               </div>
             ))}
           </div>
