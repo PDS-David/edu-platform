@@ -1274,29 +1274,61 @@ router.post('/nudge/:userId', protect, teacherOnly, async (req, res) => {
 // ── GET /api/teacher/questions ────────────────────────────────────────────────
 router.get('/questions', protect, teacherOnly, async (req, res) => {
   try {
+    // FEATURE: added an explicit ?scope=subject mode, used ONLY by the Test
+    // Builder's question picker (TeacherDashboard.jsx) — per explicit
+    // request: "the teacher only has access to the questions related to
+    // the subject(s) and exam type(s) under his supervised care" (subject
+    // supervision, via teacher_subjects — NOT authorship). The DEFAULT
+    // (no ?scope param, or ?scope=own) is left completely UNCHANGED —
+    // submitted_by = teacherId — because THREE OTHER consumers of this
+    // exact endpoint (TeacherPendingQuestions.jsx, TeacherResourcesPage.jsx's
+    // Add Question tab, TeacherAddQuestionPage.jsx) are all "manage my own
+    // submitted questions, with a Delete button next to each row" UIs.
+    // Widening those to subject-scope instead of author-scope would have
+    // let a teacher see — and attempt to DELETE via the existing
+    // DELETE /teacher/questions/:id — other people's questions in their
+    // supervised subject, a worse authorization bug than the one being
+    // fixed here. Confirmed via grep across client/src before writing this:
+    // only TeacherDashboard.jsx's Test Builder call site should ever pass
+    // scope=subject.
+    const isSubjectScope = req.query.scope === 'subject';
+
     const rows = await sequelize.query(
-      // BUG FIX: this never selected q.type, so the Test Builder's question
-      // picker (TeacherDashboard.jsx) had no way to show a teacher which
-      // questions were mcq vs essay/structured before attaching them to a
-      // test — a teacher could unknowingly build a test mixing free-text
-      // questions into what they assumed was an all-MCQ assessment.
-      `SELECT q.id, q.question_text, q.type, q.difficulty, q.explanation,
-              q.options, q.correct_answer, q.created_at,
-              s.name AS subject_name
-       FROM questions q
-       LEFT JOIN subtopics  st ON st.id = q.subtopic_id
-       LEFT JOIN topics      t ON t.id  = st.topic_id
-       LEFT JOIN subjects    s ON s.id  = t.subject_id
-       WHERE q.submitted_by = :teacherId AND q.is_active = true
-       -- BUG FIX (questions-mixed-up-in-test-builder): this used to be
-       -- ORDER BY q.created_at DESC only, which interleaves every subject
-       -- together purely by upload/creation time. The subject/topic tagging
-       -- itself was never lost (the join above has always correctly linked
-       -- each question back to its subject) — this was a display-ordering
-       -- bug, not a data bug. Sorting by subject first means the Test
-       -- Builder's question picker can group consecutive rows by subject
-       -- instead of showing them interleaved.
-       ORDER BY s.name ASC NULLS LAST, q.created_at DESC LIMIT 100`,
+      isSubjectScope
+        ? `SELECT q.id, q.question_text, q.type, q.difficulty, q.explanation,
+                  q.options, q.correct_answer, q.status, q.is_ai_generated, q.created_at,
+                  s.name AS subject_name, t.name AS topic_name, eb.name AS exam_type_name
+           FROM questions q
+           JOIN subtopics  st ON st.id = q.subtopic_id
+           JOIN topics      t ON t.id  = st.topic_id
+           JOIN subjects    s ON s.id  = t.subject_id
+           LEFT JOIN exam_boards eb ON s.exam_board_id = eb.id
+           JOIN teacher_subjects ts ON ts.subject_id = s.id AND ts.teacher_id = :teacherId AND ts.is_active = true
+           WHERE q.is_active = true
+           ORDER BY eb.name NULLS LAST, s.name ASC, t.name ASC, q.created_at DESC
+           LIMIT 100`
+        // BUG FIX: this never selected q.type, so the Test Builder's question
+        // picker (TeacherDashboard.jsx) had no way to show a teacher which
+        // questions were mcq vs essay/structured before attaching them to a
+        // test — a teacher could unknowingly build a test mixing free-text
+        // questions into what they assumed was an all-MCQ assessment.
+        : `SELECT q.id, q.question_text, q.type, q.difficulty, q.explanation,
+                  q.options, q.correct_answer, q.created_at,
+                  s.name AS subject_name
+           FROM questions q
+           LEFT JOIN subtopics  st ON st.id = q.subtopic_id
+           LEFT JOIN topics      t ON t.id  = st.topic_id
+           LEFT JOIN subjects    s ON s.id  = t.subject_id
+           WHERE q.submitted_by = :teacherId AND q.is_active = true
+           -- BUG FIX (questions-mixed-up-in-test-builder): this used to be
+           -- ORDER BY q.created_at DESC only, which interleaves every subject
+           -- together purely by upload/creation time. The subject/topic tagging
+           -- itself was never lost (the join above has always correctly linked
+           -- each question back to its subject) — this was a display-ordering
+           -- bug, not a data bug. Sorting by subject first means the Test
+           -- Builder's question picker can group consecutive rows by subject
+           -- instead of showing them interleaved.
+           ORDER BY s.name ASC NULLS LAST, q.created_at DESC LIMIT 100`,
       { replacements: { teacherId: req.user.id }, type: QueryTypes.SELECT }
     );
     return res.json({ success: true, data: rows });
