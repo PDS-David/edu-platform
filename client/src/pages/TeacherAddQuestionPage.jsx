@@ -55,12 +55,13 @@ export default function TeacherAddQuestionPage() {
   const [success,    setSuccess]    = useState(false);
   const [error,      setError]      = useState("");
 
-  // Question bank list — there was previously no way to see or delete a
-  // question once submitted, only add new ones.
+  // Question bank list — read-only: a teacher can see everything they've
+  // submitted, but can no longer delete (RESTRICT-1 — see
+  // teacherRoutes.js's DELETE /teacher/questions/:id for the full
+  // rationale: approve/reject via Question Review is now the only way a
+  // teacher acts on a question).
   const [bank,        setBank]        = useState([]);
   const [bankLoading,  setBankLoading]  = useState(true);
-  const [deletingId,   setDeletingId]   = useState(null);
-  const [bankError,    setBankError]    = useState("");
 
   const loadBank = useCallback(() => {
     setBankLoading(true);
@@ -71,20 +72,6 @@ export default function TeacherAddQuestionPage() {
   }, []);
 
   useEffect(() => { loadBank(); }, [loadBank]);
-
-  const handleDeleteQuestion = async (id) => {
-    if (!window.confirm("Remove this question from your bank? It stays intact on any test it's already attached to — this only stops it from being picked for new tests.")) return;
-    setDeletingId(id);
-    setBankError("");
-    try {
-      await api.delete(`/teacher/questions/${id}`);
-      setBank(prev => prev.filter(q => q.id !== id));
-    } catch (err) {
-      setBankError(err.message || "Failed to delete question.");
-    } finally {
-      setDeletingId(null);
-    }
-  };
 
   // Load subjects on mount
   useEffect(() => {
@@ -558,12 +545,6 @@ export default function TeacherAddQuestionPage() {
             <h2 className="text-sm font-bold text-gray-700">Your Question Bank {!bankLoading && `(${bank.length})`}</h2>
           </div>
 
-          {bankError && (
-            <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-2.5 mb-3 text-sm">
-              <AlertCircle size={16} /> {bankError}
-            </div>
-          )}
-
           {bankLoading ? (
             <div className="flex justify-center py-8"><Loader2 size={18} className="animate-spin text-indigo-300" /></div>
           ) : bank.length === 0 ? (
@@ -585,15 +566,6 @@ export default function TeacherAddQuestionPage() {
                       }`}>{q.difficulty}</span>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteQuestion(q.id)}
-                    disabled={deletingId === q.id}
-                    title="Remove from question bank"
-                    className="shrink-0 text-gray-300 hover:text-red-500 disabled:opacity-40 mt-1"
-                  >
-                    {deletingId === q.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                  </button>
                 </div>
               ))}
             </div>
