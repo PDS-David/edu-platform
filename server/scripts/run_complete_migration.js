@@ -753,6 +753,58 @@ async function run() {
       ADD COLUMN IF NOT EXISTS completed_at  TIMESTAMPTZ,
       ADD COLUMN IF NOT EXISTS total_time_ms BIGINT`],
 
+    // Examination feature, Phase 1 (database/migration_029_examinations.sql
+    // has the full rationale for every schema decision below, including
+    // why examination_assignments.student_id is NOT NULL rather than
+    // mirroring resource_assignments' nullable-student/class-level-row
+    // pattern instead).
+    ['examinations', `CREATE TABLE IF NOT EXISTS examinations (
+      id               UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+      created_by       UUID         NOT NULL REFERENCES users(id)       ON DELETE CASCADE,
+      title            VARCHAR(255) NOT NULL,
+      subject_id       INTEGER      REFERENCES subjects(id)             ON DELETE SET NULL,
+      exam_board_id    INTEGER      REFERENCES exam_boards(id)          ON DELETE SET NULL,
+      scheduled_start  TIMESTAMPTZ  NOT NULL,
+      duration_minutes INTEGER      NOT NULL DEFAULT 60,
+      total_marks      INTEGER      NOT NULL DEFAULT 0,
+      status           VARCHAR(20)  NOT NULL DEFAULT 'draft',
+      created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+      updated_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_examinations_created_by ON examinations(created_by);
+    CREATE INDEX IF NOT EXISTS idx_examinations_status     ON examinations(status);
+    CREATE INDEX IF NOT EXISTS idx_examinations_subject_id ON examinations(subject_id);
+    DO $$ BEGIN
+      ALTER TABLE examinations
+        ADD CONSTRAINT examinations_status_check
+        CHECK (status IN ('draft', 'scheduled', 'live', 'completed'));
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$`],
+
+    ['examination_questions', `CREATE TABLE IF NOT EXISTS examination_questions (
+      id              UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
+      examination_id  UUID    NOT NULL REFERENCES examinations(id) ON DELETE CASCADE,
+      question_id     INTEGER NOT NULL REFERENCES questions(id)    ON DELETE CASCADE,
+      question_order  INTEGER NOT NULL DEFAULT 0,
+      marks_allocated INTEGER NOT NULL DEFAULT 1,
+      marking_guide   TEXT,
+      UNIQUE(examination_id, question_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_eq_examination_id ON examination_questions(examination_id)`],
+
+    ['examination_assignments', `CREATE TABLE IF NOT EXISTS examination_assignments (
+      id             UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+      examination_id UUID        NOT NULL REFERENCES examinations(id) ON DELETE CASCADE,
+      student_id     UUID        NOT NULL REFERENCES users(id)        ON DELETE CASCADE,
+      class_id       UUID,
+      assigned_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      started_at     TIMESTAMPTZ,
+      submitted_at   TIMESTAMPTZ,
+      score          INTEGER,
+      UNIQUE(examination_id, student_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_ea_examination_id ON examination_assignments(examination_id);
+    CREATE INDEX IF NOT EXISTS idx_ea_student_id     ON examination_assignments(student_id)`],
+
     ['student_subjects', `CREATE TABLE IF NOT EXISTS student_subjects (
       id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
       student_id UUID        NOT NULL REFERENCES users(id)    ON DELETE CASCADE,
