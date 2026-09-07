@@ -703,6 +703,84 @@ router.get('/examination/:id', protect, studentOnly, async (req, res) => {
   }
 });
 
+// ── GET /api/students/exam-lock-status — Phase 3 Part 2 ─────────────────────
+// Single, fast, minimal-payload endpoint whose only job is answering "does
+// this student have a live, started, not-yet-submitted exam right now."
+// Deliberately independent of the two endpoints above — built against the
+// same examinations/examination_assignments tables directly, not layered
+// on top of GET /examination/:id, so this stays cheap enough to poll on
+// every route change (per Part 3's frontend guard) without dragging in
+// question content, marking_guide, or anything else those endpoints touch.
+router.get('/exam-lock-status', protect, studentOnly, async (req, res) => {
+  try {
+    const rows = await sequelize.query(
+      `SELECT ea.examination_id, e.title, e.scheduled_start, e.duration_minutes
+         FROM examination_assignments ea
+         JOIN examinations e ON e.id = ea.examination_id
+        WHERE ea.student_id = :studentId
+          AND ea.started_at   IS NOT NULL
+          AND ea.submitted_at IS NULL
+        ORDER BY ea.started_at DESC
+        LIMIT 5`,
+      { replacements: { studentId: req.user.id }, type: QueryTypes.SELECT }
+    );
+    // LIMIT 5, not 1: a student could in principle have more than one
+    // started-but-unsubmitted exam row (e.g. two exams both started, one
+    // still genuinely live and one whose window has since lapsed) --
+    // pulling a handful and picking the first one whose window is still
+    // actually live (checked below) is more correct than trusting
+    // whichever row happens to sort first and hoping it's the live one.
+    // Kept small (5, not unbounded) since this must stay cheap.
+
+    const now = Date.now();
+    const live = rows.find(r => {
+      const start = new Date(r.scheduled_start).getTime();
+      const end   = start + (r.duration_minutes * 60 * 1000);
+      return now >= start && now < end;
+    });
+
+    // DECISION (documented explicitly, per this task's own instruction,
+    // not left implicit): a student whose window has ended without ever
+    // submitting is NOT kept locked. Rationale: the exam is genuinely over
+    // either way -- there is nothing left for them to submit into, since
+    // GET /students/examination/:id (Phase 3 Part 1) already independently
+    // refuses to serve questions once the window has closed, whether or
+    // not the student ever started. Continuing to lock the rest of the
+    // app for a student who simply ran out of time (or never got back to
+    // submit) would punish them with total access loss for a mistake that
+    // already has its own, separate consequence (an incomplete exam
+    // showing up wherever grades/history are tracked) -- a much worse
+    // outcome than the missed exam itself. So: locked reflects only
+    // "currently, genuinely mid-window," not "ever started and never
+    // formally submitted." Whoever tracks grading/completion downstream
+    // should treat a row with started_at set, submitted_at still null,
+    // and the window already closed as an incomplete/missed attempt --
+    // that is a separate concern from this endpoint's own job.
+    if (!live) {
+      return res.json({ success: true, data: { locked: false } });
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        locked: true,
+        examination_id: live.examination_id,
+        title: live.title,
+        ends_at: new Date(new Date(live.scheduled_start).getTime() + live.duration_minutes * 60 * 1000).toISOString(),
+      },
+    });
+  } catch (err) {
+    console.error('[GET /students/exam-lock-status]', err.message);
+    // Fail OPEN, not closed: if this check itself errors, a genuine bug
+    // here must never be able to lock every student out of the entire
+    // app. Worst case on a transient failure is a live exam's lockdown
+    // doesn't engage for one poll cycle -- recoverable on the next poll --
+    // versus every student losing all navigation because of an unrelated
+    // server hiccup, which is not.
+    return res.json({ success: true, data: { locked: false } });
+  }
+});
+
 module.exports = router;
 module.exports.ensureEnrollmentColumns = ensureEnrollmentColumns;
 
