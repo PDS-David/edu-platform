@@ -1430,6 +1430,123 @@ router.post('/examinations/:id/questions/author', protect, teacherOnly, async (r
   }
 });
 
+// ── POST /api/teacher/examinations/:id/assign ─────────────────────────────────
+// Phase 2B — distribute an examination to a class or specific students.
+// Mirrors POST /tests/:id/assign (~line 931) exactly, including its own
+// documented count-accuracy fix: count only increments on a genuine
+// successful INSERT (ON CONFLICT DO NOTHING still counts, since that's
+// normal successful SQL — the student already had this exam, not a
+// failure), never unconditionally per loop iteration regardless of
+// outcome.
+//
+// No question-approval gate of any kind, per this feature's confirmed
+// design: matches custom_tests' own verified precedent exactly (POST
+// /tests/:id/assign has no such check either — confirmed by reading it
+// directly above). This also means an examination can be assigned while
+// it still contains a genuinely 'pending' bank question (e.g. an
+// unreviewed AI-generated one attached via /questions/bank) — consistent
+// with, not a gap introduced by, this endpoint; Test Builder already
+// permits exactly the same thing today for custom_tests.
+router.post('/examinations/:id/assign', protect, teacherOnly, async (req, res) => {
+  const { class_id, student_ids } = req.body;
+  if (!class_id && (!Array.isArray(student_ids) || student_ids.length === 0)) {
+    return res.status(400).json({ success: false, error: 'class_id or student_ids is required' });
+  }
+  try {
+    const exam = await sequelize.query(
+      `SELECT id, title, scheduled_start, duration_minutes
+       FROM examinations WHERE id = :id AND created_by = :teacherId`,
+      { replacements: { id: req.params.id, teacherId: req.user.id }, type: QueryTypes.SELECT }
+    );
+    if (!exam.length) return res.status(404).json({ success: false, error: 'Examination not found' });
+    const examRow = exam[0];
+
+    let targets = [];
+    if (class_id) {
+      const members = await sequelize.query(
+        `SELECT student_id FROM class_memberships WHERE class_id = :classId`,
+        { replacements: { classId: class_id }, type: QueryTypes.SELECT }
+      );
+      targets = members.map(m => ({ studentId: m.student_id, classId: class_id }));
+    } else {
+      const cleanIds = student_ids.filter(id => typeof id === 'string' && id.length > 10);
+      targets = cleanIds.map(id => ({ studentId: id, classId: null }));
+    }
+
+    let count = 0;
+    const failedStudentIds = [];
+    for (const { studentId, classId } of targets) {
+      try {
+        await sequelize.query(
+          `INSERT INTO examination_assignments (examination_id, student_id, class_id, assigned_at)
+           VALUES (:examId, :studentId, :classId, NOW())
+           ON CONFLICT (examination_id, student_id) DO NOTHING`,
+          {
+            replacements: { examId: req.params.id, studentId, classId: classId || null },
+            type: QueryTypes.INSERT,
+          }
+        );
+        // Same fix as POST /tests/:id/assign — only a genuine failure
+        // (caught below) is excluded from count; ON CONFLICT DO NOTHING
+        // is normal successful SQL, not a failure, and stays counted.
+        count++;
+      } catch (err) {
+        console.error(`[POST /teacher/examinations/${req.params.id}/assign] failed for student ${studentId}:`, err.message);
+        failedStudentIds.push(studentId);
+      }
+    }
+
+    // Notification inserted directly — POST /notifications is gated to
+    // admin/school_admin only, and this feature's own confirmed design
+    // decision was to bypass that route entirely for this case rather than
+    // broaden its auth as an unrelated side effect. Text explicitly states
+    // exam name, scheduled date/time, and duration, per the same decision.
+    if (count > 0) {
+      const startFmt = new Date(examRow.scheduled_start).toLocaleString('en-GB', {
+        dateStyle: 'medium', timeStyle: 'short', timeZone: 'Africa/Lagos',
+      });
+      const successfulStudentIds = targets
+        .map(t => t.studentId)
+        .filter(id => !failedStudentIds.includes(id));
+      for (const studentId of successfulStudentIds) {
+        try {
+          await sequelize.query(
+            `INSERT INTO notifications (user_id, title, message, type, is_read, created_at, updated_at)
+             VALUES (:userId, :title, :message, 'exam', false, NOW(), NOW())`,
+            {
+              replacements: {
+                userId: studentId,
+                title: `New examination: ${examRow.title}`,
+                message: `You have been assigned "${examRow.title}", scheduled for ${startFmt} (Africa/Lagos time), lasting ${examRow.duration_minutes} minute${examRow.duration_minutes !== 1 ? 's' : ''}.`,
+              },
+              type: QueryTypes.INSERT,
+            }
+          );
+        } catch (notifErr) {
+          // A notification failure must never mask or roll back a
+          // successful assignment — log and continue, same non-blocking
+          // convention used everywhere else in this codebase for
+          // notification inserts.
+          console.error(`[POST /teacher/examinations/${req.params.id}/assign] notification failed for student ${studentId}:`, notifErr.message);
+        }
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: failedStudentIds.length > 0
+        ? `Examination assigned to ${count} student${count !== 1 ? 's' : ''}. ${failedStudentIds.length} failed and were not assigned.`
+        : `Examination assigned to ${count} student${count !== 1 ? 's' : ''}.`,
+      count,
+      failed_count: failedStudentIds.length,
+      failed_student_ids: failedStudentIds,
+    });
+  } catch (err) {
+    console.error(`[POST /teacher/examinations/${req.params.id}/assign]`, err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ── POST /api/teacher/nudge/:userId ──────────────────────────────────────────
 router.post('/nudge/:userId', protect, teacherOnly, async (req, res) => {
   try {

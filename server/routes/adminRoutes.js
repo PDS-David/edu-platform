@@ -1778,3 +1778,101 @@ router.post('/examinations/:id/questions/bank', protect, adminOnly, async (req, 
     return res.status(500).json({ success: false, error: err.message });
   }
 });
+
+// ── POST /api/admin/examinations/:id/assign ───────────────────────────────────
+// Phase 2B — admin mirror of POST /teacher/examinations/:id/assign, same
+// file/line above it. Identical logic and count-accuracy fix; the only
+// difference from the teacher version is the ownership check column
+// values (adminId in place of teacherId) — matching this file's own
+// established convention just above (POST /examinations and
+// POST /examinations/:id/questions/bank both scope by
+// created_by = :adminId, not an unrestricted "any examination" admin
+// bypass), kept consistent here rather than introducing a different,
+// undiscussed admin-scoping rule for this one endpoint.
+router.post('/examinations/:id/assign', protect, adminOnly, async (req, res) => {
+  const { class_id, student_ids } = req.body;
+  if (!class_id && (!Array.isArray(student_ids) || student_ids.length === 0)) {
+    return res.status(400).json({ success: false, error: 'class_id or student_ids is required' });
+  }
+  try {
+    const exam = await sequelize.query(
+      `SELECT id, title, scheduled_start, duration_minutes
+       FROM examinations WHERE id = :id AND created_by = :adminId`,
+      { replacements: { id: req.params.id, adminId: req.user.id }, type: QueryTypes.SELECT }
+    );
+    if (!exam.length) return res.status(404).json({ success: false, error: 'Examination not found' });
+    const examRow = exam[0];
+
+    let targets = [];
+    if (class_id) {
+      const members = await sequelize.query(
+        `SELECT student_id FROM class_memberships WHERE class_id = :classId`,
+        { replacements: { classId: class_id }, type: QueryTypes.SELECT }
+      );
+      targets = members.map(m => ({ studentId: m.student_id, classId: class_id }));
+    } else {
+      const cleanIds = student_ids.filter(id => typeof id === 'string' && id.length > 10);
+      targets = cleanIds.map(id => ({ studentId: id, classId: null }));
+    }
+
+    let count = 0;
+    const failedStudentIds = [];
+    for (const { studentId, classId } of targets) {
+      try {
+        await sequelize.query(
+          `INSERT INTO examination_assignments (examination_id, student_id, class_id, assigned_at)
+           VALUES (:examId, :studentId, :classId, NOW())
+           ON CONFLICT (examination_id, student_id) DO NOTHING`,
+          {
+            replacements: { examId: req.params.id, studentId, classId: classId || null },
+            type: QueryTypes.INSERT,
+          }
+        );
+        count++;
+      } catch (err) {
+        console.error(`[POST /admin/examinations/${req.params.id}/assign] failed for student ${studentId}:`, err.message);
+        failedStudentIds.push(studentId);
+      }
+    }
+
+    if (count > 0) {
+      const startFmt = new Date(examRow.scheduled_start).toLocaleString('en-GB', {
+        dateStyle: 'medium', timeStyle: 'short', timeZone: 'Africa/Lagos',
+      });
+      const successfulStudentIds = targets
+        .map(t => t.studentId)
+        .filter(id => !failedStudentIds.includes(id));
+      for (const studentId of successfulStudentIds) {
+        try {
+          await sequelize.query(
+            `INSERT INTO notifications (user_id, title, message, type, is_read, created_at, updated_at)
+             VALUES (:userId, :title, :message, 'exam', false, NOW(), NOW())`,
+            {
+              replacements: {
+                userId: studentId,
+                title: `New examination: ${examRow.title}`,
+                message: `You have been assigned "${examRow.title}", scheduled for ${startFmt} (Africa/Lagos time), lasting ${examRow.duration_minutes} minute${examRow.duration_minutes !== 1 ? 's' : ''}.`,
+              },
+              type: QueryTypes.INSERT,
+            }
+          );
+        } catch (notifErr) {
+          console.error(`[POST /admin/examinations/${req.params.id}/assign] notification failed for student ${studentId}:`, notifErr.message);
+        }
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: failedStudentIds.length > 0
+        ? `Examination assigned to ${count} student${count !== 1 ? 's' : ''}. ${failedStudentIds.length} failed and were not assigned.`
+        : `Examination assigned to ${count} student${count !== 1 ? 's' : ''}.`,
+      count,
+      failed_count: failedStudentIds.length,
+      failed_student_ids: failedStudentIds,
+    });
+  } catch (err) {
+    console.error(`[POST /admin/examinations/${req.params.id}/assign]`, err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
