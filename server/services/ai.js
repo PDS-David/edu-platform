@@ -459,15 +459,26 @@ async function generate(prompt, task = 'default', options = {}) {
 // teacher-assigned test submission, and image marking) asks for the same
 // personalized, paragraph-style feedback instead of each having its own
 // slightly different, unstructured prompt.
-function buildEssayFeedbackPrompt({ studentName, questionText, maxMarks, modelAnswer, studentAnswer }) {
+// Phase 4 (Examination feature): added an optional markingGuide param
+// rather than forking a sibling function, since the two prompts would
+// otherwise be near-duplicates that could drift out of sync over time.
+// When markingGuide is absent -- true for all three existing call sites
+// (questionsRoutes.js practice mode, quizzes.js, studentRoutes.js test
+// submission) -- both branches below fall through to the exact original
+// text, so none of their behavior changes. Only the new examination
+// submission call site (studentRoutes.js POST /examination/:id/submit)
+// passes markingGuide.
+function buildEssayFeedbackPrompt({ studentName, questionText, maxMarks, modelAnswer, studentAnswer, markingGuide }) {
   return `You are a warm, encouraging Nigerian exam marker (WAEC/JAMB/NECO standard), marking a student's answer${studentName ? ` — their name is ${studentName}` : ''}.
 
 Question: ${questionText}
 Maximum marks: ${maxMarks}
-Model answer: ${modelAnswer || 'Not specified'}
+${markingGuide
+  ? `Marking guide (follow this specific rubric when awarding marks):\n${markingGuide}`
+  : `Model answer: ${modelAnswer || 'Not specified'}`}
 Student's answer: "${studentAnswer}"
 
-Award marks out of ${maxMarks} using your expert judgment. Then write feedback as natural, flowing prose addressed directly to the student — use "you"${studentName ? ` and open with their name (${studentName})` : ''}, never "the student". Write it as two short paragraphs, separated by a blank line: first, say plainly what they got right and acknowledge the marks earned; second, explain what was missing or could be improved (skip this second paragraph only if the answer is already complete and correct). Do not use markdown, asterisks, bullet points, or numbered lists anywhere in the feedback — plain complete sentences only. Keep the whole feedback under 100 words and keep a warm, encouraging tutor tone.
+Award marks out of ${maxMarks} using your expert judgment${markingGuide ? ', following the marking guide above as the specific rubric for this question' : ''}. Then write feedback as natural, flowing prose addressed directly to the student — use "you"${studentName ? ` and open with their name (${studentName})` : ''}, never "the student". Write it as two short paragraphs, separated by a blank line: first, say plainly what they got right and acknowledge the marks earned; second, explain what was missing or could be improved (skip this second paragraph only if the answer is already complete and correct). Do not use markdown, asterisks, bullet points, or numbered lists anywhere in the feedback — plain complete sentences only. Keep the whole feedback under 100 words and keep a warm, encouraging tutor tone.
 
 Respond ONLY with valid JSON in this exact format (no markdown fencing, no extra text outside the JSON):
 {"marks_awarded": <number 0-${maxMarks}>, "is_correct": <true or false>, "feedback": "<the two-paragraph feedback described above, as a single string with a blank line between paragraphs>"}`;

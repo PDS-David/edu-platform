@@ -781,6 +781,198 @@ router.get('/exam-lock-status', protect, studentOnly, async (req, res) => {
   }
 });
 
+// ── POST /api/students/examination/:id/submit — Phase 4 ─────────────────────
+// Body: { answers: [{ question_id, selected_answer?, essay_response? }], total_time_ms }
+//
+// Mirrors POST /students/test/:testId/submit's grading logic exactly
+// (mcq/true_false/short_answer graded against options[].is_correct with a
+// correct_answer text-match fallback; essay/structured routed through AI
+// marking) with one addition: when a question's examination_questions row
+// has a marking_guide set, it's passed to buildEssayFeedbackPrompt so the
+// grader follows that specific rubric instead of the generic "compare to
+// model answer" behavior.
+//
+// KNOWN LIMITATION, matching an existing pattern rather than introducing a
+// new one: like test submission, this returns the full per-question
+// breakdown (marks_awarded, feedback, etc.) in the response but only
+// persists the aggregate `score` to examination_assignments -- there is no
+// per-question answers/feedback table for exams any more than there is
+// for tests today. Revisiting a submitted exam later would not be able to
+// reconstruct the detailed breakdown shown at submission time. This is
+// the same gap this session already found (and separately flagged,
+// unfixed) in quizzes.js's practice-attempt history -- not new to this
+// endpoint, and not fixed here either, since inventing that storage was
+// out of this phase's scope.
+router.post('/examination/:id/submit', protect, studentOnly, async (req, res) => {
+  const { id } = req.params;
+  if (!isValidUUID(id)) {
+    return res.status(400).json({ success: false, error: 'Invalid examination ID' });
+  }
+  const { answers, total_time_ms = 0 } = req.body;
+  if (!Array.isArray(answers)) {
+    return res.status(400).json({ success: false, error: 'answers must be an array' });
+  }
+
+  const normalize = (s) =>
+    String(s ?? '')
+      .replace(/[\u2018\u2019\u201B]/g, "'")
+      .replace(/[\u201C\u201D\u201F]/g, '"')
+      .replace(/[\u00A0\u2007\u202F]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+
+  try {
+    // HARD RULE, same as GET /examination/:id above: verify the assignment
+    // exists before anything else.
+    const assignmentRows = await sequelize.query(
+      `SELECT id, submitted_at FROM examination_assignments
+        WHERE examination_id = :id AND student_id = :studentId`,
+      { replacements: { id, studentId: req.user.id }, type: QueryTypes.SELECT }
+    );
+    if (!assignmentRows.length) {
+      return res.status(403).json({ success: false, error: 'This examination has not been assigned to you.' });
+    }
+    const assignment = assignmentRows[0];
+    if (assignment.submitted_at) {
+      return res.status(409).json({ success: false, error: 'You have already submitted this examination.' });
+    }
+
+    // DECISION: not re-checking the live time window on this POST. The
+    // student was already verified to be genuinely within it by GET
+    // /examination/:id in order to see the questions at all -- rejecting a
+    // submission that happens to land a few seconds past the edge
+    // (network lag, still typing the last answer) would be a punitive
+    // failure mode for no real benefit. submitted_at still being null is
+    // the only gate enforced here.
+    const questionRows = await sequelize.query(
+      `SELECT q.id, q.question_text, q.correct_answer, q.options, q.type,
+              eq.marks_allocated, eq.marking_guide
+       FROM examination_questions eq
+       JOIN questions q ON q.id = eq.question_id
+       WHERE eq.examination_id = :id`,
+      { replacements: { id }, type: QueryTypes.SELECT }
+    );
+    const questionMap = {};
+    for (const r of questionRows) questionMap[String(r.id)] = r;
+
+    let totalScore = 0;
+    let maxScore   = 0;
+    const results  = [];
+
+    for (const answer of answers) {
+      const question = questionMap[String(answer.question_id)];
+      if (!question) continue; // question not actually on this exam — skip
+
+      const markValue = question.marks_allocated || 1;
+      maxScore += markValue;
+
+      const submittedAnswer = answer.selected_answer ?? answer.selected_option_id ?? '';
+      const essayText       = (answer.essay_response ?? (question.type !== 'mcq' && question.type !== 'true_false' ? submittedAnswer : '')) || '';
+
+      let isCorrect    = false;
+      let marksAwarded = 0;
+      let feedback     = null;
+
+      if (question.type === 'essay' || question.type === 'structured') {
+        if (process.env.GEMINI_API_KEY && essayText.trim()) {
+          try {
+            const prompt = buildEssayFeedbackPrompt({
+              studentName:   req.user?.first_name || null,
+              questionText:  question.question_text,
+              maxMarks:      markValue,
+              modelAnswer:   question.correct_answer,
+              studentAnswer: essayText.trim(),
+              // Phase 4's addition: a teacher-set rubric for this specific
+              // question, when present, takes priority over the generic
+              // model-answer comparison.
+              markingGuide:  question.marking_guide || null,
+            });
+            const raw    = await generate(prompt, 'essay-mark');
+            const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
+            marksAwarded = Math.min(Math.max(parsed.marks_awarded || 0, 0), markValue);
+            isCorrect    = parsed.is_correct ?? (marksAwarded >= markValue * 0.5);
+            feedback     = parsed.feedback || null;
+          } catch (aiErr) {
+            console.error(`[POST /students/examination/${id}/submit] AI marking failed:`, aiErr.message);
+            feedback = 'Submitted for manual review — automated marking was unavailable.';
+          }
+        } else if (!essayText.trim()) {
+          feedback = 'No answer submitted.';
+        } else {
+          feedback = 'Submitted for manual review.';
+        }
+      } else {
+        // mcq / true_false / short_answer — same convention as test
+        // submission: grade against options[].is_correct first, fall back
+        // to a raw correct_answer text comparison.
+        let opts = question.options;
+        if (typeof opts === 'string') { try { opts = JSON.parse(opts); } catch { opts = null; } }
+        const usableOpts = Array.isArray(opts)
+          ? opts.filter(o => o && typeof o === 'object' && o.option_text)
+          : [];
+
+        if (usableOpts.length > 0) {
+          const matchedOpt = usableOpts.find(o => normalize(o.option_text) === normalize(submittedAnswer));
+          if (matchedOpt && typeof matchedOpt.is_correct === 'boolean') {
+            isCorrect = matchedOpt.is_correct;
+          } else {
+            isCorrect = normalize(submittedAnswer) === normalize(question.correct_answer);
+          }
+        } else {
+          isCorrect = normalize(submittedAnswer) === normalize(question.correct_answer);
+        }
+        marksAwarded = isCorrect ? markValue : 0;
+      }
+
+      totalScore += marksAwarded;
+
+      results.push({
+        question_id:   answer.question_id,
+        is_correct:    isCorrect,
+        marks_awarded: marksAwarded,
+        max_marks:     markValue,
+        feedback,
+      });
+
+      // Record practice attempt (non-blocking) — same convention as test
+      // submission, for streak/analytics consistency across every place a
+      // student answers a real questions-table row.
+      sequelize.query(
+        `INSERT INTO practice_attempts (student_id, question_id, is_correct, time_taken_seconds, attempted_at, created_at, updated_at)
+         VALUES (:studentId, :questionId, :isCorrect, :timeTaken, NOW(), NOW(), NOW())`,
+        {
+          replacements: {
+            studentId:  req.user.id,
+            questionId: answer.question_id,
+            isCorrect:  !!isCorrect,
+            timeTaken:  Math.round((answer.time_taken_ms || 0) / 1000),
+          },
+          type: QueryTypes.INSERT,
+        }
+      ).catch(() => {});
+    }
+
+    const accuracyPct = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
+
+    await sequelize.query(
+      `UPDATE examination_assignments SET submitted_at = NOW(), score = :score WHERE id = :assignmentId`,
+      { replacements: { score: totalScore, assignmentId: assignment.id }, type: QueryTypes.UPDATE }
+    );
+
+    return res.status(200).json({
+      success:      true,
+      total_score:  totalScore,
+      max_score:    maxScore,
+      accuracy_pct: accuracyPct,
+      answers:      results,
+    });
+  } catch (err) {
+    console.error(`[POST /students/examination/${id}/submit]`, err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;
 module.exports.ensureEnrollmentColumns = ensureEnrollmentColumns;
 
