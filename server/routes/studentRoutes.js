@@ -554,6 +554,155 @@ router.post('/test/:testId/submit', protect, studentOnly, async (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// EXAMINATIONS — Phase 3 Part 1 (student-facing list + detail only)
+// No lockdown enforcement, no grading — that's Parts 2/3 of this phase,
+// worked separately. See database/migration_029_examinations.sql for
+// schema. Phase 1 (schema) and Phase 2 (teacher/admin builder + assign)
+// are both already merged.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── GET /api/students/examinations — list my assigned exams ────────────────
+// computed_status is derived from NOW() vs scheduled_start/duration_minutes
+// at request time -- deliberately NOT read from examinations.status, which
+// reflects the teacher's OWN builder-side lifecycle (draft/scheduled/live/
+// completed) and has no reason to be kept in sync with any individual
+// student's actual time window.
+router.get('/examinations', protect, studentOnly, async (req, res) => {
+  try {
+    const rows = await sequelize.query(
+      `SELECT e.id, e.title, e.subject_id, s.name AS subject_name,
+              e.exam_board_id, eb.name AS exam_board_name,
+              e.scheduled_start, e.duration_minutes, e.total_marks,
+              ea.assigned_at, ea.started_at, ea.submitted_at, ea.score
+         FROM examination_assignments ea
+         JOIN examinations e ON e.id = ea.examination_id
+         LEFT JOIN subjects s ON s.id = e.subject_id
+         LEFT JOIN exam_boards eb ON eb.id = e.exam_board_id
+        WHERE ea.student_id = :studentId
+        ORDER BY e.scheduled_start DESC`,
+      { replacements: { studentId: req.user.id }, type: QueryTypes.SELECT }
+    );
+
+    const now = Date.now();
+    const data = rows.map(r => {
+      const start = new Date(r.scheduled_start).getTime();
+      const end   = start + (r.duration_minutes * 60 * 1000);
+      const computed_status = now < start ? 'upcoming' : (now < end ? 'live' : 'completed');
+      return { ...r, computed_status };
+    });
+
+    return res.json({ success: true, data });
+  } catch (err) {
+    console.error('[GET /students/examinations]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── GET /api/students/examination/:id — questions, only within the live
+// window ─────────────────────────────────────────────────────────────────
+router.get('/examination/:id', protect, studentOnly, async (req, res) => {
+  const { id } = req.params;
+  if (!isValidUUID(id)) {
+    return res.status(400).json({ success: false, error: 'Invalid examination ID' });
+  }
+  try {
+    // HARD RULE: verify the requesting student actually has an assignment
+    // row for this exam BEFORE returning anything about it at all -- not
+    // just before returning questions. An unassigned student gets the same
+    // 403 whether the exam id is real or made up.
+    const assignment = await sequelize.query(
+      `SELECT id, started_at, submitted_at FROM examination_assignments
+        WHERE examination_id = :id AND student_id = :studentId`,
+      { replacements: { id, studentId: req.user.id }, type: QueryTypes.SELECT }
+    );
+    if (!assignment.length) {
+      return res.status(403).json({ success: false, error: 'This examination has not been assigned to you.' });
+    }
+    const assignmentRow = assignment[0];
+
+    const examRows = await sequelize.query(
+      `SELECT id, title, scheduled_start, duration_minutes, total_marks
+         FROM examinations WHERE id = :id`,
+      { replacements: { id }, type: QueryTypes.SELECT }
+    );
+    if (!examRows.length) {
+      return res.status(404).json({ success: false, error: 'Examination not found' });
+    }
+    const exam = examRows[0];
+
+    const start = new Date(exam.scheduled_start).getTime();
+    const end   = start + (exam.duration_minutes * 60 * 1000);
+    const now   = Date.now();
+
+    if (now < start) {
+      return res.status(403).json({
+        success: false,
+        error: `This examination hasn't started yet. It's scheduled for ${new Date(exam.scheduled_start).toLocaleString('en-NG', { dateStyle: 'medium', timeStyle: 'short' })}.`,
+        computed_status: 'upcoming',
+      });
+    }
+    if (now >= end) {
+      // DECISION (documented per this task's own instruction): a student
+      // whose window has closed gets 403 "this exam has ended" here,
+      // whether or not they ever actually started it (started_at null or
+      // not). Chosen over silently returning a stale question list, since
+      // this endpoint is the one guaranteeing "questions only exist within
+      // the live window" -- letting a closed exam still return its
+      // questions through here would be a standing bypass of that
+      // guarantee, independent of whatever separate lockdown mechanism
+      // Part 2 builds elsewhere.
+      return res.status(403).json({
+        success: false,
+        error: 'This examination has ended.',
+        computed_status: 'completed',
+      });
+    }
+
+    // Genuinely within the live window now. Record the first successful
+    // load as the start of this student's attempt -- only if not already
+    // set, so a second/third load during the same window doesn't reset it.
+    if (!assignmentRow.started_at) {
+      await sequelize.query(
+        `UPDATE examination_assignments SET started_at = NOW() WHERE id = :id`,
+        { replacements: { id: assignmentRow.id }, type: QueryTypes.UPDATE }
+      );
+    }
+
+    // HARD RULE: explicit column list, never SELECT * -- marking_guide
+    // must never reach this response under any circumstance, including if
+    // the table gains new columns later. Also excludes q.correct_answer
+    // and q.explanation, matching the exact same convention the parallel
+    // GET /students/test/:testId endpoint above already follows (no answer
+    // key sent before submission).
+    const questions = await sequelize.query(
+      `SELECT eq.question_order, eq.marks_allocated,
+              q.id, q.question_text, q.type, q.difficulty, q.options
+         FROM examination_questions eq
+         JOIN questions q ON q.id = eq.question_id
+        WHERE eq.examination_id = :id
+        ORDER BY eq.question_order ASC`,
+      { replacements: { id }, type: QueryTypes.SELECT }
+    );
+
+    return res.json({
+      success: true,
+      data: {
+        id: exam.id,
+        title: exam.title,
+        scheduled_start: exam.scheduled_start,
+        duration_minutes: exam.duration_minutes,
+        total_marks: exam.total_marks,
+        computed_status: 'live',
+        questions,
+      },
+    });
+  } catch (err) {
+    console.error(`[GET /students/examination/${id}]`, err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;
 module.exports.ensureEnrollmentColumns = ensureEnrollmentColumns;
 
