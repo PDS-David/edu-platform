@@ -1188,6 +1188,248 @@ router.delete('/tests/:id', protect, teacherOnly, async (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// EXAMINATION — Phase 2A: builder (create + attach questions)
+// Schema: database/migration_029_examinations.sql (Phase 1).
+// Assignment/notification (Phase 2B) and student-facing routes (Phase 3)
+// are NOT part of this slice.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── POST /api/teacher/examinations ────────────────────────────────────────────
+router.post('/examinations', protect, teacherOnly, async (req, res) => {
+  const { title, subject_id, exam_board_id, scheduled_start, duration_minutes = 60 } = req.body;
+  if (!title?.trim()) return res.status(400).json({ success: false, error: 'title is required' });
+  if (!scheduled_start) return res.status(400).json({ success: false, error: 'scheduled_start is required' });
+  const scheduledDate = new Date(scheduled_start);
+  if (isNaN(scheduledDate.getTime())) {
+    return res.status(400).json({ success: false, error: 'scheduled_start is not a valid date' });
+  }
+  // "Very much like Zoom meeting scheduling" — must be booked for the
+  // future, per this feature's own confirmed design decision.
+  if (scheduledDate.getTime() <= Date.now()) {
+    return res.status(400).json({ success: false, error: 'scheduled_start must be in the future' });
+  }
+  const durationMin = Math.max(1, parseInt(duration_minutes) || 60);
+
+  try {
+    const rows = await sequelize.query(
+      `INSERT INTO examinations (created_by, title, subject_id, exam_board_id, scheduled_start, duration_minutes, total_marks, status, created_at, updated_at)
+       VALUES (:teacherId, :title, :subjectId, :examBoardId, :scheduledStart, :duration, 0, 'draft', NOW(), NOW())
+       RETURNING id, title, subject_id, exam_board_id, scheduled_start, duration_minutes, total_marks, status, created_at`,
+      {
+        replacements: {
+          teacherId: req.user.id,
+          title: title.trim(),
+          subjectId: subject_id || null,
+          examBoardId: exam_board_id || null,
+          scheduledStart: scheduledDate.toISOString(),
+          duration: durationMin,
+        },
+        type: QueryTypes.SELECT,
+      }
+    );
+    return res.status(201).json({ success: true, data: { ...rows[0], question_count: 0 } });
+  } catch (err) {
+    console.error('[POST /teacher/examinations]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── POST /api/teacher/examinations/:id/questions/bank ─────────────────────────
+// Attach ONE existing bank question (with its own marks_allocated / optional
+// marking_guide — unlike Test Builder's array-based attach, marks are
+// per-question here, so this is deliberately one-at-a-time rather than
+// mirroring test_questions' bulk-array shape).
+//
+// VALIDATION CHOICE, deliberately diverging from Test Builder's own
+// POST /tests/:id/questions: that endpoint restricts non-admin teachers to
+// submitted_by = teacherId (authorship). This feature's own spec says the
+// exam's bank picker reuses GET /teacher/questions?scope=subject AS-IS —
+// and that endpoint is subject-scoped via teacher_subjects, not authorship,
+// and shows questions from ANY teacher in a supervised subject. Validating
+// this attach endpoint by authorship instead would recreate the exact
+// "picker shows it, attach rejects it" mismatch that already exists in
+// Test Builder today — so this checks teacher_subjects, matching what the
+// picker itself actually shows, not test_questions' precedent.
+router.post('/examinations/:id/questions/bank', protect, teacherOnly, async (req, res) => {
+  const { id: examId } = req.params;
+  const { question_id, marks_allocated = 1, marking_guide } = req.body;
+  const questionId = parseInt(question_id);
+  if (!questionId) return res.status(400).json({ success: false, error: 'question_id is required' });
+  const marks = Math.max(1, parseInt(marks_allocated) || 1);
+
+  try {
+    const exam = await sequelize.query(
+      `SELECT id FROM examinations WHERE id = :examId AND created_by = :teacherId`,
+      { replacements: { examId, teacherId: req.user.id }, type: QueryTypes.SELECT }
+    );
+    if (!exam.length) return res.status(404).json({ success: false, error: 'Examination not found' });
+
+    // Subject-scoped via teacher_subjects — see comment above for why this
+    // is deliberately NOT an authorship (submitted_by) check.
+    const validQuestion = await sequelize.query(
+      `SELECT q.id
+         FROM questions q
+         JOIN subtopics st ON st.id = q.subtopic_id
+         JOIN topics     t ON t.id  = st.topic_id
+         JOIN subjects   s ON s.id  = t.subject_id
+         JOIN teacher_subjects ts ON ts.subject_id = s.id AND ts.teacher_id = :teacherId AND ts.is_active = true
+        WHERE q.id = :questionId AND q.is_active = true`,
+      { replacements: { questionId, teacherId: req.user.id }, type: QueryTypes.SELECT }
+    );
+    if (!validQuestion.length) {
+      return res.status(403).json({ success: false, error: 'Not assigned to this subject' });
+    }
+
+    const orderRows = await sequelize.query(
+      `SELECT COALESCE(MAX(question_order), -1) AS max_order FROM examination_questions WHERE examination_id = :examId`,
+      { replacements: { examId }, type: QueryTypes.SELECT }
+    );
+    const nextOrder = (orderRows[0]?.max_order ?? -1) + 1;
+
+    await sequelize.query(
+      `INSERT INTO examination_questions (examination_id, question_id, question_order, marks_allocated, marking_guide)
+       VALUES (:examId, :questionId, :order, :marks, :guide)
+       ON CONFLICT (examination_id, question_id) DO NOTHING`,
+      {
+        replacements: { examId, questionId, order: nextOrder, marks, guide: marking_guide || null },
+        type: QueryTypes.INSERT,
+      }
+    );
+
+    // Keep total_marks in sync — same application-level convention as
+    // custom_tests.total_marks (see migration_029's own note; there is no
+    // DB trigger doing this anywhere in this schema).
+    await sequelize.query(
+      `UPDATE examinations
+          SET total_marks = (SELECT COALESCE(SUM(marks_allocated), 0) FROM examination_questions WHERE examination_id = :examId),
+              updated_at = NOW()
+        WHERE id = :examId`,
+      { replacements: { examId }, type: QueryTypes.UPDATE }
+    );
+
+    return res.status(201).json({ success: true, message: 'Question attached.' });
+  } catch (err) {
+    console.error('[POST /teacher/examinations/:id/questions/bank]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── POST /api/teacher/examinations/:id/questions/author ───────────────────────
+// Author a brand-new question just for this exam. TEACHER ONLY — explicit
+// role check below is defense-in-depth (teacherOnly middleware already
+// guarantees this, and this route is not mounted on the admin router at
+// all), per this feature's own instruction to enforce it explicitly rather
+// than rely solely on route placement.
+//
+// STATUS DECISION (confirmed by Da): status = 'approved' immediately, NOT
+// 'pending' / the AI review queue. Verified against the platform's actual
+// existing policy before implementing — POST /teacher/questions (the
+// general manual-authoring path) already does exactly this: "Per platform
+// policy, teacher-written questions are available to enrolled students
+// immediately" (see that route's own comment above). The original feature
+// spec assumed this should go through the review queue like AI-generated
+// questions do; Da corrected that after this was confirmed against actual
+// platform behavior — manually-authored questions were never subject to
+// review here, exam-authored ones aren't a new exception.
+router.post('/examinations/:id/questions/author', protect, teacherOnly, async (req, res) => {
+  if (req.user.role !== 'teacher') {
+    return res.status(403).json({ success: false, error: 'Only teachers may author questions directly into an examination' });
+  }
+  const { id: examId } = req.params;
+  const { question_text, subtopic_id, difficulty = 'medium', explanation, options, marks_allocated = 1, marking_guide } = req.body;
+
+  if (!question_text?.trim()) return res.status(400).json({ success: false, error: 'question_text is required' });
+  if (question_text.trim().length < 10) return res.status(400).json({ success: false, error: 'Question text must be at least 10 characters' });
+  if (!subtopic_id) return res.status(400).json({ success: false, error: 'Please select a subtopic — questions without one never reach students.' });
+  if (!Array.isArray(options) || options.length < 2) return res.status(400).json({ success: false, error: 'At least 2 options required' });
+  const correctOption = options.find(o => o.is_correct);
+  if (!correctOption) return res.status(400).json({ success: false, error: 'One option must be marked correct' });
+  const marks = Math.max(1, parseInt(marks_allocated) || 1);
+
+  try {
+    const exam = await sequelize.query(
+      `SELECT id, subject_id FROM examinations WHERE id = :examId AND created_by = :teacherId`,
+      { replacements: { examId, teacherId: req.user.id }, type: QueryTypes.SELECT }
+    );
+    if (!exam.length) return res.status(404).json({ success: false, error: 'Examination not found' });
+
+    // Subtopic must belong to the exam's own subject context — matches
+    // this feature's spec ("subtopic scoped from the exam's subject
+    // context") and prevents a question ending up tagged to an unrelated
+    // subject purely because the client sent an arbitrary subtopic_id.
+    if (exam[0].subject_id) {
+      const subtopicMatch = await sequelize.query(
+        `SELECT st.id FROM subtopics st JOIN topics t ON t.id = st.topic_id
+          WHERE st.id = :subtopicId AND t.subject_id = :subjectId`,
+        { replacements: { subtopicId: subtopic_id, subjectId: exam[0].subject_id }, type: QueryTypes.SELECT }
+      );
+      if (!subtopicMatch.length) {
+        return res.status(400).json({ success: false, error: "subtopic_id does not belong to this examination's subject" });
+      }
+    }
+    // Also confirm the teacher actually supervises this subtopic's subject
+    // — mirrors POST /teacher/questions' own implicit trust of the
+    // client-supplied subtopic_id (that route has no teacher_subjects
+    // check either), but since an exam is subject-anchored we can and
+    // should verify it here rather than trusting the client blindly.
+    const supervised = await sequelize.query(
+      `SELECT 1 FROM subtopics st JOIN topics t ON t.id = st.topic_id
+         JOIN teacher_subjects ts ON ts.subject_id = t.subject_id AND ts.teacher_id = :teacherId AND ts.is_active = true
+        WHERE st.id = :subtopicId`,
+      { replacements: { subtopicId: subtopic_id, teacherId: req.user.id }, type: QueryTypes.SELECT }
+    );
+    if (!supervised.length) {
+      return res.status(403).json({ success: false, error: 'Not assigned to this subject' });
+    }
+
+    const correct_answer = correctOption.option_text;
+    const inserted = await sequelize.query(
+      `INSERT INTO questions (question_text, subtopic_id, submitted_by, difficulty, explanation, options, correct_answer, type, is_active, is_ai_generated, status, created_at, updated_at)
+       VALUES (:question_text, :subtopic_id, :submitted_by, :difficulty, :explanation, :options::jsonb, :correct_answer, 'mcq', true, false, 'approved', NOW(), NOW())
+       RETURNING id`,
+      {
+        replacements: {
+          question_text: question_text.trim(),
+          subtopic_id,
+          submitted_by: req.user.id,
+          difficulty,
+          explanation: explanation || null,
+          options: JSON.stringify(options),
+          correct_answer,
+        },
+        type: QueryTypes.SELECT,
+      }
+    );
+    const newQuestionId = inserted[0].id;
+
+    const orderRows = await sequelize.query(
+      `SELECT COALESCE(MAX(question_order), -1) AS max_order FROM examination_questions WHERE examination_id = :examId`,
+      { replacements: { examId }, type: QueryTypes.SELECT }
+    );
+    const nextOrder = (orderRows[0]?.max_order ?? -1) + 1;
+
+    await sequelize.query(
+      `INSERT INTO examination_questions (examination_id, question_id, question_order, marks_allocated, marking_guide)
+       VALUES (:examId, :questionId, :order, :marks, :guide)`,
+      { replacements: { examId, questionId: newQuestionId, order: nextOrder, marks, guide: marking_guide || null }, type: QueryTypes.INSERT }
+    );
+
+    await sequelize.query(
+      `UPDATE examinations
+          SET total_marks = (SELECT COALESCE(SUM(marks_allocated), 0) FROM examination_questions WHERE examination_id = :examId),
+              updated_at = NOW()
+        WHERE id = :examId`,
+      { replacements: { examId }, type: QueryTypes.UPDATE }
+    );
+
+    return res.status(201).json({ success: true, message: 'Question authored and attached.', question_id: newQuestionId });
+  } catch (err) {
+    console.error('[POST /teacher/examinations/:id/questions/author]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ── POST /api/teacher/nudge/:userId ──────────────────────────────────────────
 router.post('/nudge/:userId', protect, teacherOnly, async (req, res) => {
   try {

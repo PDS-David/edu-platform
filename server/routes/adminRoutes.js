@@ -1673,3 +1673,108 @@ router.delete('/purge-all-resources', protect, adminOnly, adminActionLimiter, re
     return res.status(500).json({ success: false, error: err.message });
   }
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EXAMINATION — Phase 2A: builder (create + attach bank questions), admin side
+// Schema: database/migration_029_examinations.sql (Phase 1). Mirrors
+// teacherRoutes.js's equivalent routes. Admin does NOT get a
+// questions/author route — self-authoring directly into an exam is
+// explicitly teacher-only per this feature's spec; there is no route here
+// for it to hit even by mistake.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── POST /api/admin/examinations ──────────────────────────────────────────────
+router.post('/examinations', protect, adminOnly, async (req, res) => {
+  const { title, subject_id, exam_board_id, scheduled_start, duration_minutes = 60 } = req.body;
+  if (!title?.trim()) return res.status(400).json({ success: false, error: 'title is required' });
+  if (!scheduled_start) return res.status(400).json({ success: false, error: 'scheduled_start is required' });
+  const scheduledDate = new Date(scheduled_start);
+  if (isNaN(scheduledDate.getTime())) {
+    return res.status(400).json({ success: false, error: 'scheduled_start is not a valid date' });
+  }
+  if (scheduledDate.getTime() <= Date.now()) {
+    return res.status(400).json({ success: false, error: 'scheduled_start must be in the future' });
+  }
+  const durationMin = Math.max(1, parseInt(duration_minutes) || 60);
+
+  try {
+    const rows = await sequelize.query(
+      `INSERT INTO examinations (created_by, title, subject_id, exam_board_id, scheduled_start, duration_minutes, total_marks, status, created_at, updated_at)
+       VALUES (:adminId, :title, :subjectId, :examBoardId, :scheduledStart, :duration, 0, 'draft', NOW(), NOW())
+       RETURNING id, title, subject_id, exam_board_id, scheduled_start, duration_minutes, total_marks, status, created_at`,
+      {
+        replacements: {
+          adminId: req.user.id,
+          title: title.trim(),
+          subjectId: subject_id || null,
+          examBoardId: exam_board_id || null,
+          scheduledStart: scheduledDate.toISOString(),
+          duration: durationMin,
+        },
+        type: QueryTypes.SELECT,
+      }
+    );
+    return res.status(201).json({ success: true, data: { ...rows[0], question_count: 0 } });
+  } catch (err) {
+    console.error('[POST /admin/examinations]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── POST /api/admin/examinations/:id/questions/bank ───────────────────────────
+// Admin can attach any active question, regardless of subject —
+// unrestricted, matching the admin-bypass pattern already established in
+// POST /teacher/tests/:id/questions (`OR :isAdmin`) rather than the
+// teacher_subjects check the teacher-side equivalent of this route uses.
+router.post('/examinations/:id/questions/bank', protect, adminOnly, async (req, res) => {
+  const { id: examId } = req.params;
+  const { question_id, marks_allocated = 1, marking_guide } = req.body;
+  const questionId = parseInt(question_id);
+  if (!questionId) return res.status(400).json({ success: false, error: 'question_id is required' });
+  const marks = Math.max(1, parseInt(marks_allocated) || 1);
+
+  try {
+    const exam = await sequelize.query(
+      `SELECT id FROM examinations WHERE id = :examId AND created_by = :adminId`,
+      { replacements: { examId, adminId: req.user.id }, type: QueryTypes.SELECT }
+    );
+    if (!exam.length) return res.status(404).json({ success: false, error: 'Examination not found' });
+
+    const validQuestion = await sequelize.query(
+      `SELECT id FROM questions WHERE id = :questionId AND is_active = true`,
+      { replacements: { questionId }, type: QueryTypes.SELECT }
+    );
+    if (!validQuestion.length) {
+      return res.status(404).json({ success: false, error: 'Question not found' });
+    }
+
+    const orderRows = await sequelize.query(
+      `SELECT COALESCE(MAX(question_order), -1) AS max_order FROM examination_questions WHERE examination_id = :examId`,
+      { replacements: { examId }, type: QueryTypes.SELECT }
+    );
+    const nextOrder = (orderRows[0]?.max_order ?? -1) + 1;
+
+    await sequelize.query(
+      `INSERT INTO examination_questions (examination_id, question_id, question_order, marks_allocated, marking_guide)
+       VALUES (:examId, :questionId, :order, :marks, :guide)
+       ON CONFLICT (examination_id, question_id) DO NOTHING`,
+      {
+        replacements: { examId, questionId, order: nextOrder, marks, guide: marking_guide || null },
+        type: QueryTypes.INSERT,
+      }
+    );
+
+    await sequelize.query(
+      `UPDATE examinations
+          SET total_marks = (SELECT COALESCE(SUM(marks_allocated), 0) FROM examination_questions WHERE examination_id = :examId),
+              updated_at = NOW()
+        WHERE id = :examId`,
+      { replacements: { examId }, type: QueryTypes.UPDATE }
+    );
+
+    return res.status(201).json({ success: true, message: 'Question attached.' });
+  } catch (err) {
+    console.error('[POST /admin/examinations/:id/questions/bank]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
