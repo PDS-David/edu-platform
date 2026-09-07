@@ -580,6 +580,58 @@ export default function StudentDashboard() {
   const [showMockPicker, setShowMockPicker] = useState(false);
   const [subjects,       setSubjects]       = useState([]);
 
+  // Phase 3 Part 3: app-wide exam lockdown guard. Polls the Part 2 backend
+  // endpoint (GET /students/exam-lock-status), which is deliberately cheap
+  // (no question content, no joins beyond examinations/
+  // examination_assignments) so polling it on every route change plus a
+  // fixed interval is safe.
+  const [examLock, setExamLock] = useState({ locked: false });
+
+  // GAP, documented rather than silently worked around: Phase 3 Part 1
+  // built GET /students/examination/:id, but no frontend page consumes it
+  // yet (confirmed via grep across client/src and App.jsx's routes before
+  // writing this) -- there is currently nowhere for a locked-out student
+  // to actually go and take their exam. Redirecting to the exam page
+  // itself, which this guard's own spec calls for, isn't possible until
+  // that page exists. Redirecting to /student/dashboard instead as the
+  // safest available target (always exists, never itself blocked below)
+  // -- whoever builds the exam-taking page should change EXAM_REDIRECT_PATH
+  // to point there instead of leaving students at the dashboard.
+  const EXAM_REDIRECT_PATH = "/student/dashboard";
+
+  // Route prefixes a student cannot use while an exam is live, per this
+  // feature's spec ("Practice Mode, Resources, Test-Yourself, and any
+  // other question/resource-pulling route"). Past Papers is included for
+  // the same reason (pulls exam-bank content); My Tests/Quiz History/
+  // Analytics are NOT blocked -- they're review/history surfaces, not a
+  // way to pull new questions or resources.
+  const EXAM_BLOCKED_PREFIXES = [
+    "/student/resources", "/student/practice", "/student/past-papers",
+    "/student/subject/", // subtopic pages, where Resources/Practice/Quiz are actually launched from
+  ];
+
+  useEffect(() => {
+    let cancelled = false;
+    const poll = () => {
+      api.get("/students/exam-lock-status", { timeout: 10_000 })
+        .then(r => { if (!cancelled) setExamLock(r.data || { locked: false }); })
+        .catch(() => { if (!cancelled) setExamLock({ locked: false }); }); // fail open client-side too, matching the backend's own fail-open contract
+    };
+    poll();
+    const interval = setInterval(poll, 30_000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [location.pathname]); // re-poll on every route change, per spec, plus the fixed 30s interval above
+
+  // Hard redirect (not just a hidden sidebar link) -- checked directly
+  // against location.pathname so this also catches a student navigating
+  // straight to a blocked URL, not only clicks through this component's
+  // own sidebar.
+  useEffect(() => {
+    if (!examLock.locked) return;
+    const onBlockedRoute = EXAM_BLOCKED_PREFIXES.some(p => location.pathname.startsWith(p));
+    if (onBlockedRoute) navigate(EXAM_REDIRECT_PATH, { replace: true });
+  }, [examLock.locked, location.pathname, navigate]);
+
   const firstName =
     user?.first_name || user?.firstName ||
     user?.name?.split(" ")[0] ||
@@ -639,7 +691,17 @@ export default function StudentDashboard() {
   };
 
   const handleNav = (item) => {
-    if (item.onClick) { item.onClick(); return; }
+    if (item.onClick) {
+      // Same lockdown guard as the route-level redirect above -- Mock Exam
+      // opens a modal picker rather than navigating, so it isn't caught by
+      // the pathname-based effect and needs its own check here.
+      if (examLock.locked && item.label === "Mock Exam") {
+        navigate(EXAM_REDIRECT_PATH, { replace: true });
+        setDrawerOpen(false);
+        return;
+      }
+      item.onClick(); return;
+    }
     navigate(item.path);
     setDrawerOpen(false);
   };
@@ -793,6 +855,23 @@ export default function StudentDashboard() {
                   the app. */}
             </div>
           </div>
+
+          {/* Phase 3 Part 3: persistent lockdown banner — explicit,
+              visible statement per spec ("surface this restriction to the
+              student clearly and explicitly... not silently"), shown on
+              every page while locked, not just the blocked ones, so a
+              student on an unblocked page (e.g. Analytics) still
+              understands why other nav items just redirected them. */}
+          {examLock.locked && (
+            <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-center gap-2 text-xs text-amber-800">
+              <ClipboardList size={14} className="shrink-0" />
+              <span>
+                <strong>Exam in progress{examLock.title ? `: ${examLock.title}` : ''}.</strong>
+                {' '}Resources, Test-Yourself, and Past Papers are unavailable until it ends
+                {examLock.ends_at ? ` at ${new Date(examLock.ends_at).toLocaleTimeString()}` : ''}.
+              </span>
+            </div>
+          )}
 
           {/* DEF-003: <Outlet /> renders the matched child route.
               /student/dashboard → DashboardContent (wired in App.jsx as index)
