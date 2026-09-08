@@ -21,6 +21,7 @@ import { openResourceAuth } from "../utils/authenticatedDownload";
 import {
   FileText, Video, Music, File, Download,
   Zap, ClipboardList, ClipboardCheck, History, BookMarked, BarChart2, BookOpen, TrendingUp,
+  FileCheck2,
   Flame, Target, GraduationCap, Menu, X, ChevronDown,
   AlertCircle, RefreshCw, Settings, School,
 } from "lucide-react";
@@ -587,17 +588,15 @@ export default function StudentDashboard() {
   // fixed interval is safe.
   const [examLock, setExamLock] = useState({ locked: false });
 
-  // GAP, documented rather than silently worked around: Phase 3 Part 1
-  // built GET /students/examination/:id, but no frontend page consumes it
-  // yet (confirmed via grep across client/src and App.jsx's routes before
-  // writing this) -- there is currently nowhere for a locked-out student
-  // to actually go and take their exam. Redirecting to the exam page
-  // itself, which this guard's own spec calls for, isn't possible until
-  // that page exists. Redirecting to /student/dashboard instead as the
-  // safest available target (always exists, never itself blocked below)
-  // -- whoever builds the exam-taking page should change EXAM_REDIRECT_PATH
-  // to point there instead of leaving students at the dashboard.
-  const EXAM_REDIRECT_PATH = "/student/dashboard";
+  // GAP CLOSED: ExaminationPage.jsx now exists (client/src/pages/
+  // ExaminationPage.jsx, route /student/examination/:id). A locked-out
+  // student is redirected straight to their live exam using the
+  // examination_id the lock-status endpoint already returns — computed
+  // per-render rather than a fixed constant, since which exam is live can
+  // change between polls (see GET /students/exam-lock-status's own
+  // "LIMIT 5, pick the live one" handling).
+  const examRedirectPath = () =>
+    examLock.examination_id ? `/student/examination/${examLock.examination_id}` : "/student/dashboard";
 
   // Route prefixes a student cannot use while an exam is live, per this
   // feature's spec ("Practice Mode, Resources, Test-Yourself, and any
@@ -629,7 +628,7 @@ export default function StudentDashboard() {
   useEffect(() => {
     if (!examLock.locked) return;
     const onBlockedRoute = EXAM_BLOCKED_PREFIXES.some(p => location.pathname.startsWith(p));
-    if (onBlockedRoute) navigate(EXAM_REDIRECT_PATH, { replace: true });
+    if (onBlockedRoute) navigate(examRedirectPath(), { replace: true });
   }, [examLock.locked, location.pathname, navigate]);
 
   const firstName =
@@ -675,6 +674,11 @@ export default function StudentDashboard() {
       ],
     },
     { label: "Mock History", icon: History,        path: "/student/mock-history"  },
+    // Examinations page closes the Phase 4 frontend gap this file's own
+    // lockdown-guard comment documented below — grouped with the other
+    // assigned-work items (My Tests), not under "Subjects" (which is
+    // self-serve practice content).
+    { label: "Examinations", icon: FileCheck2,     path: "/student/examinations" },
     { label: "My Tests",     icon: ClipboardCheck, path: "/student/my-tests"     },
     { label: "Quiz History", icon: BookMarked,     path: "/student/quiz-history" },
     { label: "Analytics",    icon: TrendingUp,     path: "/student/analytics"    },
@@ -696,7 +700,7 @@ export default function StudentDashboard() {
       // opens a modal picker rather than navigating, so it isn't caught by
       // the pathname-based effect and needs its own check here.
       if (examLock.locked && item.label === "Mock Exam") {
-        navigate(EXAM_REDIRECT_PATH, { replace: true });
+        navigate(examRedirectPath(), { replace: true });
         setDrawerOpen(false);
         return;
       }

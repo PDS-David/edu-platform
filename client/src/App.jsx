@@ -54,6 +54,8 @@ import AllQuizHistoryPage from "./pages/AllQuizHistoryPage";
 import PracticeMode from "./pages/PracticeMode";
 import TestYourselfPage from "./pages/TestYourselfPage";
 import MockExamPage from "./pages/MockExamPage";
+import ExaminationsListPage from "./pages/ExaminationsListPage";
+import ExaminationPage from "./pages/ExaminationPage";
 import MockExamHistoryPage from "./pages/MockExamHistoryPage";
 import MyTestsPage from "./pages/MyTestsPage";
 import ImageMarkingPage from "./pages/ImageMarkingPage";
@@ -166,6 +168,17 @@ export default function App() {
             <Route path="quiz-history" element={<AllQuizHistoryPage />} />
             <Route path="mock/:subjectId" element={<MockExamPage />} />
             <Route path="mock-history" element={<MockExamHistoryPage />} />
+            {/* Phase 4 frontend gap, closed: Phase 3's backend
+                (GET /students/examinations, GET /students/examination/:id)
+                had no consuming page until now — confirmed via grep before
+                writing this, and documented explicitly in
+                StudentDashboard.jsx's own lockdown-guard comment as an
+                open gap. Examinations are the assigned/scheduled
+                counterpart to self-serve Mock Exam above, not a
+                replacement for it (Mock Exam's own retirement is Phase 5,
+                separate and not part of this work). */}
+            <Route path="examinations" element={<ExaminationsListPage />} />
+            <Route path="examination/:id" element={<ExaminationPage />} />
             <Route path="my-tests" element={<MyTestsPage />} />
             {/* Phase 5: /student/practice is now the Test-Yourself landing
                 page (four type tiles); the actual question-answering view
