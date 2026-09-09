@@ -12,7 +12,7 @@ import {
   ChevronDown, ChevronUp, CheckCircle, XCircle,
   Loader2, RotateCcw, ArrowLeft, Trophy, Clock, Target,
 } from 'lucide-react';
-import { predictGrade } from './MockExamPage';
+import { predictGrade } from '../utils/gradePrediction';
 
 
 
