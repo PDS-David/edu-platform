@@ -24,9 +24,15 @@ const { ENROLLMENT_STATUS } = require('../constants/enrollmentConstants');
 // Tier rank — mirrors videosRoutes.js; kept here as the single source of truth
 const TIER_RANK = { free: 0, student: 1, premium: 2, teacher: 3, admin: 4 };
 
-function hasTierAccess(userRole, requiredTier, isFree) {
-  if (isFree) return true;
-  return (TIER_RANK[userRole] ?? 0) >= (TIER_RANK[requiredTier] ?? 1);
+function hasTierAccess(_userRole, _requiredTier, _isFree) {
+  // The platform currently has no paid subscription tiers — all videos are
+  // free to any authenticated user. Course/subject enrollment is still
+  // required and is enforced separately, below in videoAccess() (step 3)
+  // and via the dedicated enrollment check on each route.
+  // To reintroduce paid tiers later, restore the original logic:
+  //   if (isFree) return true;
+  //   return (TIER_RANK[userRole] ?? 0) >= (TIER_RANK[requiredTier] ?? 1);
+  return true;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

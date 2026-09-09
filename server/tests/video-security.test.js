@@ -161,15 +161,26 @@ describe('videoAccess middleware — access control matrix', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
-  test('returns 403 TIER_REQUIRED for free user on paid video', async () => {
-    db.query.mockResolvedValueOnce([{ ...READY_VIDEO[0], required_tier: 'premium' }]);
+  test('hasTierAccess always returns true — platform currently has no paid tiers', () => {
+    const { hasTierAccess } = require('../middleware/videoAccess');
+    expect(hasTierAccess('free', 'premium', false)).toBe(true);
+    expect(hasTierAccess('student', 'admin', false)).toBe(true);
+    expect(hasTierAccess(undefined, undefined, undefined)).toBe(true);
+  });
+
+  test('free-role user on a "premium" video proceeds past tier check to enrollment check', async () => {
+    db.query
+      .mockResolvedValueOnce([{ ...READY_VIDEO[0], required_tier: 'premium' }]) // video lookup
+      .mockResolvedValueOnce([])   // student_subjects miss
+      .mockResolvedValueOnce([]);  // enrollments miss → still gated by enrollment, not tier
     const req  = mockReq({ user: { id: 'u1', role: 'free' } });
     const res  = mockRes();
     const next = jest.fn();
     await videoAccess(req, res, next);
+    // Tier no longer blocks — but enrollment still does
     expect(res.status).toHaveBeenCalledWith(403);
     const body = res.json.mock.calls[0][0];
-    expect(body.code).toBe('TIER_REQUIRED');
+    expect(body.code).toBe('NOT_ENROLLED');
     expect(next).not.toHaveBeenCalled();
   });
 
