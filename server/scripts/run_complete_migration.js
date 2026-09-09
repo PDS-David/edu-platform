@@ -751,7 +751,16 @@ async function run() {
     ALTER TABLE test_assignments
       ADD COLUMN IF NOT EXISTS score         INTEGER,
       ADD COLUMN IF NOT EXISTS completed_at  TIMESTAMPTZ,
-      ADD COLUMN IF NOT EXISTS total_time_ms BIGINT`],
+      ADD COLUMN IF NOT EXISTS total_time_ms BIGINT,
+      -- Set true by POST /test/:testId/submit whenever any essay/
+      -- structured answer in that submission fell back to "Submitted for
+      -- manual review" (missing GEMINI_API_KEY or a failed AI call) --
+      -- a coarse, assignment-level "this needs a teacher's attention"
+      -- signal. Not per-question detail: neither this table nor
+      -- practice_attempts persists individual answers/feedback today, so
+      -- a true per-question review queue would need that added first --
+      -- out of scope for this pass, flagged separately.
+      ADD COLUMN IF NOT EXISTS needs_manual_review BOOLEAN NOT NULL DEFAULT false`],
 
     // Examination feature, Phase 1 (database/migration_029_examinations.sql
     // has the full rationale for every schema decision below, including
@@ -803,7 +812,12 @@ async function run() {
       UNIQUE(examination_id, student_id)
     );
     CREATE INDEX IF NOT EXISTS idx_ea_examination_id ON examination_assignments(examination_id);
-    CREATE INDEX IF NOT EXISTS idx_ea_student_id     ON examination_assignments(student_id)`],
+    CREATE INDEX IF NOT EXISTS idx_ea_student_id     ON examination_assignments(student_id);
+    -- Same coarse, assignment-level signal as test_assignments' own
+    -- needs_manual_review column added alongside this one -- see that
+    -- column's comment for the full rationale.
+    ALTER TABLE examination_assignments
+      ADD COLUMN IF NOT EXISTS needs_manual_review BOOLEAN NOT NULL DEFAULT false`],
 
     ['student_subjects', `CREATE TABLE IF NOT EXISTS student_subjects (
       id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
