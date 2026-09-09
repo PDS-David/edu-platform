@@ -429,6 +429,7 @@ router.post('/test/:testId/submit', protect, studentOnly, async (req, res) => {
 
     let totalScore = 0;
     let maxScore   = 0;
+    let needsManualReview = false;
     const results  = [];
 
     for (const answer of answers) {
@@ -469,11 +470,13 @@ router.post('/test/:testId/submit', protect, studentOnly, async (req, res) => {
           } catch (aiErr) {
             console.error(`[POST /students/test/${testId}/submit] AI marking failed:`, aiErr.message);
             feedback = 'Submitted for manual review — automated marking was unavailable.';
+            needsManualReview = true;
           }
         } else if (!essayText.trim()) {
           feedback = 'No answer submitted.';
         } else {
           feedback = 'Submitted for manual review.';
+          needsManualReview = true;
         }
       } else {
         // mcq / true_false / short_answer — grade against options[].is_correct
@@ -533,10 +536,16 @@ router.post('/test/:testId/submit', protect, studentOnly, async (req, res) => {
 
     // Mark test assignment as completed — score now holds weighted marks
     // (out of maxScore/total_marks), not a flat correct-question count.
+    // needs_manual_review: coarse, assignment-level "a teacher should
+    // look at this" signal -- set whenever any essay/structured answer
+    // above fell back to manual review. See migration_030's comment for
+    // why this is assignment-level rather than per-question (no
+    // per-question answer/feedback persistence exists here to hang a
+    // finer-grained flag on).
     sequelize.query(
-      `UPDATE test_assignments SET completed_at = NOW(), score = :score
+      `UPDATE test_assignments SET completed_at = NOW(), score = :score, needs_manual_review = :needsReview
        WHERE test_id = :testId AND student_id = :studentId`,
-      { replacements: { score: totalScore, testId, studentId: req.user.id }, type: QueryTypes.UPDATE }
+      { replacements: { score: totalScore, needsReview: needsManualReview, testId, studentId: req.user.id }, type: QueryTypes.UPDATE }
     ).catch(() => {});
 
     return res.status(200).json({
@@ -858,6 +867,7 @@ router.post('/examination/:id/submit', protect, studentOnly, async (req, res) =>
 
     let totalScore = 0;
     let maxScore   = 0;
+    let needsManualReview = false;
     const results  = [];
 
     for (const answer of answers) {
@@ -896,11 +906,13 @@ router.post('/examination/:id/submit', protect, studentOnly, async (req, res) =>
           } catch (aiErr) {
             console.error(`[POST /students/examination/${id}/submit] AI marking failed:`, aiErr.message);
             feedback = 'Submitted for manual review — automated marking was unavailable.';
+            needsManualReview = true;
           }
         } else if (!essayText.trim()) {
           feedback = 'No answer submitted.';
         } else {
           feedback = 'Submitted for manual review.';
+          needsManualReview = true;
         }
       } else {
         // mcq / true_false / short_answer — same convention as test
@@ -955,9 +967,12 @@ router.post('/examination/:id/submit', protect, studentOnly, async (req, res) =>
 
     const accuracyPct = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
 
+    // needs_manual_review: same coarse, assignment-level signal as test
+    // submission's own -- see migration_030's comment for the full
+    // rationale.
     await sequelize.query(
-      `UPDATE examination_assignments SET submitted_at = NOW(), score = :score WHERE id = :assignmentId`,
-      { replacements: { score: totalScore, assignmentId: assignment.id }, type: QueryTypes.UPDATE }
+      `UPDATE examination_assignments SET submitted_at = NOW(), score = :score, needs_manual_review = :needsReview WHERE id = :assignmentId`,
+      { replacements: { score: totalScore, needsReview: needsManualReview, assignmentId: assignment.id }, type: QueryTypes.UPDATE }
     );
 
     return res.status(200).json({
