@@ -53,10 +53,18 @@ import QuizHistoryPage from "./pages/QuizHistoryPage";
 import AllQuizHistoryPage from "./pages/AllQuizHistoryPage";
 import PracticeMode from "./pages/PracticeMode";
 import TestYourselfPage from "./pages/TestYourselfPage";
-import MockExamPage from "./pages/MockExamPage";
+// Phase 5: MockExamPage import removed — self-serve Mock Exam retired,
+// replaced by the assigned Examination feature. See MockExamHistoryPage's
+// removal note below for the full context.
 import ExaminationsListPage from "./pages/ExaminationsListPage";
 import ExaminationPage from "./pages/ExaminationPage";
-import MockExamHistoryPage from "./pages/MockExamHistoryPage";
+// Phase 5: MockExamHistoryPage import removed alongside it — both were
+// part of the self-serve "any student, anytime, random 40 questions" Mock
+// Exam model, fully retired and replaced by the teacher/admin-scheduled,
+// assigned Examination feature (examinations/examination_assignments,
+// GET /student/examinations, ExaminationPage.jsx). Not a rename of the
+// old feature — a materially different one, per this feature's own
+// design decision from the start.
 import MyTestsPage from "./pages/MyTestsPage";
 import ImageMarkingPage from "./pages/ImageMarkingPage";
 import SettingsPage from "./pages/SettingsPage";
@@ -166,8 +174,8 @@ export default function App() {
             <Route path="quiz/:subtopicId" element={<QuizPage />} />
             <Route path="quiz-results/:attemptId" element={<QuizResultsPage />} />
             <Route path="quiz-history" element={<AllQuizHistoryPage />} />
-            <Route path="mock/:subjectId" element={<MockExamPage />} />
-            <Route path="mock-history" element={<MockExamHistoryPage />} />
+            {/* Phase 5: mock/:subjectId and mock-history routes removed —
+                Mock Exam retired, see the import-removal comments above. */}
             {/* Phase 4 frontend gap, closed: Phase 3's backend
                 (GET /students/examinations, GET /students/examination/:id)
                 had no consuming page until now — confirmed via grep before

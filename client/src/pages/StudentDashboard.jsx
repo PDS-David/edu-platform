@@ -20,7 +20,7 @@ import api, { TIMEOUT_DASHBOARD, TIMEOUT_ANALYTICS } from "../services/apiClient
 import { openResourceAuth } from "../utils/authenticatedDownload";
 import {
   FileText, Video, Music, File, Download,
-  Zap, ClipboardList, ClipboardCheck, History, BookMarked, BarChart2, BookOpen, TrendingUp,
+  Zap, ClipboardList, ClipboardCheck, BookMarked, BarChart2, BookOpen, TrendingUp,
   FileCheck2,
   Flame, Target, GraduationCap, Menu, X, ChevronDown,
   AlertCircle, RefreshCw, Settings, School,
@@ -314,9 +314,6 @@ export function DashboardContent() {
   const [loadingSummary,   setLoadingSummary]   = useState(true);
   const [errorSummary,     setErrorSummary]     = useState(null);
 
-  const [subjects,         setSubjects]         = useState([]);
-  const [loadingSubjects,  setLoadingSubjects]  = useState(true);
-
   const [weakTopics,       setWeakTopics]       = useState([]);
 
   const [resources,        setResources]        = useState([]);
@@ -327,13 +324,10 @@ export function DashboardContent() {
   const [loadingScores,    setLoadingScores]    = useState(true);
   const [errorScores,      setErrorScores]      = useState(null);
 
-  const [showMockPicker,   setShowMockPicker]   = useState(false);
-
   // DEF-006: loadAll uses per-request timeouts and surfaces errors instead of
   //          swallowing them.  Each section independently tracks its error state.
   const loadAll = useCallback(async () => {
     setLoadingSummary(true);   setErrorSummary(null);
-    setLoadingSubjects(true);
     setLoadingResources(true); setErrorResources(null);
     setLoadingScores(true);    setErrorScores(null);
 
@@ -342,11 +336,6 @@ export function DashboardContent() {
         .then(r => { setSummary(r.data || {}); })
         .catch(e => { setErrorSummary(e.message || "Failed to load summary"); setSummary({}); })
         .finally(() => setLoadingSummary(false)),
-
-      api.get("/students/my-subjects", { timeout: TIMEOUT_DASHBOARD })
-        .then(r => setSubjects(r.data || []))
-        .catch(() => setSubjects([]))
-        .finally(() => setLoadingSubjects(false)),
 
       api.get("/analytics/weak-topics?limit=3", { timeout: TIMEOUT_ANALYTICS })
         .then(r => setWeakTopics(r.data || []))
@@ -371,7 +360,6 @@ export function DashboardContent() {
   const dailyPct      = Math.min(100, Math.round((todayAttempts / dailyTarget) * 100));
   // X13: activity breakdown
   const todayQuiz     = summary.today_quiz_attempts     ?? 0;
-  const todayMock     = summary.today_mock_attempts     ?? 0;
   const todayPractice = summary.today_practice_attempts ?? 0;
 
   return (
@@ -425,11 +413,6 @@ export function DashboardContent() {
               {todayPractice > 0 && (
                 <span className="text-[10px] text-violet-500 bg-violet-50 px-2 py-0.5 rounded-full">
                   Practice: {todayPractice}
-                </span>
-              )}
-              {todayMock > 0 && (
-                <span className="text-[10px] text-amber-500 bg-amber-50 px-2 py-0.5 rounded-full">
-                  Mock: {todayMock}
                 </span>
               )}
             </div>
@@ -524,40 +507,6 @@ export function DashboardContent() {
           navigate={navigate}
         />
       </section>
-
-      {/* Mock exam picker modal */}
-      {showMockPicker && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white border border-gray-100 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-100 bg-gradient-to-r from-blue-500 to-blue-600">
-              <p className="text-white font-bold">Start Mock Exam</p>
-              <p className="text-white/70 text-xs mt-0.5">Choose a subject — 45-minute timed exam</p>
-            </div>
-            <div className="p-2 max-h-64 overflow-y-auto">
-              {subjects.length === 0
-                ? <p className="text-sm text-gray-400 text-center py-4">No subjects enrolled yet.</p>
-                : subjects.map(s => (
-                  <button key={s.id}
-                    onClick={() => { setShowMockPicker(false); navigate(`/student/mock/${s.id}`); }}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-blue-50 transition-colors text-left">
-                    <span className="text-lg">{s.icon_emoji || "📚"}</span>
-                    <div>
-                      <p className="text-sm font-medium text-gray-800">{s.name}</p>
-                      {s.exam_board_code && <p className="text-xs text-gray-400">{s.exam_board_code}</p>}
-                    </div>
-                  </button>
-                ))
-              }
-            </div>
-            <div className="px-4 py-3 border-t border-gray-100">
-              <button onClick={() => setShowMockPicker(false)}
-                className="w-full py-2 text-sm text-gray-400 hover:text-gray-600 transition-colors">
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -578,8 +527,6 @@ export default function StudentDashboard() {
 
   const [drawerOpen,     setDrawerOpen]     = useState(false);
   const [summary,        setSummary]        = useState({});
-  const [showMockPicker, setShowMockPicker] = useState(false);
-  const [subjects,       setSubjects]       = useState([]);
 
   // Phase 3 Part 3: app-wide exam lockdown guard. Polls the Part 2 backend
   // endpoint (GET /students/exam-lock-status), which is deliberately cheap
@@ -642,19 +589,16 @@ export default function StudentDashboard() {
     return h < 12 ? "morning" : h < 17 ? "afternoon" : "evening";
   }, []);
 
-  // Load streak + subjects for sidebar badge and mock picker
+  // Load streak summary for the sidebar badge.
   useEffect(() => {
     api.get("/analytics/summary", { timeout: 10_000 })
       .then(r => setSummary(r.data || {}))
       .catch(() => {});
-    api.get("/students/my-subjects", { timeout: 10_000 })
-      .then(r => setSubjects(r.data || []))
-      .catch(() => {});
   }, []);
 
   // Phase 1 nav restructure: Resources, Test-Yourself (formerly Practice),
-  // Past Papers, Mock Exam, and AI Marking now live as children under the
-  // "Subjects" group. "Subjects" itself keeps its existing direct link.
+  // and Past Papers live as children under the "Subjects" group.
+  // "Subjects" itself keeps its existing direct link.
   // "Exam Types" and "Join a School" nav entries are removed here — their
   // routes/components are untouched and still reachable by direct URL
   // (locked down in a later phase, not this one).
@@ -662,6 +606,11 @@ export default function StudentDashboard() {
   // only lives inside the Essay Questions tile on the Test-Yourself
   // landing page (TestYourselfPage.jsx). /student/mark-image itself is
   // untouched and still reachable from there.
+  // Phase 5 (Examinations): "Mock Exam" and "Mock History" removed —
+  // self-serve Mock Exam retired, replaced by the teacher/admin-scheduled,
+  // assigned Examination feature below. Not a rename — a materially
+  // different feature (see App.jsx's route-removal comments for the same
+  // note).
   const sidebarItems = [
     { label: "Dashboard",   icon: BarChart2,    path: "/student/dashboard"  },
     {
@@ -670,10 +619,8 @@ export default function StudentDashboard() {
         { label: "Resources",     icon: BookOpen,       path: "/student/resources" },
         { label: "Test-Yourself", icon: Zap,            path: "/student/practice"  },
         { label: "Past Papers",   icon: FileText,       path: "/student/past-papers" },
-        { label: "Mock Exam",     icon: ClipboardList,  path: null, onClick: () => setShowMockPicker(true) },
       ],
     },
-    { label: "Mock History", icon: History,        path: "/student/mock-history"  },
     // Examinations page closes the Phase 4 frontend gap this file's own
     // lockdown-guard comment documented below — grouped with the other
     // assigned-work items (My Tests), not under "Subjects" (which is
@@ -695,15 +642,14 @@ export default function StudentDashboard() {
   };
 
   const handleNav = (item) => {
+    // Phase 5 (Examinations): the Mock-Exam-specific lockdown special-case
+    // that used to live here is removed along with Mock Exam itself — it
+    // existed only because that one item opened a modal instead of
+    // navigating, so the pathname-based redirect effect above couldn't
+    // catch it. No current sidebar item uses onClick anymore, but the
+    // generic handling below is left in place for any future item that
+    // might need it.
     if (item.onClick) {
-      // Same lockdown guard as the route-level redirect above -- Mock Exam
-      // opens a modal picker rather than navigating, so it isn't caught by
-      // the pathname-based effect and needs its own check here.
-      if (examLock.locked && item.label === "Mock Exam") {
-        navigate(examRedirectPath(), { replace: true });
-        setDrawerOpen(false);
-        return;
-      }
       item.onClick(); return;
     }
     navigate(item.path);
@@ -906,40 +852,6 @@ export default function StudentDashboard() {
           );
         })}
       </nav>
-
-      {/* Mock exam picker modal */}
-      {showMockPicker && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white border border-gray-100 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-100 bg-gradient-to-r from-blue-500 to-blue-600">
-              <p className="text-white font-bold">Start Mock Exam</p>
-              <p className="text-white/70 text-xs mt-0.5">Choose a subject — 45-minute timed exam</p>
-            </div>
-            <div className="p-2 max-h-64 overflow-y-auto">
-              {subjects.length === 0
-                ? <p className="text-sm text-gray-400 text-center py-4">No subjects enrolled yet.</p>
-                : subjects.map(s => (
-                  <button key={s.id}
-                    onClick={() => { setShowMockPicker(false); navigate(`/student/mock/${s.id}`); }}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-blue-50 transition-colors text-left">
-                    <span className="text-lg">{s.icon_emoji || "📚"}</span>
-                    <div>
-                      <p className="text-sm font-medium text-gray-800">{s.name}</p>
-                      {s.exam_board_code && <p className="text-xs text-gray-400">{s.exam_board_code}</p>}
-                    </div>
-                  </button>
-                ))
-              }
-            </div>
-            <div className="px-4 py-3 border-t border-gray-100">
-              <button onClick={() => setShowMockPicker(false)}
-                className="w-full py-2 text-sm text-gray-400 hover:text-gray-600 transition-colors">
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
