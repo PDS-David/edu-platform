@@ -123,6 +123,8 @@ app.options('*', cors(corsOptions));
 //   /uploads/videos      → served via /api/videos/stream/* (HLS + auth)
 //   /uploads/resources   → served via /api/resources/:id/download (entitlement check)
 //   /uploads/past-papers → served via /api/past-papers/:id/download or R2 signed URL
+//   /uploads/syllabus    → no download route yet (upload-only feature stage);
+//                          blocked outright until one exists
 //   /uploads/raw         → internal raw uploads, never served
 //
 // /uploads remains mounted for remaining public assets (e.g. thumbnails),
@@ -150,6 +152,18 @@ app.use('/uploads/past-papers', (_req, res) => {
   return res.status(403).json({
     success: false,
     error: 'Direct access to past paper files is not permitted.',
+  });
+});
+
+// Block direct access to syllabus documents — same reasoning as resources/
+// past-papers above. No authenticated download route exists yet either
+// (this prompt is upload-only — see syllabusRoutes.js), so this exists
+// purely to prevent the local-fallback storage path from being reachable
+// via the general /uploads static mount below in the meantime.
+app.use('/uploads/syllabus', (_req, res) => {
+  return res.status(403).json({
+    success: false,
+    error: 'Direct access to syllabus documents is not permitted.',
   });
 });
 
@@ -258,6 +272,7 @@ const pastPaperRoutes = safeRequire('./routes/pastPaperRoutes');
 const notesRoutes = safeRequire('./routes/notesRoutes');
 const videosRoutes = safeRequire('./routes/videosRoutes');
 const examBoardRoutes = safeRequire('./routes/examBoardRoutes');
+const syllabusRoutes = safeRequire('./routes/syllabusRoutes');
 const aiRoutes = safeRequire('./routes/aiRoutes');
 const aiChatRoute = safeRequire('./routes/aiChatRoute');
 const conceptRoutes = safeRequire('./routes/conceptRoutes');
@@ -290,6 +305,7 @@ if (questionsRoutes) app.use('/api/questions', protect, questionsRoutes);
 if (quizRoutes) app.use('/api/quizzes', protect, quizRoutes);
 if (quizGeneratorRoute) app.use('/api/quiz-generator', protect, quizGeneratorRoute);
 if (resourceRoutes) app.use('/api/resources', protect, resourceRoutes);
+if (syllabusRoutes) app.use('/api/syllabus', protect, syllabusRoutes);
 if (analyticsRoutes) app.use('/api/analytics', protect, analyticsRoutes);
 if (progressRoutes) app.use('/api/progress', protect, progressRoutes);
 if (progressSummaryBulk) app.use('/api/progress-summary', protect, progressSummaryBulk);
