@@ -813,6 +813,49 @@ router.get('/tests', protect, teacherOnly, async (req, res) => {
   }
 });
 
+// ── GET /api/teacher/tests/:id/results ────────────────────────────────────────
+// Genuinely new — confirmed via grep that no teacher- or admin-facing
+// endpoint anywhere selected test_assignments for display before this;
+// only INSERT (assign) and DELETE existed. A teacher could create and
+// assign a test but never actually see how students did on it.
+//
+// Ownership: this repo is inconsistent on admin-bypass across the
+// existing Test Builder routes (GET /tests and POST /tests/:id/assign
+// are teacher_id-only with no admin bypass; POST /tests/:id/questions
+// bypasses for admin). For this new endpoint the deliberate choice is to
+// allow both the owning teacher AND admin — consistent with App Admin's
+// established global-oversight role (confirmed earlier this session via
+// middleware/auth.js's own "App Admin manages every school" framing),
+// not a gap in either existing direction.
+router.get('/tests/:id/results', protect, teacherOnly, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const owned = await sequelize.query(
+      `SELECT id, title, total_marks FROM custom_tests WHERE id = :id AND (teacher_id = :teacherId OR :isAdmin)`,
+      { replacements: { id, teacherId: req.user.id, isAdmin: req.user.role === 'admin' }, type: QueryTypes.SELECT }
+    );
+    if (!owned.length) {
+      return res.status(404).json({ success: false, error: 'Test not found, or not yours to view.' });
+    }
+
+    const rows = await safeQuery(
+      `SELECT ta.id AS assignment_id, ta.student_id, ta.score, ta.completed_at,
+              ta.assigned_at, ta.due_date, ta.needs_manual_review,
+              u.first_name, u.last_name, u.email
+       FROM test_assignments ta
+       JOIN users u ON u.id = ta.student_id
+       WHERE ta.test_id = :id
+       ORDER BY ta.completed_at IS NULL DESC, ta.completed_at DESC, u.first_name ASC`,
+      { id }
+    );
+
+    return res.json({ success: true, data: { test: owned[0], results: rows } });
+  } catch (err) {
+    console.error(`[GET /teacher/tests/${id}/results]`, err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ── POST /api/teacher/tests ───────────────────────────────────────────────────
 router.post('/tests', protect, teacherOnly, async (req, res) => {
   const { title, duration_minutes = 60, total_marks = 100 } = req.body;
@@ -1194,6 +1237,69 @@ router.delete('/tests/:id', protect, teacherOnly, async (req, res) => {
 // Assignment/notification (Phase 2B) and student-facing routes (Phase 3)
 // are NOT part of this slice.
 // ═══════════════════════════════════════════════════════════════════════════
+
+// ── GET /api/teacher/examinations ─────────────────────────────────────────────
+// Genuinely new — confirmed via grep that Phase 2A/2B never built any GET
+// endpoint for a teacher's own created examinations at all. A teacher
+// could create, attach questions to, and assign an exam entirely through
+// direct API calls, but had no way to see a list of their own exams
+// afterward — this was a real, complete frontend-reachability gap, not
+// just a missing results view.
+router.get('/examinations', protect, teacherOnly, async (req, res) => {
+  try {
+    const rows = await safeQuery(
+      `SELECT e.id, e.title, e.scheduled_start, e.duration_minutes, e.total_marks, e.status,
+              s.name AS subject_name, eb.name AS exam_board_name,
+              COUNT(eq.id)::INTEGER AS question_count,
+              COUNT(ea.id)::INTEGER AS assigned_count
+       FROM examinations e
+       LEFT JOIN subjects s ON s.id = e.subject_id
+       LEFT JOIN exam_boards eb ON eb.id = e.exam_board_id
+       LEFT JOIN examination_questions eq ON eq.examination_id = e.id
+       LEFT JOIN examination_assignments ea ON ea.examination_id = e.id
+       WHERE e.created_by = :teacherId
+       GROUP BY e.id, s.name, eb.name
+       ORDER BY e.scheduled_start DESC`,
+      { teacherId: req.user.id }
+    );
+    return res.json({ success: true, data: rows });
+  } catch (err) {
+    console.error('[GET /teacher/examinations]', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── GET /api/teacher/examinations/:id/results ─────────────────────────────────
+// Same rationale and admin-bypass decision as GET /teacher/tests/:id/results
+// above — read that comment for the full reasoning.
+router.get('/examinations/:id/results', protect, teacherOnly, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const owned = await sequelize.query(
+      `SELECT id, title, total_marks FROM examinations WHERE id = :id AND (created_by = :teacherId OR :isAdmin)`,
+      { replacements: { id, teacherId: req.user.id, isAdmin: req.user.role === 'admin' }, type: QueryTypes.SELECT }
+    );
+    if (!owned.length) {
+      return res.status(404).json({ success: false, error: 'Examination not found, or not yours to view.' });
+    }
+
+    const rows = await safeQuery(
+      `SELECT ea.id AS assignment_id, ea.student_id, ea.score, ea.started_at, ea.submitted_at,
+              ea.assigned_at, ea.needs_manual_review,
+              u.first_name, u.last_name, u.email
+       FROM examination_assignments ea
+       JOIN users u ON u.id = ea.student_id
+       WHERE ea.examination_id = :id
+       ORDER BY ea.submitted_at IS NULL DESC, ea.submitted_at DESC, u.first_name ASC`,
+      { id }
+    );
+
+    return res.json({ success: true, data: { examination: owned[0], results: rows } });
+  } catch (err) {
+    console.error(`[GET /teacher/examinations/${id}/results]`, err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 // ── POST /api/teacher/examinations ────────────────────────────────────────────
 router.post('/examinations', protect, teacherOnly, async (req, res) => {

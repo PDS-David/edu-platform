@@ -1250,6 +1250,13 @@ function TestBuilderTab() {
                     className="text-xs px-3 py-1.5 border border-gray-200 text-gray-500 hover:text-violet-600 hover:border-violet-200 font-semibold rounded-lg">
                     Assign
                   </button>
+                  {t.is_published && (
+                    <button onClick={() => navigate(`/teacher/tests/${t.id}/results`)}
+                      title="View student results for this test"
+                      className="text-xs px-3 py-1.5 border border-gray-200 text-gray-500 hover:text-emerald-600 hover:border-emerald-200 font-semibold rounded-lg">
+                      Results
+                    </button>
+                  )}
                   {!t.is_published && (
                     <button
                       onClick={() => setConfirmDel(t)}
