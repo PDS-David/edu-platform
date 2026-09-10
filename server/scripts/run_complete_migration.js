@@ -819,6 +819,46 @@ async function run() {
     ALTER TABLE examination_assignments
       ADD COLUMN IF NOT EXISTS needs_manual_review BOOLEAN NOT NULL DEFAULT false`],
 
+    // Syllabus-driven topic mapping, Prompt 1 of 4: schema + storage
+    // plumbing only. Full design rationale: database/migration_031_syllabus_documents.sql
+    // (this table mirrors that file exactly — kept here as the actual
+    // deploy-time source of truth, per this script's own convention).
+    ['syllabus_documents', `CREATE TABLE IF NOT EXISTS syllabus_documents (
+      id              UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+      exam_board_id   INTEGER      NOT NULL REFERENCES exam_boards(id) ON DELETE CASCADE,
+      subject_id      INTEGER      NOT NULL REFERENCES subjects(id)    ON DELETE CASCADE,
+      uploaded_by     UUID         REFERENCES users(id) ON DELETE SET NULL,
+      title           VARCHAR(255),
+      file_url        TEXT         NOT NULL,
+      r2_key          TEXT,
+      file_type       VARCHAR(10)  NOT NULL,
+      file_size_bytes INTEGER,
+      original_filename VARCHAR(255),
+      sha256          CHAR(64),
+      status          VARCHAR(20)  NOT NULL DEFAULT 'uploaded',
+      is_active       BOOLEAN      NOT NULL DEFAULT true,
+      failure_reason  TEXT,
+      created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+      updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_syllabus_docs_exam_subject ON syllabus_documents(exam_board_id, subject_id);
+    CREATE INDEX IF NOT EXISTS idx_syllabus_docs_active ON syllabus_documents(exam_board_id, subject_id) WHERE is_active = true;
+    DO $$ BEGIN
+      ALTER TABLE syllabus_documents
+        ADD CONSTRAINT syllabus_documents_status_check
+        CHECK (status IN ('uploaded', 'processing', 'extracted', 'failed'));
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+    DO $$ BEGIN
+      ALTER TABLE syllabus_documents
+        ADD CONSTRAINT syllabus_documents_file_type_check
+        CHECK (file_type IN ('pdf', 'docx'));
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+    ALTER TABLE topics
+      ADD COLUMN IF NOT EXISTS source_syllabus_id UUID REFERENCES syllabus_documents(id) ON DELETE SET NULL;
+    ALTER TABLE subtopics
+      ADD COLUMN IF NOT EXISTS source_syllabus_id UUID REFERENCES syllabus_documents(id) ON DELETE SET NULL,
+      ADD COLUMN IF NOT EXISTS parent_subtopic_id INTEGER REFERENCES subtopics(id) ON DELETE SET NULL`],
+
     ['student_subjects', `CREATE TABLE IF NOT EXISTS student_subjects (
       id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
       student_id UUID        NOT NULL REFERENCES users(id)    ON DELETE CASCADE,
