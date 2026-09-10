@@ -164,14 +164,24 @@ router.post(
 
       logger.info('[syllabus] uploaded', { id: result.id, examBoardId, subjectId, uploadedBy: req.user.id });
 
-      // TODO(Prompt 2): trigger extraction here. Recommended approach: a
-      // background job kicked off from this endpoint (matches this app's
-      // existing pattern of not blocking the upload response on slow AI
-      // calls — see e.g. resourceRoutes.js's question-extraction flow)
-      // rather than a separate "start extraction" endpoint the frontend
-      // has to remember to call. Whichever is chosen, it should move
-      // status 'uploaded' -> 'processing' -> 'extracted'/'failed', writing
-      // failure_reason on failure (column already added by this migration).
+      // Prompt 2, Part 1: extraction trigger, matching this TODO's own
+      // recommendation exactly — a fire-and-forget background job (not
+      // awaited, doesn't block this response), same pattern as
+      // resourceRoutes.js's question-extraction flow
+      // (extractor.extractFromResource(...).then().catch()). Owns the
+      // 'uploaded' -> 'processing' -> 'failed' transitions for text-
+      // extraction failures; does NOT reach 'extracted' yet — that
+      // requires Part 2's AI/JSON-parsing work, not built in this pass
+      // (see syllabusExtractor.js's extractTopicStructureFromText stub).
+      try {
+        const { beginExtraction } = require('../services/syllabusExtractor');
+        beginExtraction(result.id)
+          .then(() => logger.info('[syllabus] extraction step finished', { id: result.id }))
+          .catch(e => logger.error('[syllabus] extraction step failed', { id: result.id, error: e.message }));
+      } catch (e) {
+        logger.error('[syllabus] extractor unavailable', { id: result.id, error: e.message });
+      }
+
       return res.status(201).json({ success: true, data: result });
     } catch (err) {
       logger.error('[POST /api/syllabus]', { error: err.message });
