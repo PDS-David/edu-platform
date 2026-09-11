@@ -21,8 +21,6 @@
 //      reaching students.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const path = require('path');
-const fs = require('fs');
 const { QueryTypes } = require('sequelize');
 const sequelize = require('../config/database');
 const { generate } = require('./ai');
@@ -31,82 +29,24 @@ const logger = require('../config/logger');
 const MAX_QUESTIONS_PER_FILE = 15;
 const MAX_TEXT_CHARS = 12000;
 
+const { readFileAsTextFromUrl } = require('../utils/documentTextExtractor');
+
 // ── Optional text extraction (works even if libs aren't installed) ──────────
+// BUG FIX (dedup): this used to be a private copy of the same PDF/DOCX/TXT
+// extraction logic now shared via utils/documentTextExtractor.js (added for
+// the syllabus-extraction feature, which needed the same file-fetching/
+// parsing logic without duplicating it a second time). Delegates to the
+// shared module now — behavior preserved exactly: this call site still
+// swallows extraction errors and returns '' (falls back to title +
+// curriculum context below), unlike the shared module's own callers that
+// need to distinguish a genuine parse failure from an unsupported format.
 async function readFileAsText(resource) {
-  const url = resource.file_url || '';
-  const ext = path.extname(url.split('?')[0]).toLowerCase();
-
-  // ── Case 1: Local disk path (dev / Hetzner persistent volume) ────────────
-  if (url.startsWith('/uploads/') || url.startsWith('uploads/')) {
-    const localPath = path.join(__dirname, '..', url.replace(/^\//, ''));
-    if (!fs.existsSync(localPath)) return '';
-    return extractFromBuffer(await fs.promises.readFile(localPath), ext);
-  }
-
-  // ── Case 2: R2 proxy URL served through our API ───────────────────────────
-  //   /api/resources/r2/<encoded-key>
-  if (url.startsWith('/api/resources/r2/')) {
-    try {
-      const r2 = require('../utils/r2Storage');
-      if (!r2.isR2Enabled()) return '';
-      const key = decodeURIComponent(url.slice('/api/resources/r2/'.length));
-      const obj = await r2.getObjectByKey(key);
-      const chunks = [];
-      for await (const chunk of obj.body) chunks.push(chunk);
-      return extractFromBuffer(Buffer.concat(chunks), ext);
-    } catch (err) {
-      console.warn('[resourceQuestionExtractor] R2 proxy fetch failed:', err.message);
-      return '';
-    }
-  }
-
-  // ── Case 3: Public R2 / CDN absolute URL ─────────────────────────────────
-  if (url.startsWith('http://') || url.startsWith('https://')) {
-    try {
-      const fetcher = url.startsWith('https') ? require('https') : require('http');
-      const buf = await new Promise((resolve, reject) => {
-        fetcher.get(url, (res) => {
-          const chunks = [];
-          res.on('data', (c) => chunks.push(c));
-          res.on('end', () => resolve(Buffer.concat(chunks)));
-          res.on('error', reject);
-        }).on('error', reject);
-      });
-      return extractFromBuffer(buf, ext);
-    } catch (err) {
-      console.warn('[resourceQuestionExtractor] HTTP fetch failed:', err.message);
-      return '';
-    }
-  }
-
-  return '';
-}
-
-async function extractFromBuffer(buf, ext) {
   try {
-    if (ext === '.pdf') {
-      const pdfParse = safeReq('pdf-parse');
-      if (!pdfParse) return '';
-      const data = await pdfParse(buf);
-      return (data?.text || '').slice(0, MAX_TEXT_CHARS);
-    }
-    if (ext === '.docx') {
-      const mammoth = safeReq('mammoth');
-      if (!mammoth) return '';
-      const { value } = await mammoth.extractRawText({ buffer: buf });
-      return (value || '').slice(0, MAX_TEXT_CHARS);
-    }
-    if (['.txt', '.md'].includes(ext)) {
-      return buf.toString('utf8').slice(0, MAX_TEXT_CHARS);
-    }
+    return await readFileAsTextFromUrl(resource.file_url || '', MAX_TEXT_CHARS);
   } catch (err) {
     console.warn('[resourceQuestionExtractor] text extraction failed:', err.message);
+    return '';
   }
-  return '';
-}
-
-function safeReq(name) {
-  try { return require(name); } catch { return null; }
 }
 
 // ── Curriculum context lookup ──────────────────────────────────────────────
