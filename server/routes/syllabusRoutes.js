@@ -90,6 +90,17 @@ router.post(
         return res.status(404).json({ success: false, error: 'Unknown exam_board_id or subject_id.' });
       }
 
+      // SCOPING FIX: this endpoint previously had no teacherCanWriteSubject
+      // check at all -- POST /:id/confirm and POST /:id/retry (below) both
+      // correctly reject a teacher acting outside their assigned subjects,
+      // but upload did not, so any teacher could upload a syllabus document
+      // for any subject in the system, not just their own. Matches the
+      // exact same fail-closed shape as those two routes' own checks.
+      // Admins are unaffected -- this only applies to the teacher role.
+      if (req.user.role === 'teacher' && !(await teacherCanWriteSubject(req.user.id, subjectId))) {
+        return res.status(403).json({ success: false, error: 'You are not assigned to this subject.' });
+      }
+
       const f = req.secureFile;
 
       let fileUrl;
