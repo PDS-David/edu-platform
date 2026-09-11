@@ -103,6 +103,7 @@ const GEMINI_MODEL_MAP = {
   'remediation':        'gemini-3.5-flash',
   'essay-mark':         'gemini-3.5-flash',
   'complex_reasoning':  'gemini-3.5-flash',
+  'extract-syllabus':   'gemini-3.5-flash',
   'default':            'gemini-3.5-flash',
 };
 
@@ -242,6 +243,7 @@ const OPENAI_MODEL_MAP = {
   'remediation':        'gpt-4o-mini',
   'essay-mark':         'gpt-4o-mini',
   'complex_reasoning':  'gpt-4o-mini',
+  'extract-syllabus':   'gpt-4o-mini',
   'default':            'gpt-4o-mini',
 };
 
