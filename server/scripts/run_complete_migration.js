@@ -865,7 +865,18 @@ async function run() {
     -- services/syllabusExtractor.js.
     ALTER TABLE syllabus_documents
       ADD COLUMN IF NOT EXISTS extracted_structure JSONB,
-      ADD COLUMN IF NOT EXISTS extracted_at TIMESTAMPTZ`],
+      ADD COLUMN IF NOT EXISTS extracted_at TIMESTAMPTZ;
+    -- Prompt 3 Part 1: the 'confirmed' terminal status, plus who/when.
+    -- Full reasoning: database/migration_033_syllabus_confirmed_status.sql.
+    -- DROP+ADD (not the DO $$ EXCEPTION pattern above) because Postgres
+    -- has no ALTER CHECK — this is naturally idempotent on repeat runs.
+    ALTER TABLE syllabus_documents
+      ADD COLUMN IF NOT EXISTS confirmed_by UUID REFERENCES users(id) ON DELETE SET NULL,
+      ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMPTZ;
+    ALTER TABLE syllabus_documents DROP CONSTRAINT IF EXISTS syllabus_documents_status_check;
+    ALTER TABLE syllabus_documents
+      ADD CONSTRAINT syllabus_documents_status_check
+      CHECK (status IN ('uploaded', 'processing', 'extracted', 'failed', 'confirmed'))`],
 
     ['student_subjects', `CREATE TABLE IF NOT EXISTS student_subjects (
       id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),

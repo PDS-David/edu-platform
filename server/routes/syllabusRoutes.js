@@ -190,4 +190,243 @@ router.post(
   }
 );
 
+// ── Helper: is this teacher allowed to write to this subject_id? ───────────
+// Own local copy, not an import — topicsRoutes.js's identical helper isn't
+// exported, matching this codebase's established convention of per-file
+// duplicates for small route-scoped helpers rather than a shared module
+// (same reasoning as this feature's own sanitizeAiJson copy). Fail-closed:
+// a teacher with zero teacher_subjects rows cannot write to any subject.
+async function teacherCanWriteSubject(teacherId, subjectId) {
+  const assigned = await sequelize.query(
+    `SELECT subject_id FROM teacher_subjects WHERE teacher_id = :teacherId AND is_active = true`,
+    { replacements: { teacherId }, type: QueryTypes.SELECT }
+  );
+  return assigned.some(r => String(r.subject_id) === String(subjectId));
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   GET /api/syllabus — list documents. Deliberately unscoped by teacher-
+   subject assignment (any teacher/admin can see any document), matching
+   Prompt 1's own "deliberately global" design for this table — the same
+   design this route's header comment already documents. Scoping only
+   matters for the actual write action (confirm, below), matching how
+   topicsRoutes.js's own CRUD only scopes writes, not its GET /.
+   Excludes extracted_structure — this is a list view, not the review
+   screen's data source (GET /:id is, below).
+   ═══════════════════════════════════════════════════════════════════════ */
+router.get('/', protect, authorize('admin', 'teacher'), async (req, res) => {
+  try {
+    const { status, exam_board_id, subject_id } = req.query;
+    const conditions = [];
+    const replacements = {};
+    if (status) { conditions.push('status = :status'); replacements.status = status; }
+    if (exam_board_id) { conditions.push('exam_board_id = :examBoardId'); replacements.examBoardId = parseInt(exam_board_id, 10); }
+    if (subject_id) { conditions.push('subject_id = :subjectId'); replacements.subjectId = parseInt(subject_id, 10); }
+    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const rows = await sequelize.query(
+      `SELECT sd.id, sd.exam_board_id, eb.name AS exam_board_name,
+              sd.subject_id, s.name AS subject_name,
+              sd.title, sd.file_type, sd.status, sd.is_active,
+              sd.failure_reason, sd.extracted_at, sd.confirmed_at,
+              sd.created_at, sd.updated_at
+       FROM syllabus_documents sd
+       JOIN exam_boards eb ON eb.id = sd.exam_board_id
+       JOIN subjects s     ON s.id  = sd.subject_id
+       ${whereClause}
+       ORDER BY sd.created_at DESC`,
+      { replacements, type: QueryTypes.SELECT }
+    );
+    return res.json({ success: true, data: rows });
+  } catch (err) {
+    logger.error('[GET /api/syllabus]', { error: err.message });
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   GET /api/syllabus/:id — single document, including extracted_structure.
+   This is what the review screen loads, and what it polls while
+   status === 'processing'.
+   ═══════════════════════════════════════════════════════════════════════ */
+router.get('/:id', protect, authorize('admin', 'teacher'), async (req, res) => {
+  try {
+    const [doc] = await sequelize.query(
+      `SELECT sd.*, eb.name AS exam_board_name, s.name AS subject_name
+       FROM syllabus_documents sd
+       JOIN exam_boards eb ON eb.id = sd.exam_board_id
+       JOIN subjects s     ON s.id  = sd.subject_id
+       WHERE sd.id = :id`,
+      { replacements: { id: req.params.id }, type: QueryTypes.SELECT }
+    );
+    if (!doc) return res.status(404).json({ success: false, error: 'Syllabus document not found.' });
+    return res.json({ success: true, data: doc });
+  } catch (err) {
+    logger.error('[GET /api/syllabus/:id]', { error: err.message });
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   POST /api/syllabus/:id/confirm — Prompt 3: writes the (possibly
+   human-edited) topic hierarchy into the REAL topics/subtopics tables.
+
+   CONTRACT: the request body's `nodes` array is treated as the complete,
+   final list the reviewer wants created — exactly the same
+   { level, title, number } shape as extracted_structure (Prompt 2's own
+   documented shape), NOT a diff or patch against the stored AI output.
+   A node the reviewer deleted in the review UI (Prompt 3 Part 2, not yet
+   built) simply isn't present in what gets submitted here; this endpoint
+   has no separate "action: delete" concept to keep the contract simple.
+   This also means an edited title, a promoted/demoted level, or an
+   entirely added node are all indistinguishable from each other here —
+   whatever the client submits is what gets created, which is exactly
+   what "the edit step must not be cosmetic-only" (this prompt's own
+   verification requirement) demands: there is no code path here that
+   could silently fall back to the stored, unedited AI output.
+
+   Design decisions (Step 2.2, answered explicitly):
+   - Pre-existing topics/subtopics for this subject (source_syllabus_id
+     IS NULL, predating this upload) are left COMPLETELY untouched. This
+     endpoint only INSERTs new rows tagged with this document's id as
+     source_syllabus_id — it never deletes, updates, or reads the old
+     tree. Reconciling/merging/retiring the old tree against the new one
+     is explicitly Prompt 4's job, not attempted here.
+   - Multiple confirmed uploads over time for the same subject: each
+     confirm is independent and purely additive — confirming a new
+     syllabus does NOT deactivate or remove the topics/subtopics created
+     by a previous confirmed one for the same subject. Prompt 1's
+     is_active/versioning concept lives on syllabus_documents (which
+     upload is the CURRENT authoritative source), not on the topics/
+     subtopics rows those confirms already created — so a second confirm
+     for the same subject adds a second, parallel set of topics rather
+     than replacing the first. This is the same "don't attempt
+     reconciliation here" reasoning as the point above, and is flagged
+     for Prompt 4 the same way.
+
+   Hierarchy reconstruction: nodes are a FLAT, ORDERED array. Walking in
+   order, the most recently created level-1 topic becomes the topic_id
+   for every level-2/3 node until the next level-1 node resets it; the
+   most recently created level-2 subtopic becomes the parent_subtopic_id
+   for every level-3 node until the next level-1 OR level-2 node resets
+   it. Validated in a dry-run pass BEFORE any INSERT runs — a level-2 or
+   3 node with no valid preceding parent in the submitted array fails the
+   whole request with a 400 and writes nothing, rather than partially
+   writing a tree with dangling/wrong parentage.
+   ═══════════════════════════════════════════════════════════════════════ */
+router.post('/:id/confirm', protect, authorize('admin', 'teacher'), async (req, res) => {
+  try {
+    const [doc] = await sequelize.query(
+      `SELECT id, subject_id, status FROM syllabus_documents WHERE id = :id`,
+      { replacements: { id: req.params.id }, type: QueryTypes.SELECT }
+    );
+    if (!doc) return res.status(404).json({ success: false, error: 'Syllabus document not found.' });
+    if (doc.status !== 'extracted') {
+      return res.status(409).json({
+        success: false,
+        error: `Cannot confirm a document with status '${doc.status}' — it must be 'extracted' first.`,
+      });
+    }
+    if (req.user.role === 'teacher' && !(await teacherCanWriteSubject(req.user.id, doc.subject_id))) {
+      return res.status(403).json({ success: false, error: 'You are not assigned to this subject.' });
+    }
+
+    const nodes = Array.isArray(req.body?.nodes) ? req.body.nodes : null;
+    if (!nodes || nodes.length === 0) {
+      return res.status(400).json({ success: false, error: 'A non-empty "nodes" array is required.' });
+    }
+
+    // Dry-run validation pass — no DB writes yet. Mirrors the exact
+    // clamping/validation rules syllabusExtractor.js already applies to
+    // the AI's own output, since a client-submitted array is just as
+    // untrusted as a raw AI response.
+    const clean = [];
+    for (const [i, n] of nodes.entries()) {
+      const title = String(n?.title ?? '').trim();
+      if (!title) return res.status(400).json({ success: false, error: `Node ${i} is missing a title.` });
+      let level = Number.isInteger(n?.level) ? n.level : parseInt(n?.level, 10);
+      if (!Number.isInteger(level) || level < 1 || level > 3) {
+        return res.status(400).json({ success: false, error: `Node ${i} ("${title}") has an invalid level — must be 1, 2, or 3.` });
+      }
+      const number = n?.number != null ? String(n.number).trim().slice(0, 50) || null : null;
+      clean.push({ title: title.slice(0, 255), level, number });
+    }
+
+    let sawTopic = false, sawSubtopicSinceTopic = false;
+    for (const [i, n] of clean.entries()) {
+      if (n.level === 1) { sawTopic = true; sawSubtopicSinceTopic = false; }
+      if (n.level === 2) {
+        if (!sawTopic) return res.status(400).json({ success: false, error: `Node ${i} ("${n.title}") is a subtopic with no preceding topic.` });
+        sawSubtopicSinceTopic = true;
+      }
+      if (n.level === 3) {
+        if (!sawSubtopicSinceTopic) return res.status(400).json({ success: false, error: `Node ${i} ("${n.title}") is a sub-subtopic with no preceding subtopic under the current topic.` });
+      }
+    }
+
+    const created = await sequelize.transaction(async (t) => {
+      const rows = { topics: [], subtopics: [] };
+      let currentTopicId = null;
+      let currentSubtopicId = null;
+
+      for (const n of clean) {
+        if (n.level === 1) {
+          const [topic] = await sequelize.query(
+            `INSERT INTO topics (subject_id, name, title, order_index, source_syllabus_id, created_by, created_at, updated_at)
+             VALUES (:subjectId, :title, :title, :order, :syllabusId, :userId, NOW(), NOW())
+             RETURNING id, name`,
+            {
+              replacements: { subjectId: doc.subject_id, title: n.title, order: rows.topics.length, syllabusId: doc.id, userId: req.user.id },
+              type: QueryTypes.SELECT, transaction: t,
+            }
+          );
+          currentTopicId = topic.id;
+          currentSubtopicId = null;
+          rows.topics.push({ id: topic.id, title: n.title, number: n.number });
+        } else if (n.level === 2) {
+          const [sub] = await sequelize.query(
+            `INSERT INTO subtopics (topic_id, subject_id, name, order_index, is_active, source_syllabus_id, parent_subtopic_id, created_by, created_at, updated_at)
+             VALUES (:topicId, :subjectId, :title, :order, true, :syllabusId, NULL, :userId, NOW(), NOW())
+             RETURNING id, name`,
+            {
+              replacements: { topicId: currentTopicId, subjectId: doc.subject_id, title: n.title, order: rows.subtopics.length, syllabusId: doc.id, userId: req.user.id },
+              type: QueryTypes.SELECT, transaction: t,
+            }
+          );
+          currentSubtopicId = sub.id;
+          rows.subtopics.push({ id: sub.id, title: n.title, number: n.number, level: 2, parent_subtopic_id: null });
+        } else {
+          const [sub] = await sequelize.query(
+            `INSERT INTO subtopics (topic_id, subject_id, name, order_index, is_active, source_syllabus_id, parent_subtopic_id, created_by, created_at, updated_at)
+             VALUES (:topicId, :subjectId, :title, :order, true, :syllabusId, :parentId, :userId, NOW(), NOW())
+             RETURNING id, name`,
+            {
+              replacements: { topicId: currentTopicId, subjectId: doc.subject_id, title: n.title, order: rows.subtopics.length, syllabusId: doc.id, parentId: currentSubtopicId, userId: req.user.id },
+              type: QueryTypes.SELECT, transaction: t,
+            }
+          );
+          rows.subtopics.push({ id: sub.id, title: n.title, number: n.number, level: 3, parent_subtopic_id: currentSubtopicId });
+        }
+      }
+
+      await sequelize.query(
+        `UPDATE syllabus_documents SET status = 'confirmed', confirmed_by = :userId, confirmed_at = NOW(), updated_at = NOW() WHERE id = :id`,
+        { replacements: { userId: req.user.id, id: doc.id }, type: QueryTypes.UPDATE, transaction: t }
+      );
+
+      return rows;
+    });
+
+    logger.info('[syllabus] confirmed', {
+      id: doc.id, subjectId: doc.subject_id, userId: req.user.id,
+      topicCount: created.topics.length, subtopicCount: created.subtopics.length,
+    });
+
+    return res.json({ success: true, data: created });
+  } catch (err) {
+    logger.error('[POST /api/syllabus/:id/confirm]', { error: err.message });
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;
