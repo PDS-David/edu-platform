@@ -449,6 +449,7 @@ function MCQQuestion({ question, questionNumber, totalQuestions, onAnswer, onPre
   const [shownHints,  setShownHints]  = useState(0);
   const [aiExplain,   setAiExplain]   = useState('');
   const [explainLoad, setExplainLoad] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
   const startTime = useRef(Date.now());
 
   useEffect(() => {
@@ -462,6 +463,7 @@ function MCQQuestion({ question, questionNumber, totalQuestions, onAnswer, onPre
   const handleSubmit = async () => {
     if (!selected || submitting || result) return;
     setSubmitting(true);
+    setSubmitError(null);
     try {
       const res = await api.post(`/questions/${question.id}/answer`, {
         selected_answer:  selected,                        // option text
@@ -492,7 +494,9 @@ function MCQQuestion({ question, questionNumber, totalQuestions, onAnswer, onPre
         .then(r => { if (r.success) setAiExplain(r.data?.explanation ?? r.explanation); })
         .catch(() => {})
         .finally(() => setExplainLoad(false));
-    } catch { alert('Failed to submit. Try again.'); }
+    } catch {
+      setSubmitError('Failed to submit. Please try again.');
+    }
     finally  { setSubmitting(false); }
   };
 
@@ -603,6 +607,15 @@ function MCQQuestion({ question, questionNumber, totalQuestions, onAnswer, onPre
           </>
         )}
       </div>
+
+      {submitError && (
+        <div className="fixed bottom-16 left-0 right-0 px-4 z-40">
+          <div className="max-w-3xl mx-auto flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl px-4 py-2.5 shadow-sm">
+            <XCircle size={13} className="shrink-0" />
+            <span className="flex-1">{submitError}</span>
+          </div>
+        </div>
+      )}
 
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-4 py-3 flex items-center justify-between z-50">
         <div className="max-w-3xl mx-auto w-full flex items-center justify-between">

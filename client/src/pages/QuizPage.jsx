@@ -31,6 +31,7 @@ function QuizQuestion({ question, questionNumber, submitRef, onAnswered }) {
   const [submitting,  setSubmitting]  = useState(false);
   const [aiExplain,   setAiExplain]   = useState('');
   const [explainLoad, setExplainLoad] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
   const startTime = useRef(Date.now());
 
   // GRADE-3 FIX: this component previously assumed every question was MCQ —
@@ -70,6 +71,7 @@ function QuizQuestion({ question, questionNumber, submitRef, onAnswered }) {
     const answerValue = isFreeText ? essayText.trim() : selected;
     if (!answerValue || submitting || result) return;
     setSubmitting(true);
+    setSubmitError(null);
     try {
       const timeTaken = Date.now() - startTime.current;
       // BUG FIX: this comment previously claimed "api interceptor returns
@@ -135,7 +137,7 @@ function QuizQuestion({ question, questionNumber, submitRef, onAnswered }) {
         ? { question_id: question.id, essay_response: essayText.trim(), time_taken_ms: timeTaken }
         : { question_id: question.id, selected_answer: selected, time_taken_ms: timeTaken }); // option text
     } catch {
-      alert('Failed to submit answer. Please try again.');
+      setSubmitError('Failed to submit answer. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -349,6 +351,12 @@ function QuizQuestion({ question, questionNumber, submitRef, onAnswered }) {
             )}
           </div>
         )}
+        {submitError && (
+          <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl px-4 py-2.5 mt-3">
+            <XCircle size={13} className="shrink-0" />
+            <span className="flex-1">{submitError}</span>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -388,6 +396,7 @@ export default function QuizPage() {
   const [upgradeWall, setUpgradeWall] = useState(false);
   const [subjectId,   setSubjectId]   = useState(location.state?.subjectId || null);
   const [answeredIdx, setAnsweredIdx] = useState(-1);
+  const [quizSubmitError, setQuizSubmitError] = useState(null);
 
   const answersRef  = useRef([]);
   const submitRef   = useRef(null);
@@ -437,8 +446,8 @@ export default function QuizPage() {
       return;
     }
     setSubmitting(true);
+    setQuizSubmitError(null);
     try {
-      // POST /quizzes/attempt wraps its payload in data:{} server-side, so
       // res.data is the actual result object: { subtopic_id, total_score,
       // max_score, accuracy_pct, passed, answers, attempt_id, ... }.
       // (Do not assume "interceptor returns response.data directly" — it
@@ -471,7 +480,7 @@ export default function QuizPage() {
         },
       });
     } catch {
-      alert('Failed to submit quiz. Please try again.');
+      setQuizSubmitError('Failed to submit quiz. Please try again.');
       setSubmitting(false);
     }
   };
@@ -536,6 +545,15 @@ export default function QuizPage() {
           onAnswered={handleAnswered}
         />
       </div>
+
+      {quizSubmitError && (
+        <div className="fixed bottom-16 left-0 right-0 px-4 z-40">
+          <div className="max-w-3xl mx-auto flex items-center gap-2 bg-red-500/10 border border-red-400/30 text-red-200 text-xs rounded-xl px-4 py-2.5">
+            <XCircle size={13} className="shrink-0" />
+            <span className="flex-1">{quizSubmitError}</span>
+          </div>
+        </div>
+      )}
 
       {/* Fixed bottom bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-[#0a4a3f] border-t border-white/10 px-4 py-3 z-50">

@@ -81,6 +81,7 @@ export default function StudentTestPage() {
   const [loading,    setLoading]    = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [result,     setResult]     = useState(null);
+  const [submitError, setSubmitError] = useState(null);
   const [timeLeft,   setTimeLeft]   = useState(null);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const timerRef        = useRef(null);
@@ -118,6 +119,7 @@ export default function StudentTestPage() {
   const submitTest = useCallback(async () => {
     clearInterval(timerRef.current);
     setSubmitting(true);
+    setSubmitError(null);
     try {
       const answersArray = (test?.questions || []).map(q => {
         const isFreeText = q.type === 'essay' || q.type === 'structured';
@@ -137,7 +139,7 @@ export default function StudentTestPage() {
       );
       setResult(res.data ?? res);
     } catch (err) {
-      alert('Submission failed. Please try again.');
+      setSubmitError('Submission failed. Please try again.');
       setSubmitting(false);
     }
   }, [test, answers, testId]);
@@ -277,6 +279,15 @@ export default function StudentTestPage() {
           )}
         </div>
       </div>
+
+      {submitError && (
+        <div className="fixed bottom-16 left-0 right-0 px-4 z-40">
+          <div className="max-w-3xl mx-auto flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl px-4 py-2.5 shadow-sm">
+            <XCircle size={13} className="shrink-0" />
+            <span className="flex-1">{submitError}</span>
+          </div>
+        </div>
+      )}
 
       {/* Fixed bottom bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-4 py-3 z-50">

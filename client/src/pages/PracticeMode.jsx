@@ -55,6 +55,7 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
   const [aiHint,        setAiHint]        = useState(null);
   const [aiHintLoading, setAiHintLoading] = useState(false);
   const [submitting,    setSubmitting]    = useState(false);
+  const [submitError,   setSubmitError]   = useState(null);
   const startTime = useRef(Date.now());
 
   // BUG FIX: GET /questions/random (questionsRoutes.js) returns the field as
@@ -116,6 +117,7 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
   const handleSubmitMCQ = async () => {
     if (!selected || submitting || result) return;
     setSubmitting(true);
+    setSubmitError(null);
     try {
       const res = await api.post(`/questions/${question.id}/answer`, {
         selected_answer: selected,    // option text
@@ -136,7 +138,7 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
       // including ones the backend graded correctly.
       setResult(res.data);
     } catch {
-      alert('Failed to submit answer. Please try again.');
+      setSubmitError('Failed to submit answer. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -146,6 +148,7 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
   const handleSubmitEssay = async () => {
     if (!essayText.trim() || submitting || result) return;
     setSubmitting(true);
+    setSubmitError(null);
     try {
       const res = await api.post(`/questions/${question.id}/answer`, {
         essay_response: essayText.trim(),
@@ -155,7 +158,7 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
       });
       setResult(res.data);
     } catch {
-      alert('Failed to submit answer. Please try again.');
+      setSubmitError('Failed to submit answer. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -487,6 +490,12 @@ function QuestionCard({ question, questionNumber, totalQuestions, onAnswer, sess
             )}
           </div>
         </div>
+        {submitError && (
+          <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl px-4 py-2.5 mt-3">
+            <XCircle size={13} className="shrink-0" />
+            <span className="flex-1">{submitError}</span>
+          </div>
+        )}
       </div>
     </div>
   );

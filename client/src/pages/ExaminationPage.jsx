@@ -228,6 +228,7 @@ export default function ExaminationPage() {
   const [submitting, setSubmitting]   = useState(false);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [result, setResult]     = useState(null);
+  const [submitError, setSubmitError] = useState(null);
 
   const timerRef   = useRef(null);
   const startTime  = useRef(Date.now());
@@ -322,6 +323,7 @@ export default function ExaminationPage() {
     if (submitting || result) return;
     clearInterval(timerRef.current);
     setSubmitting(true);
+    setSubmitError(null);
     try {
       const answersArray = questions.map(q => ({
         question_id:     q.id,
@@ -354,7 +356,7 @@ export default function ExaminationPage() {
           setResult({ total_score: 0, max_score: exam?.total_marks || 0, accuracy_pct: 0, answers: [], already_submitted: true });
         }
       } else {
-        alert(err?.message || 'Failed to submit. Please try again.');
+        setSubmitError(err?.message || 'Failed to submit. Please try again.');
         setSubmitting(false);
       }
     }
@@ -457,6 +459,15 @@ export default function ExaminationPage() {
           onSelect={(val) => setAnswers(prev => ({ ...prev, [q.id]: val }))}
         />
       </div>
+
+      {submitError && (
+        <div className="fixed bottom-16 left-0 right-0 px-4 z-40">
+          <div className="max-w-3xl mx-auto flex items-center gap-2 bg-red-500/10 border border-red-400/30 text-red-200 text-xs rounded-xl px-4 py-2.5">
+            <AlertCircle size={13} className="shrink-0" />
+            <span className="flex-1">{submitError}</span>
+          </div>
+        </div>
+      )}
 
       <div className="fixed bottom-0 left-0 right-0 bg-[#0a4a3f] border-t border-white/10 px-4 py-3 z-50">
         <div className="max-w-3xl mx-auto flex items-center justify-between">
