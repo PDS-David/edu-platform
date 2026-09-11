@@ -429,4 +429,51 @@ router.post('/:id/confirm', protect, authorize('admin', 'teacher'), async (req, 
   }
 });
 
+/* ═══════════════════════════════════════════════════════════════════════
+   POST /api/syllabus/:id/retry — re-trigger extraction on a failed
+   document.
+   GAP FILL: Part 3's own brief for the review screen (Part 2, this
+   prompt's actual scope) requires a "re-trigger" action on the failed
+   state, but Part 1's backend never built a retry endpoint — only the
+   upload route ever calls beginExtraction, once, fire-and-forget. Added
+   here as the minimal plumbing needed to make that button function,
+   flagged rather than silently building a non-functional button in the
+   frontend. Same auth/ownership shape as confirm above; re-invokes the
+   exact same beginExtraction() the upload route already uses — no new
+   extraction logic.
+   ═══════════════════════════════════════════════════════════════════════ */
+router.post('/:id/retry', protect, authorize('admin', 'teacher'), async (req, res) => {
+  try {
+    const [doc] = await sequelize.query(
+      `SELECT id, subject_id, status FROM syllabus_documents WHERE id = :id`,
+      { replacements: { id: req.params.id }, type: QueryTypes.SELECT }
+    );
+    if (!doc) return res.status(404).json({ success: false, error: 'Syllabus document not found.' });
+    if (doc.status !== 'failed') {
+      return res.status(409).json({
+        success: false,
+        error: `Cannot retry a document with status '${doc.status}' — it must be 'failed' first.`,
+      });
+    }
+    if (req.user.role === 'teacher' && !(await teacherCanWriteSubject(req.user.id, doc.subject_id))) {
+      return res.status(403).json({ success: false, error: 'You are not assigned to this subject.' });
+    }
+
+    await sequelize.query(
+      `UPDATE syllabus_documents SET status = 'uploaded', failure_reason = NULL, updated_at = NOW() WHERE id = :id`,
+      { replacements: { id: doc.id }, type: QueryTypes.UPDATE }
+    );
+
+    const { beginExtraction } = require('../services/syllabusExtractor');
+    beginExtraction(doc.id)
+      .then(() => logger.info('[syllabus] retry extraction finished', { id: doc.id }))
+      .catch(e => logger.error('[syllabus] retry extraction failed', { id: doc.id, error: e.message }));
+
+    return res.json({ success: true, data: { id: doc.id, status: 'processing' } });
+  } catch (err) {
+    logger.error('[POST /api/syllabus/:id/retry]', { error: err.message });
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;
