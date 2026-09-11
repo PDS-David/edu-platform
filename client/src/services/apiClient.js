@@ -23,6 +23,19 @@ export const TIMEOUT_AI_GENERATE = 110_000; // 110 s — AI question-batch gener
                                              //         chain). Kept just under Caddy's 120 s
                                              //         read_timeout so the frontend doesn't
                                              //         give up before the server would have.
+export const TIMEOUT_FILE_UPLOAD = 60_000;  //  60 s — multipart file uploads (syllabus, past
+                                             //         papers, resources). NOT about server-side
+                                             //         processing time -- POST /syllabus's own
+                                             //         extraction step is fire-and-forget and
+                                             //         returns immediately after the DB insert.
+                                             //         This is upload transfer + hashing + disk/R2
+                                             //         write time for a real multi-MB document,
+                                             //         which the 15 s TIMEOUT_DEFAULT was never
+                                             //         sized for -- confirmed live: a real syllabus
+                                             //         PDF hit "timeout of 15000ms exceeded" on
+                                             //         SyllabusListPage.jsx's upload call, which had
+                                             //         been silently inheriting TIMEOUT_DEFAULT
+                                             //         instead of overriding it.
 
 const apiClient = axios.create({
   baseURL:         API_BASE_URL,
