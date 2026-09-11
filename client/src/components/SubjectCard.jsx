@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../services/apiClient';
+import { Lock } from 'lucide-react';
 
 const subjectIcons = {
   'Mathematics': '📐', 'Physics': '⚡', 'Chemistry': '🧪', 'Biology': '🧬',
@@ -16,25 +16,9 @@ const subjectIcons = {
 
 const SubjectCard = ({ subject, examBoard, showExamBoard = true, isEnrolled = false, onEnrolled }) => {
   const navigate  = useNavigate();
-  const [enrolling, setEnrolling] = useState(false);
-  const [enrolled,  setEnrolled]  = useState(isEnrolled);
+  const [enrolled] = useState(isEnrolled);
 
   const icon = subject.icon_emoji || subjectIcons[subject.name] || '📘';
-
-  const handleEnrol = async (e) => {
-    e.stopPropagation();
-    if (enrolled || enrolling) return;
-    setEnrolling(true);
-    try {
-      await api.post('/students/subjects', { subject_id: String(subject.id) });
-      setEnrolled(true);
-      if (onEnrolled) onEnrolled(subject.id);
-    } catch (err) {
-      alert(err?.message || 'Could not enrol. Please try again.');
-    } finally {
-      setEnrolling(false);
-    }
-  };
 
   const handleStudy = () => navigate(`/student/subject/${subject.id}`);
 
@@ -132,9 +116,18 @@ const SubjectCard = ({ subject, examBoard, showExamBoard = true, isEnrolled = fa
             </button>
           ) : (
             <>
-              <button onClick={handleEnrol} disabled={enrolling} className="flex-1 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 disabled:opacity-60 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-200 shadow-md">
-                {enrolling ? 'Enrolling…' : '+ Enrol'}
-              </button>
+              {/* Self-service enrolment was intentionally locked down --
+                  subjects/exam boards are now assigned by the student's
+                  school or App Admin (same change StudentExamTypesPage.jsx
+                  already reflects at /student/exam-types). This card used
+                  to still show an "Enrol" button that called the now-locked
+                  POST /students/subjects and failed with an alert() on
+                  every click; replaced with the same "managed by your
+                  admin" message instead of a dead-end error. */}
+              <div className="flex-1 flex items-center gap-2 px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-500">
+                <Lock size={13} className="shrink-0 text-gray-300" />
+                Managed by your school or app admin
+              </div>
               <button onClick={handleStudy} className="px-4 py-3 border-2 border-blue-200 hover:border-blue-400 text-blue-600 font-semibold rounded-lg transition-all duration-200">
                 Preview
               </button>
