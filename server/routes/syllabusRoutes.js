@@ -142,7 +142,15 @@ router.post(
               uploadedBy: req.user.id,
               title:      docTitle,
               fileUrl, r2Key,
-              fileType:   f.ext,
+              // BUG FIX, confirmed live before fixing: f.ext is dot-prefixed
+              // ('.pdf'/'.docx', per uploadSecurity.js's runValidation), but
+              // syllabus_documents.file_type has a CHECK constraint requiring
+              // no dot ('pdf'/'docx') — every upload was failing with a 500
+              // ("violates check constraint syllabus_documents_file_type_check").
+              // Reproduced with a real POST against the actual merged
+              // migration before writing this fix, not assumed from reading
+              // the code alone.
+              fileType:   f.ext.replace(/^\./, ''),
               size:       f.size,
               origName:   f.originalname,
               hash:       f.sha256,
