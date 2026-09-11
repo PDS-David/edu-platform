@@ -22,7 +22,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../services/apiClient';
+import api, { TIMEOUT_FILE_UPLOAD } from '../services/apiClient';
 import { useAuth } from '../context/AuthContext';
 import { useCatalog } from '../hooks/useCatalog';
 import {
@@ -125,6 +125,7 @@ export default function SyllabusListPage() {
 
       const res = await api.post('/syllabus', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: TIMEOUT_FILE_UPLOAD,
       });
 
       // Straight into the review screen — it already polls while
