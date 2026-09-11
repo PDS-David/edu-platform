@@ -1189,6 +1189,50 @@ async function run() {
     ['resource_user_assignments: add assigned_by column if missing (M-7)', `
       ALTER TABLE resource_user_assignments
         ADD COLUMN IF NOT EXISTS assigned_by UUID REFERENCES users(id)`],
+
+    // Syllabus-driven topic mapping, Prompt 4 Part 1: dry-run AI-suggestion
+    // storage. Full design rationale: database/migration_034_syllabus_remap_suggestions.sql
+    // (mirrors that file exactly, same convention as syllabus_documents
+    // above). Writes nothing to resources/questions/videos/revision_notes/
+    // concepts — this table only ever holds suggestions for Part 2 to read.
+    ['syllabus_remap_suggestions', `CREATE TABLE IF NOT EXISTS syllabus_remap_suggestions (
+      id                     UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+      subject_id             INTEGER      NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+      syllabus_document_id   UUID         NOT NULL REFERENCES syllabus_documents(id) ON DELETE CASCADE,
+      source_table           VARCHAR(20)  NOT NULL,
+      source_id              TEXT         NOT NULL,
+      source_old_topic_id    INTEGER      REFERENCES topics(id)    ON DELETE SET NULL,
+      source_old_subtopic_id INTEGER      REFERENCES subtopics(id) ON DELETE SET NULL,
+      suggested_topic_id     INTEGER      REFERENCES topics(id)    ON DELETE SET NULL,
+      suggested_subtopic_id  INTEGER      REFERENCES subtopics(id) ON DELETE SET NULL,
+      no_confident_match     BOOLEAN      NOT NULL DEFAULT false,
+      confidence              NUMERIC(3,2),
+      ai_rationale             TEXT,
+      status                 VARCHAR(20)  NOT NULL DEFAULT 'pending',
+      reviewed_by             UUID        REFERENCES users(id) ON DELETE SET NULL,
+      reviewed_at              TIMESTAMPTZ,
+      generated_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      created_at                TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_srs_subject  ON syllabus_remap_suggestions(subject_id);
+    CREATE INDEX IF NOT EXISTS idx_srs_doc      ON syllabus_remap_suggestions(syllabus_document_id);
+    CREATE INDEX IF NOT EXISTS idx_srs_status   ON syllabus_remap_suggestions(status);
+    CREATE INDEX IF NOT EXISTS idx_srs_no_match ON syllabus_remap_suggestions(no_confident_match) WHERE no_confident_match = true;
+    DO $$ BEGIN
+      ALTER TABLE syllabus_remap_suggestions
+        ADD CONSTRAINT syllabus_remap_suggestions_source_table_check
+        CHECK (source_table IN ('resources', 'questions', 'videos', 'revision_notes', 'concepts'));
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+    DO $$ BEGIN
+      ALTER TABLE syllabus_remap_suggestions
+        ADD CONSTRAINT syllabus_remap_suggestions_status_check
+        CHECK (status IN ('pending', 'accepted', 'overridden', 'skipped'));
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+    DO $$ BEGIN
+      ALTER TABLE syllabus_remap_suggestions
+        ADD CONSTRAINT syllabus_remap_suggestions_unique_source
+        UNIQUE (syllabus_document_id, source_table, source_id);
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$`],
   ];
 
   for (const [label, sql] of tables) {
