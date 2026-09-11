@@ -80,6 +80,8 @@ import QuestionReview from "./pages/QuestionReview";
 import TeacherAddQuestionPage from "./pages/TeacherAddQuestionPage";
 import TeacherExaminationsPage from "./pages/TeacherExaminationsPage";
 import TeacherResultsPage from "./pages/TeacherResultsPage";
+import SyllabusListPage from "./pages/SyllabusListPage";
+import SyllabusReviewPage from "./pages/SyllabusReviewPage";
 
 // Admin
 import AdminDashboard from "./pages/AdminDashboard";
@@ -232,6 +234,8 @@ export default function App() {
             <Route path="pending-questions" element={<TeacherPendingQuestions />} />
             <Route path="resources" element={<TeacherResourcesPage />} />
             <Route path="review" element={<QuestionReview />} />
+            <Route path="syllabus" element={<SyllabusListPage />} />
+            <Route path="syllabus/:id" element={<SyllabusReviewPage />} />
             <Route path="contribute" element={<ContributeQuestion />} />
             <Route path="questions/add" element={<TeacherAddQuestionPage />} />
             <Route path="examinations" element={<TeacherExaminationsPage />} />
@@ -250,6 +254,8 @@ export default function App() {
             <Route path="students" element={<AdminStudents />} />
             <Route path="students/:studentId" element={<SchoolAdminStudentReport />} />
             <Route path="questions/review" element={<QuestionReview />} />
+            <Route path="syllabus" element={<SyllabusListPage />} />
+            <Route path="syllabus/:id" element={<SyllabusReviewPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="english-masterclass" element={<AdminEnglishMasterclass />} />
             <Route path="language-masterclass/:language" element={<AdminLanguageMasterclass />} />
