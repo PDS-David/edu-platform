@@ -857,7 +857,15 @@ async function run() {
       ADD COLUMN IF NOT EXISTS source_syllabus_id UUID REFERENCES syllabus_documents(id) ON DELETE SET NULL;
     ALTER TABLE subtopics
       ADD COLUMN IF NOT EXISTS source_syllabus_id UUID REFERENCES syllabus_documents(id) ON DELETE SET NULL,
-      ADD COLUMN IF NOT EXISTS parent_subtopic_id INTEGER REFERENCES subtopics(id) ON DELETE SET NULL`],
+      ADD COLUMN IF NOT EXISTS parent_subtopic_id INTEGER REFERENCES subtopics(id) ON DELETE SET NULL;
+    -- Prompt 2 Part 2: staging area for the AI-parsed hierarchy, reviewed
+    -- by a human (Prompt 3) before it ever touches the live topics/
+    -- subtopics tables. Full shape documented in
+    -- migration_032_syllabus_extracted_structure.sql and
+    -- services/syllabusExtractor.js.
+    ALTER TABLE syllabus_documents
+      ADD COLUMN IF NOT EXISTS extracted_structure JSONB,
+      ADD COLUMN IF NOT EXISTS extracted_at TIMESTAMPTZ`],
 
     ['student_subjects', `CREATE TABLE IF NOT EXISTS student_subjects (
       id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),

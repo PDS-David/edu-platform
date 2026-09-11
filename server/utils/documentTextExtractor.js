@@ -22,10 +22,25 @@ const DEFAULT_MAX_CHARS = 12000;
 async function extractTextFromBuffer(buf, ext, maxChars = DEFAULT_MAX_CHARS) {
   try {
     if (ext === '.pdf') {
-      const pdfParse = safeRequire('pdf-parse');
-      if (!pdfParse) return '';
-      const data = await pdfParse(buf);
-      return (data?.text || '').slice(0, maxChars);
+      // BUG FIX, confirmed live before fixing (not assumed from a version
+      // number alone): pdf-parse@1.1.4's calling convention (`pdfParse(buf)`)
+      // is what this branch used to call, but its bundled legacy pdf.js
+      // parser fails on ANY real PDF in this Node 22 environment —
+      // reproduced with an independently-validated, genuinely well-formed
+      // PDF (confirmed readable by a separate trusted parser), which still
+      // threw "bad XRef entry" here. Not a corrupt-file problem; a
+      // dependency-version problem. Switched to pdf-parse v2's actively
+      // maintained API (`new PDFParse({ data }).getText()`, matching its
+      // README's migration example) and re-verified against the same PDF.
+      const pdfModule = safeRequire('pdf-parse');
+      if (!pdfModule || !pdfModule.PDFParse) return '';
+      const parser = new pdfModule.PDFParse({ data: buf });
+      try {
+        const result = await parser.getText();
+        return (result?.text || '').slice(0, maxChars);
+      } finally {
+        await parser.destroy(); // v2 README: always call to free memory
+      }
     }
     if (ext === '.docx') {
       const mammoth = safeRequire('mammoth');
