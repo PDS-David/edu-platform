@@ -12,6 +12,14 @@ const sequelize      = require('../config/database');
 const { protect }    = require('../middleware/auth');
 const { requireTeacherClassOwnership } = require('../middleware/teacherScope');
 const { generate } = require('../services/ai');
+// Shared with syllabusExtractor.js's own AI-response handling and (as of
+// migration_034's remap-suggestion work) generateSyllabusRemapSuggestions.js
+// — this route used to call sanitizeAiJson() without importing it at all,
+// throwing "sanitizeAiJson is not defined" on every single AI Question
+// Generator request (confirmed live in production via a teacher's own
+// screenshot of the AI Generate tab). Reusing the existing export here
+// instead of adding a 3rd copy of the same sanitizer.
+const { sanitizeAiJson } = require('../services/syllabusExtractor');
 const { success, error } = require('../utils/response');
 const { adminActionLimiter } = require('../middleware/rateLimiter');
 
