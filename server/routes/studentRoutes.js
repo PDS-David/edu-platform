@@ -1057,6 +1057,7 @@ router.get('/my-boards', protect, studentOnly, async (req, res) => {
        FROM student_exam_types set2
        JOIN exam_boards eb ON eb.id = set2.exam_board_id
        WHERE set2.student_id = :studentId AND set2.status = :approvedStatus
+         AND set2.is_active = true
        ORDER BY eb.name`,
       { replacements: { studentId: req.user.id, approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.SELECT }
     );
@@ -1098,6 +1099,7 @@ router.get('/my-subjects', protect, studentOnly, async (req, res) => {
          JOIN subjects  s  ON s.id  = ss.subject_id
          JOIN exam_boards eb ON eb.id = s.exam_board_id
          WHERE ss.student_id = :studentId AND ss.status = :approvedStatus AND s.is_active = true
+           AND ss.is_active = true
          ORDER BY s.name`,
         { replacements: { studentId, approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.SELECT }
       );

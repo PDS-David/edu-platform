@@ -339,6 +339,7 @@ router.get('/course/:courseId', protect, async (req, res) => {
          WHERE ss.student_id  = :userId
            AND cs.course_id   = :courseId
            AND ss.status      = 'approved'
+           AND ss.is_active   = true
            AND (ss.expires_at IS NULL OR ss.expires_at > NOW())
          LIMIT 1`,
         { replacements: { userId: req.user.id, courseId }, type: QueryTypes.SELECT }
@@ -563,6 +564,7 @@ router.get('/:id', protect, async (req, res) => {
          WHERE ss.student_id  = :userId
            AND cs.course_id   = :courseId
            AND ss.status      = 'approved'
+           AND ss.is_active   = true
            AND (ss.expires_at IS NULL OR ss.expires_at > NOW())
          LIMIT 1`,
         { replacements: { userId: req.user.id, courseId: video.course_id }, type: QueryTypes.SELECT }

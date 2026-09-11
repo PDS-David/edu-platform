@@ -41,7 +41,7 @@ router.get('/', protect, async (req, res) => {
   if (subjectId && req.user.role === 'student') {
     const registered = await sequelize.query(
       `SELECT 1 FROM student_subjects ss
-        WHERE ss.student_id = :studentId AND ss.subject_id = :subjectId AND ss.status = 'approved'
+        WHERE ss.student_id = :studentId AND ss.subject_id = :subjectId AND ss.status = 'approved' AND ss.is_active = true
        UNION
        SELECT 1 FROM class_memberships cm
          JOIN class_subjects cs ON cs.class_id = cm.class_id
@@ -325,7 +325,7 @@ router.get('/:id', protect, async (req, res) => {
     if (req.user.role === 'student') {
       const registered = await sequelize.query(
         `SELECT 1 FROM student_subjects ss
-          WHERE ss.student_id = :studentId AND ss.subject_id = :subjectId AND ss.status = 'approved'
+          WHERE ss.student_id = :studentId AND ss.subject_id = :subjectId AND ss.status = 'approved' AND ss.is_active = true
          UNION
          SELECT 1 FROM class_memberships cm
            JOIN class_subjects cs ON cs.class_id = cm.class_id

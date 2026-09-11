@@ -87,6 +87,7 @@ const videoAccess = async (req, res, next) => {
          WHERE ss.student_id  = :userId
            AND cs.course_id   = :courseId
            AND ss.status      = :approved
+           AND ss.is_active   = true
            AND (ss.expires_at IS NULL OR ss.expires_at > NOW())
          LIMIT 1`,
         {

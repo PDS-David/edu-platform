@@ -413,7 +413,7 @@ router.get('/', async (req, res) => {
                   SELECT 1 FROM student_subjects ss
                   WHERE ss.student_id = cm.student_id
                     AND ss.subject_id = r.subject_id
-                    AND (ss.status = 'approved' OR ss.status IS NULL)
+                    AND (ss.status = 'approved' OR ss.status IS NULL) AND (ss.is_active = true OR ss.is_active IS NULL)
                 )
               )
           )
@@ -517,7 +517,7 @@ router.get('/my-assignments', async (req, res) => {
                     SELECT 1 FROM student_subjects ss
                     WHERE ss.student_id = cm.student_id
                       AND ss.subject_id = r.subject_id
-                      AND (ss.status = 'approved' OR ss.status IS NULL)
+                      AND (ss.status = 'approved' OR ss.status IS NULL) AND (ss.is_active = true OR ss.is_active IS NULL)
                   )
                 )
             )
@@ -697,7 +697,7 @@ router.get('/:id/download', protect, async (req, res) => {
                        SELECT 1 FROM student_subjects ss
                        WHERE ss.student_id = cm.student_id
                          AND ss.subject_id = r.subject_id
-                         AND (ss.status = 'approved' OR ss.status IS NULL)
+                         AND (ss.status = 'approved' OR ss.status IS NULL) AND (ss.is_active = true OR ss.is_active IS NULL)
                      )
                    )
               )
@@ -944,7 +944,7 @@ router.put('/:id/assign-users', authorize('admin', 'teacher', 'school_admin'), a
     let eligibleIds = candidateIds;
     if (meta.subject_id && candidateIds.length > 0) {
       const enrolledRows = await sequelize.query(
-        `SELECT student_id FROM student_subjects WHERE subject_id = :sid AND (status = :approvedStatus OR status IS NULL) AND student_id IN (:cids)`,
+        `SELECT student_id FROM student_subjects WHERE subject_id = :sid AND (status = :approvedStatus OR status IS NULL) AND (is_active = true OR is_active IS NULL) AND student_id IN (:cids)`,
         { replacements: { sid: meta.subject_id, cids: candidateIds, approvedStatus: ENROLLMENT_STATUS.APPROVED }, type: QueryTypes.SELECT }
       );
       const enrolledSet = new Set(enrolledRows.map(r => r.student_id));

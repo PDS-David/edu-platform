@@ -380,6 +380,7 @@ router.get('/subject-breakdown', protect, analyticsLimiter, async (req, res) => 
                                      AND pa.student_id  = :userId
        WHERE ss.student_id = :userId
          AND ss.status     = :approvedStatus
+         AND ss.is_active  = true
          AND s.is_active   = true
        GROUP BY s.id, s.name
        ORDER BY attempts DESC NULLS LAST, s.name ASC`,

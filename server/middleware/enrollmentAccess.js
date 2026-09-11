@@ -95,7 +95,7 @@ async function checkCourseEnrollment(userId, courseId) {
 async function checkSubjectEnrollment(userId, courseId) {
   // Path A: student_subjects → subjects → course_subjects
   const rows = await db.query(
-    `SELECT ss.status
+    `SELECT ss.status, ss.is_active
      FROM student_subjects ss
      JOIN subjects      s  ON s.id  = ss.subject_id
      JOIN course_subjects cs ON cs.subject_id = s.id
@@ -115,8 +115,17 @@ async function checkSubjectEnrollment(userId, courseId) {
   );
   if (rows.length) {
     const raw = rows[0].status;
-    // Map student_subjects status → enrollment status vocabulary
-    const mapped = raw === 'approved' ? 'active'
+    // GAP FIX: this used to map purely off ss.status, never checking
+    // ss.is_active — so a subject an admin deactivated (e.g. via
+    // schoolRoutes.js's assign-exam-type replace-on-reassign, which sets
+    // is_active=false but leaves status='approved' untouched) still
+    // granted full content access here, even though the student's own
+    // dashboard correctly stopped listing it (see the my-subjects/
+    // my-boards fix in studentRoutes.js). is_active=false now always
+    // means 'cancelled' regardless of what status says, since it's the
+    // more specific, more recently-set signal of the two.
+    const mapped = rows[0].is_active === false ? 'cancelled'
+                 : raw === 'approved' ? 'active'
                  : raw === 'pending'  ? 'pending'
                  : 'cancelled';
     return { enrolled: true, status: mapped };
