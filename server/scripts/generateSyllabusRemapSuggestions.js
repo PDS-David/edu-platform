@@ -151,15 +151,25 @@ async function getOldTreeItems(subjectId, currentSyllabusDocId, cfg) {
   let whereClause, replacements;
   if (cfg.hasSubjectId) {
     const parts = [];
-    if (cfg.hasTopicId)    parts.push('topic_id = ANY(:topicIds)');
-    if (cfg.hasSubtopicId) parts.push('subtopic_id = ANY(:subtopicIds)');
+    // BUG FIX: ANY(:namedParam) with a Sequelize named replacement holding
+    // a plain JS array renders as a bare comma list (ANY(1, 2, 3)), which
+    // is invalid SQL -- ANY() needs a real array expression. Confirmed
+    // live in production: "syntax error at or near ','" on exactly this
+    // query. IN (:param) is the correct, already-idiomatic replacement
+    // used throughout the rest of this codebase (see
+    // server/tests/no-any-named-replacement.test.js, the repo-wide
+    // regression guard for this exact anti-pattern -- which did not catch
+    // this file because its scan list didn't include server/scripts/;
+    // fixed alongside this).
+    if (cfg.hasTopicId)    parts.push('topic_id IN (:topicIds)');
+    if (cfg.hasSubtopicId) parts.push('subtopic_id IN (:subtopicIds)');
     whereClause = `subject_id = :sid AND (${parts.join(' OR ')})`;
     replacements = { sid: subjectId, topicIds: safeTopicIds, subtopicIds: safeSubtopicIds };
   } else if (cfg.hasTopicId) {
-    whereClause = `topic_id = ANY(:topicIds)`;
+    whereClause = `topic_id IN (:topicIds)`;
     replacements = { topicIds: safeTopicIds };
   } else {
-    whereClause = `subtopic_id = ANY(:subtopicIds)`;
+    whereClause = `subtopic_id IN (:subtopicIds)`;
     replacements = { subtopicIds: safeSubtopicIds };
   }
 

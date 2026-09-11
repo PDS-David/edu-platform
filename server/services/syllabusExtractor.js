@@ -34,6 +34,11 @@ const logger = require('../config/logger');
 // handing a near-empty string off to Part 2's future AI step.
 const MIN_EXTRACTABLE_CHARS = 50;
 
+// See the readFileAsTextFromUrl call site below for the full story on why
+// this exists and isn't just documentTextExtractor.js's shared 12,000
+// default.
+const SYLLABUS_MAX_CHARS = 1_000_000;
+
 // ── beginExtraction ───────────────────────────────────────────────────────
 // Entry point called (fire-and-forget) from POST /api/syllabus right after
 // a successful upload. Owns every 'uploaded' -> 'processing' -> 'failed'
@@ -60,7 +65,37 @@ async function beginExtraction(syllabusId) {
 
     let rawText;
     try {
-      rawText = await readFileAsTextFromUrl(doc.file_url);
+      // BUG FIX, confirmed against a real production failure (not assumed):
+      // readFileAsTextFromUrl's shared default cap (documentTextExtractor.js's
+      // DEFAULT_MAX_CHARS = 12,000) was silently truncating every syllabus
+      // upload almost immediately -- a real 10-topic, ~120-page Cambridge
+      // A-Level scheme of work measured at 797,203 characters was cut to
+      // its first 12,000 (about 1.5%), landing mid-sentence inside Topic 1's
+      // own content, nowhere near Topic 2. The AI then correctly extracted
+      // whatever tiny fragment of structure it could find in that scrap --
+      // it produced valid, well-formed JSON (1 topic, 2 subtopics), so this
+      // never surfaced as a 'failed' status or any visible error; it looked
+      // exactly like a normal, successful extraction of a much shorter
+      // document. Confirmed live: production created exactly 1 topic + 2
+      // subtopics from this file, verified directly against the real
+      // uploaded document's actual structure (10 topics).
+      //
+      // 12,000 is left untouched as documentTextExtractor.js's own shared
+      // default -- resourceQuestionExtractor.js (generating a handful of
+      // practice questions from a resource) is a different task with a
+      // deliberately different budget, and lowering its behavior wasn't
+      // this bug. SYLLABUS_MAX_CHARS is passed explicitly here instead,
+      // scoped to this one caller. 1,000,000 comfortably covers the
+      // measured 797,203-character document plus headroom for larger real
+      // syllabi, while staying a bounded value rather than removing the
+      // cap outright. Not verified against a live model call (no
+      // GEMINI_API_KEY/OPENAI_API_KEY in this sandbox, same limitation as
+      // this feature's original PR) -- if a genuinely enormous document's
+      // AI *output* (not input) were to hit its own token limit, the
+      // existing JSON.parse failure path a few lines below already surfaces
+      // that as a clear, visible 'failed' status rather than another silent
+      // partial success -- confirmed by reading that path, not assumed.
+      rawText = await readFileAsTextFromUrl(doc.file_url, SYLLABUS_MAX_CHARS);
     } catch (err) {
       // Genuine parse failure — a corrupted/unreadable file, distinct from
       // "parsed fine but had no text" below. documentTextExtractor.js

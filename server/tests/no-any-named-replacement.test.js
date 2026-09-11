@@ -34,10 +34,16 @@ const path = require('path');
 // weeks later (several of the six 2026-08-27 instances had their errors
 // caught and swallowed, so nothing crashed — the query just always returned
 // empty/zero and nobody noticed).
+//
+// SCOPE GAP, found and closed: 'scripts' was missing from SCAN_DIRS until
+// generateSyllabusRemapSuggestions.js was written with exactly this
+// anti-pattern and shipped anyway — confirmed live in production
+// ("syntax error at or near ','"), not caught by this test because
+// server/scripts/ was never in the scan list. Added here alongside that fix.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const SCAN_ROOT = path.join(__dirname, '..'); // server/
-const SCAN_DIRS = ['routes', 'services', 'tools', 'controllers'];
+const SCAN_DIRS = ['routes', 'services', 'tools', 'controllers', 'scripts'];
 const ANTI_PATTERN = /ANY\s*\(\s*:[a-zA-Z_]\w*/;
 
 function listJsFilesRecursive(dir) {
