@@ -77,6 +77,17 @@
 //        reverse fallback wouldn't also be reasonable — just not what was
 //        asked for here.
 //
+// v20 — TIMEOUT FIX (PRIORITY 0, 2026-09-11): neither outbound provider
+//        call had ANY timeout — a network stall never threw, so nothing
+//        caught it, logged it, or moved a stuck syllabus_documents row off
+//        'processing'. Added a native AbortSignal-based 30s-per-attempt
+//        timeout to both _callGemini and _callOpenAI (a distinct
+//        AITimeoutError, recognized by _isRetryableError() so a stalled
+//        primary model now correctly falls through the existing chain
+//        instead of hanging). Full reasoning — why AbortSignal over
+//        Promise.race, why not the SDK's other native ClientOptions.timeout,
+//        why 30s — documented inline just above AITimeoutError's definition.
+//
 // Public API (signature UNCHANGED from v17):
 //   generate(prompt, task, options?) → Promise<string>
 //   options.provider: 'gemini' (default, unchanged) | 'openai'
@@ -138,6 +149,7 @@ function _getAI() {
 
 // ── Helper: detect ANY retryable/unavailability error from Google ──────────
 function _isRetryableError(err) {
+  if (err?.code === 'AI_TIMEOUT') return true; // see AITimeoutError below
   const msg    = (err?.message || '').toLowerCase();
   const status = err?.status || err?.statusCode || 0;
   return (
@@ -162,6 +174,94 @@ function _isRetryableError(err) {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// v20 — TIMEOUT FIX (2026-09-11): PRIORITY 0 incident — syllabus extraction
+// hanging in status='processing' forever with a 502 on the unrelated polling
+// GET. Root cause confirmed by reading this file, not speculation: neither
+// outbound provider call below had ANY timeout — a network-level stall
+// doesn't throw, so nothing here ever caught it, nothing ever logged it, and
+// syllabus_documents never left 'processing'.
+//
+// Mechanism chosen — native AbortController/AbortSignal on BOTH providers,
+// not a Promise.race() wrapper. Confirmed from @google/genai v1.48.0's own
+// type definitions (node_modules/@google/genai/dist/genai.d.ts) that
+// GenerateContentConfig accepts a per-call `abortSignal`, so this is a
+// genuinely native mechanism, not a workaround. Deliberately NOT using the
+// SDK's other native option, the GoogleGenAI CLIENT-constructor-level
+// `timeout` (ClientOptions.timeout, set once in _getAI()) — its own doc
+// comment warns "request timeouts are retried by default, so in a
+// worst-case scenario you may wait much longer than this timeout before the
+// promise succeeds or fails", which would stack unpredictably on top of
+// this file's OWN fallback-chain retries. A real AbortSignal was also
+// specifically preferred over Promise.race() because it actually cancels
+// the underlying in-flight HTTP request (real resource cleanup) rather
+// than merely abandoning the await while the real request keeps running
+// unseen — directly relevant given the open, unconfirmed hypothesis that a
+// stalled connection may be what eventually exhausted a resource/pool limit
+// and took the API process down with it (see this fix's own commit message
+// for what that investigation did and didn't establish).
+//
+// Timeout value — 30s per individual provider attempt. Reasoning: the
+// tightest real constraint in this app is SYNCHRONOUS callers (teacherRoutes
+// .js's /generate-questions, questionsRoutes.js's essay-mark, etc.) awaited
+// within a single HTTP request/response cycle. generate() can make up to 3
+// sequential outbound attempts before giving up (primary Gemini model,
+// Gemini's own one-model FALLBACK_CHAIN, then the automatic OpenAI
+// fallback) — worst case, 3 x 30s = 90s. client/src/services/apiClient.js's
+// TIMEOUT_AI_GENERATE (110s) is that file's own documented "kept just under
+// Caddy's 120s read_timeout" ceiling for exactly this kind of call — so 90s
+// worst-case leaves real headroom under both the 110s frontend wait and the
+// 120s proxy ceiling, rather than eating that whole budget with nothing
+// left for actual response processing. 30s is also comfortably above
+// realistic legitimate latency: even this app's largest prompt (syllabus
+// extraction, tens of thousands of characters) normally resolves well
+// under 20s in practice, so a legitimate-but-slow response is not at real
+// risk of being cut off prematurely. For the syllabus-extraction caller
+// specifically — NOT synchronous (confirmed by PR #87's own finding:
+// beginExtraction is fire-and-forget, the HTTP response already returned
+// after the initial DB insert) — a 90s worst-case-before-'failed' is a
+// perfectly reasonable background-job ceiling with no request/proxy
+// deadline to race against at all.
+//
+// AITimeoutError is recognized by _isRetryableError() above (first check),
+// so a stalled PRIMARY Gemini model now correctly engages the existing
+// fallback chain instead of hanging forever — verified by tracing the
+// control flow, not by producing a real network stall against Google's
+// live API (not practically reproducible from here; see this fix's commit
+// message for the full honesty note on what was and wasn't executed).
+class AITimeoutError extends Error {
+  constructor(providerLabel, ms) {
+    super(`${providerLabel} request timed out after ${ms}ms with no response.`);
+    this.name = 'AITimeoutError';
+    this.code = 'AI_TIMEOUT';
+  }
+}
+
+const AI_CALL_TIMEOUT_MS = 30_000;
+
+// Runs `requestFn(signal)` under a hard AbortController deadline. On abort,
+// re-throws as AITimeoutError (a distinct, identifiable shape this file
+// controls) rather than letting whatever the SDK/fetch happens to throw on
+// abort leak through — that raw shape isn't documented/guaranteed to stay
+// consistent across SDK versions, and a fetch AbortError and a
+// @google/genai abort rejection don't necessarily look the same, so this
+// normalizes both providers to one shape _isRetryableError() only has to
+// know about once.
+async function _withTimeout(requestFn, providerLabel, ms = AI_CALL_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    return await requestFn(controller.signal);
+  } catch (err) {
+    if (controller.signal.aborted) {
+      throw new AITimeoutError(providerLabel, ms);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // ── Gemini call with automatic retry + fallback chain ─────────────────────
 async function _callGemini(prompt, task) {
   if (!process.env.GEMINI_API_KEY) {
@@ -177,10 +277,14 @@ async function _callGemini(prompt, task) {
     const isLast    = i === modelsToTry.length - 1;
 
     try {
-      const response = await ai.models.generateContent({
-        model:    modelName,
-        contents: prompt,
-      });
+      const response = await _withTimeout(
+        (signal) => ai.models.generateContent({
+          model:    modelName,
+          contents: prompt,
+          config:   { abortSignal: signal },
+        }),
+        `Gemini (${modelName})`
+      );
 
       const text = response.text;
 
@@ -267,20 +371,29 @@ async function _callOpenAI(prompt, task) {
 
   let response;
   try {
-    response = await fetch(OPENAI_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type':  'application/json',
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'user', content: prompt }],
+    response = await _withTimeout(
+      (signal) => fetch(OPENAI_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: 'user', content: prompt }],
+        }),
+        signal,
       }),
-    });
+      'OpenAI'
+    );
   } catch (err) {
-    // Network-level failure (DNS, timeout, connection refused) — no HTTP
-    // status to inspect at all.
+    // Network-level failure (DNS, connection refused) OR our own
+    // AITimeoutError from _withTimeout above — both are "no usable
+    // response came back", same friendly outcome either way. This
+    // function has no further fallback of its own (see the comment above
+    // _callOpenAI), so there's no need to distinguish AI_TIMEOUT from any
+    // other network failure here the way _isRetryableError() does for
+    // _callGemini's own retry loop.
     throw Object.assign(
       new Error('AI is temporarily busy. Please try again in a moment.'),
       { statusCode: 503 }
