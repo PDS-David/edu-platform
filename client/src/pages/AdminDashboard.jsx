@@ -2131,7 +2131,7 @@ const AdminPastPapersPanel = () => {
   const fetchPapers = async () => {
     setLoading(true);
     try { const params = {}; if (filters.exam_board) params.exam_board = filters.exam_board; if (filters.year_from) params.year_from = filters.year_from; if (filters.year_to) params.year_to = filters.year_to; const r = await api.get('/past-papers', { params }); setPapers(r.data || []); }
-    catch { }
+    catch (err) { showToast(err?.message || 'Could not load past papers.', 'error'); }
     finally { setLoading(false); }
   };
   useEffect(() => { fetchPapers(); }, []);
