@@ -170,6 +170,7 @@ export default function SyllabusReviewPage() {
   const showToast = (msg, type = 'success') => setToast({ msg, type });
 
   const pollRef = useRef(null);
+  const pollStartRef = useRef(null); // set once when we first see processing/uploaded — used to pick a time-aware message below, not reset on every 4s poll tick
 
   const load = useCallback(async () => {
     try {
@@ -202,10 +203,29 @@ export default function SyllabusReviewPage() {
   useEffect(() => {
     if (!doc) return;
     if (doc.status === 'processing' || doc.status === 'uploaded') {
+      if (pollStartRef.current === null) pollStartRef.current = Date.now();
       pollRef.current = setTimeout(() => load(), POLL_INTERVAL_MS);
+    } else {
+      pollStartRef.current = null; // reset so a later retry gets its own fresh timer
     }
     return () => clearTimeout(pollRef.current);
   }, [doc, load]);
+
+  // Time-aware processing message (PRIORITY 0 fix in PR #88 made 30s-per-
+  // attempt / up to 3 attempts a real, expected worst case — up to ~90s
+  // before the backend itself gives up and flips this to "failed". Below
+  // that, silence reads as "stuck" even though it's still within normal
+  // bounds — these tiers exist purely to keep saying something true and
+  // reassuring the longer it legitimately runs, not to promise an exact
+  // time.
+  function processingMessage() {
+    if (!pollStartRef.current) return 'Extracting the topic structure…';
+    const elapsedSec = Math.round((Date.now() - pollStartRef.current) / 1000);
+    if (elapsedSec < 15)  return 'Extracting the topic structure…';
+    if (elapsedSec < 40)  return 'Still working — larger documents can take a little longer.';
+    if (elapsedSec < 75)  return 'Still going — this is a longer document. Almost there.';
+    return "This is taking longer than usual. It should still finish shortly — if it doesn't within another minute, try refreshing.";
+  }
 
   const errors = nodes ? validateTree(nodes) : [];
   const errorsByIndex = new Map(errors.map(e => [e.index, e.message]));
@@ -334,7 +354,7 @@ export default function SyllabusReviewPage() {
       {(doc.status === 'processing' || doc.status === 'uploaded') && (
         <div className="p-8 rounded-2xl border border-gray-100 bg-gray-50 text-center">
           <Loader2 size={22} className="animate-spin text-gray-400 mx-auto mb-3" />
-          <p className="text-sm font-semibold text-gray-700">Extracting the topic structure…</p>
+          <p className="text-sm font-semibold text-gray-700">{processingMessage()}</p>
           <p className="text-xs text-gray-400 mt-1">This page updates automatically — no need to refresh.</p>
         </div>
       )}
