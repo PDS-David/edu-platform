@@ -20,7 +20,7 @@ import { useState, useEffect } from 'react';
 import api from '../services/apiClient';
 import {
   Send, CheckCircle, PlusCircle, Trash2, Lightbulb,
-  Loader, BookOpen, ArrowLeft, Eye,
+  Loader, BookOpen, ArrowLeft, Eye, AlertCircle,
 } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -42,6 +42,7 @@ export default function ContributeQuestion() {
   const [allMySubjects, setAllMySubjects] = useState([]); // teacher: full list
   const [boardsLoading, setBoardsLoading] = useState(true);
   const [submitting,    setSubmitting]    = useState(false);
+  const [submitError,   setSubmitError]   = useState(null);
   const [submitted,     setSubmitted]     = useState(false);
   const [submittedId,   setSubmittedId]   = useState(null);
 
@@ -143,6 +144,7 @@ export default function ContributeQuestion() {
   const handleSubmit = async () => {
     if (!validate()) return;
     setSubmitting(true);
+    setSubmitError(null);
     const payload = {
       exam_board_id: parseInt(form.exam_board_id, 10),
       subject_id:    form.subject_id ? parseInt(form.subject_id, 10) : null,
@@ -166,10 +168,10 @@ export default function ContributeQuestion() {
         setSubmittedId(res.data?.id || null);
         setSubmitted(true);
       } else {
-        alert(res.error || 'Submission failed');
+        setSubmitError(res.error || 'Submission failed. Please try again.');
       }
     } catch (err) {
-      alert(err?.message || 'Failed to submit question. Please try again.');
+      setSubmitError(err?.message || 'Failed to submit question. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -502,6 +504,12 @@ export default function ContributeQuestion() {
           </div>
 
           {/* Submit */}
+          {submitError && (
+            <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <span className="flex-1">{submitError}</span>
+            </div>
+          )}
           <button
             onClick={handleSubmit} disabled={submitting}
             className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-4 rounded-xl flex items-center justify-center gap-2 transition-colors"
