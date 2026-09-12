@@ -73,6 +73,27 @@ www.aischoolonair.ng {
         }
     }
 
+    # Shared agent service (server/routes/agentServiceRoutes.js) — mounted
+    # at /agent, deliberately OUTSIDE /api (see that file's own header
+    # comment on why: a different trust boundary, X-Api-Key not JWT). Never
+    # had a matcher here at all, so every request to it fell through to the
+    # final catch-all below and hit the React SPA instead of the API --
+    # this endpoint was unreachable from the public internet since it was
+    # built, for both this app's own use and sts-school-app's. Same
+    # generous AI-call timeouts as the REST API block above, since a
+    # generate() call can genuinely take a while.
+    @agent path /agent/*
+    route @agent {
+        reverse_proxy http://api:5000 {
+            transport http {
+                read_timeout  120s
+                write_timeout 120s
+            }
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Real-IP       {remote_host}
+        }
+    }
+
     # Uploads
     @uploads path /uploads/*
     route @uploads {
@@ -120,6 +141,16 @@ staging.aischoolonair.ng {
 
     @api_stg path /api/*
     route @api_stg {
+        reverse_proxy http://api_staging:5000 {
+            transport http {
+                read_timeout 0
+                write_timeout 0
+            }
+        }
+    }
+
+    @agent_stg path /agent/*
+    route @agent_stg {
         reverse_proxy http://api_staging:5000 {
             transport http {
                 read_timeout 0
