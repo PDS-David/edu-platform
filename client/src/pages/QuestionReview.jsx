@@ -177,6 +177,7 @@ export default function QuestionReview() {
   const [action,    setAction]    = useState('');   // 'approve' | 'reject'
   const [feedback,  setFeedback]  = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [reviewError, setReviewError] = useState(null);
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
@@ -214,6 +215,7 @@ export default function QuestionReview() {
   const submitReview = async () => {
     if (!reviewing || !action) return;
     setSubmitting(true);
+    setReviewError(null);
     try {
       const data = await api.put(
         `${apiBase}/questions/${reviewing.id}/review`,
@@ -228,7 +230,7 @@ export default function QuestionReview() {
         setTotal(t => t - 1);
       }
     } catch (err) {
-      alert(err?.response?.data?.error || 'Review failed');
+      setReviewError(err?.response?.data?.error || 'Review failed. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -589,7 +591,7 @@ export default function QuestionReview() {
                 {/* Action buttons */}
                 <div className="px-6 pb-5 flex gap-3">
                   <button
-                    onClick={() => { setReviewing(q); setAction('approve'); setFeedback(''); }}
+                    onClick={() => { setReviewing(q); setAction('approve'); setFeedback(''); setReviewError(null); }}
                     disabled={isBroken}
                     title={isBroken ? 'Cannot approve — this question has no usable answer options.' : undefined}
                     className="flex-1 bg-blue-500 hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-blue-500 text-white font-semibold py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors text-sm"
@@ -597,7 +599,7 @@ export default function QuestionReview() {
                     <CheckCircle className="w-4 h-4" /> Approve
                   </button>
                   <button
-                    onClick={() => { setReviewing(q); setAction('reject'); setFeedback(''); }}
+                    onClick={() => { setReviewing(q); setAction('reject'); setFeedback(''); setReviewError(null); }}
                     className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors text-sm"
                   >
                     <XCircle className="w-4 h-4" /> Reject
@@ -666,9 +668,16 @@ export default function QuestionReview() {
               />
             </div>
 
+            {reviewError && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4 flex items-center gap-2 text-red-700">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <span className="text-sm">{reviewError}</span>
+              </div>
+            )}
+
             <div className="flex gap-3">
               <button
-                onClick={() => { setReviewing(null); setAction(''); setFeedback(''); }}
+                onClick={() => { setReviewing(null); setAction(''); setFeedback(''); setReviewError(null); }}
                 disabled={submitting}
                 className="flex-1 border-2 border-gray-200 text-gray-600 hover:bg-gray-50 font-semibold py-3 rounded-xl transition-colors text-sm"
               >
