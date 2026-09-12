@@ -555,13 +555,22 @@ router.get('/:id/remap-suggestions', protect, authorize('admin', 'teacher'), asy
       { replacements: { id: doc.id }, type: QueryTypes.SELECT }
     );
 
+    // Prompt 4 Part 3: ?unmatched=true switches this same endpoint to the
+    // no_confident_match queue instead of the main review list — same
+    // source-text-joining logic below serves both rather than duplicating
+    // it in a second route, per this feature's own established "one
+    // subject at a time" / avoid-duplication conventions. Default (false)
+    // is byte-for-byte the same query Part 2 already shipped — zero
+    // behavior change for the existing SyllabusRemapPage.jsx caller, which
+    // never passes this param.
+    const wantUnmatched = req.query.unmatched === 'true';
     const suggestionRows = await sequelize.query(
       `SELECT id, source_table, source_id, suggested_topic_id, suggested_subtopic_id,
               no_confident_match, confidence, ai_rationale, status
          FROM syllabus_remap_suggestions
-        WHERE syllabus_document_id = :id AND status = 'pending' AND no_confident_match = false
+        WHERE syllabus_document_id = :id AND status = 'pending' AND no_confident_match = :wantUnmatched
         ORDER BY source_table, confidence DESC NULLS LAST`,
-      { replacements: { id: doc.id }, type: QueryTypes.SELECT }
+      { replacements: { id: doc.id, wantUnmatched }, type: QueryTypes.SELECT }
     );
 
     // Join back to each source table for display text — grouped by table
@@ -718,6 +727,145 @@ router.post('/:id/remap-suggestions/apply', protect, authorize('admin', 'teacher
     await t.rollback();
     logger.error('[POST /api/syllabus/:id/remap-suggestions/apply]', { error: err.message });
     return res.status(500).json({ success: false, error: 'Could not apply remap decisions.' });
+  }
+});
+
+// ─── GET /api/syllabus/:id/old-topics ────────────────────────────────────
+// Prompt 4 Part 3, second half: lists the OLD topics/subtopics for this
+// document's subject (source_syllabus_id IS DISTINCT FROM this document —
+// covers both "never had the column set" and, defensively, "belongs to a
+// different syllabus document for the same subject" should that ever
+// happen) alongside a live count of remaining 'pending' suggestions still
+// referencing each one. A topic/subtopic only becomes deactivatable once
+// its own count reaches zero — enforced server-side in the POST below,
+// not just hinted at here.
+router.get('/:id/old-topics', protect, authorize('admin', 'teacher'), async (req, res) => {
+  try {
+    const docRows = await sequelize.query(
+      `SELECT id, subject_id, status FROM syllabus_documents WHERE id = :id`,
+      { replacements: { id: req.params.id }, type: QueryTypes.SELECT }
+    );
+    const doc = docRows[0];
+    if (!doc) return res.status(404).json({ success: false, error: 'Syllabus document not found.' });
+    if (doc.status !== 'confirmed') {
+      return res.status(409).json({ success: false, error: `This document's syllabus tree is not confirmed yet (status: '${doc.status}').` });
+    }
+    if (req.user.role === 'teacher' && !(await teacherCanWriteSubject(req.user.id, doc.subject_id))) {
+      return res.status(403).json({ success: false, error: 'You are not assigned to this subject.' });
+    }
+
+    const topics = await sequelize.query(
+      `SELECT t.id, t.title, t.is_active,
+              (SELECT COUNT(*) FROM syllabus_remap_suggestions srs
+                WHERE srs.source_old_topic_id = t.id AND srs.status = 'pending')::INTEGER AS pending_count
+         FROM topics t
+        WHERE t.subject_id = :subjectId
+          AND t.source_syllabus_id IS DISTINCT FROM :docId
+        ORDER BY t.title`,
+      { replacements: { subjectId: doc.subject_id, docId: doc.id }, type: QueryTypes.SELECT }
+    );
+    const subtopics = await sequelize.query(
+      `SELECT st.id, st.title, st.topic_id, st.is_active,
+              (SELECT COUNT(*) FROM syllabus_remap_suggestions srs
+                WHERE srs.source_old_subtopic_id = st.id AND srs.status = 'pending')::INTEGER AS pending_count
+         FROM subtopics st
+         JOIN topics t ON t.id = st.topic_id
+        WHERE t.subject_id = :subjectId
+          AND st.source_syllabus_id IS DISTINCT FROM :docId
+        ORDER BY st.title`,
+      { replacements: { subjectId: doc.subject_id, docId: doc.id }, type: QueryTypes.SELECT }
+    );
+
+    return res.json({ success: true, data: { topics, subtopics } });
+  } catch (err) {
+    logger.error('[GET /api/syllabus/:id/old-topics]', { error: err.message });
+    return res.status(500).json({ success: false, error: 'Could not load old topics.' });
+  }
+});
+
+// ─── POST /api/syllabus/:id/old-topics/deactivate ────────────────────────
+// Body: { topicIds?: [...], subtopicIds?: [...] }. Refuses (whole request,
+// nothing partial) if ANY named id still has a pending suggestion
+// referencing it — re-checked here server-side, not trusted from the
+// GET response the client is holding, in case another reviewer resolved
+// something in between. One transaction, scoped to this document's own
+// subject_id only (never touches another subject's topics/subtopics even
+// if a client somehow supplied a foreign id).
+router.post('/:id/old-topics/deactivate', protect, authorize('admin', 'teacher'), async (req, res) => {
+  const topicIds = Array.isArray(req.body?.topicIds) ? req.body.topicIds : [];
+  const subtopicIds = Array.isArray(req.body?.subtopicIds) ? req.body.subtopicIds : [];
+  if (!topicIds.length && !subtopicIds.length) {
+    return res.status(400).json({ success: false, error: 'topicIds and/or subtopicIds is required.' });
+  }
+
+  const t = await sequelize.transaction();
+  try {
+    const docRows = await sequelize.query(
+      `SELECT id, subject_id FROM syllabus_documents WHERE id = :id`,
+      { replacements: { id: req.params.id }, type: QueryTypes.SELECT, transaction: t }
+    );
+    const doc = docRows[0];
+    if (!doc) { await t.rollback(); return res.status(404).json({ success: false, error: 'Syllabus document not found.' }); }
+    if (req.user.role === 'teacher' && !(await teacherCanWriteSubject(req.user.id, doc.subject_id))) {
+      await t.rollback();
+      return res.status(403).json({ success: false, error: 'You are not assigned to this subject.' });
+    }
+
+    if (topicIds.length) {
+      const blocked = await sequelize.query(
+        `SELECT t.id, t.title,
+                (SELECT COUNT(*) FROM syllabus_remap_suggestions srs
+                  WHERE srs.source_old_topic_id = t.id AND srs.status = 'pending')::INTEGER AS pending_count
+           FROM topics t WHERE t.id IN (:ids) AND t.subject_id = :subjectId`,
+        { replacements: { ids: topicIds, subjectId: doc.subject_id }, type: QueryTypes.SELECT, transaction: t }
+      );
+      const stillPending = blocked.filter(b => b.pending_count > 0);
+      if (stillPending.length) {
+        await t.rollback();
+        return res.status(409).json({
+          success: false,
+          error: `${stillPending.length} topic(s) still have unresolved suggestions and cannot be deactivated yet.`,
+          blocked: stillPending,
+        });
+      }
+      await sequelize.query(
+        `UPDATE topics SET is_active = false WHERE id IN (:ids) AND subject_id = :subjectId`,
+        { replacements: { ids: topicIds, subjectId: doc.subject_id }, type: QueryTypes.UPDATE, transaction: t }
+      );
+    }
+
+    if (subtopicIds.length) {
+      const blocked = await sequelize.query(
+        `SELECT st.id, st.title,
+                (SELECT COUNT(*) FROM syllabus_remap_suggestions srs
+                  WHERE srs.source_old_subtopic_id = st.id AND srs.status = 'pending')::INTEGER AS pending_count
+           FROM subtopics st JOIN topics t ON t.id = st.topic_id
+          WHERE st.id IN (:ids) AND t.subject_id = :subjectId`,
+        { replacements: { ids: subtopicIds, subjectId: doc.subject_id }, type: QueryTypes.SELECT, transaction: t }
+      );
+      const stillPending = blocked.filter(b => b.pending_count > 0);
+      if (stillPending.length) {
+        await t.rollback();
+        return res.status(409).json({
+          success: false,
+          error: `${stillPending.length} subtopic(s) still have unresolved suggestions and cannot be deactivated yet.`,
+          blocked: stillPending,
+        });
+      }
+      await sequelize.query(
+        `UPDATE subtopics st SET is_active = false FROM topics t
+          WHERE st.topic_id = t.id AND st.id IN (:ids) AND t.subject_id = :subjectId`,
+        { replacements: { ids: subtopicIds, subjectId: doc.subject_id }, type: QueryTypes.UPDATE, transaction: t }
+      );
+    }
+
+    await t.commit();
+    logger.info('[syllabus] old topics/subtopics deactivated', { subjectId: doc.subject_id, topicIds, subtopicIds, userId: req.user.id });
+    return res.json({ success: true, data: { deactivatedTopics: topicIds.length, deactivatedSubtopics: subtopicIds.length } });
+  } catch (err) {
+    await t.rollback();
+    logger.error('[POST /api/syllabus/:id/old-topics/deactivate]', { error: err.message });
+    return res.status(500).json({ success: false, error: 'Could not deactivate old topics.' });
   }
 });
 

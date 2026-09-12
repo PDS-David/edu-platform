@@ -23,7 +23,7 @@
 // reviewer thinks about differently, not a single flat list.
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import api from '../services/apiClient';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -155,7 +155,10 @@ export default function SyllabusRemapPage() {
       <h1 className="text-xl font-bold text-gray-900 mb-1">Remap existing content</h1>
       <p className="text-sm text-gray-500 mb-6">
         {doc?.subject_name} · {doc?.exam_board_name} — {suggestions.length} item{suggestions.length === 1 ? '' : 's'} awaiting review.
-        {' '}Items the AI couldn't confidently place aren't shown here — they'll have their own review queue.
+        {' '}Items the AI couldn't confidently place aren't shown here —{' '}
+        <Link to={`${basePath}/${id}/unmatched`} className="text-blue-600 hover:text-blue-700 font-medium">
+          review those in the unmatched queue
+        </Link>.
       </p>
 
       {submitResult && (
@@ -222,7 +225,11 @@ export default function SyllabusRemapPage() {
   );
 }
 
-function SuggestionRow({ suggestion, destinationLabel, decision, onDecide, newTree, subtopicsByTopic }) {
+// Exported — reused as-is by SyllabusUnmatchedPage.jsx's queue (Prompt 4
+// Part 3) rather than duplicating this ~75-line component. hideAccept lets
+// that caller hide the one action guaranteed to 400 there (the backend's
+// own apply endpoint blocks 'accept' for no_confident_match rows).
+export function SuggestionRow({ suggestion, destinationLabel, decision, onDecide, newTree, subtopicsByTopic, hideAccept = false }) {
   const [overriding, setOverriding] = useState(false);
   const [overrideTopicId, setOverrideTopicId] = useState(suggestion.suggested_topic_id || '');
   const [overrideSubtopicId, setOverrideSubtopicId] = useState(suggestion.suggested_subtopic_id || '');
@@ -262,8 +269,10 @@ function SuggestionRow({ suggestion, destinationLabel, decision, onDecide, newTr
           <span className="shrink-0 text-xs font-semibold text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">{decisionLabel}</span>
         ) : (
           <div className="flex items-center gap-1 shrink-0">
-            <button onClick={() => onDecide({ action: 'accept' })} title="Accept"
-              className="p-1.5 rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50"><CheckCircle2 size={16} /></button>
+            {!hideAccept && (
+              <button onClick={() => onDecide({ action: 'accept' })} title="Accept"
+                className="p-1.5 rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50"><CheckCircle2 size={16} /></button>
+            )}
             <button onClick={() => setOverriding(v => !v)} title="Override"
               className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50"><PenLine size={16} /></button>
             <button onClick={() => onDecide({ action: 'skip' })} title="Skip"

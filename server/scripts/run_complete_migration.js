@@ -152,6 +152,20 @@ async function run() {
   await exec('subtopics: add created_by', `
     ALTER TABLE subtopics ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id) ON DELETE SET NULL`);
 
+  // Prompt 4 Part 3: old-tree deactivation needs a way to hide a topic/
+  // subtopic once everything referencing it has been remapped — neither
+  // table had any such mechanism before this (confirmed by reading both
+  // models and every prior migration directly). Mirrors subjects/
+  // exam_boards/teacher_subjects/resources' existing is_active convention.
+  await exec('topics: add is_active', `
+    ALTER TABLE topics ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true`);
+  await exec('subtopics: add is_active', `
+    ALTER TABLE subtopics ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true`);
+  await exec('topics: is_active index', `
+    CREATE INDEX IF NOT EXISTS idx_topics_is_active ON topics(is_active) WHERE is_active = false`);
+  await exec('subtopics: is_active index', `
+    CREATE INDEX IF NOT EXISTS idx_subtopics_is_active ON subtopics(is_active) WHERE is_active = false`);
+
   // subjects.exam_board_id must be INTEGER (matching exam_boards.id which is SERIAL int).
   // A previous bad migration added it as UUID — detect and correct that here.
   await exec('subjects: ensure exam_board_id is INTEGER (fix if UUID)', `
