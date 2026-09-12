@@ -6,8 +6,23 @@ import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/apiClient';
 import {
-  CheckCircle, Loader2, BookOpen, Plus, Clock, XCircle, Trash2,
+  CheckCircle, Loader2, BookOpen, Plus, Clock, XCircle, Trash2, AlertTriangle, X,
 } from 'lucide-react';
+
+// GAP-3 fix: handleDelete used to alert() on failure. Small local toast,
+// same pattern used elsewhere in the app (e.g. TeacherDashboard.jsx) —
+// this page had no existing toast/error infra to reuse instead.
+function Toast({ msg, type, onClose }) {
+  return (
+    <div className={`fixed bottom-6 right-4 z-50 flex items-center gap-2.5 px-5 py-3 rounded-xl shadow-lg text-sm font-semibold border ${
+      type === 'success' ? 'bg-white border-emerald-200 text-emerald-700' : 'bg-white border-red-200 text-red-700'
+    }`}>
+      {type === 'success' ? <CheckCircle size={14} className="text-emerald-500" /> : <AlertTriangle size={14} className="text-red-500" />}
+      {msg}
+      <button onClick={onClose}><X size={13} className="opacity-40 hover:opacity-80" /></button>
+    </div>
+  );
+}
 
 const STATUS_META = {
   approved: {
@@ -45,6 +60,8 @@ export default function TeacherPendingQuestions() {
   const [loading,   setLoading]   = useState(true);
   const [tab,       setTab]       = useState('all');
   const [deletingId, setDeletingId] = useState(null);
+  const [toast, setToast] = useState(null);
+  const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
 
   useEffect(() => {
     // T2: fetch ALL questions (no status filter) so teacher can see every outcome
@@ -61,7 +78,7 @@ export default function TeacherPendingQuestions() {
       await api.delete(`/teacher/questions/${id}`);
       setQuestions(prev => prev.filter(q => q.id !== id));
     } catch (err) {
-      alert(err?.message || 'Failed to delete question.');
+      showToast(err?.message || 'Failed to delete question.', 'error');
     } finally {
       setDeletingId(null);
     }
@@ -224,6 +241,7 @@ export default function TeacherPendingQuestions() {
           </div>
         )}
       </div>
+      {toast && <Toast {...toast} onClose={() => setToast(null)} />}
     </div>
   );
 }
