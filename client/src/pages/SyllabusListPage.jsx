@@ -273,14 +273,26 @@ export default function SyllabusListPage() {
       ) : (
         <div className="rounded-2xl border border-gray-100 divide-y divide-gray-50">
           {docs.map(d => (
-            <button key={d.id} onClick={() => navigate(`${basePath}/${d.id}`)}
-              className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left hover:bg-gray-50 transition-colors">
-              <div className="min-w-0">
+            <div key={d.id}
+              className="w-full flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-gray-50 transition-colors">
+              <button onClick={() => navigate(`${basePath}/${d.id}`)} className="flex-1 min-w-0 text-left">
                 <p className="text-sm font-semibold text-gray-800 truncate">{d.title}</p>
                 <p className="text-xs text-gray-400 mt-0.5">{d.subject_name} · {d.exam_board_name}</p>
-              </div>
+              </button>
+              {/* Prompt 4 Part 2 entry point — only meaningful once a
+                  document's tree is actually confirmed (remap-suggestions
+                  requires status='confirmed', see syllabusRoutes.js). Kept
+                  as a second action on the existing row rather than a new
+                  nav entry or page, per this session's own preference for
+                  building on what's already there. */}
+              {d.status === 'confirmed' && (
+                <button onClick={() => navigate(`${basePath}/${d.id}/remap`)}
+                  className="shrink-0 text-xs font-semibold text-blue-600 hover:text-blue-700 px-2 py-1 rounded-lg hover:bg-blue-50">
+                  Remap Content
+                </button>
+              )}
               <StatusBadge status={d.status} />
-            </button>
+            </div>
           ))}
         </div>
       )}
