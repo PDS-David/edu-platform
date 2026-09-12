@@ -487,4 +487,238 @@ router.post('/:id/retry', protect, authorize('admin', 'teacher'), async (req, re
   }
 });
 
+// ═══════════════════════════════════════════════════════════════════════
+// Prompt 4 Part 2 — remap-suggestion review + the actual remap writes
+// ═══════════════════════════════════════════════════════════════════════
+// Reads/writes syllabus_remap_suggestions (Part 1, migration_034) and
+// performs the real subtopic_id/topic_id UPDATEs on the five source
+// tables Part 1 already scoped: resources, questions, videos,
+// revision_notes, concepts. Scoped to ONE subject/syllabus_document at a
+// time per Prompt 4's own "not an app-wide migration" instruction — there
+// is no endpoint here that touches more than one syllabus_document_id per
+// call. teacherCanWriteSubject-gated, matching confirm/retry/upload.
+//
+// Per-source-table config: same shape as generateSyllabusRemapSuggestions.js's
+// own SOURCE_TABLES (kept as an independent copy here rather than a shared
+// import, since that script lives outside the Express app and importing
+// across that boundary would be an unusual dependency direction for a
+// route file — the two lists must be kept in sync by hand if a table is
+// ever added, which is exactly the kind of thing worth a comment, not a
+// shared module for two five-line arrays).
+const REMAP_TABLE_CONFIG = {
+  resources:       { idIsUuid: true,  hasTopicId: true,  hasSubtopicId: true  },
+  questions:       { idIsUuid: false, hasTopicId: false, hasSubtopicId: true  },
+  videos:          { idIsUuid: true,  hasTopicId: true,  hasSubtopicId: false },
+  revision_notes:  { idIsUuid: true,  hasTopicId: false, hasSubtopicId: true  },
+  concepts:        { idIsUuid: true,  hasTopicId: false, hasSubtopicId: true  },
+};
+
+// ─── GET /api/syllabus/:id/remap-suggestions ─────────────────────────────
+// :id is a syllabus_documents.id (matching every other :id in this file),
+// NOT a subject_id — a subject could in principle have more than one
+// confirmed doc over time, and suggestions are stored per
+// syllabus_document_id (migration_034's own unique constraint), so this
+// stays consistent with that rather than introducing a second identifier
+// shape. Returns: the document's own subject/board context, the new tree
+// (real topics/subtopics rows for this doc, for the override picker — same
+// query shape as generateSyllabusRemapSuggestions.js's getNewTree()), and
+// every 'pending' suggestion joined back to its source table for display
+// text (title/question_text/name — the suggestions table itself only
+// stores source_id, not the item's text).
+router.get('/:id/remap-suggestions', protect, authorize('admin', 'teacher'), async (req, res) => {
+  try {
+    const docRows = await sequelize.query(
+      `SELECT sd.id, sd.subject_id, sd.exam_board_id, sd.status,
+              s.name AS subject_name, eb.name AS exam_board_name
+         FROM syllabus_documents sd
+         JOIN subjects s ON s.id = sd.subject_id
+         JOIN exam_boards eb ON eb.id = sd.exam_board_id
+        WHERE sd.id = :id`,
+      { replacements: { id: req.params.id }, type: QueryTypes.SELECT }
+    );
+    const doc = docRows[0];
+    if (!doc) return res.status(404).json({ success: false, error: 'Syllabus document not found.' });
+    if (doc.status !== 'confirmed') {
+      return res.status(409).json({ success: false, error: `This document's syllabus tree is not confirmed yet (status: '${doc.status}').` });
+    }
+    if (req.user.role === 'teacher' && !(await teacherCanWriteSubject(req.user.id, doc.subject_id))) {
+      return res.status(403).json({ success: false, error: 'You are not assigned to this subject.' });
+    }
+
+    const topics = await sequelize.query(
+      `SELECT id, name AS title FROM topics WHERE source_syllabus_id = :id ORDER BY order_index`,
+      { replacements: { id: doc.id }, type: QueryTypes.SELECT }
+    );
+    const subtopics = await sequelize.query(
+      `SELECT id, topic_id, parent_subtopic_id, name AS title
+         FROM subtopics WHERE source_syllabus_id = :id ORDER BY order_index`,
+      { replacements: { id: doc.id }, type: QueryTypes.SELECT }
+    );
+
+    const suggestionRows = await sequelize.query(
+      `SELECT id, source_table, source_id, suggested_topic_id, suggested_subtopic_id,
+              no_confident_match, confidence, ai_rationale, status
+         FROM syllabus_remap_suggestions
+        WHERE syllabus_document_id = :id AND status = 'pending' AND no_confident_match = false
+        ORDER BY source_table, confidence DESC NULLS LAST`,
+      { replacements: { id: doc.id }, type: QueryTypes.SELECT }
+    );
+
+    // Join back to each source table for display text — grouped by table
+    // first so this is one query per table (max 5), not N+1 per row.
+    const byTable = {};
+    for (const s of suggestionRows) (byTable[s.source_table] ||= []).push(s);
+
+    const textById = {};
+    for (const [table, rows] of Object.entries(byTable)) {
+      const cfg = REMAP_TABLE_CONFIG[table];
+      if (!cfg) continue; // defensive — source_table's own CHECK constraint should prevent this
+      const textCol = table === 'questions' ? 'question_text' : table === 'concepts' ? 'name' : 'title';
+      const ids = rows.map(r => cfg.idIsUuid ? r.source_id : parseInt(r.source_id, 10));
+      const found = await sequelize.query(
+        `SELECT id, ${textCol} AS text FROM ${table} WHERE id IN (:ids)`,
+        { replacements: { ids }, type: QueryTypes.SELECT }
+      );
+      for (const f of found) textById[`${table}:${f.id}`] = f.text;
+    }
+
+    const suggestions = suggestionRows.map(s => ({
+      ...s,
+      source_text: textById[`${s.source_table}:${s.source_id}`] ?? '(item no longer exists)',
+    }));
+
+    return res.json({
+      success: true,
+      data: {
+        document: { id: doc.id, subject_id: doc.subject_id, subject_name: doc.subject_name, exam_board_name: doc.exam_board_name },
+        newTree: { topics, subtopics },
+        suggestions,
+      },
+    });
+  } catch (err) {
+    logger.error('[GET /api/syllabus/:id/remap-suggestions]', { error: err.message });
+    return res.status(500).json({ success: false, error: 'Could not load remap suggestions.' });
+  }
+});
+
+// ─── POST /api/syllabus/:id/remap-suggestions/apply ──────────────────────
+// Body: { decisions: [{ suggestionId, action: 'accept'|'override'|'skip',
+//          topicId?, subtopicId? }] }. 'override' requires topicId and/or
+// subtopicId (validated against THIS document's own new tree, not trusted
+// blindly). One transaction per call — either every decision in the batch
+// lands, or none do, so a partial failure can't leave some items remapped
+// and others not from what the reviewer believed was a single submit.
+router.post('/:id/remap-suggestions/apply', protect, authorize('admin', 'teacher'), async (req, res) => {
+  const { decisions } = req.body;
+  if (!Array.isArray(decisions) || decisions.length === 0) {
+    return res.status(400).json({ success: false, error: 'decisions must be a non-empty array.' });
+  }
+
+  const t = await sequelize.transaction();
+  try {
+    const docRows = await sequelize.query(
+      `SELECT id, subject_id FROM syllabus_documents WHERE id = :id`,
+      { replacements: { id: req.params.id }, type: QueryTypes.SELECT, transaction: t }
+    );
+    const doc = docRows[0];
+    if (!doc) { await t.rollback(); return res.status(404).json({ success: false, error: 'Syllabus document not found.' }); }
+    if (req.user.role === 'teacher' && !(await teacherCanWriteSubject(req.user.id, doc.subject_id))) {
+      await t.rollback();
+      return res.status(403).json({ success: false, error: 'You are not assigned to this subject.' });
+    }
+
+    // Validate every override destination against THIS document's own new
+    // tree up front — never trust a client-supplied topicId/subtopicId
+    // blindly, same reasoning as generateSyllabusRemapSuggestions.js's own
+    // "validate the returned node_id actually exists in the tree we sent".
+    const validTopicIds = new Set((await sequelize.query(
+      `SELECT id FROM topics WHERE source_syllabus_id = :id`,
+      { replacements: { id: doc.id }, type: QueryTypes.SELECT, transaction: t }
+    )).map(r => r.id));
+    const validSubtopicIds = new Set((await sequelize.query(
+      `SELECT id FROM subtopics WHERE source_syllabus_id = :id`,
+      { replacements: { id: doc.id }, type: QueryTypes.SELECT, transaction: t }
+    )).map(r => r.id));
+
+    let accepted = 0, overridden = 0, skipped = 0;
+
+    for (const d of decisions) {
+      const rows = await sequelize.query(
+        `SELECT * FROM syllabus_remap_suggestions WHERE id = :id AND syllabus_document_id = :docId AND status = 'pending'`,
+        { replacements: { id: d.suggestionId, docId: doc.id }, type: QueryTypes.SELECT, transaction: t }
+      );
+      const suggestion = rows[0];
+      if (!suggestion) continue; // already reviewed, or belongs to a different document — silently skip, not a hard error, since a stale UI state (two tabs open) shouldn't fail the whole batch
+
+      if (d.action === 'skip') {
+        await sequelize.query(
+          `UPDATE syllabus_remap_suggestions SET status = 'skipped', reviewed_by = :uid, reviewed_at = NOW() WHERE id = :id`,
+          { replacements: { id: suggestion.id, uid: req.user.id }, type: QueryTypes.UPDATE, transaction: t }
+        );
+        skipped++;
+        continue;
+      }
+
+      let topicId = suggestion.suggested_topic_id;
+      let subtopicId = suggestion.suggested_subtopic_id;
+
+      if (d.action === 'override') {
+        topicId = d.topicId ?? null;
+        subtopicId = d.subtopicId ?? null;
+        if (topicId != null && !validTopicIds.has(topicId)) {
+          await t.rollback();
+          return res.status(400).json({ success: false, error: `Invalid override topicId ${topicId} for this document's tree.` });
+        }
+        if (subtopicId != null && !validSubtopicIds.has(subtopicId)) {
+          await t.rollback();
+          return res.status(400).json({ success: false, error: `Invalid override subtopicId ${subtopicId} for this document's tree.` });
+        }
+      } else if (d.action === 'accept') {
+        if (suggestion.no_confident_match) {
+          await t.rollback();
+          return res.status(400).json({ success: false, error: `Suggestion ${suggestion.id} has no confident match — it cannot be accepted as-is (override or leave for the unmatched-item queue instead).` });
+        }
+      } else {
+        await t.rollback();
+        return res.status(400).json({ success: false, error: `Unknown action '${d.action}' for suggestion ${suggestion.id}.` });
+      }
+
+      const cfg = REMAP_TABLE_CONFIG[suggestion.source_table];
+      const idValue = cfg.idIsUuid ? suggestion.source_id : parseInt(suggestion.source_id, 10);
+      const setParts = [];
+      if (cfg.hasTopicId) setParts.push('topic_id = :topicId');
+      if (cfg.hasSubtopicId) setParts.push('subtopic_id = :subtopicId');
+      if (setParts.length > 0) {
+        await sequelize.query(
+          `UPDATE ${suggestion.source_table} SET ${setParts.join(', ')} WHERE id = :itemId`,
+          { replacements: { topicId, subtopicId, itemId: idValue }, type: QueryTypes.UPDATE, transaction: t }
+        );
+      }
+
+      await sequelize.query(
+        `UPDATE syllabus_remap_suggestions
+            SET status = :status, suggested_topic_id = :topicId, suggested_subtopic_id = :subtopicId,
+                reviewed_by = :uid, reviewed_at = NOW()
+          WHERE id = :id`,
+        {
+          replacements: {
+            id: suggestion.id, status: d.action === 'override' ? 'overridden' : 'accepted',
+            topicId, subtopicId, uid: req.user.id,
+          },
+          type: QueryTypes.UPDATE, transaction: t,
+        }
+      );
+      if (d.action === 'override') overridden++; else accepted++;
+    }
+
+    await t.commit();
+    logger.info('[syllabus] remap decisions applied', { syllabusDocumentId: doc.id, accepted, overridden, skipped, userId: req.user.id });
+    return res.json({ success: true, data: { accepted, overridden, skipped } });
+  } catch (err) {
+    await t.rollback();
+    logger.error('[POST /api/syllabus/:id/remap-suggestions/apply]', { error: err.message });
+    return res.status(500).json({ success: false, error: 'Could not apply remap decisions.' });
+  }
+});
+
 module.exports = router;

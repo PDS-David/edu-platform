@@ -82,6 +82,7 @@ import TeacherExaminationsPage from "./pages/TeacherExaminationsPage";
 import TeacherResultsPage from "./pages/TeacherResultsPage";
 import SyllabusListPage from "./pages/SyllabusListPage";
 import SyllabusReviewPage from "./pages/SyllabusReviewPage";
+import SyllabusRemapPage from "./pages/SyllabusRemapPage";
 
 // Admin
 import AdminDashboard from "./pages/AdminDashboard";
@@ -236,6 +237,7 @@ export default function App() {
             <Route path="review" element={<QuestionReview />} />
             <Route path="syllabus" element={<SyllabusListPage />} />
             <Route path="syllabus/:id" element={<SyllabusReviewPage />} />
+            <Route path="syllabus/:id/remap" element={<SyllabusRemapPage />} />
             <Route path="contribute" element={<ContributeQuestion />} />
             <Route path="questions/add" element={<TeacherAddQuestionPage />} />
             <Route path="examinations" element={<TeacherExaminationsPage />} />
@@ -256,6 +258,7 @@ export default function App() {
             <Route path="questions/review" element={<QuestionReview />} />
             <Route path="syllabus" element={<SyllabusListPage />} />
             <Route path="syllabus/:id" element={<SyllabusReviewPage />} />
+            <Route path="syllabus/:id/remap" element={<SyllabusRemapPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="english-masterclass" element={<AdminEnglishMasterclass />} />
             <Route path="language-masterclass/:language" element={<AdminLanguageMasterclass />} />
