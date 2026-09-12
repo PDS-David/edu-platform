@@ -727,13 +727,13 @@ export default function SchoolAdminDashboard() {
   const loadRoster = () => {
     api.get('/schools/me/roster')
       .then(res => setRoster(res.data || []))
-      .catch(() => {});
+      .catch(err => showToast(err?.response?.data?.error || err?.message || 'Could not refresh the roster — your last action may not be reflected yet.', 'error'));
   };
 
   const loadSchool = () => {
     api.get('/schools/me')
       .then(res => setSchool(res.data || null))
-      .catch(() => {});
+      .catch(err => showToast(err?.response?.data?.error || err?.message || 'Could not refresh your school\'s details — your last change may not be reflected yet.', 'error'));
   };
 
   const handleRemove = async () => {
