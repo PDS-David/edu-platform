@@ -300,6 +300,7 @@ function DeleteSchoolModal({ school, onClose, onDeleted }) {
 function SchoolRow({ school, onServicesUpdated, onDetailsUpdated, onDeleted }) {
   const [expanded, setExpanded] = useState(false);
   const [roster,   setRoster]   = useState(null);
+  const [rosterError, setRosterError] = useState('');
   const [loading,  setLoading]  = useState(false);
   const [copied,   setCopied]   = useState(false);
   const [editingServices, setEditingServices] = useState(false);
@@ -318,14 +319,21 @@ function SchoolRow({ school, onServicesUpdated, onDetailsUpdated, onDeleted }) {
   const [logoSaving, setLogoSaving] = useState(false);
   const [logoError, setLogoError] = useState('');
 
+  const loadRoster = async () => {
+    setLoading(true);
+    setRosterError('');
+    try {
+      const res = await api.get(`/schools/${school.id}/roster`);
+      setRoster(res.data || []);
+    } catch (err) {
+      setRosterError(err?.response?.data?.error || err?.message || 'Could not load roster.');
+    }
+    setLoading(false);
+  };
+
   const toggle = async () => {
     if (!expanded && !roster) {
-      setLoading(true);
-      try {
-        const res = await api.get(`/schools/${school.id}/roster`);
-        setRoster(res.data || []);
-      } catch { setRoster([]); }
-      setLoading(false);
+      await loadRoster();
     }
     setExpanded(e => !e);
   };
@@ -538,10 +546,21 @@ function SchoolRow({ school, onServicesUpdated, onDetailsUpdated, onDeleted }) {
             )}
           </div>
           {loading && <Loader2 size={16} className="animate-spin text-gray-400" />}
-          {!loading && roster?.length === 0 && (
+          {!loading && rosterError && (
+            <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+              <span className="flex-1">{rosterError}</span>
+              <button
+                onClick={loadRoster}
+                className="font-semibold underline shrink-0"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+          {!loading && !rosterError && roster?.length === 0 && (
             <p className="text-xs text-gray-400 py-2">No one has joined this school yet.</p>
           )}
-          {!loading && roster?.length > 0 && (
+          {!loading && !rosterError && roster?.length > 0 && (
             <div className="space-y-1.5">
               {roster.map(u => (
                 <div key={u.id} className="flex items-center justify-between text-xs py-1">
