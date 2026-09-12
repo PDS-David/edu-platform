@@ -869,4 +869,73 @@ router.post('/:id/old-topics/deactivate', protect, authorize('admin', 'teacher')
   }
 });
 
+// ─── DELETE /api/syllabus/:id ────────────────────────────────────────────
+// Lets an admin/teacher remove a syllabus document that's stuck, failed, or
+// was uploaded by mistake — self-service, so this doesn't require going
+// through the database directly next time a document gets permanently
+// stuck (as one did: a fire-and-forget beginExtraction() call with no
+// process-restart recovery left a row at status='processing' for 8+ hours
+// after an apparent server restart mid-extraction — the AI-call-timeout
+// fix in 5746acb prevents the underlying hang going forward, but doesn't
+// retroactively clean up a document that was already orphaned before it
+// landed).
+//
+// Deliberately BLOCKS deleting a 'confirmed' document. source_syllabus_id
+// on topics/subtopics is ON DELETE SET NULL (migration_031), not CASCADE
+// or RESTRICT — so deleting a confirmed document would not error, it would
+// silently null out source_syllabus_id on every real topic/subtopic that
+// document created, making an already-live, in-use tree look exactly like
+// an old, pre-syllabus one to every downstream feature (this is precisely
+// the "old tree" definition generateSyllabusRemapSuggestions.js and the
+// old-topics/deactivate endpoint above both use: source_syllabus_id IS
+// NULL). That's real data corruption for a click that looks like ordinary
+// cleanup, so it's refused outright rather than requiring the caller to
+// know to avoid it.
+router.delete('/:id', protect, authorize('admin', 'teacher'), async (req, res) => {
+  try {
+    const [doc] = await sequelize.query(
+      `SELECT id, subject_id, status, file_url FROM syllabus_documents WHERE id = :id`,
+      { replacements: { id: req.params.id }, type: QueryTypes.SELECT }
+    );
+    if (!doc) return res.status(404).json({ success: false, error: 'Syllabus document not found.' });
+
+    if (doc.status === 'confirmed') {
+      return res.status(409).json({
+        success: false,
+        error: 'Cannot delete a confirmed syllabus document — it created real topics and subtopics that are in use. Deactivate the old tree instead once a replacement has been remapped, if you need to retire it.',
+      });
+    }
+
+    if (req.user.role === 'teacher' && !(await teacherCanWriteSubject(req.user.id, doc.subject_id))) {
+      return res.status(403).json({ success: false, error: 'You are not assigned to this subject.' });
+    }
+
+    // syllabus_remap_suggestions has ON DELETE CASCADE on syllabus_document_id
+    // (migration_034) — shouldn't have any rows here anyway, since those are
+    // only ever generated for a subject's CONFIRMED tree, but the cascade
+    // makes this safe regardless.
+    await sequelize.query(`DELETE FROM syllabus_documents WHERE id = :id`, {
+      replacements: { id: doc.id }, type: QueryTypes.DELETE,
+    });
+
+    // Best-effort storage cleanup — same pattern as resourceRoutes.js's
+    // DELETE /:id (r2.deleteByUrl for R2, fs.unlink for local disk), never
+    // lets a storage-cleanup failure block or fail the actual deletion.
+    if (doc.file_url) {
+      if (/^https?:\/\//.test(doc.file_url)) {
+        r2.deleteByUrl(doc.file_url).catch(() => {});
+      } else {
+        const fileName = path.basename(doc.file_url);
+        fs.unlink(path.join(UPLOADS_DIR, fileName), () => {});
+      }
+    }
+
+    logger.info('[syllabus] document deleted', { id: doc.id, status: doc.status, userId: req.user.id });
+    return res.json({ success: true, data: { id: doc.id } });
+  } catch (err) {
+    logger.error('[DELETE /api/syllabus/:id]', { error: err.message });
+    return res.status(500).json({ success: false, error: 'Could not delete this syllabus document.' });
+  }
+});
+
 module.exports = router;

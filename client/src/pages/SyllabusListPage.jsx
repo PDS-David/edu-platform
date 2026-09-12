@@ -27,7 +27,7 @@ import { useAuth } from '../context/AuthContext';
 import { useCatalog } from '../hooks/useCatalog';
 import {
   Loader2, AlertTriangle, FileText, Upload, ChevronLeft,
-  CheckCircle, Clock, XCircle, FileSearch, X,
+  CheckCircle, Clock, XCircle, FileSearch, X, Trash2,
 } from 'lucide-react';
 
 const STATUS_META = {
@@ -83,6 +83,28 @@ export default function SyllabusListPage() {
   }, []);
 
   useEffect(() => { loadDocs(); }, [loadDocs]);
+
+  // Self-service cleanup for a stuck/failed/mistaken upload — previously
+  // required going through the database directly (DELETE /api/syllabus/:id
+  // added alongside this). No local toast system existed in this file;
+  // small inline one, same shape used elsewhere in the app.
+  const [deletingId, setDeletingId] = useState(null);
+  const [toast, setToast] = useState(null);
+  const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3500); };
+
+  const handleDelete = async (doc) => {
+    if (!window.confirm(`Delete "${doc.title}"? This cannot be undone.`)) return;
+    setDeletingId(doc.id);
+    try {
+      await api.delete(`/syllabus/${doc.id}`);
+      setDocs(prev => (prev || []).filter(d => d.id !== doc.id));
+      showToast('Syllabus document deleted.');
+    } catch (err) {
+      showToast(err?.response?.data?.error || err?.message || 'Could not delete this document.', 'error');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const goToBoard = async (b) => {
     setBoard(b);
@@ -292,8 +314,38 @@ export default function SyllabusListPage() {
                 </button>
               )}
               <StatusBadge status={d.status} />
+              {/* Confirmed documents can't be deleted here — see the
+                  DELETE /api/syllabus/:id backend guard's own comment for
+                  why (source_syllabus_id is ON DELETE SET NULL, so deleting
+                  a confirmed doc would silently orphan its real topics/
+                  subtopics rather than error). Every other status
+                  (queued/processing/ready-for-review/failed) is fair game —
+                  this is the self-service replacement for the SSH+psql
+                  cleanup a stuck document previously required. */}
+              {d.status !== 'confirmed' && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleDelete(d); }}
+                  disabled={deletingId === d.id}
+                  title="Delete this syllabus document"
+                  className="shrink-0 p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
+                >
+                  {deletingId === d.id
+                    ? <Loader2 size={14} className="animate-spin" />
+                    : <Trash2 size={14} />
+                  }
+                </button>
+              )}
             </div>
           ))}
+        </div>
+      )}
+      {toast && (
+        <div className={`fixed bottom-6 right-4 z-50 flex items-center gap-2.5 px-5 py-3 rounded-xl shadow-lg text-sm font-semibold border ${
+          toast.type === 'error' ? 'bg-white border-red-200 text-red-700' : 'bg-white border-emerald-200 text-emerald-700'
+        }`}>
+          {toast.type === 'error' ? <AlertTriangle size={14} className="text-red-500" /> : <CheckCircle size={14} className="text-emerald-500" />}
+          {toast.msg}
+          <button onClick={() => setToast(null)}><X size={13} className="opacity-40 hover:opacity-80" /></button>
         </div>
       )}
     </div>
