@@ -39,6 +39,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import api from '../services/apiClient';
 import {
   Loader2, AlertTriangle, CheckCircle, X, Save, Plus, Trash2,
@@ -155,6 +156,18 @@ const nextKey = () => `n${Date.now()}_${_keyCounter++}`;
 export default function SyllabusReviewPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  // BUG FIX: this page's Back button used navigate(-1) (browser history)
+  // while every sibling syllabus page navigates to an explicit path
+  // (SyllabusRemapPage.jsx:139/151, SyllabusUnmatchedPage.jsx:168/180 all
+  // do this). History-based Back is wrong here because this page is
+  // reachable from more than one place -- notably
+  // unmatched -> "Back to main queue" -> remap -> "Back to document" ->
+  // HERE, where navigate(-1) sends you back into the remap/unmatched
+  // flow you were trying to leave, instead of out to the syllabus list.
+  // Same basePath derivation as the siblings, so admin and teacher each
+  // land in their own portal's list.
+  const basePath = user?.role === 'admin' ? '/admin/syllabus' : '/teacher/syllabus';
 
   const [doc,       setDoc]       = useState(null);   // full syllabus_documents row from GET /:id
   const [nodes,     setNodes]     = useState(null);    // locally-editable flat array, null until loaded
@@ -333,7 +346,7 @@ export default function SyllabusReviewPage() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
-      <button onClick={() => navigate(-1)}
+      <button onClick={() => navigate(basePath)}
         className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-700 mb-4">
         <ArrowLeft size={14} /> Back
       </button>
