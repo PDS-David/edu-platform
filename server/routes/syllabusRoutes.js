@@ -754,25 +754,44 @@ router.get('/:id/old-topics', protect, authorize('admin', 'teacher'), async (req
       return res.status(403).json({ success: false, error: 'You are not assigned to this subject.' });
     }
 
+    // BUG FIX: these two queries selected `t.title`/`st.title`, but that
+    // column does not exist on topics/subtopics — every INSERT in this
+    // codebase writes to `name` (adminRoutes.js:1224/1234/1395,
+    // teacherRoutes.js:118, and this very file's own confirm endpoint at
+    // ~line 399/411 all use `name`). Postgres therefore threw
+    // "column t.title does not exist" on every single call, which the
+    // catch below turned into the generic 500 "Could not load old topics."
+    // the user was seeing — the real cause was invisible from the UI.
+    //
+    // Using COALESCE(name, title) rather than a bare `name` deliberately:
+    // topicsRoutes.js's own primary lookup already does exactly this
+    // (`COALESCE(t.name, t.title, 'Untitled Topic') AS name`), which is
+    // strong evidence the column genuinely varies between environments in
+    // this project's history rather than being uniformly `name`
+    // everywhere. Matching that existing defensive pattern keeps this
+    // endpoint working on whichever shape a given environment actually
+    // has, instead of trading one environment's breakage for another's.
+    // Aliased AS title so the frontend (SyllabusUnmatchedPage.jsx, which
+    // reads .title) needs no change.
     const topics = await sequelize.query(
-      `SELECT t.id, t.title, t.is_active,
+      `SELECT t.id, COALESCE(t.name, t.title, 'Untitled Topic') AS title, t.is_active,
               (SELECT COUNT(*) FROM syllabus_remap_suggestions srs
                 WHERE srs.source_old_topic_id = t.id AND srs.status = 'pending')::INTEGER AS pending_count
          FROM topics t
         WHERE t.subject_id = :subjectId
           AND t.source_syllabus_id IS DISTINCT FROM :docId
-        ORDER BY t.title`,
+        ORDER BY title`,
       { replacements: { subjectId: doc.subject_id, docId: doc.id }, type: QueryTypes.SELECT }
     );
     const subtopics = await sequelize.query(
-      `SELECT st.id, st.title, st.topic_id, st.is_active,
+      `SELECT st.id, COALESCE(st.name, st.title, 'Untitled Subtopic') AS title, st.topic_id, st.is_active,
               (SELECT COUNT(*) FROM syllabus_remap_suggestions srs
                 WHERE srs.source_old_subtopic_id = st.id AND srs.status = 'pending')::INTEGER AS pending_count
          FROM subtopics st
          JOIN topics t ON t.id = st.topic_id
         WHERE t.subject_id = :subjectId
           AND st.source_syllabus_id IS DISTINCT FROM :docId
-        ORDER BY st.title`,
+        ORDER BY title`,
       { replacements: { subjectId: doc.subject_id, docId: doc.id }, type: QueryTypes.SELECT }
     );
 
@@ -813,7 +832,7 @@ router.post('/:id/old-topics/deactivate', protect, authorize('admin', 'teacher')
 
     if (topicIds.length) {
       const blocked = await sequelize.query(
-        `SELECT t.id, t.title,
+        `SELECT t.id, COALESCE(t.name, t.title, 'Untitled Topic') AS title,
                 (SELECT COUNT(*) FROM syllabus_remap_suggestions srs
                   WHERE srs.source_old_topic_id = t.id AND srs.status = 'pending')::INTEGER AS pending_count
            FROM topics t WHERE t.id IN (:ids) AND t.subject_id = :subjectId`,
@@ -836,7 +855,7 @@ router.post('/:id/old-topics/deactivate', protect, authorize('admin', 'teacher')
 
     if (subtopicIds.length) {
       const blocked = await sequelize.query(
-        `SELECT st.id, st.title,
+        `SELECT st.id, COALESCE(st.name, st.title, 'Untitled Subtopic') AS title,
                 (SELECT COUNT(*) FROM syllabus_remap_suggestions srs
                   WHERE srs.source_old_subtopic_id = st.id AND srs.status = 'pending')::INTEGER AS pending_count
            FROM subtopics st JOIN topics t ON t.id = st.topic_id
