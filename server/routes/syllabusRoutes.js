@@ -754,25 +754,35 @@ router.get('/:id/old-topics', protect, authorize('admin', 'teacher'), async (req
       return res.status(403).json({ success: false, error: 'You are not assigned to this subject.' });
     }
 
-    // BUG FIX: these two queries selected `t.title`/`st.title`, but that
-    // column does not exist on topics/subtopics — every INSERT in this
-    // codebase writes to `name` (adminRoutes.js:1224/1234/1395,
-    // teacherRoutes.js:118, and this very file's own confirm endpoint at
-    // ~line 399/411 all use `name`). Postgres therefore threw
-    // "column t.title does not exist" on every single call, which the
-    // catch below turned into the generic 500 "Could not load old topics."
-    // the user was seeing — the real cause was invisible from the UI.
+    // BUG FIX (round 2 — PR #90's fix was incorrect and this error persisted
+    // in production with the "fixed" code demonstrably deployed):
     //
-    // Using COALESCE(name, title) rather than a bare `name` deliberately:
-    // topicsRoutes.js's own primary lookup already does exactly this
-    // (`COALESCE(t.name, t.title, 'Untitled Topic') AS name`), which is
-    // strong evidence the column genuinely varies between environments in
-    // this project's history rather than being uniformly `name`
-    // everywhere. Matching that existing defensive pattern keeps this
-    // endpoint working on whichever shape a given environment actually
-    // has, instead of trading one environment's breakage for another's.
-    // Aliased AS title so the frontend (SyllabusUnmatchedPage.jsx, which
-    // reads .title) needs no change.
+    // These queries originally selected `t.title`/`st.title`. PR #90 tried
+    // to make that safe by wrapping both in COALESCE(name, title, ...),
+    // reasoning that the column "varies between environments." That reasoning
+    // was wrong, and COALESCE cannot do what it was being asked to do here:
+    // Postgres resolves every column reference at PLANNING time, before any
+    // row is read. If `subtopics.title` does not exist, the query is rejected
+    // outright with "column st.title does not exist" — it never reaches the
+    // point of evaluating which COALESCE argument is non-null. COALESCE
+    // rescues a NULL value; it cannot rescue a missing column.
+    //
+    // Verified against the models (the source of truth here, cross-checked
+    // against every SQL schema file — there is no `subtopics.title` anywhere
+    // in database/*.sql or run_complete_migration.js):
+    //   server/models/Topic.js    -> has BOTH `name` and `title`
+    //   server/models/Subtopic.js -> has `name` ONLY, no `title`
+    //
+    // So `t.title` was always valid and is kept (topicsRoutes.js's existing
+    // COALESCE(t.name, t.title, ...) pattern is genuinely correct for topics
+    // — that precedent was real, it just doesn't transfer to subtopics).
+    // `st.title` was never valid and is removed entirely. This is why the
+    // error message only ever named st.title: planning aborts at the first
+    // unresolvable column, so the (valid) t.title reference above was never
+    // the problem.
+    //
+    // Both stay aliased AS title so the frontend (SyllabusUnmatchedPage.jsx,
+    // which reads .title) needs no change.
     const topics = await sequelize.query(
       `SELECT t.id, COALESCE(t.name, t.title, 'Untitled Topic') AS title, t.is_active,
               (SELECT COUNT(*) FROM syllabus_remap_suggestions srs
@@ -784,7 +794,7 @@ router.get('/:id/old-topics', protect, authorize('admin', 'teacher'), async (req
       { replacements: { subjectId: doc.subject_id, docId: doc.id }, type: QueryTypes.SELECT }
     );
     const subtopics = await sequelize.query(
-      `SELECT st.id, COALESCE(st.name, st.title, 'Untitled Subtopic') AS title, st.topic_id, st.is_active,
+      `SELECT st.id, COALESCE(st.name, 'Untitled Subtopic') AS title, st.topic_id, st.is_active,
               (SELECT COUNT(*) FROM syllabus_remap_suggestions srs
                 WHERE srs.source_old_subtopic_id = st.id AND srs.status = 'pending')::INTEGER AS pending_count
          FROM subtopics st
@@ -855,7 +865,7 @@ router.post('/:id/old-topics/deactivate', protect, authorize('admin', 'teacher')
 
     if (subtopicIds.length) {
       const blocked = await sequelize.query(
-        `SELECT st.id, COALESCE(st.name, st.title, 'Untitled Subtopic') AS title,
+        `SELECT st.id, COALESCE(st.name, 'Untitled Subtopic') AS title,
                 (SELECT COUNT(*) FROM syllabus_remap_suggestions srs
                   WHERE srs.source_old_subtopic_id = st.id AND srs.status = 'pending')::INTEGER AS pending_count
            FROM subtopics st JOIN topics t ON t.id = st.topic_id
