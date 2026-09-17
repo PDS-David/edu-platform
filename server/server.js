@@ -261,6 +261,8 @@ const resourceRoutes = safeRequire('./routes/resourceRoutes');
 const ipWhitelist = safeRequire('./middleware/ipWhitelist');
 const adminRoutes = safeRequire('./routes/adminRoutes');
 const auditRoutes = safeRequire('./routes/auditRoutes');
+// Platform-owner oversight (ownerOnly-gated; see middleware/ownerOnly.js).
+const platformRoutes = safeRequire('./routes/platformRoutes');
 const studentRoutes = safeRequire('./routes/studentRoutes');
 const teacherRoutes = safeRequire('./routes/teacherRoutes');
 const catalogRoutes = safeRequire('./routes/catalogRoutes');
@@ -335,6 +337,7 @@ if (studentRoutes) app.use('/api/students', protect, studentRoutes);
 if (teacherRoutes) app.use('/api/teacher', protect, teacherRoutes);
 if (adminRoutes) app.use('/api/admin', protect, ...(ipWhitelist ? [ipWhitelist] : []), adminRoutes);
 if (auditRoutes) app.use('/api/audit', protect, auditRoutes);
+if (platformRoutes) app.use('/api/platform', protect, platformRoutes);
 if (paymentRoutes) app.use('/api/payments', protect, paymentRoutes);
 if (weakTopicRoutes) app.use('/api/weak-topics', protect, weakTopicRoutes);
 if (recommendationRoutes) app.use('/api/recommendations', protect, recommendationRoutes);
