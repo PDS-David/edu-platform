@@ -87,6 +87,10 @@ import SyllabusUnmatchedPage from "./pages/SyllabusUnmatchedPage";
 
 // Admin
 import AdminDashboard from "./pages/AdminDashboard";
+// Not exported from any nav — see PlatformOversightPage.jsx's own header
+// comment for why "hidden" means obscurity only, not the real access
+// control (that's entirely server-side, in ownerOnly.js).
+import PlatformOversightPage from "./pages/PlatformOversightPage";
 import AdminSchools from "./pages/AdminSchools";
 import SchoolAdminDashboard from "./pages/SchoolAdminDashboard";
 import SchoolAdminStudentReport from "./pages/SchoolAdminStudentReport";
@@ -265,6 +269,7 @@ export default function App() {
             <Route path="settings" element={<SettingsPage />} />
             <Route path="english-masterclass" element={<AdminEnglishMasterclass />} />
             <Route path="language-masterclass/:language" element={<AdminLanguageMasterclass />} />
+            <Route path="platform-oversight" element={<PlatformOversightPage />} />
           </Route>
         </Route>
 
