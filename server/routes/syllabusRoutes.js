@@ -256,6 +256,56 @@ router.get('/', protect, authorize('admin', 'teacher'), async (req, res) => {
 });
 
 /* ═══════════════════════════════════════════════════════════════════════
+   GET /api/syllabus/orphaned-subjects — orphaned-resources full
+   generalization. Lists subjects that have orphaned resources (topic_id
+   AND subtopic_id both NULL) and a real active topic tree, but NO
+   confirmed syllabus document — the ~31 subjects (confirmed via real
+   production query this session) that never went through the syllabus
+   feature at all and therefore have no row in the list above to attach a
+   "Remap Content" link to. Registered BEFORE GET /:id so Express doesn't
+   try to match "orphaned-subjects" as a document id.
+
+   Deliberately unscoped by teacher-subject assignment for the same reason
+   GET / above is — this is a list view, not a write action; scoping is
+   enforced where it actually matters, inside resolveRemapContext() when
+   someone actually opens one of these subjects to review/apply.
+
+   Excludes subjects with a CONFIRMED syllabus document (those already
+   have a "Remap Content" link on their document row in the list above) —
+   same exclusion generateSyllabusRemapSuggestions.js's own
+   findSubjectsWithOrphanedResourcesAndTopics() applies, kept consistent
+   rather than redefined, so this list always matches what the generation
+   script would actually process for this population.
+   ═══════════════════════════════════════════════════════════════════════ */
+router.get('/orphaned-subjects', protect, authorize('admin', 'teacher'), async (req, res) => {
+  try {
+    const confirmedSubjectIds = (await sequelize.query(
+      `SELECT DISTINCT subject_id FROM syllabus_documents WHERE status = 'confirmed'`,
+      { type: QueryTypes.SELECT }
+    )).map(r => r.subject_id);
+    const excluded = confirmedSubjectIds.length ? confirmedSubjectIds : [-1];
+
+    const rows = await sequelize.query(
+      `SELECT s.id AS subject_id, s.name AS subject_name, eb.name AS exam_board_name,
+              COUNT(r.id)::int AS orphaned_resource_count
+         FROM subjects s
+         JOIN exam_boards eb ON eb.id = s.exam_board_id
+         JOIN resources r ON r.subject_id = s.id AND r.topic_id IS NULL AND r.subtopic_id IS NULL AND r.is_active = true
+        WHERE s.is_active = true
+          AND s.id NOT IN (:excluded)
+          AND EXISTS (SELECT 1 FROM topics t WHERE t.subject_id = s.id AND t.is_active = true)
+        GROUP BY s.id, s.name, eb.name
+        ORDER BY orphaned_resource_count DESC`,
+      { replacements: { excluded }, type: QueryTypes.SELECT }
+    );
+    return res.json({ success: true, data: rows });
+  } catch (err) {
+    logger.error('[GET /api/syllabus/orphaned-subjects]', { error: err.message });
+    return res.status(500).json({ success: false, error: 'Could not load orphaned-content subjects.' });
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
    GET /api/syllabus/:id — single document, including extracted_structure.
    This is what the review screen loads, and what it polls while
    status === 'processing'.
@@ -513,6 +563,116 @@ const REMAP_TABLE_CONFIG = {
   concepts:        { idIsUuid: true,  hasTopicId: false, hasSubtopicId: true  },
 };
 
+// ── Orphaned-resources full generalization ────────────────────────────────
+// Not every subject with pending suggestions has a confirmed syllabus
+// document — 31 of 33 subjects with orphaned resources (confirmed via real
+// production query) have never been through the syllabus feature at all,
+// so there is no syllabus_documents.id to hit these routes with. Rather
+// than a second, parallel route path (GET /subjects/:subjectId/... etc.,
+// duplicating every query below), both routes accept EITHER a
+// syllabus_documents.id (UUID) or a bare subjects.id (INTEGER) on the same
+// :id param — safe to disambiguate by format alone, confirmed directly
+// from the schema: syllabus_documents.id is UUID PRIMARY KEY
+// DEFAULT gen_random_uuid() (migration_031), subjects.id is a plain
+// INTEGER (confirmed via syllabus_documents.subject_id's own FK type
+// declaration, migration_031 line 62) — the two id spaces can never
+// collide on format, so a regex check is a reliable, not a fragile, way
+// to tell them apart.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Resolves :id to a consistent { syllabusDocumentId, subjectId,
+// subjectName, examBoardName, treeSourceIsDocument } shape for both
+// routes below, regardless of which kind of id was passed. Returns null
+// (with the response already sent) on any not-found/not-confirmed/
+// forbidden case, so callers can just `if (!ctx) return;`.
+async function resolveRemapContext(req, res, transaction) {
+  const raw = req.params.id;
+  const opts = transaction ? { type: QueryTypes.SELECT, transaction } : { type: QueryTypes.SELECT };
+
+  if (UUID_RE.test(raw)) {
+    const docRows = await sequelize.query(
+      `SELECT sd.id, sd.subject_id, sd.exam_board_id, sd.status,
+              s.name AS subject_name, eb.name AS exam_board_name
+         FROM syllabus_documents sd
+         JOIN subjects s ON s.id = sd.subject_id
+         JOIN exam_boards eb ON eb.id = sd.exam_board_id
+        WHERE sd.id = :id`,
+      { replacements: { id: raw }, ...opts }
+    );
+    const doc = docRows[0];
+    if (!doc) { res.status(404).json({ success: false, error: 'Syllabus document not found.' }); return null; }
+    if (doc.status !== 'confirmed') {
+      res.status(409).json({ success: false, error: `This document's syllabus tree is not confirmed yet (status: '${doc.status}').` });
+      return null;
+    }
+    if (req.user.role === 'teacher' && !(await teacherCanWriteSubject(req.user.id, doc.subject_id))) {
+      res.status(403).json({ success: false, error: 'You are not assigned to this subject.' });
+      return null;
+    }
+    return {
+      syllabusDocumentId: doc.id, subjectId: doc.subject_id,
+      subjectName: doc.subject_name, examBoardName: doc.exam_board_name,
+      treeSourceIsDocument: true,
+    };
+  }
+
+  // Not a UUID — treat as a bare subjects.id. No syllabus document to
+  // resolve or check confirmation status on; the tree comes straight from
+  // the subject's own real, active topics/subtopics instead (see
+  // getTreeForSubject()'s equivalent below).
+  const subjectId = parseInt(raw, 10);
+  if (!Number.isInteger(subjectId)) {
+    res.status(400).json({ success: false, error: `'${raw}' is neither a syllabus document id nor a valid subject id.` });
+    return null;
+  }
+  const subjRows = await sequelize.query(
+    `SELECT s.id, s.name AS subject_name, eb.name AS exam_board_name
+       FROM subjects s JOIN exam_boards eb ON eb.id = s.exam_board_id
+      WHERE s.id = :id AND s.is_active = true`,
+    { replacements: { id: subjectId }, ...opts }
+  );
+  const subj = subjRows[0];
+  if (!subj) { res.status(404).json({ success: false, error: 'Subject not found or inactive.' }); return null; }
+  if (req.user.role === 'teacher' && !(await teacherCanWriteSubject(req.user.id, subj.id))) {
+    res.status(403).json({ success: false, error: 'You are not assigned to this subject.' });
+    return null;
+  }
+  return {
+    syllabusDocumentId: null, subjectId: subj.id,
+    subjectName: subj.subject_name, examBoardName: subj.exam_board_name,
+    treeSourceIsDocument: false,
+  };
+}
+
+async function fetchTreeForContext(ctx, transaction) {
+  const opts = transaction ? { type: QueryTypes.SELECT, transaction } : { type: QueryTypes.SELECT };
+  if (ctx.treeSourceIsDocument) {
+    const topics = await sequelize.query(
+      `SELECT id, name AS title FROM topics WHERE source_syllabus_id = :id ORDER BY order_index`,
+      { replacements: { id: ctx.syllabusDocumentId }, ...opts }
+    );
+    const subtopics = await sequelize.query(
+      `SELECT id, topic_id, parent_subtopic_id, name AS title
+         FROM subtopics WHERE source_syllabus_id = :id ORDER BY order_index`,
+      { replacements: { id: ctx.syllabusDocumentId }, ...opts }
+    );
+    return { topics, subtopics };
+  }
+  // No syllabus document — the subject's own real, currently-active tree,
+  // same query shape as generateSyllabusRemapSuggestions.js's
+  // getTreeForSubject(), kept consistent rather than redefined.
+  const topics = await sequelize.query(
+    `SELECT id, name AS title FROM topics WHERE subject_id = :sid AND is_active = true ORDER BY order_index`,
+    { replacements: { sid: ctx.subjectId }, ...opts }
+  );
+  const subtopics = await sequelize.query(
+    `SELECT id, topic_id, parent_subtopic_id, name AS title
+       FROM subtopics WHERE subject_id = :sid AND is_active = true ORDER BY order_index`,
+    { replacements: { sid: ctx.subjectId }, ...opts }
+  );
+  return { topics, subtopics };
+}
+
 // ─── GET /api/syllabus/:id/remap-suggestions ─────────────────────────────
 // :id is a syllabus_documents.id (matching every other :id in this file),
 // NOT a subject_id — a subject could in principle have more than one
@@ -527,33 +687,10 @@ const REMAP_TABLE_CONFIG = {
 // stores source_id, not the item's text).
 router.get('/:id/remap-suggestions', protect, authorize('admin', 'teacher'), async (req, res) => {
   try {
-    const docRows = await sequelize.query(
-      `SELECT sd.id, sd.subject_id, sd.exam_board_id, sd.status,
-              s.name AS subject_name, eb.name AS exam_board_name
-         FROM syllabus_documents sd
-         JOIN subjects s ON s.id = sd.subject_id
-         JOIN exam_boards eb ON eb.id = sd.exam_board_id
-        WHERE sd.id = :id`,
-      { replacements: { id: req.params.id }, type: QueryTypes.SELECT }
-    );
-    const doc = docRows[0];
-    if (!doc) return res.status(404).json({ success: false, error: 'Syllabus document not found.' });
-    if (doc.status !== 'confirmed') {
-      return res.status(409).json({ success: false, error: `This document's syllabus tree is not confirmed yet (status: '${doc.status}').` });
-    }
-    if (req.user.role === 'teacher' && !(await teacherCanWriteSubject(req.user.id, doc.subject_id))) {
-      return res.status(403).json({ success: false, error: 'You are not assigned to this subject.' });
-    }
+    const ctx = await resolveRemapContext(req, res);
+    if (!ctx) return; // response already sent
 
-    const topics = await sequelize.query(
-      `SELECT id, name AS title FROM topics WHERE source_syllabus_id = :id ORDER BY order_index`,
-      { replacements: { id: doc.id }, type: QueryTypes.SELECT }
-    );
-    const subtopics = await sequelize.query(
-      `SELECT id, topic_id, parent_subtopic_id, name AS title
-         FROM subtopics WHERE source_syllabus_id = :id ORDER BY order_index`,
-      { replacements: { id: doc.id }, type: QueryTypes.SELECT }
-    );
+    const { topics, subtopics } = await fetchTreeForContext(ctx);
 
     // Prompt 4 Part 3: ?unmatched=true switches this same endpoint to the
     // no_confident_match queue instead of the main review list — same
@@ -564,13 +701,29 @@ router.get('/:id/remap-suggestions', protect, authorize('admin', 'teacher'), asy
     // behavior change for the existing SyllabusRemapPage.jsx caller, which
     // never passes this param.
     const wantUnmatched = req.query.unmatched === 'true';
+    // syllabus_document_id may itself be NULL (orphaned-resources
+    // extension, migration_037) — match on subject_id + the IS NULL
+    // condition directly, not on a bind value, since ":x = NULL" is never
+    // true in SQL regardless of what NULL-ish value you bind to :x.
     const suggestionRows = await sequelize.query(
       `SELECT id, source_table, source_id, suggested_topic_id, suggested_subtopic_id,
-              no_confident_match, confidence, ai_rationale, status
+              no_confident_match, confidence, ai_rationale, status, origin
          FROM syllabus_remap_suggestions
-        WHERE syllabus_document_id = :id AND status = 'pending' AND no_confident_match = :wantUnmatched
+        WHERE subject_id = :subjectId
+          AND (
+            (:hasDoc = true  AND syllabus_document_id = :docId)
+            OR
+            (:hasDoc = false AND syllabus_document_id IS NULL)
+          )
+          AND status = 'pending' AND no_confident_match = :wantUnmatched
         ORDER BY source_table, confidence DESC NULLS LAST`,
-      { replacements: { id: doc.id, wantUnmatched }, type: QueryTypes.SELECT }
+      {
+        replacements: {
+          subjectId: ctx.subjectId, hasDoc: ctx.treeSourceIsDocument,
+          docId: ctx.syllabusDocumentId, wantUnmatched,
+        },
+        type: QueryTypes.SELECT,
+      }
     );
 
     // Join back to each source table for display text — grouped by table
@@ -599,7 +752,11 @@ router.get('/:id/remap-suggestions', protect, authorize('admin', 'teacher'), asy
     return res.json({
       success: true,
       data: {
-        document: { id: doc.id, subject_id: doc.subject_id, subject_name: doc.subject_name, exam_board_name: doc.exam_board_name },
+        document: {
+          id: ctx.syllabusDocumentId, subject_id: ctx.subjectId,
+          subject_name: ctx.subjectName, exam_board_name: ctx.examBoardName,
+          has_syllabus_document: ctx.treeSourceIsDocument,
+        },
         newTree: { topics, subtopics },
         suggestions,
       },
@@ -625,39 +782,44 @@ router.post('/:id/remap-suggestions/apply', protect, authorize('admin', 'teacher
 
   const t = await sequelize.transaction();
   try {
-    const docRows = await sequelize.query(
-      `SELECT id, subject_id FROM syllabus_documents WHERE id = :id`,
-      { replacements: { id: req.params.id }, type: QueryTypes.SELECT, transaction: t }
-    );
-    const doc = docRows[0];
-    if (!doc) { await t.rollback(); return res.status(404).json({ success: false, error: 'Syllabus document not found.' }); }
-    if (req.user.role === 'teacher' && !(await teacherCanWriteSubject(req.user.id, doc.subject_id))) {
-      await t.rollback();
-      return res.status(403).json({ success: false, error: 'You are not assigned to this subject.' });
-    }
+    const ctx = await resolveRemapContext(req, res, t);
+    if (!ctx) { await t.rollback(); return; } // response already sent
 
-    // Validate every override destination against THIS document's own new
+    // Validate every override destination against THIS subject's own real
     // tree up front — never trust a client-supplied topicId/subtopicId
     // blindly, same reasoning as generateSyllabusRemapSuggestions.js's own
     // "validate the returned node_id actually exists in the tree we sent".
-    const validTopicIds = new Set((await sequelize.query(
-      `SELECT id FROM topics WHERE source_syllabus_id = :id`,
-      { replacements: { id: doc.id }, type: QueryTypes.SELECT, transaction: t }
-    )).map(r => r.id));
-    const validSubtopicIds = new Set((await sequelize.query(
-      `SELECT id FROM subtopics WHERE source_syllabus_id = :id`,
-      { replacements: { id: doc.id }, type: QueryTypes.SELECT, transaction: t }
-    )).map(r => r.id));
+    // Works for both populations via fetchTreeForContext()'s own branch on
+    // ctx.treeSourceIsDocument.
+    const { topics: validTopics, subtopics: validSubtopics } = await fetchTreeForContext(ctx, t);
+    const validTopicIds = new Set(validTopics.map(x => x.id));
+    const validSubtopicIds = new Set(validSubtopics.map(x => x.id));
 
     let accepted = 0, overridden = 0, skipped = 0;
 
     for (const d of decisions) {
+      // Matches on subject_id + the correct syllabus_document_id
+      // condition for this context, same reasoning as the GET endpoint
+      // above — ":x = NULL" is never true in SQL, so the doc/no-doc split
+      // has to be two real conditions, not one bind value.
       const rows = await sequelize.query(
-        `SELECT * FROM syllabus_remap_suggestions WHERE id = :id AND syllabus_document_id = :docId AND status = 'pending'`,
-        { replacements: { id: d.suggestionId, docId: doc.id }, type: QueryTypes.SELECT, transaction: t }
+        `SELECT * FROM syllabus_remap_suggestions
+          WHERE id = :id AND subject_id = :subjectId AND status = 'pending'
+            AND (
+              (:hasDoc = true  AND syllabus_document_id = :docId)
+              OR
+              (:hasDoc = false AND syllabus_document_id IS NULL)
+            )`,
+        {
+          replacements: {
+            id: d.suggestionId, subjectId: ctx.subjectId,
+            hasDoc: ctx.treeSourceIsDocument, docId: ctx.syllabusDocumentId,
+          },
+          type: QueryTypes.SELECT, transaction: t,
+        }
       );
       const suggestion = rows[0];
-      if (!suggestion) continue; // already reviewed, or belongs to a different document — silently skip, not a hard error, since a stale UI state (two tabs open) shouldn't fail the whole batch
+      if (!suggestion) continue; // already reviewed, or belongs to a different subject/document — silently skip, not a hard error, since a stale UI state (two tabs open) shouldn't fail the whole batch
 
       if (d.action === 'skip') {
         await sequelize.query(
@@ -676,11 +838,11 @@ router.post('/:id/remap-suggestions/apply', protect, authorize('admin', 'teacher
         subtopicId = d.subtopicId ?? null;
         if (topicId != null && !validTopicIds.has(topicId)) {
           await t.rollback();
-          return res.status(400).json({ success: false, error: `Invalid override topicId ${topicId} for this document's tree.` });
+          return res.status(400).json({ success: false, error: `Invalid override topicId ${topicId} for this subject's tree.` });
         }
         if (subtopicId != null && !validSubtopicIds.has(subtopicId)) {
           await t.rollback();
-          return res.status(400).json({ success: false, error: `Invalid override subtopicId ${subtopicId} for this document's tree.` });
+          return res.status(400).json({ success: false, error: `Invalid override subtopicId ${subtopicId} for this subject's tree.` });
         }
       } else if (d.action === 'accept') {
         if (suggestion.no_confident_match) {
@@ -721,7 +883,7 @@ router.post('/:id/remap-suggestions/apply', protect, authorize('admin', 'teacher
     }
 
     await t.commit();
-    logger.info('[syllabus] remap decisions applied', { syllabusDocumentId: doc.id, accepted, overridden, skipped, userId: req.user.id });
+    logger.info('[syllabus] remap decisions applied', { subjectId: ctx.subjectId, syllabusDocumentId: ctx.syllabusDocumentId, accepted, overridden, skipped, userId: req.user.id });
     return res.json({ success: true, data: { accepted, overridden, skipped } });
   } catch (err) {
     await t.rollback();

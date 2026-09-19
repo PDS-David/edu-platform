@@ -1260,6 +1260,21 @@ async function run() {
         ADD CONSTRAINT syllabus_remap_suggestions_origin_check
         CHECK (origin IN ('old_tree', 'orphaned'));
     EXCEPTION WHEN duplicate_object THEN NULL; END $$`],
+
+    // Orphaned-resources full generalization: see
+    // database/migration_037_syllabus_remap_suggestions_nullable_doc.sql
+    // for the full rationale, including the duplicate-suggestion risk this
+    // must close alongside the nullable change (a partial unique index on
+    // (subject_id, source_table, source_id) for the syllabus_document_id
+    // IS NULL population — Postgres does not treat NULLs as equal for the
+    // original UNIQUE constraint, so that constraint alone cannot prevent
+    // duplicates once syllabus_document_id can be NULL).
+    ['syllabus_remap_suggestions: syllabus_document_id nullable + orphaned unique index', `
+      ALTER TABLE syllabus_remap_suggestions
+        ALTER COLUMN syllabus_document_id DROP NOT NULL;
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_srs_orphaned_unique
+        ON syllabus_remap_suggestions (subject_id, source_table, source_id)
+        WHERE syllabus_document_id IS NULL`],
   ];
 
   for (const [label, sql] of tables) {
