@@ -5,11 +5,25 @@
 // DRY RUN ONLY.
 //
 // WHAT THIS DOES: for every subject that has a confirmed syllabus-derived
-// topic tree (syllabus_documents.status = 'confirmed'), finds every existing
-// content item still pointing at that subject's OLD (pre-syllabus or
-// superseded) topics/subtopics, asks the AI hub for the single best-matching
-// node in the NEW tree (or "no confident match"), and writes the suggestion
-// to syllabus_remap_suggestions.
+// topic tree (syllabus_documents.status = 'confirmed'), finds TWO
+// populations of existing content that need a home in the new tree:
+//   1. Content pointing at that subject's OLD (pre-syllabus or superseded)
+//      topics/subtopics -- the original population this script covered.
+//   2. Resources that were never tagged at all (topic_id IS NULL AND
+//      subtopic_id IS NULL) -- added after a real production audit found
+//      55 such resources; ~34 sit in subjects that already have a
+//      confirmed tree to assign into (see getOrphanedResources() below for
+//      why this is resources-only, not all 5 source tables). The other ~21
+//      either have no subject_id at all or belong to an inactive subject
+//      -- confirm via the two SQL checks referenced in the commit for this
+//      change before assuming this script's coverage is complete; those
+//      21 need their own, separate handling if real, not a silent gap.
+// For both populations: asks the AI hub for the single best-matching node
+// in the NEW tree (or "no confident match"), and writes the suggestion to
+// syllabus_remap_suggestions, tagged with origin = 'old_tree' or
+// 'orphaned' respectively so the review UI can label them accurately --
+// "outdated" and "never categorized" mean very different things to an
+// admin reviewing these.
 //
 // WHAT THIS NEVER DOES: write to resources.topic_id/subtopic_id,
 // questions.subtopic_id, videos.topic_id, revision_notes.subtopic_id, or

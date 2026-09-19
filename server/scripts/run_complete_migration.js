@@ -1247,6 +1247,19 @@ async function run() {
         ADD CONSTRAINT syllabus_remap_suggestions_unique_source
         UNIQUE (syllabus_document_id, source_table, source_id);
     EXCEPTION WHEN duplicate_object THEN NULL; END $$`],
+
+    // Orphaned-resource extension: see
+    // database/migration_036_syllabus_remap_suggestions_origin.sql for the
+    // full rationale (mirrors that file exactly, same convention as the
+    // syllabus_remap_suggestions block above).
+    ['syllabus_remap_suggestions: add origin column', `
+      ALTER TABLE syllabus_remap_suggestions
+        ADD COLUMN IF NOT EXISTS origin VARCHAR(20) NOT NULL DEFAULT 'old_tree';
+    DO $$ BEGIN
+      ALTER TABLE syllabus_remap_suggestions
+        ADD CONSTRAINT syllabus_remap_suggestions_origin_check
+        CHECK (origin IN ('old_tree', 'orphaned'));
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$`],
   ];
 
   for (const [label, sql] of tables) {
