@@ -735,7 +735,15 @@ router.get('/:id/remap-suggestions', protect, authorize('admin', 'teacher'), asy
     for (const [table, rows] of Object.entries(byTable)) {
       const cfg = REMAP_TABLE_CONFIG[table];
       if (!cfg) continue; // defensive — source_table's own CHECK constraint should prevent this
-      const textCol = table === 'questions' ? 'question_text' : table === 'concepts' ? 'name' : 'title';
+      // FIX: concepts used to be special-cased to 'name' here, matching the
+      // same wrong assumption generateSyllabusRemapSuggestions.js's
+      // SOURCE_TABLES had — confirmed wrong against the real schema
+      // (server/models/Concept.js declares `title`, and the migration
+      // file's `name` column declaration never took effect against the
+      // already-existing production table, per CREATE TABLE IF NOT
+      // EXISTS's usual silent-no-op pitfall). concepts uses 'title' like
+      // everything except questions now.
+      const textCol = table === 'questions' ? 'question_text' : 'title';
       const ids = rows.map(r => cfg.idIsUuid ? r.source_id : parseInt(r.source_id, 10));
       const found = await sequelize.query(
         `SELECT id, ${textCol} AS text FROM ${table} WHERE id IN (:ids)`,
