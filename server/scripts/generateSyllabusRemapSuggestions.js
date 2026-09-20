@@ -98,7 +98,7 @@ const SOURCE_TABLES = [
   { table: 'questions',       textCol: 'question_text',  hasSubjectId: false, hasTopicId: false, hasSubtopicId: true  },
   { table: 'videos',          textCol: 'title',          hasSubjectId: false, hasTopicId: true,  hasSubtopicId: false },
   { table: 'revision_notes',  textCol: 'title',          hasSubjectId: false, hasTopicId: false, hasSubtopicId: true  },
-  { table: 'concepts',        textCol: 'name',           hasSubjectId: false, hasTopicId: false, hasSubtopicId: true  },
+  { table: 'concepts',        textCol: 'title',          hasSubjectId: false, hasTopicId: false, hasSubtopicId: true  },
 ];
 
 // Step 2.1: confidence is a 0.0-1.0 float (matches the NUMERIC(3,2) column
