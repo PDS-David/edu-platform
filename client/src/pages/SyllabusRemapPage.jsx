@@ -148,8 +148,16 @@ export default function SyllabusRemapPage() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
-      <button onClick={() => navigate(`${basePath}/${id}`)} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4">
-        <ChevronLeft size={15} /> Back to document
+      {/* Orphaned-resources full generalization: a subject reached here via
+          orphaned-subjects (no syllabus document at all) has no document
+          review page to go back to — ${basePath}/${id} would try to open
+          SyllabusReviewPage.jsx with a bare subject id and 404 there
+          instead. doc?.has_syllabus_document (from the GET response) tells
+          us which case this is. */}
+      <button
+        onClick={() => navigate(doc?.has_syllabus_document ? `${basePath}/${id}` : basePath)}
+        className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4">
+        <ChevronLeft size={15} /> {doc?.has_syllabus_document ? 'Back to document' : 'Back to Syllabus Review'}
       </button>
 
       <h1 className="text-xl font-bold text-gray-900 mb-1">Remap existing content</h1>
@@ -229,12 +237,26 @@ export default function SyllabusRemapPage() {
 // Part 3) rather than duplicating this ~75-line component. hideAccept lets
 // that caller hide the one action guaranteed to 400 there (the backend's
 // own apply endpoint blocks 'accept' for no_confident_match rows).
+//
+// origin badge (orphaned-resources full generalization): "Outdated" means
+// this item was tagged to a topic/subtopic that predates the subject's
+// current syllabus-confirmed tree (origin='old_tree') — it once had a
+// home, just not this one anymore. "Never categorized" (origin='orphaned')
+// means the item never had a topic_id/subtopic_id at all, in either tree —
+// a materially different situation for a reviewer to understand at a
+// glance, not just cosmetic labeling.
+const ORIGIN_BADGE = {
+  old_tree: { label: 'Outdated', cls: 'text-amber-700 bg-amber-50' },
+  orphaned: { label: 'Never categorized', cls: 'text-purple-700 bg-purple-50' },
+};
+
 export function SuggestionRow({ suggestion, destinationLabel, decision, onDecide, newTree, subtopicsByTopic, hideAccept = false }) {
   const [overriding, setOverriding] = useState(false);
   const [overrideTopicId, setOverrideTopicId] = useState(suggestion.suggested_topic_id || '');
   const [overrideSubtopicId, setOverrideSubtopicId] = useState(suggestion.suggested_subtopic_id || '');
 
   const confidencePct = suggestion.confidence != null ? Math.round(suggestion.confidence * 100) : null;
+  const originBadge = ORIGIN_BADGE[suggestion.origin];
 
   const saveOverride = () => {
     onDecide({
@@ -255,7 +277,12 @@ export function SuggestionRow({ suggestion, destinationLabel, decision, onDecide
     <div className="px-4 py-3.5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-gray-800 truncate">{suggestion.source_text}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium text-gray-800 truncate">{suggestion.source_text}</p>
+            {originBadge && (
+              <span className={`shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${originBadge.cls}`}>{originBadge.label}</span>
+            )}
+          </div>
           <p className="text-xs text-gray-400 mt-0.5">
             &rarr; {destinationLabel}
             {confidencePct != null && <span className="ml-2 text-gray-300">· {confidencePct}% confidence</span>}

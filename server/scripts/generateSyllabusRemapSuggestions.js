@@ -108,6 +108,60 @@ const SOURCE_TABLES = [
 // this script's own summary counts below; Part 2 owns the real threshold.
 const HIGH_CONFIDENCE_THRESHOLD = 0.85;
 
+// Step 1 (orphaned-resources extension): resources-only, not all 5 source
+// tables, because resources is the ONLY table with its own subject_id
+// column. questions/videos/revision_notes/concepts all derive subject via
+// a topic_id/subtopic_id join -- but that's exactly the column that's
+// NULL for an orphaned item, so there is no way to even determine which
+// subject an orphaned question/video/etc. belongs to. Those would need a
+// content-based (title/text) subject classifier, a different and harder
+// problem than "map this item onto its own subject's tree" -- explicitly
+// out of scope here, not silently ignored.
+async function findSubjectsWithOrphanedResourcesAndTopics(excludeSubjectIds) {
+  const excluded = excludeSubjectIds.length ? excludeSubjectIds : [-1];
+  return sequelize.query(
+    `SELECT DISTINCT s.id AS subject_id, s.name AS subject_name, eb.name AS exam_board_name
+       FROM subjects s
+       JOIN exam_boards eb ON eb.id = s.exam_board_id
+      WHERE s.is_active = true
+        AND s.id NOT IN (:excluded)
+        AND EXISTS (SELECT 1 FROM resources r WHERE r.subject_id = s.id AND r.topic_id IS NULL AND r.subtopic_id IS NULL)
+        AND EXISTS (SELECT 1 FROM topics t WHERE t.subject_id = s.id AND t.is_active = true)`,
+    { replacements: { excluded }, type: QueryTypes.SELECT }
+  );
+}
+
+// Generic version of getNewTree() for a subject with NO confirmed syllabus
+// document -- pulls every currently-active topic/subtopic for the subject
+// directly, rather than filtering by source_syllabus_id (there is no
+// syllabus document to filter by for this population). For a subject that
+// DOES have a confirmed doc, getNewTree(syllabusDocumentId) above remains
+// the correct, narrower call -- this function is only used for the 31
+// (confirmed count from this session's production audit) subjects with no
+// confirmed syllabus at all, via the loop in main() below.
+async function getTreeForSubject(subjectId) {
+  const topics = await sequelize.query(
+    `SELECT id, name AS title FROM topics WHERE subject_id = :sid AND is_active = true ORDER BY order_index`,
+    { replacements: { sid: subjectId }, type: QueryTypes.SELECT }
+  );
+  const subtopics = await sequelize.query(
+    `SELECT id, topic_id, parent_subtopic_id, name AS title
+       FROM subtopics WHERE subject_id = :sid AND is_active = true ORDER BY order_index`,
+    { replacements: { sid: subjectId }, type: QueryTypes.SELECT }
+  );
+  return { topics, subtopics };
+}
+
+async function getOrphanedResources(subjectId) {
+  return sequelize.query(
+    `SELECT id, title AS text_content, NULL::int AS topic_id, NULL::int AS subtopic_id
+       FROM resources
+      WHERE subject_id = :sid AND topic_id IS NULL AND subtopic_id IS NULL AND is_active = true`,
+    { replacements: { sid: subjectId }, type: QueryTypes.SELECT }
+  );
+}
+
+
 async function findConfirmedSubjects() {
   // Every subject with a confirmed syllabus doc, across every exam board --
   // no board/subject filter, per this session's explicit instruction that
@@ -236,7 +290,7 @@ For EACH item, return the single best-matching tree node id, or state there is n
 Include exactly one entry per item, in the same order as the items above. If you are not reasonably confident, set no_confident_match to true and node_id to null rather than guessing.`;
 }
 
-async function processBatch(items, newTree, subjectId, syllabusDocumentId) {
+async function processBatch(items, newTree, subjectId, syllabusDocumentId, origin = 'old_tree') {
   const treeDescription = buildTreeDescription(newTree);
   const topicIds     = new Set(newTree.topics.map(t => t.id));
   const subtopicById = new Map(newTree.subtopics.map(s => [s.id, s]));
@@ -248,7 +302,7 @@ async function processBatch(items, newTree, subjectId, syllabusDocumentId) {
     raw = await generate(prompt, 'syllabus-remap-suggest');
   } catch (err) {
     console.error(`    [AI call FAILED] ${err.message} -- marking all ${items.length} item(s) in this batch as no_confident_match`);
-    return items.map(item => noMatchRow(item, subjectId, syllabusDocumentId, `AI call failed: ${err.message}`));
+    return items.map(item => noMatchRow(item, subjectId, syllabusDocumentId, `AI call failed: ${err.message}`, origin));
   }
 
   // Same JSON-parsing shape as syllabusExtractor.js's own AI response
@@ -262,7 +316,7 @@ async function processBatch(items, newTree, subjectId, syllabusDocumentId) {
     parsed = JSON.parse(sanitized);
   } catch (err) {
     console.error(`    [JSON parse FAILED] ${err.message} -- marking all ${items.length} item(s) in this batch as no_confident_match`);
-    return items.map(item => noMatchRow(item, subjectId, syllabusDocumentId, `AI response could not be parsed: ${err.message}`));
+    return items.map(item => noMatchRow(item, subjectId, syllabusDocumentId, `AI response could not be parsed: ${err.message}`, origin));
   }
 
   const resultsByIndex = new Map(
@@ -272,7 +326,7 @@ async function processBatch(items, newTree, subjectId, syllabusDocumentId) {
   return items.map((item, i) => {
     const r = resultsByIndex.get(i);
     if (!r || r.no_confident_match || r.node_id == null) {
-      return noMatchRow(item, subjectId, syllabusDocumentId, r?.rationale || null);
+      return noMatchRow(item, subjectId, syllabusDocumentId, r?.rationale || null, origin);
     }
 
     // Untrusted AI output -- validate the returned node_id actually exists
@@ -284,7 +338,7 @@ async function processBatch(items, newTree, subjectId, syllabusDocumentId) {
       suggestedSubtopicId = r.node_id;
       suggestedTopicId = subtopicById.get(r.node_id).topic_id;
     } else {
-      return noMatchRow(item, subjectId, syllabusDocumentId, 'AI returned a node_id not present in the supplied tree');
+      return noMatchRow(item, subjectId, syllabusDocumentId, 'AI returned a node_id not present in the supplied tree', origin);
     }
 
     return {
@@ -299,11 +353,12 @@ async function processBatch(items, newTree, subjectId, syllabusDocumentId) {
       no_confident_match: false,
       confidence: Math.min(Math.max(Number(r.confidence) || 0, 0), 1),
       ai_rationale: String(r.rationale || '').slice(0, 500) || null,
+      origin,
     };
   });
 }
 
-function noMatchRow(item, subjectId, syllabusDocumentId, rationale) {
+function noMatchRow(item, subjectId, syllabusDocumentId, rationale, origin = 'old_tree') {
   return {
     subject_id: subjectId,
     syllabus_document_id: syllabusDocumentId,
@@ -316,54 +371,125 @@ function noMatchRow(item, subjectId, syllabusDocumentId, rationale) {
     no_confident_match: true,
     confidence: null,
     ai_rationale: rationale ? String(rationale).slice(0, 500) : null,
+    origin,
   };
 }
 
 async function upsertSuggestions(rows) {
   for (const row of rows) {
-    await sequelize.query(
-      `INSERT INTO syllabus_remap_suggestions
-         (subject_id, syllabus_document_id, source_table, source_id,
-          source_old_topic_id, source_old_subtopic_id,
-          suggested_topic_id, suggested_subtopic_id,
-          no_confident_match, confidence, ai_rationale, generated_at)
-       VALUES
-         (:subject_id, :syllabus_document_id, :source_table, :source_id,
-          :source_old_topic_id, :source_old_subtopic_id,
-          :suggested_topic_id, :suggested_subtopic_id,
-          :no_confident_match, :confidence, :ai_rationale, NOW())
-       ON CONFLICT (syllabus_document_id, source_table, source_id)
-       DO UPDATE SET
-         suggested_topic_id    = EXCLUDED.suggested_topic_id,
-         suggested_subtopic_id = EXCLUDED.suggested_subtopic_id,
-         no_confident_match    = EXCLUDED.no_confident_match,
-         confidence             = EXCLUDED.confidence,
-         ai_rationale            = EXCLUDED.ai_rationale,
-         generated_at             = NOW(),
-         status                  = 'pending'`,
-      { replacements: row, type: QueryTypes.INSERT }
-    );
+    // Two different ON CONFLICT targets, matching migration_037's two real
+    // unique constraints — Postgres requires the target to match a real
+    // index, and there is no single index covering both the
+    // syllabus_document_id-set population (the original, named
+    // constraint) and the syllabus_document_id-NULL population (the new
+    // partial index) at once. NULLs are never equal to each other for
+    // uniqueness purposes in Postgres, so the original constraint alone
+    // provides zero duplicate protection once syllabus_document_id can be
+    // NULL — this branch, not just the nullable column change, is what
+    // actually closes that gap.
+    if (row.syllabus_document_id == null) {
+      await sequelize.query(
+        `INSERT INTO syllabus_remap_suggestions
+           (subject_id, syllabus_document_id, source_table, source_id,
+            source_old_topic_id, source_old_subtopic_id,
+            suggested_topic_id, suggested_subtopic_id,
+            no_confident_match, confidence, ai_rationale, origin, generated_at)
+         VALUES
+           (:subject_id, NULL, :source_table, :source_id,
+            :source_old_topic_id, :source_old_subtopic_id,
+            :suggested_topic_id, :suggested_subtopic_id,
+            :no_confident_match, :confidence, :ai_rationale, :origin, NOW())
+         ON CONFLICT (subject_id, source_table, source_id) WHERE syllabus_document_id IS NULL
+         DO UPDATE SET
+           suggested_topic_id    = EXCLUDED.suggested_topic_id,
+           suggested_subtopic_id = EXCLUDED.suggested_subtopic_id,
+           no_confident_match    = EXCLUDED.no_confident_match,
+           confidence             = EXCLUDED.confidence,
+           ai_rationale            = EXCLUDED.ai_rationale,
+           generated_at             = NOW(),
+           status                  = 'pending'`,
+        { replacements: row, type: QueryTypes.INSERT }
+      );
+    } else {
+      await sequelize.query(
+        `INSERT INTO syllabus_remap_suggestions
+           (subject_id, syllabus_document_id, source_table, source_id,
+            source_old_topic_id, source_old_subtopic_id,
+            suggested_topic_id, suggested_subtopic_id,
+            no_confident_match, confidence, ai_rationale, origin, generated_at)
+         VALUES
+           (:subject_id, :syllabus_document_id, :source_table, :source_id,
+            :source_old_topic_id, :source_old_subtopic_id,
+            :suggested_topic_id, :suggested_subtopic_id,
+            :no_confident_match, :confidence, :ai_rationale, :origin, NOW())
+         ON CONFLICT (syllabus_document_id, source_table, source_id)
+         DO UPDATE SET
+           suggested_topic_id    = EXCLUDED.suggested_topic_id,
+           suggested_subtopic_id = EXCLUDED.suggested_subtopic_id,
+           no_confident_match    = EXCLUDED.no_confident_match,
+           confidence             = EXCLUDED.confidence,
+           ai_rationale            = EXCLUDED.ai_rationale,
+           generated_at             = NOW(),
+           status                  = 'pending'`,
+        { replacements: row, type: QueryTypes.INSERT }
+      );
+    }
   }
 }
 
 async function main() {
   console.log('Syllabus remap suggestion generation -- DRY RUN (writes only to syllabus_remap_suggestions)\n');
 
-  const subjects = await findConfirmedSubjects();
-  if (subjects.length === 0) {
-    console.log('No subject has a confirmed syllabus yet (syllabus_documents.status = \'confirmed\'). Nothing to do.');
+  const confirmedSubjects = await findConfirmedSubjects();
+  // Orphaned-resources extension: process every OTHER active subject that
+  // has orphaned resources and a real active topic tree — NOT restricted
+  // to confirmed-syllabus subjects. Confirmed subjects are excluded here
+  // and handled inside the loop below instead (their orphaned resources
+  // get syllabus_document_id set to that subject's own confirmed doc,
+  // reusing the same row shape as old-tree suggestions, rather than the
+  // NULL-syllabus_document_id path this second population uses) — this is
+  // the "fold into the existing loop for those 2, new path for the rest"
+  // choice, made explicitly rather than left as an open question.
+  const orphanOnlySubjects = await findSubjectsWithOrphanedResourcesAndTopics(
+    confirmedSubjects.map(s => s.subject_id)
+  );
+
+  // Confirmed via production query (18 / 0 respectively, this session):
+  // resources with NO subject_id at all cannot go through ANY version of
+  // this pipeline, which fundamentally needs a known subject to pick a
+  // tree from — the query above already excludes them by construction
+  // (it joins through subjects, so a NULL subject_id can never match),
+  // but that exclusion needs to be visible, not just an implicit side
+  // effect nobody would notice. Reported explicitly, not silently
+  // dropped, per this feature's own explicit instruction on this point.
+  const noSubjectRows = await sequelize.query(
+    `SELECT COUNT(*)::int AS c FROM resources WHERE topic_id IS NULL AND subtopic_id IS NULL AND subject_id IS NULL`,
+    { type: QueryTypes.SELECT }
+  );
+  const noSubjectCount = noSubjectRows[0].c;
+
+  if (confirmedSubjects.length === 0 && orphanOnlySubjects.length === 0) {
+    console.log('No subject has a confirmed syllabus, and no other subject has both orphaned resources and an active topic tree. Nothing to do.');
+    if (noSubjectCount > 0) {
+      console.log(`\nNOTE: ${noSubjectCount} resource(s) have no subject_id at all and are OUT OF SCOPE for this script entirely — they need separate, content-based (title/text) subject classification before anything here can apply to them. Not touched, not silently dropped.`);
+    }
     await sequelize.close();
     return;
   }
 
-  console.log(`Found ${subjects.length} subject(s) with a confirmed syllabus:`);
-  for (const s of subjects) console.log(`  - ${s.subject_name} (${s.exam_board_name})`);
+  console.log(`Found ${confirmedSubjects.length} subject(s) with a confirmed syllabus, and ${orphanOnlySubjects.length} further subject(s) with orphaned resources against an existing (non-syllabus-derived) tree.`);
+  if (noSubjectCount > 0) {
+    console.log(`NOTE: ${noSubjectCount} further resource(s) have no subject_id at all and are OUT OF SCOPE for this script entirely — they need separate, content-based subject classification before anything here can apply to them. Not touched, not silently dropped.`);
+  }
   console.log('');
 
   const summary = [];
 
-  for (const subj of subjects) {
-    console.log(`=== ${subj.subject_name} (${subj.exam_board_name}) ===`);
+  // ── Population 1: confirmed-syllabus subjects — old-tree items AND, in
+  // the same pass, that subject's own orphaned resources against the same
+  // real new tree. ──────────────────────────────────────────────────────
+  for (const subj of confirmedSubjects) {
+    console.log(`=== ${subj.subject_name} (${subj.exam_board_name}) [confirmed syllabus] ===`);
     const newTree = await getNewTree(subj.syllabus_document_id);
     if (newTree.topics.length === 0) {
       console.log('  New tree is empty for this confirmed doc -- skipping (should not happen; flag for investigation).\n');
@@ -381,7 +507,24 @@ async function main() {
 
       for (let i = 0; i < items.length; i += BATCH_SIZE) {
         const batch = items.slice(i, i + BATCH_SIZE);
-        const rows = await processBatch(batch, newTree, subj.subject_id, subj.syllabus_document_id);
+        const rows = await processBatch(batch, newTree, subj.subject_id, subj.syllabus_document_id, 'old_tree');
+        await upsertSuggestions(rows);
+        subjectTotal    += rows.length;
+        subjectNoMatch  += rows.filter(r => r.no_confident_match).length;
+        subjectHighConf += rows.filter(r => !r.no_confident_match && r.confidence >= HIGH_CONFIDENCE_THRESHOLD).length;
+      }
+    }
+
+    // This subject's own orphaned resources (topic_id/subtopic_id both
+    // NULL) — same confirmed tree, same syllabus_document_id, tagged
+    // origin='orphaned' so the review UI can tell "outdated" from "never
+    // categorized" apart, per migration_036's whole reason for existing.
+    const orphanedResources = (await getOrphanedResources(subj.subject_id)).map(it => ({ ...it, _table: 'resources' }));
+    if (orphanedResources.length > 0) {
+      console.log(`  resources (orphaned, never tagged): ${orphanedResources.length} item(s)`);
+      for (let i = 0; i < orphanedResources.length; i += BATCH_SIZE) {
+        const batch = orphanedResources.slice(i, i + BATCH_SIZE);
+        const rows = await processBatch(batch, newTree, subj.subject_id, subj.syllabus_document_id, 'orphaned');
         await upsertSuggestions(rows);
         subjectTotal    += rows.length;
         subjectNoMatch  += rows.filter(r => r.no_confident_match).length;
@@ -393,15 +536,48 @@ async function main() {
     summary.push({ subject: subj.subject_name, examBoard: subj.exam_board_name, total: subjectTotal, highConf: subjectHighConf, noMatch: subjectNoMatch });
   }
 
+  // ── Population 2: subjects with NO confirmed syllabus at all, but a
+  // real active topic tree and orphaned resources sitting against it. ──
+  for (const subj of orphanOnlySubjects) {
+    console.log(`=== ${subj.subject_name} (${subj.exam_board_name}) [no confirmed syllabus — existing tree] ===`);
+    const newTree = await getTreeForSubject(subj.subject_id);
+    if (newTree.topics.length === 0) {
+      console.log('  Active topic tree is empty -- skipping (should not happen given the EXISTS check; flag for investigation).\n');
+      continue;
+    }
+
+    let subjectTotal = 0, subjectNoMatch = 0, subjectHighConf = 0;
+    const orphanedResources = (await getOrphanedResources(subj.subject_id)).map(it => ({ ...it, _table: 'resources' }));
+
+    console.log(`  resources (orphaned, never tagged): ${orphanedResources.length} item(s)`);
+    for (let i = 0; i < orphanedResources.length; i += BATCH_SIZE) {
+      const batch = orphanedResources.slice(i, i + BATCH_SIZE);
+      // syllabus_document_id explicitly null — no document to attach to;
+      // upsertSuggestions() branches on this to use the correct (partial-
+      // index) ON CONFLICT target for this population.
+      const rows = await processBatch(batch, newTree, subj.subject_id, null, 'orphaned');
+      await upsertSuggestions(rows);
+      subjectTotal    += rows.length;
+      subjectNoMatch  += rows.filter(r => r.no_confident_match).length;
+      subjectHighConf += rows.filter(r => !r.no_confident_match && r.confidence >= HIGH_CONFIDENCE_THRESHOLD).length;
+    }
+
+    console.log(`  -> ${subjectTotal} suggestion(s), ${subjectHighConf} high-confidence (>= ${HIGH_CONFIDENCE_THRESHOLD}), ${subjectNoMatch} no-confident-match\n`);
+    summary.push({ subject: subj.subject_name, examBoard: subj.exam_board_name, total: subjectTotal, highConf: subjectHighConf, noMatch: subjectNoMatch });
+  }
+
   console.log('=== SUMMARY ===');
   if (summary.length === 0) {
-    console.log('Every confirmed subject had zero old-tree items to remap -- nothing generated.');
+    console.log('Nothing generated -- every candidate subject had zero items to remap.');
   }
   for (const s of summary) {
     console.log(`${s.subject} (${s.examBoard}): ${s.total} total, ${s.highConf} high-confidence, ${s.noMatch} no-match`);
   }
+  if (noSubjectCount > 0) {
+    console.log(`\n${noSubjectCount} resource(s) with no subject_id at all were NOT processed -- out of scope for this script, needs separate content-based classification.`);
+  }
   console.log('\nZero writes were made to resources/questions/videos/revision_notes/concepts.');
-  console.log('All suggestions are in syllabus_remap_suggestions with status=\'pending\', awaiting Part 2 review.');
+  console.log('All suggestions are in syllabus_remap_suggestions with status=\'pending\', awaiting review via the syllabus remap UI.');
 
   await sequelize.close();
 }

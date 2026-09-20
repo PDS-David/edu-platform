@@ -84,6 +84,24 @@ export default function SyllabusListPage() {
 
   useEffect(() => { loadDocs(); }, [loadDocs]);
 
+  // ── Orphaned-content subjects (no syllabus document at all) ─────────────
+  // Orphaned-resources full generalization: ~31 subjects (confirmed via
+  // real production query) have orphaned resources sitting against a real,
+  // pre-existing topic tree, but never went through the syllabus feature —
+  // no document row exists for them in the list below, so there was
+  // previously NO way to reach their remap review screen at all, even
+  // though the backend (syllabusRoutes.js's resolveRemapContext) already
+  // supports it via a bare subject id. This section is that missing entry
+  // point.
+  const [orphanedSubjects,      setOrphanedSubjects]      = useState(null);
+  const [orphanedSubjectsError, setOrphanedSubjectsError] = useState('');
+
+  useEffect(() => {
+    api.get('/syllabus/orphaned-subjects')
+      .then(r => setOrphanedSubjects(r.data || []))
+      .catch(err => setOrphanedSubjectsError(err?.response?.data?.error || err?.message || 'Could not load subjects with orphaned content.'));
+  }, []);
+
   // Self-service cleanup for a stuck/failed/mistaken upload — previously
   // required going through the database directly (DELETE /api/syllabus/:id
   // added alongside this). No local toast system existed in this file;
@@ -339,6 +357,35 @@ export default function SyllabusListPage() {
           ))}
         </div>
       )}
+
+      {/* ── Orphaned-content subjects (no syllabus document at all) ────── */}
+      {orphanedSubjects && orphanedSubjects.length > 0 && (
+        <div className="mt-10 pt-6 border-t border-gray-100">
+          <h2 className="text-sm font-semibold text-gray-700 mb-1">Subjects with uncategorized content</h2>
+          <p className="text-xs text-gray-400 mb-3">
+            These subjects already have their own topic list — just never had a syllabus uploaded — but have resources that were never tagged to any topic or subtopic.
+          </p>
+          <div className="rounded-2xl border border-gray-100 divide-y divide-gray-50">
+            {orphanedSubjects.map(s => (
+              <div key={s.subject_id}
+                className="w-full flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-gray-50 transition-colors">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-800 truncate">{s.subject_name}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{s.exam_board_name} · {s.orphaned_resource_count} uncategorized resource{s.orphaned_resource_count === 1 ? '' : 's'}</p>
+                </div>
+                <button onClick={() => navigate(`${basePath}/${s.subject_id}/remap`)}
+                  className="shrink-0 text-xs font-semibold text-blue-600 hover:text-blue-700 px-2 py-1 rounded-lg hover:bg-blue-50">
+                  Remap Content
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {orphanedSubjectsError && (
+        <p className="text-xs text-red-500 mt-4">{orphanedSubjectsError}</p>
+      )}
+
       {toast && (
         <div className={`fixed bottom-6 right-4 z-50 flex items-center gap-2.5 px-5 py-3 rounded-xl shadow-lg text-sm font-semibold border ${
           toast.type === 'error' ? 'bg-white border-red-200 text-red-700' : 'bg-white border-emerald-200 text-emerald-700'
