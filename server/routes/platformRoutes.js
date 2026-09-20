@@ -74,13 +74,27 @@ router.get('/timeline', protect, ownerOnly, async (req, res) => {
   // filter login events too — without that join, a login would have no role
   // and would be dropped by the filter, which is exactly the event this view
   // most needs to show.
+  //
+  // BUG FIX (found via live production testing, not caught by this feature's
+  // own earlier test suite — that suite's local Postgres used a plain
+  // VARCHAR for users.role as a simplification; production's real schema
+  // uses an actual Postgres ENUM, enum_users_role): u.role/au.role are that
+  // enum type, while audit_logs.actor_role is plain text (see
+  // auditLogger.js's INSERT — it's never validated against the enum).
+  // COALESCE (and UNION ALL, which the second branch below also needs this
+  // cast for) require matching types across every branch, and Postgres does
+  // not implicitly cast a custom enum to/from text. Casting the enum side
+  // to ::text (not the other direction) is deliberate: audit_logs.actor_role
+  // is free text that isn't guaranteed to be a valid enum value, so casting
+  // text -> enum could fail at runtime on unexpected values, while enum ->
+  // text is always safe.
   const unified = `
     SELECT
       'action'                                   AS source,
       al.created_at                              AS occurred_at,
       al.actor_id                                AS actor_id,
       al.actor_email                             AS actor_email,
-      COALESCE(al.actor_role, u.role)            AS actor_role,
+      COALESCE(al.actor_role, u.role::text)      AS actor_role,
       al.action                                  AS event,
       al.target_type                             AS target_type,
       al.target_id                               AS target_id,
@@ -97,7 +111,7 @@ router.get('/timeline', protect, ownerOnly, async (req, res) => {
       aal.created_at                             AS occurred_at,
       aal.user_id                                AS actor_id,
       aal.email                                  AS actor_email,
-      au.role                                    AS actor_role,
+      au.role::text                              AS actor_role,
       aal.event_type                             AS event,
       NULL                                       AS target_type,
       NULL                                       AS target_id,
