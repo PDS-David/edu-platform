@@ -253,7 +253,23 @@ router.get('/random', protect, async (req, res) => {
     // exclude the question entirely rather than show an unanswerable one —
     // consistent with the rest of the platform's "return fewer questions
     // rather than a broken one" approach (see quizGenerator.js).
-    const needsFallback = questions.filter(q => !hasUsableOptions(q.options));
+    //
+    // BUG FIX: this options-usability check only makes sense for the two
+    // click-an-option types (mcq, true_false). short_answer/structured (and
+    // essay) are free-text by design and are inserted with options: NULL
+    // (see teacherRoutes.js/adminRoutes.js generate-questions INSERT) — they
+    // have no answer_options rows either, since there's nothing to store
+    // there. Before this fix, hasUsableOptions(null) was always false for
+    // these types, so they were unconditionally pulled into needsFallback,
+    // found nothing in answer_options, and were dropped by the final
+    // `usable` filter below — meaning every short_answer/structured question
+    // was silently excluded from every /questions/random response
+    // regardless of approval status or content, which is what made
+    // SubtopicPage.jsx's "Short Questions"/"Structured Questions" tabs
+    // always render empty. Scope the check to only the types that actually
+    // need options.
+    const OPTION_BASED_TYPES = ['mcq', 'true_false'];
+    const needsFallback = questions.filter(q => OPTION_BASED_TYPES.includes(q.type) && !hasUsableOptions(q.options));
 
     if (needsFallback.length > 0) {
       const fallbackRows = await sequelize.query(
@@ -288,8 +304,10 @@ router.get('/random', protect, async (req, res) => {
     }
 
     // Final pass: drop anything still unusable from either source rather
-    // than send a student a question they cannot answer.
-    const usable = questions.filter(q => hasUsableOptions(q.options));
+    // than send a student a question they cannot answer. Free-text types
+    // (short_answer/structured/essay) have no options to validate, so they
+    // always pass this check — see OPTION_BASED_TYPES note above.
+    const usable = questions.filter(q => !OPTION_BASED_TYPES.includes(q.type) || hasUsableOptions(q.options));
 
     // BUG FIX: normalize option shape (see normalizeOptions above) so plain
     // string arrays — the documented output format for AI-extracted
