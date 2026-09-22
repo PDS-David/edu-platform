@@ -2438,6 +2438,7 @@ const AdminDashboard = () => {
                     { label: 'Manage Subjects', desc: 'Add, edit or deactivate exam types and subjects', action: () => setActivePanel('catalog'),              color: 'hover:border-violet-300 hover:bg-violet-50' },
                     { label: 'Past Papers',     desc: 'View and manage past exam papers',               action: () => setActivePanel('pastpapers'),            color: 'hover:border-blue-300 hover:bg-blue-50'   },
                     { label: 'Question Review', desc: 'Review and approve submitted questions',          action: () => navigate('/admin/questions/review'),     color: 'hover:border-teal-300 hover:bg-teal-50'   },
+                    { label: 'Orphaned Questions', desc: 'Assign a subtopic to questions with none — invisible to students until fixed', action: () => navigate('/admin/questions/orphaned'), color: 'hover:border-amber-300 hover:bg-amber-50' },
                   ].map(c => (
                     <button key={c.label} onClick={c.action}
                       className={`p-4 bg-white border border-gray-100 ${c.color} rounded-xl text-left transition-colors group`}>
