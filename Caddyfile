@@ -61,12 +61,27 @@ www.aischoolonair.ng {
     }
 
     # REST API
+    # read_timeout/write_timeout raised from 120s to 600s (10 min) — a
+    # 120s ceiling was too low for large file uploads (confirmed: a
+    # 111.4MB video upload hit "Server error 504" here). This value has
+    # been unchanged since this repo's earliest commit and had simply
+    # never been hit by a slow/large enough upload before now — not a
+    # regression. 600s covers the app's own 500MB upload ceiling
+    # (resourceRoutes.js, createUploadMiddleware maxSizeMB: 500) down to
+    # ~0.83 MB/s sustained throughput. A large fixed ceiling was chosen
+    # over matching staging's fully-unlimited (read_timeout 0/write_timeout
+    # 0) setting deliberately: on a public-facing endpoint, an unlimited
+    # timeout lets a stalled or malicious connection hold a backend worker
+    # open indefinitely, where a large fixed number gets nearly all the
+    # practical benefit without that risk. Node itself adds no timeout of
+    # its own (no server.timeout/keepAliveTimeout/headersTimeout override
+    # in server.js) — this was the sole bottleneck.
     @api path /api/*
     route @api {
         reverse_proxy http://api:5000 {
             transport http {
-                read_timeout  120s
-                write_timeout 120s
+                read_timeout  600s
+                write_timeout 600s
             }
             header_up X-Forwarded-For {remote_host}
             header_up X-Real-IP       {remote_host}
