@@ -940,8 +940,31 @@ router.patch('/tests/:id', protect, teacherOnly, async (req, res) => {
 });
 
 // ── PUT /api/teacher/tests/:id/publish ────────────────────────────────────────
+// BUG FIX: this had no validation at all — a teacher could publish (and a
+// class/student could be assigned to) a test with zero questions attached.
+// GET /students/test/:testId has no guard against this either; the student
+// simply reaches a "No questions in this test." dead end
+// (StudentTestPage.jsx) with no indication anything is wrong on the
+// teacher's side. Confirmed live in production: one published test
+// ("Mathematics") had 6 real students assigned to it with 0 rows in
+// test_questions. Reject the publish here instead, before any student can
+// ever be assigned to an empty test.
 router.put('/tests/:id/publish', protect, teacherOnly, async (req, res) => {
   try {
+    const questionCount = await sequelize.query(
+      `SELECT COUNT(*)::int AS count
+       FROM test_questions tq
+       JOIN custom_tests ct ON ct.id = tq.test_id
+       WHERE tq.test_id = :id AND ct.teacher_id = :teacherId`,
+      { replacements: { id: req.params.id, teacherId: req.user.id }, type: QueryTypes.SELECT }
+    );
+    if (!questionCount[0]?.count) {
+      return res.status(400).json({
+        success: false,
+        error: 'Add at least one question before publishing this test.',
+      });
+    }
+
     await sequelize.query(
       `UPDATE custom_tests SET is_published = true WHERE id = :id AND teacher_id = :teacherId`,
       { replacements: { id: req.params.id, teacherId: req.user.id }, type: QueryTypes.UPDATE }
