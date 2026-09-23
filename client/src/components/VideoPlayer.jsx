@@ -66,6 +66,24 @@ export default function VideoPlayer({ videoId, onComplete }) {
   const [accessDenied, setAccessDenied] = useState(false);
   const [notEnrolled,  setNotEnrolled]  = useState(false);
 
+  // FIX (video/resources pipeline split): SubtopicPage.jsx renders this
+  // component with a `resources.id` for anything with resource_type ===
+  // 'video' — but that id was never written to the `videos` table (the
+  // dedicated pipeline below is entirely course_id-scoped, with its own
+  // freshly-generated UUIDs; there is no INSERT INTO videos anywhere
+  // outside this pipeline's own upload handler, and no linking column
+  // between the two tables). Every bulk-uploaded video therefore 404s
+  // against GET /videos/:id and previously had no fallback at all --
+  // confirmed via direct query that zero rows can ever coincidentally
+  // match between the two tables. When that 404 happens specifically
+  // (not a 403/access issue), we fall back to playing the plain file via
+  // the existing, already access-gated resources download endpoint,
+  // using native <video controls> instead of the HLS/custom-control UI
+  // below (which only makes sense for a real videos-table row with
+  // renditions, progress tracking, and a quality ladder -- none of which
+  // exist for a resources-table entry).
+  const [fallbackSrc, setFallbackSrc] = useState(null);
+
   const [isPlaying,    setIsPlaying]    = useState(false);
   const [isMuted,      setIsMuted]      = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -93,26 +111,43 @@ export default function VideoPlayer({ videoId, onComplete }) {
       setError(null);
       setAccessDenied(false);
       setNotEnrolled(false);
+      setFallbackSrc(null);
 
+      // Metadata fetch is separated from the progress fetch (previously a
+      // single Promise.all) specifically so a 404 here -- meaning this id
+      // simply isn't in the videos table -- can be handled on its own,
+      // without a progress-fetch error (which would ALSO 404, since there's
+      // no video_progress row possible for a non-catalogued id) muddying
+      // which failure we're actually looking at.
+      let video;
       try {
-        const [videoRes, progressRes] = await Promise.all([
-          api.get(`/videos/${videoId}`),
-          api.get(`/videos/${videoId}/progress`),
-        ]);
-
-        setVideoData(videoRes.data);
-
-        const p = progressRes.data;
-        if (p?.current_position_seconds > 10) {
-          setResumePos(p.current_position_seconds);
-          setShowResume(true);
-        }
-        setWatchPct(p?.watch_percentage ?? 0);
-        setIsCompleted(p?.is_completed ?? false);
-
+        const videoRes = await api.get(`/videos/${videoId}`);
+        video = videoRes.data;
       } catch (err) {
         const status = err?.response?.status;
         const code   = err?.response?.data?.code;
+
+        if (status === 404) {
+          // Not a real videos-table entry -- fall back to the resources
+          // download endpoint, which already enforces the same per-student
+          // entitlement check (direct/class/user assignment + subject
+          // enrollment) as every other resource type.
+          try {
+            const dl = await api.get(`/resources/${videoId}/download`, { params: { viewer: '1' } });
+            if (dl?.data?.url) {
+              setFallbackSrc(dl.data.url);
+            } else {
+              setError('This video could not be loaded.');
+            }
+          } catch (dlErr) {
+            const dlStatus = dlErr?.response?.status;
+            if (dlStatus === 403) setAccessDenied(true);
+            else setError(dlErr?.response?.data?.error || 'This video could not be loaded.');
+          } finally {
+            setLoading(false);
+          }
+          return;
+        }
 
         if (status === 403 && code === 'NOT_ENROLLED') {
           setNotEnrolled(true);
@@ -121,9 +156,28 @@ export default function VideoPlayer({ videoId, onComplete }) {
         } else {
           setError(err?.response?.data?.error || 'Failed to load video');
         }
-      } finally {
         setLoading(false);
+        return;
       }
+
+      setVideoData(video);
+
+      // Progress is best-effort and only meaningful for a real videos-table
+      // entry -- a failure here shouldn't block showing the video itself.
+      try {
+        const progressRes = await api.get(`/videos/${videoId}/progress`);
+        const p = progressRes.data;
+        if (p?.current_position_seconds > 10) {
+          setResumePos(p.current_position_seconds);
+          setShowResume(true);
+        }
+        setWatchPct(p?.watch_percentage ?? 0);
+        setIsCompleted(p?.is_completed ?? false);
+      } catch {
+        // non-fatal
+      }
+
+      setLoading(false);
     };
 
     load();
@@ -133,7 +187,7 @@ export default function VideoPlayer({ videoId, onComplete }) {
   // HLS init — handles both hls.js and Safari native
   // ─────────────────────────────────────────────
   useEffect(() => {
-    if (!videoData || !videoRef.current) return;
+    if (!videoData || !videoRef.current || fallbackSrc) return;
 
     const video   = videoRef.current;
     const apiBase = getApiBase();
@@ -221,7 +275,7 @@ export default function VideoPlayer({ videoId, onComplete }) {
   // Save progress
   // ─────────────────────────────────────────────
   const saveProgress = useCallback(async (pos, dur) => {
-    if (!videoId || !dur) return;
+    if (!videoId || !dur || fallbackSrc) return;
     const pct = Math.min((pos / dur) * 100, 100);
 
     try {
@@ -240,7 +294,7 @@ export default function VideoPlayer({ videoId, onComplete }) {
     } catch {
       // silent — don't break UX on progress save failures
     }
-  }, [videoId, isCompleted, onComplete]);
+  }, [videoId, isCompleted, onComplete, fallbackSrc]);
 
   // ─────────────────────────────────────────────
   // Video event listeners
@@ -409,6 +463,25 @@ export default function VideoPlayer({ videoId, onComplete }) {
       <div className="aspect-video bg-gray-900 flex flex-col items-center justify-center text-white gap-2">
         <AlertTriangle size={32} />
         <p>{error}</p>
+      </div>
+    );
+  }
+
+  // Fallback render: a plain resources-table video with no HLS renditions,
+  // no progress tracking, no quality ladder -- just native browser controls
+  // against a direct (signed, time-limited) file URL. See the fallbackSrc
+  // comment above for why this path exists at all.
+  if (fallbackSrc) {
+    return (
+      <div className="space-y-3">
+        <div className="relative aspect-video bg-black rounded-xl overflow-hidden">
+          <video
+            className="w-full h-full"
+            controls
+            playsInline
+            src={fallbackSrc}
+          />
+        </div>
       </div>
     );
   }
