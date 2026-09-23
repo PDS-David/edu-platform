@@ -215,6 +215,21 @@ const GRADE_MAP = {
   'Edexcel International A Level': ['Grade 11/Year 12', 'Grade 12/Year 13'],
   'WAEC':                          ['SS1', 'SS2', 'SS3'],
   'NECO':                          ['SS1', 'SS2', 'SS3'],
+  // BUG FIX: live production exam_boards.name for the WAEC code is literally
+  // 'WAEC (SSCE)' (confirmed via direct DB query), not 'WAEC' -- the exact-
+  // name lookup below only matched a bare 'WAEC' curriculum name, so this
+  // real curriculum fell through to the code-based/partial-match branches
+  // further down, both of which referenced a 'WAEC/NECO (SSCE)' key that
+  // was never defined anywhere in this map. Those lookups returned
+  // `undefined` unguarded (unlike every other lookup here), so gradeOptions
+  // became undefined, and CustomDropdown's `options.length` check threw the
+  // moment a student opened the Grade dropdown after picking WAEC -- an
+  // uncaught render error with no error boundary around this page unmounts
+  // the whole React tree, i.e. exactly the reported "blanks out in white"
+  // when picking grade. Added here so the exact-name match (the first,
+  // fastest path in getGradeOptions) catches the real curriculum name
+  // directly, without relying on the partial-match fallback at all.
+  'WAEC (SSCE)':                   ['SS1', 'SS2', 'SS3'],
   'JAMB/UTME':                     ['SS3 / Year 13'],
   'JAMB':                          ['SS3 / Year 13'],
   'Junior WAEC (BECE)':            ['JSS1', 'JSS2', 'JSS3'],
@@ -267,8 +282,8 @@ function getGradeOptions(curriculum) {
   // Code-based match
   const codeMap = {
     'JAMB':    GRADE_MAP['JAMB/UTME'],
-    'WAEC':    GRADE_MAP['WAEC/NECO (SSCE)'],
-    'NECO':    GRADE_MAP['WAEC/NECO (SSCE)'],
+    'WAEC':    GRADE_MAP['WAEC'],
+    'NECO':    GRADE_MAP['NECO'],
     'BECE':    GRADE_MAP['Junior WAEC (BECE)'],
     'IELTS':   GRADE_MAP['IELTS'],
     'TOEFL':   GRADE_MAP['TOEFL'],
@@ -286,7 +301,7 @@ function getGradeOptions(curriculum) {
   const lowerName = name.toLowerCase();
   if (lowerName.includes('jamb'))     return GRADE_MAP['JAMB/UTME'];
   if (lowerName.includes('waec') || lowerName.includes('neco') || lowerName.includes('ssce'))
-    return GRADE_MAP['WAEC/NECO (SSCE)'];
+    return GRADE_MAP['WAEC'];
   if (lowerName.includes('junior') || lowerName.includes('bece') || lowerName.includes('jss'))
     return GRADE_MAP['Junior WAEC (BECE)'];
   if (lowerName.includes('jupeb'))    return GRADE_MAP['JUPEB'];
@@ -490,6 +505,18 @@ function CustomDropdown({ value, options, onChange, disabled, placeholder, loadi
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
+  // DEFENSIVE FIX: this component previously assumed `options` was always
+  // an array and read `options.length` directly further down. That's true
+  // today for every known caller, but the WAEC/NECO grade bug (see
+  // GRADE_MAP above) showed exactly how a data-shape mismatch upstream can
+  // make a caller pass `undefined` here instead -- and because this page
+  // has no error boundary, an uncaught TypeError on `options.length` at
+  // render time doesn't just fail this one dropdown, it blanks the entire
+  // registration page to white. Normalizing to an array here means any
+  // future bug of the same shape degrades to "dropdown shows no options"
+  // instead of "the whole page crashes".
+  const safeOptions = Array.isArray(options) ? options : [];
+
   useEffect(() => {
     const handler = (e) => {
       if (ref.current && !ref.current.contains(e.target)) setOpen(false);
@@ -529,10 +556,10 @@ function CustomDropdown({ value, options, onChange, disabled, placeholder, loadi
             : <ChevronDown size={15} className="text-gray-400 shrink-0 ml-1" />
         }
       </button>
-      {open && options.length > 0 && (
+      {open && safeOptions.length > 0 && (
         <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-56 overflow-y-auto">
-          {options.map((opt, i) => {
-            const optLabel = typeof opt === 'string' ? opt : (opt.name || String(opt));
+          {safeOptions.map((opt, i) => {
+            const optLabel = typeof opt === 'string' ? opt : (opt?.name || String(opt));
             return (
               <button
                 key={i}
@@ -548,7 +575,7 @@ function CustomDropdown({ value, options, onChange, disabled, placeholder, loadi
         </div>
       )}
       {/* FIX: Show a message when dropdown is open but has no options */}
-      {open && options.length === 0 && (
+      {open && safeOptions.length === 0 && (
         <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl px-4 py-3">
           <p className="text-sm text-gray-400 text-center">No options available</p>
         </div>
