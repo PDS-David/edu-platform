@@ -110,7 +110,7 @@ function InlineViewer({ file }) {
   }
 
   if (type === "video" || ["mp4","webm","mov"].includes(ext))
-    return <div className="mt-2 rounded-xl overflow-hidden bg-black"><video src={url} controls className="w-full max-h-56 rounded-xl" /></div>;
+    return <div className="mt-2 rounded-xl overflow-hidden bg-black"><video src={url} controls controlsList="nodownload noremoteplayback" disablePictureInPicture onContextMenu={(e) => e.preventDefault()} className="w-full max-h-56 rounded-xl" /></div>;
   if (type === "audio" || ["mp3","wav","ogg","m4a"].includes(ext))
     return <audio src={url} controls className="w-full mt-2" />;
   if (type === "image" || ["jpg","jpeg","png","gif","webp"].includes(ext))

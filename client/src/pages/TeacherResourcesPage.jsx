@@ -488,7 +488,7 @@ function TeacherInlineViewer({ resource, onClose }) {
         <button onClick={onClose} className="text-white/60 hover:text-white text-xs px-2 py-0.5">✕ close</button>
       </div>
       {urlErr  && <p className="text-xs text-red-400 p-3">Could not load video. Try downloading instead.</p>}
-      {!urlErr && rawUrl && <video src={rawUrl} controls className="w-full max-h-72" />}
+      {!urlErr && rawUrl && <video src={rawUrl} controls controlsList="nodownload noremoteplayback" disablePictureInPicture onContextMenu={(e) => e.preventDefault()} className="w-full max-h-72" />}
       {!urlErr && !rawUrl && <div className="flex items-center justify-center py-8"><Loader2 size={16} className="animate-spin text-white/40" /></div>}
     </div>
   );

@@ -92,7 +92,7 @@ function InlineViewer({ file }) {
   };
 
   // ── Video / Audio / Image — these need a blob URL with auth too
-  if (type === 'video') return <video src={rawUrl} controls className="w-full rounded-xl mt-2 max-h-60 bg-black" />;
+  if (type === 'video') return <video src={rawUrl} controls controlsList="nodownload noremoteplayback" disablePictureInPicture onContextMenu={(e) => e.preventDefault()} className="w-full rounded-xl mt-2 max-h-60 bg-black" />;
   if (type === 'audio') return <audio src={rawUrl} controls className="w-full mt-2" />;
   if (type === 'image') return <img src={rawUrl} alt={file.title} className="w-full rounded-xl mt-2 max-h-60 object-contain bg-gray-100" />;
 

@@ -482,6 +482,9 @@ export default function VideoPlayer({ videoId, onComplete }) {
           <video
             className="w-full h-full"
             controls
+            controlsList="nodownload noremoteplayback"
+            disablePictureInPicture
+            onContextMenu={(e) => e.preventDefault()}
             playsInline
             src={fallbackSrc}
           />
@@ -513,6 +516,9 @@ export default function VideoPlayer({ videoId, onComplete }) {
           className="w-full h-full"
           playsInline
           crossOrigin="use-credentials"
+          controlsList="nodownload noremoteplayback"
+          disablePictureInPicture
+          onContextMenu={(e) => e.preventDefault()}
         />
 
         {/* Resume banner */}
