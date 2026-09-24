@@ -52,6 +52,16 @@ const formatTime = (secs) => {
 const getApiBase = () =>
   (import.meta.env.VITE_API_URL || '').replace(/\/$/, '').replace(/\/api$/, '');
 
+// videos.id is `integer`; resources.id is `uuid` (confirmed via direct
+// schema check). Same pattern the server itself uses in videosRoutes.js's
+// isValidUUID(), duplicated here so the client can decide deterministically,
+// before ever calling GET /videos/:id, whether an id could possibly be a
+// real videos-table row -- rather than inferring it from a response status
+// code after the fact (which has a real edge case: a genuine transient
+// error on an actual integer-keyed video would also be a non-403 status,
+// and would incorrectly trigger the resources-fallback attempt too).
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export default function VideoPlayer({ videoId, onComplete }) {
   const videoRef    = useRef(null);
   const hlsRef      = useRef(null);
@@ -69,19 +79,18 @@ export default function VideoPlayer({ videoId, onComplete }) {
   // FIX (video/resources pipeline split): SubtopicPage.jsx renders this
   // component with a `resources.id` for anything with resource_type ===
   // 'video' — but that id was never written to the `videos` table (the
-  // dedicated pipeline below is entirely course_id-scoped, with its own
-  // freshly-generated UUIDs; there is no INSERT INTO videos anywhere
-  // outside this pipeline's own upload handler, and no linking column
-  // between the two tables). Every bulk-uploaded video therefore 404s
-  // against GET /videos/:id and previously had no fallback at all --
-  // confirmed via direct query that zero rows can ever coincidentally
-  // match between the two tables. When that 404 happens specifically
-  // (not a 403/access issue), we fall back to playing the plain file via
-  // the existing, already access-gated resources download endpoint,
-  // using native <video controls> instead of the HLS/custom-control UI
-  // below (which only makes sense for a real videos-table row with
-  // renditions, progress tracking, and a quality ladder -- none of which
-  // exist for a resources-table entry).
+  // dedicated pipeline below is entirely course_id-scoped with its own
+  // integer ids -- confirmed via direct schema check: videos.id is
+  // `integer`, resources.id is `uuid`; there is no INSERT INTO videos
+  // anywhere outside this pipeline's own upload handler, and no linking
+  // column between the two tables). A resources.id can therefore never be
+  // a real videos.id -- not "usually 404s", literally impossible by type.
+  // When that's detected (see the UUID_RE check in the load effect below),
+  // we fall back to playing the plain file via the existing, already
+  // access-gated resources download endpoint, using native <video controls>
+  // instead of the HLS/custom-control UI below (which only makes sense for
+  // a real videos-table row with renditions, progress tracking, and a
+  // quality ladder -- none of which exist for a resources-table entry).
   const [fallbackSrc, setFallbackSrc] = useState(null);
 
   const [isPlaying,    setIsPlaying]    = useState(false);
@@ -113,12 +122,29 @@ export default function VideoPlayer({ videoId, onComplete }) {
       setNotEnrolled(false);
       setFallbackSrc(null);
 
-      // Metadata fetch is separated from the progress fetch (previously a
-      // single Promise.all) specifically so a 404 here -- meaning this id
-      // simply isn't in the videos table -- can be handled on its own,
-      // without a progress-fetch error (which would ALSO 404, since there's
-      // no video_progress row possible for a non-catalogued id) muddying
-      // which failure we're actually looking at.
+      // A resources.id (uuid) can never be a real videos.id (integer) --
+      // skip the guaranteed-to-fail /videos/:id call entirely and go
+      // straight to the resources-download fallback. Anything NOT
+      // uuid-shaped is assumed to be a genuine integer videos.id and goes
+      // through the normal path below.
+      if (UUID_RE.test(String(videoId))) {
+        try {
+          const dl = await api.get(`/resources/${videoId}/download`, { params: { viewer: '1' } });
+          if (dl?.data?.url) {
+            setFallbackSrc(dl.data.url);
+          } else {
+            setError('This video could not be loaded.');
+          }
+        } catch (dlErr) {
+          const dlStatus = dlErr?.response?.status;
+          if (dlStatus === 403) setAccessDenied(true);
+          else setError(dlErr?.response?.data?.error || 'This video could not be loaded.');
+        } finally {
+          setLoading(false);
+        }
+        return;
+      }
+
       let video;
       try {
         const videoRes = await api.get(`/videos/${videoId}`);
@@ -126,28 +152,6 @@ export default function VideoPlayer({ videoId, onComplete }) {
       } catch (err) {
         const status = err?.response?.status;
         const code   = err?.response?.data?.code;
-
-        if (status === 404) {
-          // Not a real videos-table entry -- fall back to the resources
-          // download endpoint, which already enforces the same per-student
-          // entitlement check (direct/class/user assignment + subject
-          // enrollment) as every other resource type.
-          try {
-            const dl = await api.get(`/resources/${videoId}/download`, { params: { viewer: '1' } });
-            if (dl?.data?.url) {
-              setFallbackSrc(dl.data.url);
-            } else {
-              setError('This video could not be loaded.');
-            }
-          } catch (dlErr) {
-            const dlStatus = dlErr?.response?.status;
-            if (dlStatus === 403) setAccessDenied(true);
-            else setError(dlErr?.response?.data?.error || 'This video could not be loaded.');
-          } finally {
-            setLoading(false);
-          }
-          return;
-        }
 
         if (status === 403 && code === 'NOT_ENROLLED') {
           setNotEnrolled(true);
