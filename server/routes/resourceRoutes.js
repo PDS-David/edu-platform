@@ -665,7 +665,7 @@ router.get('/:id/download', protect, async (req, res) => {
 
     // ── 1. Fetch resource ──────────────────────────────────────────────────
     const rows = await sequelize.query(
-      `SELECT id, title, file_url, r2_key, stored_filename, mime_type, original_filename, is_active
+      `SELECT id, title, file_url, r2_key, stored_filename, mime_type, original_filename, is_active, resource_type
          FROM resources WHERE id = :id LIMIT 1`,
       { replacements: { id }, type: QueryTypes.SELECT }
     );
@@ -712,7 +712,21 @@ router.get('/:id/download', protect, async (req, res) => {
       }
     }
 
-    // ── 3. Resolve the R2 object key ───────────────────────────────────────
+    // ── 3. Videos: streaming only, never a downloadable link ────────────────
+    // Confirmed this session: this endpoint previously returned the SAME
+    // kind of raw, directly-signed R2 URL for a video as for any document —
+    // trivially copyable from DevTools' Network tab regardless of the
+    // 10-minute "viewer" TTL. A plain (non-viewer) request for a video is
+    // an explicit download attempt with no legitimate streaming use here —
+    // VideoPlayer.jsx's fallback path always passes ?viewer=1. Reject
+    // anything else for videos outright. Scoped to resource_type='video'
+    // only — documents/audio keep their existing behavior unchanged.
+    if (resource.resource_type === 'video' && req.query.viewer !== '1') {
+      logger.warn('[download] video download attempt rejected', { resourceId: id, userId });
+      return res.status(403).json({ success: false, error: 'Videos can only be streamed in the app, not downloaded.' });
+    }
+
+    // ── 4. Resolve the R2 object key ───────────────────────────────────────
     // Decode exactly ONCE. Previous code called decodeURIComponent twice
     // (once here, once in r2Storage). That double-decode is now removed.
     let key = resource.r2_key || null;
@@ -730,12 +744,17 @@ router.get('/:id/download', protect, async (req, res) => {
       }
     }
 
-    // ── 4. Serve the file ──────────────────────────────────────────────────
+    // ── 5. Serve the file ──────────────────────────────────────────────────
     if (key && r2.isR2Enabled()) {
       // R2: viewer mode gets a 10-minute signed URL so Microsoft/Google viewer
       // has time to fetch the file asynchronously after the client receives the URL.
       // Download mode keeps the tight 60-second TTL.
-      const ttlSeconds = req.query.viewer === '1' ? 600 : 60;
+      // Videos get only 60s even in viewer mode (never the 10-minute window) --
+      // a browser's <video> element begins its own range-request fetch
+      // immediately once src is set, so it doesn't need anywhere near 10
+      // minutes; a long-lived streamable link is exactly the thing being
+      // closed here, not a document-viewer convenience.
+      const ttlSeconds = resource.resource_type === 'video' ? 60 : (req.query.viewer === '1' ? 600 : 60);
       const signedUrl = await getSignedDownloadUrl(key, ttlSeconds);
       logger.info('[download] R2 signed URL issued', { resourceId: id, userId });
 
