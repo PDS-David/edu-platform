@@ -1275,6 +1275,18 @@ async function run() {
       CREATE UNIQUE INDEX IF NOT EXISTS idx_srs_orphaned_unique
         ON syllabus_remap_suggestions (subject_id, source_table, source_id)
         WHERE syllabus_document_id IS NULL`],
+
+    // Video download-prevention (session continuation): see
+    // database/migration_038_resources_video_encryption_columns.sql for
+    // the full rationale, including why bulk-uploaded videos stay on
+    // resources (subject/subtopic-categorized, correct access control
+    // already) rather than being migrated into the course-scoped `videos`
+    // table. Purely additive, zero behavior change on its own.
+    ['resources: video encryption columns', `
+      ALTER TABLE resources
+        ADD COLUMN IF NOT EXISTS encrypted_playlist_url TEXT,
+        ADD COLUMN IF NOT EXISTS encryption_key_id UUID,
+        ADD COLUMN IF NOT EXISTS video_upload_status VARCHAR(20) NOT NULL DEFAULT 'n/a'`],
   ];
 
   for (const [label, sql] of tables) {
