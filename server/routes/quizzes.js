@@ -332,10 +332,33 @@ router.post('/attempt', protect, async (req, res) => {
       // so the student is marked wrong regardless of selection. Falls back
       // to the original text comparison only when no usable options exist
       // on this question.
+      // BUG FIX (grading-always-wrong): grade against options[].is_correct,
+      // the flag set deliberately at question creation/review time, instead
+      // of re-deriving correctness from a separately-stored correct_answer
+      // text field. correct_answer and option_text are stored independently
+      // and can drift (different wording/punctuation, especially for
+      // AI-generated questions) — when they do, every option compares false
+      // against correct_answer, including the one already flagged correct,
+      // so the student is marked wrong regardless of selection. Falls back
+      // to the original text comparison only when no usable options exist
+      // on this question.
+      //
+      // BUG FIX 2: matching studentRoutes.js's own grading (POST
+      // /questions/random and POST /tests/:id/submit, both already fixed) —
+      // `!!matchedOpt.is_correct` blindly coerced null/undefined/a missing
+      // key to false with no fallback, so a question whose matching option
+      // has a malformed is_correct (confirmed live: 686 MCQ questions have
+      // at least one option where is_correct is missing or not a real
+      // boolean) marked a genuinely correct answer wrong, silently, with no
+      // error anywhere. studentRoutes.js already only trusts is_correct
+      // when it's actually `typeof ... === 'boolean'`, falling back to the
+      // same correct_answer text comparison BUG FIX 1 above already uses
+      // for the "no matched option at all" case — this mirrors that exact
+      // check rather than inventing a second pattern.
       let isCorrect;
       const matchedOpt = qOpts.find(o => normalizeAnswer(o.option_text) === normalizeAnswer(submittedAnswer));
-      if (matchedOpt) {
-        isCorrect = !!matchedOpt.is_correct;
+      if (matchedOpt && typeof matchedOpt.is_correct === 'boolean') {
+        isCorrect = matchedOpt.is_correct;
       } else {
         isCorrect = normalizeAnswer(submittedAnswer) === normalizeAnswer(question.correct_answer);
       }
