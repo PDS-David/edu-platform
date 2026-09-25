@@ -52,11 +52,14 @@ export default function SubjectPage() {
       .finally(() => setLoading(false));
   }, [subjectId]);
 
-  // Auto-enroll silently on first visit
-  useEffect(() => {
-    if (!user || !subjectId || user.role !== 'student') return;
-    api.post('/students/subjects', { subject_id: subjectId }).catch(() => {});
-  }, [user, subjectId]);
+  // FIX: this used to auto-enroll a student in a subject on first visit, but
+  // POST /students/subjects has been intentionally locked down since a past
+  // "Phase 3 Step 4" change (studentRoutes.js) -- it now unconditionally
+  // returns 403 for every student request, by design (enrollment is
+  // admin/school-managed now). This call could therefore never succeed;
+  // it only produced a console error on every subtopic page load with no
+  // functional effect (already silently caught). Removed rather than left
+  // firing a guaranteed-to-fail request.
 
   const goToSubtopic = (subtopicId) => {
     const tab = activeMode === 'practice' ? 'practice' : activeMode === 'quiz' ? 'quiz' : 'resources';
