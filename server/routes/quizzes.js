@@ -332,10 +332,20 @@ router.post('/attempt', protect, async (req, res) => {
       // so the student is marked wrong regardless of selection. Falls back
       // to the original text comparison only when no usable options exist
       // on this question.
+      //
+      // FIX (live grading bug, confirmed against real assessment data):
+      // matchedOpt.is_correct could be missing/null/a stray string on a
+      // malformed options entry — `!!matchedOpt.is_correct` silently
+      // coerced any of those to false, marking a genuinely correct answer
+      // wrong. studentRoutes.js's two graders (test submission ~line 494,
+      // practice submission ~line 929) already guard against this with a
+      // strict `typeof ... === 'boolean'` check, falling back to the text
+      // comparison for anything else — this file was missing that same
+      // guard. Now matches both occurrences exactly.
       let isCorrect;
       const matchedOpt = qOpts.find(o => normalizeAnswer(o.option_text) === normalizeAnswer(submittedAnswer));
-      if (matchedOpt) {
-        isCorrect = !!matchedOpt.is_correct;
+      if (matchedOpt && typeof matchedOpt.is_correct === 'boolean') {
+        isCorrect = matchedOpt.is_correct;
       } else {
         isCorrect = normalizeAnswer(submittedAnswer) === normalizeAnswer(question.correct_answer);
       }
