@@ -2067,12 +2067,25 @@ router.post('/generate-questions', protect, teacherOnly, async (req, res) => {
           continue;
         }
 
+        // BUG FIX: this INSERT never included a `marks` column at all, so
+        // every structured/short_answer question silently fell back to
+        // Question.js's schema default (marks: 1) -- identical to a
+        // one-click MCQ guess, regardless of whether the model answer is a
+        // single word or a 300-500+ character multi-paragraph response.
+        // Confirmed via direct DB query: all 25 existing short_answer/
+        // structured rows have marks=1. Scaling by type/depth rather than
+        // exposing a new request param (out of scope for this fix) --
+        // short_answer gets 2 (more than a guessable MCQ, less than a full
+        // written response), structured gets 3, matching common real-world
+        // grading conventions for the amount of work each type demands.
+        const generatedMarks = question_type === 'structured' ? 3 : question_type === 'short_answer' ? 2 : 1;
+
         await sequelize.query(
           `INSERT INTO questions
              (question_text, options, correct_answer, explanation, difficulty,
-              subtopic_id, type, is_active, is_ai_generated, status, created_at, updated_at)
+              subtopic_id, type, marks, is_active, is_ai_generated, status, created_at, updated_at)
            VALUES (:q, NULL, :c, :e, :d,
-                   :subtopicId, :type, true, true, 'pending', NOW(), NOW())`,
+                   :subtopicId, :type, :marks, true, true, 'pending', NOW(), NOW())`,
           {
             replacements: {
               q: q.question_text,
@@ -2081,6 +2094,7 @@ router.post('/generate-questions', protect, teacherOnly, async (req, res) => {
               d: difficulty,
               subtopicId: resolvedSubtopicId,
               type: question_type,
+              marks: generatedMarks,
             },
             type: QueryTypes.INSERT,
           }
