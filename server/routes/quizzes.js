@@ -332,16 +332,6 @@ router.post('/attempt', protect, async (req, res) => {
       // so the student is marked wrong regardless of selection. Falls back
       // to the original text comparison only when no usable options exist
       // on this question.
-      // BUG FIX (grading-always-wrong): grade against options[].is_correct,
-      // the flag set deliberately at question creation/review time, instead
-      // of re-deriving correctness from a separately-stored correct_answer
-      // text field. correct_answer and option_text are stored independently
-      // and can drift (different wording/punctuation, especially for
-      // AI-generated questions) — when they do, every option compares false
-      // against correct_answer, including the one already flagged correct,
-      // so the student is marked wrong regardless of selection. Falls back
-      // to the original text comparison only when no usable options exist
-      // on this question.
       //
       // BUG FIX 2: matching studentRoutes.js's own grading (POST
       // /questions/random and POST /tests/:id/submit, both already fixed) —

@@ -331,16 +331,37 @@ function InProgressScreen({ subtopicId, subtopic, selectedPaper, onFinish, navig
         subject_id:    subtopic?.subject_id || null,
         paper_type:    selectedPaper,
         total_time_ms: elapsedMs,
-        answers: questions.map((q, i) => ({
-          question_id:        q.id,
-          selected_option_id: answersRef.current[i] ?? null,
-          // Distribute the real elapsed time evenly across every question.
-          // Per-question tracking would need a separate per-question timer
-          // (a future enhancement); for now this ensures the DB stores real
-          // values so GET /quizzes/attempt/:id recomputes a correct total
-          // instead of summing zeros and showing "0m 0s" every time.
-          time_taken_ms: perQuestionMs,
-        })),
+        answers: questions.map((q, i) => {
+          // FIX: free-text answers were being sent under selected_option_id
+          // -- the same field used for MCQ option text -- with no
+          // essay_response field at all. Grading only worked by coincidence
+          // via fallback chains in quizzes.js. Sending the right field
+          // explicitly removes that fragile reliance.
+          //
+          // Important distinction: short_answer is FREE-TEXT INPUT (renders
+          // via OpenAnswerArea, same as structured) but is graded via the
+          // exact-text-comparison branch, same as MCQ -- NOT AI-marked.
+          // Only structured/essay go through AI marking and expect
+          // essay_response specifically (see quizzes.js: `if (type ===
+          // 'structured' || type === 'essay')`). Using the coarser "is this
+          // rendered as MCQ options" check here would have sent
+          // short_answer's text as essay_response, which the backend's
+          // short_answer branch never reads at all -- grading would have
+          // silently seen an empty answer for every short_answer question.
+          const isAIMarked = q?.type === 'structured' || q?.type === 'essay';
+          const answerText = answersRef.current[i] ?? null;
+          return {
+            question_id:        q.id,
+            selected_option_id: isAIMarked ? null : answerText,
+            essay_response:     isAIMarked ? answerText : null,
+            // Distribute the real elapsed time evenly across every question.
+            // Per-question tracking would need a separate per-question timer
+            // (a future enhancement); for now this ensures the DB stores real
+            // values so GET /quizzes/attempt/:id recomputes a correct total
+            // instead of summing zeros and showing "0m 0s" every time.
+            time_taken_ms: perQuestionMs,
+          };
+        }),
       });
       onFinish(res.data?.attempt_id ?? res.attempt_id ?? res.id ?? null);
     } catch (err) {
