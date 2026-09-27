@@ -13,9 +13,9 @@ WHERE u.id = ts.teacher_id
   AND ts.school_id IS NULL
   AND u.school_id IS NOT NULL;
 
-DROP INDEX IF EXISTS teacher_subjects_teacher_id_subject_id_key;
 ALTER TABLE teacher_subjects
   DROP CONSTRAINT IF EXISTS teacher_subjects_teacher_id_subject_id_key;
+DROP INDEX IF EXISTS teacher_subjects_teacher_id_subject_id_key;
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_teacher_subjects_teacher_subject_school
   ON teacher_subjects (teacher_id, subject_id, school_id)
