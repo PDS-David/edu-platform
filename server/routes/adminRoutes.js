@@ -108,13 +108,14 @@ router.get('/question-bank/structure', protect, adminOnly, async (req, res) => {
               s.id AS subject_id, s.name AS subject_name, s.code AS subject_code,
               t.id AS topic_id, t.name AS topic_name,
               st.id AS subtopic_id, st.name AS subtopic_name
-         FROM subjects s
-         LEFT JOIN exam_boards eb ON eb.id = s.exam_board_id
+         FROM exam_boards eb
+         LEFT JOIN subjects s ON s.exam_board_id = eb.id AND s.is_active = true
          LEFT JOIN topics t ON t.subject_id = s.id AND t.is_active = true
          LEFT JOIN subtopics st ON st.topic_id = t.id AND st.is_active = true
-        WHERE s.is_active = true
-        ORDER BY eb.name NULLS LAST, s.name, t.order_index ASC NULLS LAST,
-                 t.name, st.order_index ASC NULLS LAST, st.name`,
+        WHERE eb.is_active = true
+        ORDER BY eb.display_order ASC NULLS LAST, eb.name,
+                 s.name, t.order_index ASC NULLS LAST, t.name,
+                 st.order_index ASC NULLS LAST, st.name`,
       { type: QueryTypes.SELECT }
     );
     return res.json({ success: true, data: rows });
