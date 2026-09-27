@@ -1820,7 +1820,6 @@ router.get('/question-bank/questions', protect, questionBankTeacherOnly, async (
     // subject_id is now the authoritative scope for the teacher queue.
     // Legacy orphaned questions with subject_id NULL remain App-Admin-only.
     const scopeJoin =
-      'JOIN subjects scope_s ON scope_s.id = q.subject_id ' +
       'JOIN teacher_subjects scope_ts ON scope_ts.subject_id = q.subject_id ' +
       'AND scope_ts.teacher_id = :teacherId AND scope_ts.is_active = true';
     const classifiedJoin = unclassified
@@ -1842,6 +1841,7 @@ router.get('/question-bank/questions', protect, questionBankTeacherOnly, async (
       'LEFT JOIN subtopics st2 ON st2.id = q.subtopic_id ' +
       'LEFT JOIN topics t2 ON t2.id = st2.topic_id ' +
       'LEFT JOIN subjects s2 ON s2.id = t2.subject_id ' +
+      'LEFT JOIN subjects scope_s ON scope_s.id = q.subject_id ' +
       'WHERE ' + clauses.join(' AND ') + ' ' +
       'ORDER BY q.created_at DESC, q.id DESC LIMIT :limit OFFSET :offset',
       { replacements, type: QueryTypes.SELECT }
