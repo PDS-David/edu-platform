@@ -1326,6 +1326,16 @@ async function run() {
         ON syllabus_remap_suggestions (subject_id, source_table, source_id)
         WHERE syllabus_document_id IS NULL`],
 
+    // Question Bank classification safety: return unclassified AI questions to human review.
+    ['questions: return unclassified AI questions to review', `
+      UPDATE questions
+         SET status = 'pending',
+             is_active = false,
+             updated_at = NOW()
+       WHERE is_ai_generated = true
+         AND subtopic_id IS NULL
+    `],
+
     // Video download-prevention (session continuation): see
     // database/migration_038_resources_video_encryption_columns.sql for
     // the full rationale, including why bulk-uploaded videos stay on
