@@ -539,18 +539,56 @@ router.post('/:id/answer', protect, async (req, res) => {
 // is_ai_generated=false (human-written, just not yet reviewed). Goes through
 // the same Question Review Queue as AI-generated content.
 router.post('/submit', protect, async (req, res) => {
-  const { question_text, subtopic_id, difficulty = 'medium', explanation, options, correct_answer } = req.body;
+  const {
+    question_text,
+    subtopic_id,
+    difficulty = 'medium',
+    explanation,
+    options = [],
+    correct_answer,
+    question_type = 'mcq',
+    model_answer,
+    mark_scheme,
+  } = req.body;
+
   if (!question_text?.trim()) return res.status(400).json({ success: false, error: 'question_text is required' });
   if (question_text.trim().length < 10) return res.status(400).json({ success: false, error: 'Question text must be at least 10 characters' });
-  if (!Array.isArray(options) || options.length < 2) return res.status(400).json({ success: false, error: 'At least 2 options required' });
 
-  const correctOpt = options.find(o => o.is_correct);
-  const correctAns = correct_answer || correctOpt?.option_text || correctOpt?.text || '';
+  const allowedTypes = ['mcq', 'essay'];
+  const type = allowedTypes.includes(question_type) ? question_type : null;
+  if (!type) return res.status(400).json({ success: false, error: 'Unsupported question type' });
+
+  const normalizedOptions = Array.isArray(options)
+    ? options.filter(o => (o?.option_text || o?.text || '').trim()).map(o => ({
+        option_text: o.option_text || o.text || '',
+        is_correct: !!o.is_correct,
+      }))
+    : [];
+
+  let correctAns = correct_answer?.trim() || '';
+
+  if (type === 'mcq') {
+    if (normalizedOptions.length < 2) {
+      return res.status(400).json({ success: false, error: 'At least 2 options required for MCQ' });
+    }
+    const correctOpt = normalizedOptions.find(o => o.is_correct);
+    if (!correctOpt && !correctAns) {
+      return res.status(400).json({ success: false, error: 'Please provide a correct answer for the MCQ' });
+    }
+    correctAns = correctAns || correctOpt.option_text;
+  } else {
+    // Essay questions have no option list. Store the contributor's model
+    // answer as the authoritative correct_answer used by the existing grader.
+    correctAns = correctAns || model_answer?.trim() || '';
+    if (!correctAns) {
+      return res.status(400).json({ success: false, error: 'Model answer is required for essay questions' });
+    }
+  }
 
   try {
     const result = await sequelize.query(
       `INSERT INTO questions (question_text, subtopic_id, submitted_by, difficulty, explanation, options, correct_answer, type, is_active, is_ai_generated, status, created_at, updated_at)
-       VALUES (:question_text, :subtopic_id, :submitted_by, :difficulty, :explanation, :options::jsonb, :correct_answer, 'mcq', true, false, 'pending', NOW(), NOW())
+       VALUES (:question_text, :subtopic_id, :submitted_by, :difficulty, :explanation, :options::jsonb, :correct_answer, :type, true, false, 'pending', NOW(), NOW())
        RETURNING id`,
       {
         replacements: {
@@ -558,9 +596,10 @@ router.post('/submit', protect, async (req, res) => {
           subtopic_id:    subtopic_id || null,
           submitted_by:   req.user.id,
           difficulty,
-          explanation:    explanation?.trim() || null,
-          options:        JSON.stringify(options.map(o => ({ option_text: o.option_text || o.text || '', is_correct: !!o.is_correct }))),
+          explanation:    explanation?.trim() || mark_scheme?.trim() || null,
+          options:        JSON.stringify(normalizedOptions),
           correct_answer: correctAns,
+          type,
         },
         type: QueryTypes.SELECT,
       }
