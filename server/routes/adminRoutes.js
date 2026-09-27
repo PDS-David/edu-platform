@@ -268,7 +268,7 @@ router.get('/platform-stats', protect, adminOnly, async (req, res) => {
         SELECT
           s.name,
           COUNT(pa.id)::INTEGER                                                         AS attempt_count,
-          ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0.0 END), 1)               AS avg_accuracy
+          ROUND(AVG(CASE WHEN pa.marks_awarded IS NOT NULL AND q.marks IS NOT NULL AND q.marks > 0 THEN (pa.marks_awarded::numeric / q.marks::numeric) * 100.0 WHEN pa.is_correct THEN 100.0 ELSE 0.0 END), 1)               AS avg_accuracy
         FROM practice_attempts pa
         -- Traverse full content chain — questions have no direct subject_id column
         JOIN questions  q  ON q.id  = pa.question_id
