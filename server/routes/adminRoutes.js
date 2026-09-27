@@ -1098,6 +1098,7 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
             c: q.correct_answer  || null,
             e: q.explanation     || null,
             d: difficulty,
+            subjectId: subject_id,
             subtopicId: resolvedSubtopicId,
             type: question_type,
           },
