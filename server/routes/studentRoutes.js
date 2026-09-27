@@ -450,6 +450,7 @@ router.post('/test/:testId/submit', protect, studentOnly, async (req, res) => {
     let maxScore   = 0;
     let needsManualReview = false;
     const results  = [];
+    const persistedAnswers = [];
 
     for (const answer of answers) {
       const question = questionMap[String(answer.question_id)];
@@ -558,6 +559,39 @@ router.post('/test/:testId/submit', protect, studentOnly, async (req, res) => {
       ).catch(() => {});
     }
 
+    // Persist the examination-specific answer record before marking the
+    // assignment submitted. Unlike practice_attempts, this row is tied to
+    // the exact examination assignment, so later result retrieval cannot
+    // accidentally mix practice/test/quiz attempts for the same question.
+    for (const answer of persistedAnswers) {
+      await sequelize.query(
+        `INSERT INTO examination_answers
+           (assignment_id, question_id, selected_answer, is_correct, marks_awarded, max_marks, feedback, time_taken_seconds, created_at, updated_at)
+         VALUES (:assignmentId, :questionId, :selectedAnswer, :isCorrect, :marksAwarded, :maxMarks, :feedback, :timeTakenSeconds, NOW(), NOW())
+         ON CONFLICT (assignment_id, question_id) DO UPDATE SET
+           selected_answer = EXCLUDED.selected_answer,
+           is_correct = EXCLUDED.is_correct,
+           marks_awarded = EXCLUDED.marks_awarded,
+           max_marks = EXCLUDED.max_marks,
+           feedback = EXCLUDED.feedback,
+           time_taken_seconds = EXCLUDED.time_taken_seconds,
+           updated_at = NOW()`,
+        {
+          replacements: {
+            assignmentId:      assignment.id,
+            questionId:        answer.question_id,
+            selectedAnswer:    answer.selected_answer,
+            isCorrect:         answer.is_correct,
+            marksAwarded:      answer.marks_awarded,
+            maxMarks:          answer.max_marks,
+            feedback:          answer.feedback,
+            timeTakenSeconds:  answer.time_taken_seconds,
+          },
+          type: QueryTypes.INSERT,
+        }
+      );
+    }
+
     const accuracyPct = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
 
     // Mark test assignment as completed — score now holds weighted marks
@@ -636,6 +670,86 @@ router.get('/examinations', protect, studentOnly, async (req, res) => {
 
 // ── GET /api/students/examination/:id — questions, only within the live
 // window ─────────────────────────────────────────────────────────────────
+// ── GET /api/students/examination/:id/result ────────────────────────────────
+// Returns the persisted result for a submitted scheduled examination.
+// This is deliberately separate from GET /examination/:id: the latter is
+// the live-question endpoint and refuses access after the exam window closes.
+// Only the assigned student can retrieve this result.
+router.get('/examination/:id/result', protect, studentOnly, async (req, res) => {
+  const { id } = req.params;
+  if (!isValidUUID(id)) {
+    return res.status(400).json({ success: false, error: 'Invalid examination ID' });
+  }
+
+  try {
+    const rows = await sequelize.query(
+      `SELECT
+          ea.id AS assignment_id,
+          ea.submitted_at,
+          ea.score,
+          e.id AS examination_id,
+          e.title,
+          e.total_marks
+       FROM examination_assignments ea
+       JOIN examinations e ON e.id = ea.examination_id
+       WHERE ea.examination_id = :id
+         AND ea.student_id = :studentId
+       LIMIT 1`,
+      { replacements: { id, studentId: req.user.id }, type: QueryTypes.SELECT }
+    );
+
+    if (!rows.length) {
+      return res.status(403).json({ success: false, error: 'This examination has not been assigned to you.' });
+    }
+
+    const assignment = rows[0];
+    if (!assignment.submitted_at) {
+      return res.status(409).json({ success: false, error: 'This examination has not been submitted yet.' });
+    }
+
+    const answers = await sequelize.query(
+      `SELECT
+          ea.question_id,
+          ea.selected_answer,
+          ea.is_correct,
+          ea.marks_awarded,
+          ea.max_marks,
+          ea.feedback,
+          ea.time_taken_seconds,
+          eq.question_order,
+          q.question_text,
+          q.type
+       FROM examination_answers ea
+       JOIN examination_questions eq
+         ON eq.examination_id = :id
+        AND eq.question_id = ea.question_id
+       JOIN questions q ON q.id = ea.question_id
+       WHERE ea.assignment_id = :assignmentId
+       ORDER BY eq.question_order ASC`,
+      {
+        replacements: { id, assignmentId: assignment.assignment_id },
+        type: QueryTypes.SELECT,
+      }
+    );
+
+    const maxScore = assignment.total_marks ?? answers.reduce((sum, a) => sum + (a.max_marks || 0), 0);
+    const totalScore = assignment.score ?? answers.reduce((sum, a) => sum + (a.marks_awarded || 0), 0);
+    const accuracyPct = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
+
+    return res.status(200).json({
+      success: true,
+      total_score: totalScore,
+      max_score: maxScore,
+      accuracy_pct: accuracyPct,
+      answers,
+      answers_available: answers.length > 0,
+    });
+  } catch (err) {
+    console.error(`[GET /students/examination/${id}/result]`, err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.get('/examination/:id', protect, studentOnly, async (req, res) => {
   const { id } = req.params;
   if (!isValidUUID(id)) {
@@ -827,17 +941,10 @@ router.get('/exam-lock-status', protect, studentOnly, async (req, res) => {
 // grader follows that specific rubric instead of the generic "compare to
 // model answer" behavior.
 //
-// KNOWN LIMITATION, matching an existing pattern rather than introducing a
-// new one: like test submission, this returns the full per-question
-// breakdown (marks_awarded, feedback, etc.) in the response but only
-// persists the aggregate `score` to examination_assignments -- there is no
-// per-question answers/feedback table for exams any more than there is
-// for tests today. Revisiting a submitted exam later would not be able to
-// reconstruct the detailed breakdown shown at submission time. This is
-// the same gap this session already found (and separately flagged,
-// unfixed) in quizzes.js's practice-attempt history -- not new to this
-// endpoint, and not fixed here either, since inventing that storage was
-// out of this phase's scope.
+// RESULT PERSISTENCE: the detailed per-question breakdown is stored in
+// examination_answers, keyed to the exact examination assignment. This keeps
+// examination history separate from practice_attempts, which is an analytics
+// stream and cannot safely identify which exam a question attempt belonged to.
 router.post('/examination/:id/submit', protect, studentOnly, async (req, res) => {
   const { id } = req.params;
   if (!isValidUUID(id)) {
@@ -972,6 +1079,16 @@ router.post('/examination/:id/submit', protect, studentOnly, async (req, res) =>
         marks_awarded: marksAwarded,
         max_marks:     markValue,
         feedback,
+      });
+
+      persistedAnswers.push({
+        question_id:        answer.question_id,
+        selected_answer:    (answer.essay_response ?? answer.selected_answer ?? answer.selected_option_id ?? null),
+        is_correct:         !!isCorrect,
+        marks_awarded:      marksAwarded,
+        max_marks:          markValue,
+        feedback,
+        time_taken_seconds: Math.round((answer.time_taken_ms || 0) / 1000),
       });
 
       // Record practice attempt (non-blocking) — same convention as test
