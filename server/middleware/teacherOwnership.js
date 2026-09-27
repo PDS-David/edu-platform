@@ -224,8 +224,8 @@ const requireClassOwnership = async (req, res, next) => {
   let rows;
   try {
     rows = await sequelize.query(
-      `SELECT id FROM classes WHERE id = :classId AND teacher_id = :teacherId`,
-      { replacements: { classId, teacherId: req.user.id }, type: QueryTypes.SELECT }
+      `SELECT id FROM classes WHERE id = :classId AND teacher_id = :teacherId AND ((school_id = :schoolId) OR (school_id IS NULL AND :schoolId IS NULL))`,
+      { replacements: { classId, teacherId: req.user.id, schoolId: req.user.school_id || null }, type: QueryTypes.SELECT }
     );
   } catch (err) {
     if (isMissingTableError(err)) {
