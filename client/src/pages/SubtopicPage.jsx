@@ -645,20 +645,42 @@ function OpenAnswerQuestion({ question, questionNumber, totalQuestions, dismisse
   const [answer,  setAnswer]  = useState('');
   const [result,  setResult]  = useState(null);
   const [loading, setLoading] = useState(false);
+  const startedAtRef = useRef(Date.now());
 
-  const handleAIMarker = async () => {
-    if (!answer.trim()) return;
+  useEffect(() => {
+    startedAtRef.current = Date.now();
+    setAnswer('');
+    setResult(null);
+    setLoading(false);
+  }, [question.id]);
+
+  const handleSubmit = async () => {
+    const trimmedAnswer = answer.trim();
+    if (!trimmedAnswer) return;
+
     setLoading(true);
     try {
-      const r = await api.post('/ai/explain', {
-        question_id:        question.id,
-        selected_option_id: null,
-        typed_answer:       answer,
+      const timeTaken = Math.max(0, Math.round((Date.now() - startedAtRef.current) / 1000));
+      const r = await api.post(`/questions/${question.id}/answer`, {
+        selected_answer: trimmedAnswer,
+        time_taken_seconds: timeTaken,
       });
-      setResult(r.data?.explanation ?? r.explanation ?? 'AI feedback submitted.');
-    } catch { setResult('AI marking not available. Continue to next question.'); }
-    finally  { setLoading(false); }
+
+      // apiClient unwraps standard responses; r.data is the authoritative
+      // grading payload returned by POST /questions/:id/answer.
+      setResult(r.data || {});
+    } catch (err) {
+      console.error('[OpenAnswerQuestion] Short Question grading failed:', err);
+      setResult({
+        error: err?.message || 'Unable to mark this answer right now. Please try again.',
+      });
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const feedback = result?.feedback || result?.explanation || null;
+  const hasError = !!result?.error;
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -673,33 +695,68 @@ function OpenAnswerQuestion({ question, questionNumber, totalQuestions, dismisse
         <div className="mx-5 mb-3 bg-gray-900 text-white rounded-xl p-3 flex items-start gap-3">
           <span className="text-xl shrink-0"></span>
           <div className="flex-1">
-            <p className="text-xs leading-relaxed">Upon submission, you'll receive a detailed analysis of your answer and personalised feedback to help you improve! </p>
+            <p className="text-xs leading-relaxed">Submit your answer to receive your mark and feedback.</p>
           </div>
           <button onClick={onDismiss} className="text-gray-400 hover:text-white text-lg shrink-0">×</button>
         </div>
       )}
       <div className="px-5 pb-4">
         <div className="relative">
-          <textarea value={answer} onChange={e => setAnswer(e.target.value)} placeholder="Type your answer here"
-            className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm text-gray-800 resize-none focus:outline-none focus:border-blue-400 min-h-[120px]" />
+          <textarea value={answer} onChange={e => setAnswer(e.target.value)} disabled={!!result}
+            placeholder="Type your answer here"
+            className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm text-gray-800 resize-none focus:outline-none focus:border-blue-400 min-h-[120px] disabled:bg-gray-50 disabled:text-gray-500" />
           <div className="absolute bottom-3 right-3 flex gap-2">
             <button className="w-7 h-7 rounded-full bg-purple-500 flex items-center justify-center text-white hover:bg-purple-600"><Upload size={12} /></button>
             <button className="w-7 h-7 rounded-full bg-green-500 flex items-center justify-center text-white hover:bg-green-600"><Sigma size={12} /></button>
           </div>
         </div>
+
         {result && (
-          <div className="mt-3 bg-blue-50 border border-blue-100 rounded-xl p-3">
-            <p className="text-xs font-semibold text-blue-700 mb-1 flex items-center gap-1"><Sparkles size={12} /> AI Feedback</p>
-            <p className="text-xs text-blue-700 leading-relaxed whitespace-pre-line">{result}</p>
+          <div className={`mt-3 rounded-xl p-3 border ${
+            hasError
+              ? 'bg-red-50 border-red-100'
+              : result.is_correct
+                ? 'bg-green-50 border-green-100'
+                : 'bg-red-50 border-red-100'
+          }`}>
+            {hasError ? (
+              <p className="text-xs text-red-700 leading-relaxed">{result.error}</p>
+            ) : (
+              <>
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <p className={`text-xs font-bold ${
+                    result.is_correct ? 'text-green-700' : 'text-red-700'
+                  }`}>
+                    {result.is_correct ? 'Correct' : 'Incorrect'}
+                  </p>
+                  <p className="text-xs font-bold text-gray-800">
+                    Marks: {result.marks_awarded ?? 0} / {result.max_marks ?? question.marks ?? 1}
+                  </p>
+                </div>
+                {!result.is_correct && result.correct_answer && (
+                  <p className="text-xs text-gray-700 mb-2">
+                    <span className="font-semibold">Correct answer:</span> {result.correct_answer}
+                  </p>
+                )}
+                {feedback && (
+                  <div>
+                    <p className="text-xs font-semibold text-blue-700 mb-1 flex items-center gap-1">
+                      <Sparkles size={12} /> Feedback
+                    </p>
+                    <p className="text-xs text-blue-700 leading-relaxed whitespace-pre-line">{feedback}</p>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
       </div>
       <div className="px-5 pb-5 flex items-center gap-3">
         {onPrev && <button onClick={onPrev} className="border-2 border-gray-200 text-gray-600 font-semibold px-4 py-2.5 rounded-xl text-sm hover:bg-gray-50">← Prev</button>}
-        <button onClick={result ? onNext : handleAIMarker} disabled={loading || (!result && !answer.trim())}
+        <button onClick={result && !hasError ? () => onNext(!!result.is_correct) : handleSubmit} disabled={loading || (!result && !answer.trim())}
           className="flex-1 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-200 disabled:text-gray-400 text-white font-semibold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2">
           {loading && <Loader2 size={14} className="animate-spin" />}
-          {result ? 'Next Question' : loading ? 'Marking…' : 'AI Marker '}
+          {result && !hasError ? 'Next Question' : loading ? 'Marking…' : 'Submit Answer'}
         </button>
         <span className="text-xs text-gray-400 shrink-0">{questionNumber} of {totalQuestions}</span>
       </div>
