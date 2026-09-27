@@ -1645,6 +1645,29 @@ router.post('/examinations/:id/assign', protect, teacherOnly, async (req, res) =
 
     let targets = [];
     if (class_id) {
+      // SECURITY FIX (TEACHER-04): a teacher may only assign an examination
+      // to a class they own in their active school. Previously the supplied
+      // class_id was trusted and its entire membership was loaded, allowing
+      // a teacher to target another teacher's class by UUID.
+      const ownedClass = await sequelize.query(
+        `SELECT id FROM classes
+         WHERE id = :classId
+           AND teacher_id = :teacherId
+           AND ((school_id = :schoolId) OR (school_id IS NULL AND :schoolId IS NULL))
+         LIMIT 1`,
+        {
+          replacements: {
+            classId: class_id,
+            teacherId: req.user.id,
+            schoolId: req.user.school_id || null,
+          },
+          type: QueryTypes.SELECT,
+        }
+      );
+      if (!ownedClass.length) {
+        return res.status(403).json({ success: false, error: 'Not your class' });
+      }
+
       const members = await sequelize.query(
         `SELECT student_id FROM class_memberships WHERE class_id = :classId`,
         { replacements: { classId: class_id }, type: QueryTypes.SELECT }
