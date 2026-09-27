@@ -747,6 +747,33 @@ router.delete('/:id', protect, authorize('admin'), async (req, res) => {
 const bcrypt = require('bcryptjs');
 const crypto2 = require('crypto');
 const { validateEmail, validatePassword, validateName, normaliseEmail, normaliseName } = require('../utils/registrationValidators');
+// Teachers can review and accept invitations without school-admin privileges.
+router.get('/my-memberships', protect, async (req, res) => {
+  if (req.user.role !== 'teacher') return res.status(403).json({ success: false, error: 'Teacher access required' });
+  try {
+    const rows = await q(`SELECT m.school_id, m.status, s.name
+      FROM teacher_school_memberships m JOIN schools s ON s.id = m.school_id
+      WHERE m.teacher_id = $1 ORDER BY s.name`, [req.user.id]);
+    return res.json({ success: true, data: rows });
+  } catch (err) {
+    console.error('[schools] memberships', err.message);
+    return res.status(500).json({ success: false, error: 'Could not load memberships' });
+  }
+});
+router.post('/my-memberships/:schoolId/accept', protect, async (req, res) => {
+  if (req.user.role !== 'teacher') return res.status(403).json({ success: false, error: 'Teacher access required' });
+  try {
+    const rows = await q(`UPDATE teacher_school_memberships SET status = 'active', updated_at = NOW()
+      WHERE teacher_id = $1 AND school_id = $2 AND status = 'pending'
+      RETURNING school_id`, [req.user.id, req.params.schoolId]);
+    if (!rows.length) return res.status(404).json({ success: false, error: 'Pending invitation not found' });
+    return res.json({ success: true, data: { school_id: rows[0].school_id } });
+  } catch (err) {
+    console.error('[schools] accept membership', err.message);
+    return res.status(500).json({ success: false, error: 'Could not accept invitation' });
+  }
+});
+
 router.post('/me/invite', protect, requireSchoolAdmin, async (req, res) => {
   const email      = normaliseEmail(req.body.email);
   const password   = req.body.password;
@@ -765,6 +792,21 @@ router.post('/me/invite', protect, requireSchoolAdmin, async (req, res) => {
   if (!fnCheck.valid) return res.status(400).json({ success: false, error: fnCheck.error });
 
   try {
+    // Existing teachers retain their credentials. They must explicitly accept
+    // the pending invitation before this school gains access to their work.
+    if (role === 'teacher') {
+      const existing = await q(`SELECT id, role FROM users WHERE lower(email) = $1 LIMIT 1`, [email]);
+      if (existing.length) {
+        if (existing[0].role !== 'teacher') return res.status(409).json({ success: false, error: 'Email belongs to another account type' });
+        const membership = await q(`INSERT INTO teacher_school_memberships (teacher_id, school_id, status, invited_by)
+          VALUES ($1, $2, 'pending', $3)
+          ON CONFLICT (teacher_id, school_id) DO UPDATE
+          SET status = CASE WHEN teacher_school_memberships.status = 'active' THEN 'active' ELSE 'pending' END,
+              invited_by = EXCLUDED.invited_by, updated_at = NOW()
+          RETURNING status`, [existing[0].id, req.user.school_id, req.user.id]);
+        return res.status(202).json({ success: true, data: { invited: true, status: membership[0].status } });
+      }
+    }
     const hashed = await bcrypt.hash(password, await bcrypt.genSalt(12));
     const verificationToken        = crypto2.randomBytes(32).toString('hex');
     const verificationTokenExpires = new Date(Date.now() + 86400000);
@@ -796,6 +838,12 @@ router.post('/me/invite', protect, requireSchoolAdmin, async (req, res) => {
         type: sequelize.QueryTypes.SELECT,
       }
     );
+
+    if (rows?.length && role === 'teacher') {
+      await q(`INSERT INTO teacher_school_memberships (teacher_id, school_id, status, invited_by)
+        VALUES ($1, $2, 'active', $3) ON CONFLICT (teacher_id, school_id) DO NOTHING`,
+        [rows[0].id, req.user.school_id, req.user.id]);
+    }
 
     if (!rows || rows.length === 0) {
       return res.status(409).json({ success: false, error: 'An account with that email already exists' });
