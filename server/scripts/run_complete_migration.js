@@ -2845,6 +2845,18 @@ async function run() {
   await exec('languages: confirm Arabic is_rtl = true', `
     UPDATE languages SET is_rtl = true WHERE code = 'arabic'`);
 
+  // ── Subject/class deactivation cascade (migration_041) ────────────────
+  // class_subjects now carries its own active flag, and catalog deactivation
+  // must never leave student/class assignments active under an inactive subject.
+  await exec('class_subjects: add deactivation state', `
+    ALTER TABLE class_subjects
+      ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true
+  `);
+  await exec('class_subjects: add subject/active index', `
+    CREATE INDEX IF NOT EXISTS idx_class_subjects_subject_active
+      ON class_subjects(subject_id, is_active)
+  `);
+
   // ── Reconcile stale deactivation status (migration_027) ──────────────────
   // Folded in as a permanent, idempotent safeguard rather than relying on
   // migration_027_reconcile_stale_deactivation_status.sql being run by hand

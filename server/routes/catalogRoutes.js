@@ -203,17 +203,36 @@ router.delete('/types/:id', protect, authorize('admin'), async (req, res) => {
     );
     if (!typeRows.length) return res.status(404).json({ success: false, error: 'Exam type not found' });
 
-    // Cascade: deactivate all subjects under this exam type first
-    await sequelize.query(
-      `UPDATE subjects SET is_active = false, updated_at = NOW() WHERE exam_board_id::text = :id`,
-      { replacements: { id }, type: QueryTypes.UPDATE }
-    );
-    // Then deactivate the exam type itself
-    await sequelize.query(
-      `UPDATE exam_boards SET is_active = false, updated_at = NOW() WHERE id::text = :id`,
-      { replacements: { id }, type: QueryTypes.UPDATE }
-    );
-    return res.status(200).json({ success: true, message: 'Exam type and all its subjects deactivated' });
+    const transaction = await sequelize.transaction();
+    try {
+      await sequelize.query(
+        `UPDATE student_subjects SET is_active = false
+         WHERE subject_id IN (SELECT id FROM subjects WHERE exam_board_id::text = :id)`,
+        { replacements: { id }, type: QueryTypes.UPDATE, transaction }
+      );
+      await sequelize.query(
+        `UPDATE student_exam_types SET is_active = false WHERE exam_board_id::text = :id`,
+        { replacements: { id }, type: QueryTypes.UPDATE, transaction }
+      );
+      await sequelize.query(
+        `UPDATE class_subjects SET is_active = false
+         WHERE subject_id IN (SELECT id FROM subjects WHERE exam_board_id::text = :id)`,
+        { replacements: { id }, type: QueryTypes.UPDATE, transaction }
+      );
+      await sequelize.query(
+        `UPDATE subjects SET is_active = false, updated_at = NOW() WHERE exam_board_id::text = :id`,
+        { replacements: { id }, type: QueryTypes.UPDATE, transaction }
+      );
+      await sequelize.query(
+        `UPDATE exam_boards SET is_active = false, updated_at = NOW() WHERE id::text = :id`,
+        { replacements: { id }, type: QueryTypes.UPDATE, transaction }
+      );
+      await transaction.commit();
+    } catch (err) {
+      await transaction.rollback();
+      throw err;
+    }
+    return res.status(200).json({ success: true, message: 'Exam type, subjects, and dependent enrollments deactivated' });
   } catch (err) {
     console.error('[DELETE /catalog/types/:id]', err.message);
     return res.status(500).json({ success: false, error: err.message });
@@ -332,6 +351,33 @@ router.put('/subjects/:id', protect, authorize('admin'), async (req, res) => {
   const { id } = req.params;
   const { name, description, level, icon_emoji, is_active } = req.body;
   try {
+    if (is_active === false) {
+      const transaction = await sequelize.transaction();
+      try {
+        await sequelize.query(
+          `UPDATE student_exam_types SET is_active = false WHERE exam_board_id = :id`,
+          { replacements: { id }, type: QueryTypes.UPDATE, transaction }
+        );
+        await sequelize.query(
+          `UPDATE student_subjects SET is_active = false
+           WHERE subject_id IN (SELECT id FROM subjects WHERE exam_board_id = :id)`,
+          { replacements: { id }, type: QueryTypes.UPDATE, transaction }
+        );
+        await sequelize.query(
+          `UPDATE class_subjects SET is_active = false
+           WHERE subject_id IN (SELECT id FROM subjects WHERE exam_board_id = :id)`,
+          { replacements: { id }, type: QueryTypes.UPDATE, transaction }
+        );
+        await sequelize.query(
+          `UPDATE subjects SET is_active = false, updated_at = NOW() WHERE exam_board_id = :id`,
+          { replacements: { id }, type: QueryTypes.UPDATE, transaction }
+        );
+        await transaction.commit();
+      } catch (err) {
+        await transaction.rollback();
+        throw err;
+      }
+    }
     await sequelize.query(
       `UPDATE subjects SET
          name        = COALESCE(:name,        name),
@@ -366,8 +412,26 @@ router.put('/subjects/:id', protect, authorize('admin'), async (req, res) => {
 router.delete('/subjects/:id', protect, authorize('admin'), async (req, res) => {
   const { id } = req.params;
   try {
-    await sequelize.query(`UPDATE subjects SET is_active = false, updated_at = NOW() WHERE id = :id`, { replacements: { id }, type: QueryTypes.UPDATE });
-    return res.status(200).json({ success: true, message: 'Subject deactivated' });
+    const transaction = await sequelize.transaction();
+    try {
+      await sequelize.query(
+        `UPDATE student_subjects SET is_active = false WHERE subject_id = :id`,
+        { replacements: { id }, type: QueryTypes.UPDATE, transaction }
+      );
+      await sequelize.query(
+        `UPDATE class_subjects SET is_active = false WHERE subject_id = :id`,
+        { replacements: { id }, type: QueryTypes.UPDATE, transaction }
+      );
+      await sequelize.query(
+        `UPDATE subjects SET is_active = false, updated_at = NOW() WHERE id = :id`,
+        { replacements: { id }, type: QueryTypes.UPDATE, transaction }
+      );
+      await transaction.commit();
+    } catch (err) {
+      await transaction.rollback();
+      throw err;
+    }
+    return res.status(200).json({ success: true, message: 'Subject and dependent enrollments deactivated' });
   } catch (err) {
     console.error('[DELETE /catalog/subjects/:id]', err.message);
     return res.status(500).json({ success: false, error: err.message });
