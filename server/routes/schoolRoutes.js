@@ -330,7 +330,11 @@ router.delete('/me/roster/:userId', protect, requireSchoolAdmin, async (req, res
 
   try {
     const target = await q(
-      `SELECT id, role, first_name, last_name FROM users WHERE id = $1 AND school_id = $2`,
+      `SELECT id, role, first_name, last_name, school_id FROM users
+        WHERE id = $1 AND (school_id = $2 OR (role = 'teacher' AND EXISTS (
+          SELECT 1 FROM teacher_school_memberships m
+          WHERE m.teacher_id = users.id AND m.school_id = $2 AND m.status = 'active'
+        )))`,
       [userId, req.user.school_id]
     );
     if (!target.length) {
@@ -344,10 +348,29 @@ router.delete('/me/roster/:userId', protect, requireSchoolAdmin, async (req, res
 
     const t = await sequelize.transaction();
     try {
-      await sequelize.query(
-        `UPDATE users SET school_id = NULL WHERE id = $1`,
+      if (role === 'teacher') {
+        await sequelize.query(
+          `UPDATE teacher_school_memberships SET status = 'inactive', updated_at = NOW()
+            WHERE teacher_id = $1 AND school_id = $2`,
+          { bind: [userId, req.user.school_id], type: sequelize.QueryTypes.UPDATE, transaction: t }
+        );
+        if (target[0].school_id === req.user.school_id) {
+          const remaining = await sequelize.query(
+            `SELECT school_id FROM teacher_school_memberships
+              WHERE teacher_id = $1 AND status = 'active' ORDER BY created_at LIMIT 1`,
+            { bind: [userId], type: sequelize.QueryTypes.SELECT, transaction: t }
+          );
+          await sequelize.query(
+            `UPDATE users SET school_id = $2 WHERE id = $1`,
+            { bind: [userId, remaining[0]?.school_id || null], type: sequelize.QueryTypes.UPDATE, transaction: t }
+          );
+        }
+      } else {
+        await sequelize.query(
+          `UPDATE users SET school_id = NULL WHERE id = $1`,
         { bind: [userId], type: sequelize.QueryTypes.UPDATE, transaction: t }
-      );
+        );
+      }
 
       if (role === 'student') {
         await sequelize.query(
@@ -360,8 +383,8 @@ router.delete('/me/roster/:userId', protect, requireSchoolAdmin, async (req, res
         );
       } else {
         await sequelize.query(
-          `UPDATE teacher_subjects SET is_active = false WHERE teacher_id = $1`,
-          { bind: [userId], type: sequelize.QueryTypes.UPDATE, transaction: t }
+          `UPDATE teacher_subjects SET is_active = false WHERE teacher_id = $1 AND school_id = $2`,
+          { bind: [userId, req.user.school_id], type: sequelize.QueryTypes.UPDATE, transaction: t }
         );
       }
 
