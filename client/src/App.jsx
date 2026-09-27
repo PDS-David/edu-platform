@@ -74,6 +74,7 @@ import TeacherDashboard from "./pages/TeacherDashboard";
 import TeacherContentPage from "./pages/TeacherContentPage";
 import TeacherPastPapersPage from "./pages/TeacherPastPapersPage";
 import TeacherPendingQuestions from "./pages/TeacherPendingQuestions";
+import TeacherQuestionBankPage from "./pages/TeacherQuestionBankPage";
 import TeacherResourcesPage from "./pages/TeacherResourcesPage";
 import ContributeQuestion from "./pages/ContributeQuestion";
 import QuestionReview from "./pages/QuestionReview";
@@ -241,6 +242,7 @@ export default function App() {
             <Route path="pending-questions" element={<TeacherPendingQuestions />} />
             <Route path="resources" element={<TeacherResourcesPage />} />
             <Route path="review" element={<QuestionReview />} />
+            <Route path="question-bank" element={<TeacherQuestionBankPage />} />
             <Route path="syllabus" element={<SyllabusListPage />} />
             <Route path="syllabus/:id" element={<SyllabusReviewPage />} />
             <Route path="syllabus/:id/remap" element={<SyllabusRemapPage />} />

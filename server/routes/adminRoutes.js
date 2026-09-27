@@ -590,6 +590,7 @@ router.put('/questions/:id/review', protect, adminOnly, adminActionLimiter, asyn
     await sequelize.query(
       `UPDATE questions
        SET status = :status,
+           is_active = :status = 'approved',
            review_feedback = :feedback,
            reviewed_by = :reviewer,
            reviewed_at = NOW(),
@@ -619,7 +620,7 @@ router.put('/questions/:id/review', protect, adminOnly, adminActionLimiter, asyn
     try {
       const newStatus = req.body.action === 'approve' ? 'approved' : 'rejected';
       await sequelize.query(
-        `UPDATE questions SET status = :status, updated_at = NOW() WHERE id = :id`,
+        `UPDATE questions SET status = :status, is_active = (:status = 'approved'), updated_at = NOW() WHERE id = :id`,
         { replacements: { status: newStatus, id: req.params.id }, type: QueryTypes.UPDATE }
       );
       return res.json({ success: true, status: newStatus });

@@ -1113,13 +1113,13 @@ router.post('/tests/:id/questions', protect, teacherOnly, async (req, res) => {
     let validQuestions;
     if (isAdmin) {
       const rows = await sequelize.query(
-        `SELECT id FROM questions WHERE id = ANY(ARRAY[${question_ids.map((_, i) => `$${i + 1}`).join(',')}]::integer[]) AND is_active = true`,
+        `SELECT id FROM questions WHERE id = ANY(ARRAY[${question_ids.map((_, i) => `${i + 1}`).join(',')}]::integer[]) AND is_active = true AND COALESCE(status, 'pending') IN ('approved', 'active')`,
         { bind: question_ids, type: QueryTypes.SELECT }
       );
       validQuestions = rows;
     } else {
       const rows = await sequelize.query(
-        `SELECT id FROM questions WHERE id = ANY(ARRAY[${question_ids.map((_, i) => `$${i + 1}`).join(',')}]::integer[]) AND is_active = true AND submitted_by = $${question_ids.length + 1}`,
+        `SELECT id FROM questions WHERE id = ANY(ARRAY[${question_ids.map((_, i) => `${i + 1}`).join(',')}]::integer[]) AND is_active = true AND COALESCE(status, 'pending') IN ('approved', 'active') AND submitted_by = ${question_ids.length + 1}`,
         { bind: [...question_ids, req.user.id], type: QueryTypes.SELECT }
       );
       validQuestions = rows;
@@ -1416,7 +1416,9 @@ router.post('/examinations/:id/questions/bank', protect, teacherOnly, async (req
          JOIN topics     t ON t.id  = st.topic_id
          JOIN subjects   s ON s.id  = t.subject_id
          JOIN teacher_subjects ts ON ts.subject_id = s.id AND ts.teacher_id = :teacherId AND ts.is_active = true
-        WHERE q.id = :questionId AND q.is_active = true`,
+        WHERE q.id = :questionId
+          AND q.is_active = true
+          AND COALESCE(q.status, 'pending') IN ('approved', 'active')`,
       { replacements: { questionId, teacherId: req.user.id }, type: QueryTypes.SELECT }
     );
     if (!validQuestion.length) {
@@ -1772,6 +1774,117 @@ router.post('/nudge/:userId', protect, teacherOnly, async (req, res) => {
   } catch (err) { return res.status(500).json({ success: false, error: err.message }); }
 });
 
+// ── QUESTION BANK CLASSIFICATION ─────────────────────────────────────────────
+// The Question Bank is the controlled bridge between generated content and
+// student allocation. Teachers can classify AI-generated questions only into
+// subtopics belonging to subjects they supervise. Classification deliberately
+// does NOT approve the question: it moves the question to pending/inactive so
+// the normal human review queue must approve it before students can receive it.
+
+router.get('/question-bank/questions', protect, teacherOnly, async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(parseInt(req.query.limit || '50', 10), 1), 100);
+    const offset = Math.max(parseInt(req.query.offset || '0', 10), 0);
+    const search = String(req.query.search || '').trim();
+    const unclassified = String(req.query.unclassified || '') === 'true';
+    const subtopicId = req.query.subtopic_id ? parseInt(req.query.subtopic_id, 10) : null;
+
+    const replacements = { teacherId: req.user.id, limit, offset };
+    const clauses = ['q.is_ai_generated = true'];
+
+    if (unclassified) {
+      clauses.push('q.subtopic_id IS NULL');
+    } else if (Number.isInteger(subtopicId)) {
+      clauses.push('q.subtopic_id = :subtopicId');
+      replacements.subtopicId = subtopicId;
+    } else {
+      return res.status(400).json({ success: false, error: 'Choose a subtopic or the unclassified queue.' });
+    }
+
+    if (search) {
+      clauses.push('q.question_text ILIKE :search');
+      replacements.search = '%' + search + '%';
+    }
+
+    const classifiedJoin = unclassified ? '' :
+      'JOIN subtopics st ON st.id = q.subtopic_id ' +
+      'JOIN topics t ON t.id = st.topic_id ' +
+      'JOIN subjects s ON s.id = t.subject_id ' +
+      'JOIN teacher_subjects ts ON ts.subject_id = s.id ' +
+      'AND ts.teacher_id = :teacherId AND ts.is_active = true';
+
+    const rows = await sequelize.query(
+      'SELECT q.id, q.question_text, q.type, q.question_type, q.difficulty, ' +
+      'q.status, q.is_active, q.is_ai_generated, q.created_at, ' +
+      'q.options, q.correct_answer, q.explanation, ' +
+      's.name AS subject_name, t.name AS topic_name, st.name AS subtopic_name ' +
+      'FROM questions q ' + classifiedJoin + ' ' +
+      'LEFT JOIN subtopics st2 ON st2.id = q.subtopic_id ' +
+      'LEFT JOIN topics t2 ON t2.id = st2.topic_id ' +
+      'LEFT JOIN subjects s2 ON s2.id = t2.subject_id ' +
+      'WHERE ' + clauses.join(' AND ') + ' ' +
+      'ORDER BY q.created_at DESC, q.id DESC LIMIT :limit OFFSET :offset',
+      { replacements, type: QueryTypes.SELECT }
+    );
+
+    const countRow = await sequelize.query(
+      'SELECT COUNT(*)::INTEGER AS count FROM questions q ' + classifiedJoin +
+      ' WHERE ' + clauses.join(' AND '),
+      { replacements, type: QueryTypes.SELECT }
+    );
+
+    return res.json({ success: true, data: rows, total: countRow[0]?.count || 0 });
+  } catch (err) {
+    console.error('[GET /teacher/question-bank/questions]', err.message);
+    return res.status(500).json({ success: false, error: 'Could not load the question bank.' });
+  }
+});
+
+router.put('/question-bank/questions/:id/classify', protect, teacherOnly, async (req, res) => {
+  const questionId = parseInt(req.params.id, 10);
+  const subtopicId = parseInt(req.body.subtopic_id, 10);
+  if (!Number.isInteger(questionId) || !Number.isInteger(subtopicId)) {
+    return res.status(400).json({ success: false, error: 'question_id and subtopic_id are required.' });
+  }
+
+  try {
+    const target = await sequelize.query(
+      'SELECT st.id, t.id AS topic_id, t.subject_id ' +
+      'FROM subtopics st JOIN topics t ON t.id = st.topic_id ' +
+      'WHERE st.id = :subtopicId AND st.is_active = true AND t.is_active = true LIMIT 1',
+      { replacements: { subtopicId }, type: QueryTypes.SELECT }
+    );
+    if (!target.length) return res.status(404).json({ success: false, error: 'Subtopic not found.' });
+
+    if (!(await teacherOwnsSubject(req.user.id, target[0].subject_id))) {
+      return res.status(403).json({ success: false, error: 'Not assigned to this subject.' });
+    }
+
+    const question = await sequelize.query(
+      'SELECT id, is_ai_generated FROM questions WHERE id = :questionId LIMIT 1',
+      { replacements: { questionId }, type: QueryTypes.SELECT }
+    );
+    if (!question.length) return res.status(404).json({ success: false, error: 'Question not found.' });
+    if (!question[0].is_ai_generated) {
+      return res.status(400).json({ success: false, error: 'Only AI-generated questions are classified through this queue.' });
+    }
+
+    await sequelize.query(
+      "UPDATE questions SET subtopic_id = :subtopicId, status = 'pending', is_active = false, updated_at = NOW() WHERE id = :questionId",
+      { replacements: { questionId, subtopicId }, type: QueryTypes.UPDATE }
+    );
+
+    return res.json({
+      success: true,
+      data: { question_id: questionId, subtopic_id: subtopicId, status: 'pending', is_active: false },
+      message: 'Question classified and returned to review.',
+    });
+  } catch (err) {
+    console.error('[PUT /teacher/question-bank/questions/:id/classify]', err.message);
+    return res.status(500).json({ success: false, error: 'Could not classify the question.' });
+  }
+});
+
 // ── GET /api/teacher/questions ────────────────────────────────────────────────
 router.get('/questions', protect, teacherOnly, async (req, res) => {
   try {
@@ -1806,6 +1919,7 @@ router.get('/questions', protect, teacherOnly, async (req, res) => {
            LEFT JOIN exam_boards eb ON s.exam_board_id = eb.id
            JOIN teacher_subjects ts ON ts.subject_id = s.id AND ts.teacher_id = :teacherId AND ts.is_active = true
            WHERE q.is_active = true
+             AND COALESCE(q.status, 'pending') IN ('approved', 'active')
            ORDER BY eb.name NULLS LAST, s.name ASC, t.name ASC, q.created_at DESC
            LIMIT 100`
         // BUG FIX: this never selected q.type, so the Test Builder's question
@@ -1997,8 +2111,19 @@ router.post('/generate-questions', protect, teacherOnly, async (req, res) => {
     // that's what reads this same correct_answer column as "Model answer"
     // for these two types at grading time, same as every other question-
     // creation path that already produces essay-marked content).
+    let generationScope = `topic "${topic}"`;
+    if (resolvedSubtopicId) {
+      const subtopicRows = await sequelize.query(
+        'SELECT name FROM subtopics WHERE id = :id LIMIT 1',
+        { replacements: { id: resolvedSubtopicId }, type: QueryTypes.SELECT }
+      );
+      if (subtopicRows[0]?.name) {
+        generationScope = `topic "${topic}", specifically the subtopic "${subtopicRows[0].name}"`;
+      }
+    }
+
     const prompt = question_type === 'mcq'
-      ? `Generate ${count} ${difficulty} multiple-choice questions on the topic "${topic}" for the subject "${subjectRows[0].name}". Return ONLY a valid JSON array, no markdown. Each object must have: question_text (string), options (array of 4 strings), correct_answer (string matching one option exactly), explanation (string).`
+      ? `Generate ${count} ${difficulty} multiple-choice questions for the subject "${subjectRows[0].name}" on ${generationScope}. Every question MUST test the named subtopic when one is supplied. Do not generate questions from neighbouring subtopics. Return ONLY a valid JSON array, no markdown. Each object must have: question_text (string), options (array of 4 strings), correct_answer (string matching one option exactly), explanation (string).`
       : question_type === 'short_answer'
       ? `Generate ${count} ${difficulty} short-answer questions on the topic "${topic}" for the subject "${subjectRows[0].name}". Each question must have ONE brief, unambiguous correct answer — a single word, number, or short phrase (not a sentence or paragraph) — since these are graded by exact-text matching, not by an examiner's judgment. Return ONLY a valid JSON array, no markdown. Each object must have: question_text (string), correct_answer (the brief expected answer, string), explanation (string).`
       : `Generate ${count} ${difficulty} structured (free-response) questions on the topic "${topic}" for the subject "${subjectRows[0].name}", suitable for WAEC/JAMB/NECO-style exams. These require a written answer of a few sentences, not a single word. IMPORTANT: if a question asks for a list of items (e.g. "State three...", "Give two..."), the model answer must give a full explanatory sentence for EVERY item named -- never just name an item and move on without elaborating on it; a model answer that lists N items but only explains fewer than N is unacceptable. Return ONLY a valid JSON array, no markdown. Each object must have: question_text (string), correct_answer (a full model answer of 2-5 sentences, string, with every listed item fully explained), explanation (string, may briefly restate key marking points).`;
@@ -2317,6 +2442,7 @@ router.put('/questions/:id/review', protect, teacherOnly, adminActionLimiter, as
       await sequelize.query(
         `UPDATE questions
          SET status = :status,
+             is_active = :status = 'approved',
              review_feedback = :feedback,
              reviewed_by = :reviewer,
              reviewed_at = NOW(),
@@ -2337,7 +2463,7 @@ router.put('/questions/:id/review', protect, teacherOnly, adminActionLimiter, as
       // optional review_feedback/reviewed_by/reviewed_at columns might not
       // exist on some deployments yet.
       await sequelize.query(
-        `UPDATE questions SET status = :status, updated_at = NOW() WHERE id = :id`,
+        `UPDATE questions SET status = :status, is_active = (:status = 'approved'), updated_at = NOW() WHERE id = :id`,
         { replacements: { status: newStatus, id: req.params.id }, type: QueryTypes.UPDATE }
       );
     }

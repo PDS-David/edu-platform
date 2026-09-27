@@ -22,6 +22,7 @@ const TEACHER_NAV_ITEMS = [
   { id: "examinations", kind: "link", icon: FileCheck2, label: "Examinations",  link: "/teacher/examinations"  },
   { id: "aigenerate",  kind: "tab",  icon: Sparkles,  label: "AI Generate"     },
   { id: "review",      kind: "link", icon: ClipboardCheck, label: "Review Questions", link: "/teacher/review" },
+  { id: "questionbank", kind: "link", icon: BookOpen, label: "Question Bank", link: "/teacher/question-bank" },
   { id: "syllabus",    kind: "link", icon: FileSearch, label: "Syllabus Review", link: "/teacher/syllabus" },
   { id: "content",     kind: "link", icon: BookOpen,  label: "Content Manager", link: "/teacher/content"       },
   { id: "resources",   kind: "link", icon: Upload,    label: "Resources",      link: "/teacher/resources"     },
