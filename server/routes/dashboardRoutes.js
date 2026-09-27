@@ -32,7 +32,7 @@ router.get('/summary', protect, studentOnly, async (req, res) => {
   try {
     const [attempts, streak, subtopics] = await Promise.all([
       sq(`SELECT COUNT(*)::int AS total,
-                ROUND(AVG(CASE WHEN is_correct THEN 100.0 ELSE 0 END), 1) AS accuracy_pct
+                ROUND(AVG(CASE WHEN pa.marks_awarded IS NOT NULL AND q.marks IS NOT NULL AND q.marks > 0 THEN (pa.marks_awarded::numeric / q.marks::numeric) * 100.0 WHEN pa.is_correct THEN 100.0 ELSE 0.0 END), 1) AS accuracy_pct
           FROM practice_attempts WHERE student_id = :uid`, { uid }, [{}]),
       sq(`SELECT study_streak_days, xp_points FROM users WHERE id = :uid`, { uid }, [{}]),
       sq(`SELECT COUNT(*)::int AS completed
@@ -59,7 +59,7 @@ router.get('/weak-topics', protect, studentOnly, async (req, res) => {
   try {
     const rows = await sq(
       `SELECT q.topic, s.name AS subject_name,
-              ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 1) AS accuracy_pct,
+              ROUND(AVG(CASE WHEN pa.marks_awarded IS NOT NULL AND q.marks IS NOT NULL AND q.marks > 0 THEN (pa.marks_awarded::numeric / q.marks::numeric) * 100.0 WHEN pa.is_correct THEN 100.0 ELSE 0.0 END), 1) AS accuracy_pct,
               COUNT(pa.id)::int AS attempt_count
        FROM practice_attempts pa
        JOIN questions  q  ON q.id  = pa.question_id
