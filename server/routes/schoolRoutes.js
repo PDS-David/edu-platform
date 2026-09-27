@@ -50,6 +50,7 @@ const { ENROLLMENT_SOURCE, ENROLLMENT_STATUS } = require('../constants/enrollmen
 // on its very first real use. Calling the same idempotent function
 // defensively here closes the gap regardless of migration/deploy order.
 const { ensureEnrollmentColumns } = require('./studentRoutes');
+const { sendSchoolInvitationEmail, sendSchoolMemberWelcomeEmail } = require('../services/emailService');
 
 // Single-file, image-only, small size cap — a logo isn't a document upload.
 // Same validation pipeline (magic-byte check + AV scan) as every other
@@ -813,8 +814,6 @@ router.post('/me/invite', protect, requireSchoolAdmin, async (req, res) => {
   }
   const emailCheck = validateEmail(email);
   if (!emailCheck.valid) return res.status(400).json({ success: false, error: emailCheck.error });
-  const passCheck = validatePassword(password);
-  if (!passCheck.valid) return res.status(400).json({ success: false, error: passCheck.error });
   const fnCheck = validateName(first_name, 'First name');
   if (!fnCheck.valid) return res.status(400).json({ success: false, error: fnCheck.error });
 
@@ -831,9 +830,21 @@ router.post('/me/invite', protect, requireSchoolAdmin, async (req, res) => {
           SET status = CASE WHEN teacher_school_memberships.status = 'active' THEN 'active' ELSE 'pending' END,
               invited_by = EXCLUDED.invited_by, updated_at = NOW()
           RETURNING status`, [existing[0].id, req.user.school_id, req.user.id]);
-        return res.status(202).json({ success: true, data: { invited: true, status: membership[0].status } });
+        if (membership[0].status === 'pending') {
+          const schoolRows = await q(`SELECT name FROM schools WHERE id = $1`, [req.user.school_id]);
+          await sendSchoolInvitationEmail({
+            email,
+            first_name: first_name || 'Teacher',
+            school_name: schoolRows[0]?.name || 'your school',
+          });
+        }
+        return res.status(membership[0].status === 'active' ? 200 : 202).json({
+          success: true, data: { invited: membership[0].status === 'pending', status: membership[0].status }
+        });
       }
     }
+    const passCheck = validatePassword(password);
+    if (!passCheck.valid) return res.status(400).json({ success: false, error: passCheck.error });
     const hashed = await bcrypt.hash(password, await bcrypt.genSalt(12));
     const verificationToken        = crypto2.randomBytes(32).toString('hex');
     const verificationTokenExpires = new Date(Date.now() + 86400000);
