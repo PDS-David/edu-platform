@@ -39,7 +39,7 @@ class AnalyticsEngine {
           COUNT(*)::INTEGER AS total_attempts,
 
           COALESCE(
-            ROUND(AVG(CASE WHEN is_correct THEN 100 ELSE 0 END))::INTEGER,
+            ROUND(AVG(CASE WHEN pa.marks_awarded IS NOT NULL AND q.marks IS NOT NULL AND q.marks > 0 THEN (pa.marks_awarded::numeric / q.marks::numeric) * 100.0 WHEN pa.is_correct THEN 100.0 ELSE 0.0 END))::INTEGER,
             0
           ) AS accuracy_pct,
 
@@ -47,8 +47,9 @@ class AnalyticsEngine {
 
           COUNT(DISTINCT DATE(attempted_at))::INTEGER AS active_days
 
-        FROM practice_attempts
-        WHERE student_id = :userId
+        FROM practice_attempts pa
+        JOIN questions q ON q.id = pa.question_id
+        WHERE pa.student_id = :userId
         `,
         { replacements: { userId }, type: QueryTypes.SELECT }
       ),
@@ -79,7 +80,7 @@ class AnalyticsEngine {
         COUNT(*)::INTEGER AS attempt_count,
 
         ROUND(
-          AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END),
+          AVG(CASE WHEN pa.marks_awarded IS NOT NULL AND q.marks IS NOT NULL AND q.marks > 0 THEN (pa.marks_awarded::numeric / q.marks::numeric) * 100.0 WHEN pa.is_correct THEN 100.0 ELSE 0.0 END),
           1
         ) AS accuracy_pct
 
@@ -116,9 +117,10 @@ class AnalyticsEngine {
       `
       SELECT
         DATE(attempted_at) AS date,
-        ROUND(AVG(CASE WHEN is_correct THEN 100.0 ELSE 0 END), 1) AS avg_score
-      FROM practice_attempts
-      WHERE student_id = :userId
+        ROUND(AVG(CASE WHEN pa.marks_awarded IS NOT NULL AND q.marks IS NOT NULL AND q.marks > 0 THEN (pa.marks_awarded::numeric / q.marks::numeric) * 100.0 WHEN pa.is_correct THEN 100.0 ELSE 0.0 END), 1) AS avg_score
+      FROM practice_attempts pa
+      JOIN questions q ON q.id = pa.question_id
+      WHERE pa.student_id = :userId
         AND attempted_at > NOW() - (:days * INTERVAL '1 day')
       GROUP BY DATE(attempted_at)
       ORDER BY date ASC
@@ -143,7 +145,7 @@ class AnalyticsEngine {
         COUNT(pa.id)::INTEGER AS attempts,
 
         ROUND(
-          AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END),
+          AVG(CASE WHEN pa.marks_awarded IS NOT NULL AND q.marks IS NOT NULL AND q.marks > 0 THEN (pa.marks_awarded::numeric / q.marks::numeric) * 100.0 WHEN pa.is_correct THEN 100.0 ELSE 0.0 END),
           1
         ) AS accuracy_pct,
 
@@ -224,7 +226,7 @@ class AnalyticsEngine {
         COALESCE(u.xp_points, 0) AS xp_points,
 
         ROUND(
-          AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END),
+          AVG(CASE WHEN pa.marks_awarded IS NOT NULL AND q.marks IS NOT NULL AND q.marks > 0 THEN (pa.marks_awarded::numeric / q.marks::numeric) * 100.0 WHEN pa.is_correct THEN 100.0 ELSE 0.0 END),
           1
         ) AS accuracy_pct,
 
@@ -260,7 +262,7 @@ class AnalyticsEngine {
       `
       SELECT
         q.topic,
-        ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 1) AS avg_accuracy,
+        ROUND(AVG(CASE WHEN pa.marks_awarded IS NOT NULL AND q.marks IS NOT NULL AND q.marks > 0 THEN (pa.marks_awarded::numeric / q.marks::numeric) * 100.0 WHEN pa.is_correct THEN 100.0 ELSE 0.0 END), 1) AS avg_accuracy,
         COUNT(DISTINCT pa.student_id)::INTEGER AS student_count
 
       FROM practice_attempts pa
