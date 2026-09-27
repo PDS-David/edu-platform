@@ -52,11 +52,12 @@ const safeQuery = async (sql, replacements, fallback = []) => {
 };
 
 // Check if teacher is assigned to a subject (graceful if table missing)
-async function teacherOwnsSubject(teacherId, subjectId) {
+async function teacherOwnsSubject(teacherId, subjectId, schoolId = null) {
   try {
     const r = await sequelize.query(
-      `SELECT id FROM teacher_subjects WHERE teacher_id=:teacherId AND subject_id=:subjectId AND is_active=true`,
-      { replacements: { teacherId, subjectId }, type: QueryTypes.SELECT }
+      `SELECT id FROM teacher_subjects WHERE teacher_id=:teacherId AND subject_id=:subjectId AND is_active=true
+        AND ((school_id = :schoolId) OR (school_id IS NULL AND :schoolId IS NULL))`,
+      { replacements: { teacherId, subjectId, schoolId }, type: QueryTypes.SELECT }
     );
     return r.length > 0;
   } catch {
@@ -76,9 +77,9 @@ router.get('/my-subjects', protect, teacherOnly, async (req, res) => {
        FROM teacher_subjects ts
        JOIN subjects    s  ON s.id  = ts.subject_id
        LEFT JOIN exam_boards eb ON eb.id = s.exam_board_id
-       WHERE ts.teacher_id = :teacherId AND ts.is_active = true
+       WHERE ts.teacher_id = :teacherId AND ts.is_active = true AND ((ts.school_id = :schoolId) OR (ts.school_id IS NULL AND :schoolId IS NULL))
        ORDER BY s.name ASC`,
-      { teacherId: req.user.id }
+      { teacherId: req.user.id, schoolId: req.user.school_id }
     );
     // No fallback to all-subjects — a teacher with no assignments
     // sees an empty list. The UI already handles this with a "No subjects assigned"
@@ -97,7 +98,7 @@ router.get('/topics', protect, teacherOrAdmin, async (req, res) => {
   try {
     // Teachers: confirm assigned to this subject. Admins: skip ownership check.
     if (req.user.role === 'teacher') {
-      const owned = await teacherOwnsSubject(req.user.id, subject_id);
+      const owned = await teacherOwnsSubject(req.user.id, subject_id, req.user.school_id);
       if (!owned) return res.status(403).json({ success: false, error: 'Not assigned to this subject' });
     }
 
@@ -157,7 +158,7 @@ router.put('/topics/:id', protect, teacherOnly, async (req, res) => {
         `SELECT subject_id FROM topics WHERE id = :id LIMIT 1`,
         { replacements: { id: parseInt(req.params.id) }, type: QueryTypes.SELECT }
       );
-      if (topicRow.length && !(await teacherOwnsSubject(req.user.id, topicRow[0].subject_id))) {
+      if (topicRow.length && !(await teacherOwnsSubject(req.user.id, topicRow[0].subject_id, req.user.school_id))) {
         return res.status(403).json({ success: false, error: 'Not assigned to this subject' });
       }
     }
@@ -315,7 +316,7 @@ router.post('/subtopics', protect, teacherOrAdmin, async (req, res) => {
     // derived from the topic (not trusted from the client), but nothing
     // then verified the calling teacher is actually assigned to that
     // subject, so any teacher could still add subtopics under any topic.
-    if (req.user.role === 'teacher' && !(await teacherOwnsSubject(req.user.id, subjectId))) {
+    if (req.user.role === 'teacher' && !(await teacherOwnsSubject(req.user.id, subjectId, req.user.school_id))) {
       return res.status(403).json({ success: false, error: 'Not assigned to this subject' });
     }
 
@@ -343,7 +344,7 @@ router.put('/subtopics/:id', protect, teacherOnly, async (req, res) => {
         `SELECT subject_id FROM subtopics WHERE id = :id LIMIT 1`,
         { replacements: { id: parseInt(req.params.id) }, type: QueryTypes.SELECT }
       );
-      if (stRow.length && !(await teacherOwnsSubject(req.user.id, stRow[0].subject_id))) {
+      if (stRow.length && !(await teacherOwnsSubject(req.user.id, stRow[0].subject_id, req.user.school_id))) {
         return res.status(403).json({ success: false, error: 'Not assigned to this subject' });
       }
     }
@@ -1430,7 +1431,7 @@ router.post('/examinations/:id/questions/bank', protect, teacherOnly, async (req
          JOIN subtopics st ON st.id = q.subtopic_id
          JOIN topics     t ON t.id  = st.topic_id
          JOIN subjects   s ON s.id  = t.subject_id
-         JOIN teacher_subjects ts ON ts.subject_id = s.id AND ts.teacher_id = :teacherId AND ts.is_active = true
+         JOIN teacher_subjects ts ON ts.subject_id = s.id AND ts.teacher_id = :teacherId AND ts.is_active = true AND ((ts.school_id = :schoolId) OR (ts.school_id IS NULL AND :schoolId IS NULL))
         WHERE q.id = :questionId
           AND q.is_active = true
           AND COALESCE(q.status, 'pending') IN ('approved', 'active')`,
@@ -1534,7 +1535,7 @@ router.post('/examinations/:id/questions/author', protect, teacherOnly, async (r
     // should verify it here rather than trusting the client blindly.
     const supervised = await sequelize.query(
       `SELECT 1 FROM subtopics st JOIN topics t ON t.id = st.topic_id
-         JOIN teacher_subjects ts ON ts.subject_id = t.subject_id AND ts.teacher_id = :teacherId AND ts.is_active = true
+         JOIN teacher_subjects ts ON ts.subject_id = t.subject_id AND ts.teacher_id = :teacherId AND ts.is_active = true AND ((ts.school_id = :schoolId) OR (ts.school_id IS NULL AND :schoolId IS NULL))
         WHERE st.id = :subtopicId`,
       { replacements: { subtopicId: subtopic_id, teacherId: req.user.id }, type: QueryTypes.SELECT }
     );
@@ -1730,7 +1731,7 @@ router.post('/nudge/:userId', protect, teacherOnly, async (req, res) => {
         UNION
        SELECT 1
          FROM student_subjects ss
-         JOIN teacher_subjects ts ON ts.subject_id = ss.subject_id
+         JOIN teacher_subjects ts ON ts.subject_id = ss.subject_id AND ((ts.school_id = :schoolId) OR (ts.school_id IS NULL AND :schoolId IS NULL))
         WHERE ts.teacher_id = :teacherId AND ss.student_id = :studentId AND ss.is_active = true
         LIMIT 1`,
       { replacements: { teacherId: req.user.id, studentId: student.id }, type: QueryTypes.SELECT }
@@ -1804,7 +1805,7 @@ router.get('/question-bank/questions', protect, questionBankTeacherOnly, async (
     const unclassified = String(req.query.unclassified || '') === 'true';
     const subtopicId = req.query.subtopic_id ? parseInt(req.query.subtopic_id, 10) : null;
 
-    const replacements = { teacherId: req.user.id, limit, offset };
+    const replacements = { teacherId: req.user.id, schoolId: req.user.school_id, limit, offset };
     const clauses = ['q.is_ai_generated = true'];
 
     if (unclassified) {
@@ -1825,7 +1826,7 @@ router.get('/question-bank/questions', protect, questionBankTeacherOnly, async (
     // subject_id is now the authoritative scope for the teacher queue.
     // Legacy orphaned questions with subject_id NULL remain App-Admin-only.
     const scopeJoin =
-      'JOIN teacher_subjects scope_ts ON scope_ts.subject_id = q.subject_id ' +
+      'JOIN teacher_subjects scope_ts ON scope_ts.subject_id = q.subject_id AND ((scope_ts.school_id = :schoolId) OR (scope_ts.school_id IS NULL AND :schoolId IS NULL)) ' +
       'AND scope_ts.teacher_id = :teacherId AND scope_ts.is_active = true';
     const classifiedJoin = unclassified
       ? scopeJoin
@@ -1833,7 +1834,7 @@ router.get('/question-bank/questions', protect, questionBankTeacherOnly, async (
         'JOIN topics t ON t.id = st.topic_id ' +
         'JOIN subjects s ON s.id = t.subject_id ' +
         'JOIN teacher_subjects ts ON ts.subject_id = s.id ' +
-        'AND ts.teacher_id = :teacherId AND ts.is_active = true';
+        'AND ts.teacher_id = :teacherId AND ts.is_active = true AND ((ts.school_id = :schoolId) OR (ts.school_id IS NULL AND :schoolId IS NULL))';
 
     const rows = await sequelize.query(
       'SELECT q.id, q.question_text, q.type, q.question_type, q.difficulty, ' +
@@ -1881,7 +1882,7 @@ router.put('/question-bank/questions/:id/classify', protect, questionBankTeacher
     );
     if (!target.length) return res.status(404).json({ success: false, error: 'Subtopic not found.' });
 
-    if (!(await teacherOwnsSubject(req.user.id, target[0].subject_id))) {
+    if (!(await teacherOwnsSubject(req.user.id, target[0].subject_id, req.user.school_id))) {
       return res.status(403).json({ success: false, error: 'Not assigned to this subject.' });
     }
 
@@ -1948,7 +1949,7 @@ router.get('/questions', protect, teacherOnly, async (req, res) => {
            JOIN topics      t ON t.id  = st.topic_id
            JOIN subjects    s ON s.id  = t.subject_id
            LEFT JOIN exam_boards eb ON s.exam_board_id = eb.id
-           JOIN teacher_subjects ts ON ts.subject_id = s.id AND ts.teacher_id = :teacherId AND ts.is_active = true
+           JOIN teacher_subjects ts ON ts.subject_id = s.id AND ts.teacher_id = :teacherId AND ts.is_active = true AND ((ts.school_id = :schoolId) OR (ts.school_id IS NULL AND :schoolId IS NULL))
            WHERE q.is_active = true
              AND COALESCE(q.status, 'pending') IN ('approved', 'active')
            ORDER BY eb.name NULLS LAST, s.name ASC, t.name ASC, q.created_at DESC
@@ -2113,7 +2114,7 @@ router.post('/generate-questions', protect, teacherOnly, async (req, res) => {
     // parallel reimplementation.
     const assignedSubjects = await sequelize.query(
       `SELECT 1 FROM teacher_subjects WHERE teacher_id = :teacherId AND subject_id = :subjectId AND is_active = true LIMIT 1`,
-      { replacements: { teacherId: req.user.id, subjectId: subject_id }, type: QueryTypes.SELECT }
+      { replacements: { teacherId: req.user.id, subjectId: subject_id, schoolId: req.user.school_id }, type: QueryTypes.SELECT }
     );
     if (!assignedSubjects.length) {
       return error(res, 'You are not assigned to this subject', 403);
@@ -2403,7 +2404,7 @@ router.get('/questions/pending', protect, teacherOnly, async (req, res) => {
        JOIN      subjects   s  ON st.subject_id   = s.id
        JOIN      topics     t  ON st.topic_id     = t.id
        LEFT JOIN exam_boards eb ON s.exam_board_id = eb.id
-       JOIN      teacher_subjects ts ON ts.subject_id = s.id AND ts.teacher_id = :teacherId AND ts.is_active = true
+       JOIN      teacher_subjects ts ON ts.subject_id = s.id AND ts.teacher_id = :teacherId AND ts.is_active = true AND ((ts.school_id = :schoolId) OR (ts.school_id IS NULL AND :schoolId IS NULL))
        WHERE COALESCE(q.status, 'pending') NOT IN ('approved', 'active', 'rejected')
        ${filterSql}
        ORDER BY eb.name NULLS LAST, s.name, t.name, q.created_at DESC
@@ -2422,7 +2423,7 @@ router.get('/questions/pending', protect, teacherOnly, async (req, res) => {
        JOIN subjects  s  ON st.subject_id = s.id
        JOIN topics    t  ON st.topic_id   = t.id
        LEFT JOIN exam_boards eb ON s.exam_board_id = eb.id
-       JOIN teacher_subjects ts ON ts.subject_id = s.id AND ts.teacher_id = :teacherId AND ts.is_active = true
+       JOIN teacher_subjects ts ON ts.subject_id = s.id AND ts.teacher_id = :teacherId AND ts.is_active = true AND ((ts.school_id = :schoolId) OR (ts.school_id IS NULL AND :schoolId IS NULL))
        WHERE COALESCE(q.status, 'pending') NOT IN ('approved', 'active', 'rejected')
        ${filterSql}`,
       { replacements: { teacherId: req.user.id, ...filterReplacements }, type: QueryTypes.SELECT }
@@ -2451,7 +2452,7 @@ router.put('/questions/:id/review', protect, teacherOnly, adminActionLimiter, as
       `SELECT q.id FROM questions q
          JOIN subtopics st ON q.subtopic_id = st.id
          JOIN subjects  s  ON st.subject_id = s.id
-         JOIN teacher_subjects ts ON ts.subject_id = s.id AND ts.teacher_id = :teacherId AND ts.is_active = true
+         JOIN teacher_subjects ts ON ts.subject_id = s.id AND ts.teacher_id = :teacherId AND ts.is_active = true AND ((ts.school_id = :schoolId) OR (ts.school_id IS NULL AND :schoolId IS NULL))
         WHERE q.id = :id`,
       { replacements: { teacherId: req.user.id, id: req.params.id }, type: QueryTypes.SELECT }
     );
