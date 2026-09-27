@@ -244,6 +244,16 @@ router.post('/', protect, authorize('teacher', 'admin'), async (req, res) => {
 
     if (!title) return res.status(400).json({ success: false, error: 'title is required' });
 
+    // Teachers may only create courses for subjects they are actively assigned to in their current school.
+    if (req.user.role === 'teacher') {
+      if (!subject_id) return res.status(403).json({ success: false, error: 'A teacher can only create a course for an assigned subject' });
+      const assigned = await db.query(
+        'SELECT 1 FROM teacher_subjects WHERE teacher_id = :teacherId AND subject_id = :subjectId AND is_active = true AND ((school_id = :schoolId) OR (school_id IS NULL AND :schoolId IS NULL)) LIMIT 1',
+        { replacements: { teacherId: req.user.id, subjectId: subject_id, schoolId: req.user.school_id || null }, type: QueryTypes.SELECT }
+      );
+      if (!assigned.length) return res.status(403).json({ success: false, error: 'You are not assigned to this subject' });
+    }
+
     const [rows] = await db.query(
       `INSERT INTO courses
          (title, description, subject_id, price, currency, is_free, is_premium,
@@ -276,6 +286,16 @@ router.post('/', protect, authorize('teacher', 'admin'), async (req, res) => {
 router.put('/:id', protect, authorize('teacher', 'admin'), async (req, res) => {
   try {
     const { id } = req.params;
+
+    // Teachers may update only courses they created. App Admin remains unrestricted.
+    if (req.user.role === 'teacher') {
+      const owned = await db.query(
+        'SELECT 1 FROM courses WHERE id = :id AND created_by = :teacherId LIMIT 1',
+        { replacements: { id, teacherId: req.user.id }, type: QueryTypes.SELECT }
+      );
+      if (!owned.length) return res.status(403).json({ success: false, error: 'You are not authorised to update this course' });
+    }
+
     const {
       title, description, price, currency, is_free, is_premium,
       thumbnail_url, level, duration_hours, is_active,
