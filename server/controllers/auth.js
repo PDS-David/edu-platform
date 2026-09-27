@@ -785,6 +785,7 @@ exports.getMe = async (req, res, next) => {
     );
     if (!rows.length) return res.status(404).json({ success: false, error: 'User not found' });
     const user = await safeUser(rows[0]);
+    if (req.user.role === 'teacher') user.school_id = req.user.school_id;
     // req.school is populated by the `protect` middleware for any
     // student/teacher/school_admin with a school_id — reuse it here rather
     // than a second query, same shape as the login response so client route
@@ -792,7 +793,7 @@ exports.getMe = async (req, res, next) => {
     // do right after login.
     if (req.school) {
       user.school = {
-        id: rows[0].school_id, name: req.school.name, logo_url: req.school.logo_url,
+        id: req.user.school_id, name: req.school.name, logo_url: req.school.logo_url,
         enable_aischoolonair: req.school.enable_aischoolonair, enable_em: req.school.enable_em,
         enabledLanguages: req.school.enabledLanguages || [],
         hasLanguageMasterclass: !!req.school.hasLanguageMasterclass,
