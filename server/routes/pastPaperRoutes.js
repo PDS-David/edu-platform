@@ -179,8 +179,8 @@ router.get('/', optionalAuth, async (req, res) => {
     // teacher can browse any.
     if (req.user?.role === 'teacher') {
       const assignedSubjects = await sequelize.query(
-        `SELECT subject_id FROM teacher_subjects WHERE teacher_id = :teacherId AND is_active = true`,
-        { replacements: { teacherId: req.user.id }, type: QueryTypes.SELECT }
+        `SELECT subject_id FROM teacher_subjects WHERE teacher_id = :teacherId AND is_active = true AND ((school_id = :schoolId) OR (school_id IS NULL AND :schoolId IS NULL))`,
+        { replacements: { teacherId: req.user.id, schoolId: req.user.school_id }, type: QueryTypes.SELECT }
       );
       const teacherSubjectIds = assignedSubjects.map(r => r.subject_id).filter(Boolean);
       if (!teacherSubjectIds.length) {
@@ -340,8 +340,8 @@ router.get('/:id/download', protect, async (req, res) => {
     // cannot download any past paper.
     if (req.user?.role === 'teacher') {
       const assignedSubjects = await sequelize.query(
-        `SELECT 1 FROM teacher_subjects WHERE teacher_id = :teacherId AND subject_id = :subjectId AND is_active = true LIMIT 1`,
-        { replacements: { teacherId: req.user.id, subjectId: rows[0].subject_id }, type: QueryTypes.SELECT }
+        `SELECT 1 FROM teacher_subjects WHERE teacher_id = :teacherId AND subject_id = :subjectId AND is_active = true AND ((school_id = :schoolId) OR (school_id IS NULL AND :schoolId IS NULL)) LIMIT 1`,
+        { replacements: { teacherId: req.user.id, subjectId: rows[0].subject_id, schoolId: req.user.school_id }, type: QueryTypes.SELECT }
       );
       if (!assignedSubjects.length) {
         return res.status(403).json({ success: false, error: 'This past paper is not available for your assigned subject(s).' });
