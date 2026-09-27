@@ -2239,15 +2239,16 @@ router.post('/generate-questions', protect, teacherOnly, async (req, res) => {
         await sequelize.query(
           `INSERT INTO questions
              (question_text, options, correct_answer, explanation, difficulty,
-              subtopic_id, type, marks, is_active, is_ai_generated, status, created_at, updated_at)
+              subject_id, subtopic_id, type, marks, is_active, is_ai_generated, status, created_at, updated_at)
            VALUES (:q, NULL, :c, :e, :d,
-                   :subtopicId, :type, :marks, true, true, 'pending', NOW(), NOW())`,
+                   :subjectId, :subtopicId, :type, :marks, true, true, 'pending', NOW(), NOW())`,
           {
             replacements: {
               q: q.question_text,
               c: modelAnswer,
               e: q.explanation || null,
               d: difficulty,
+              subjectId: subject_id,
               subtopicId: resolvedSubtopicId,
               type: question_type,
               marks: generatedMarks,
@@ -2316,9 +2317,9 @@ router.post('/generate-questions', protect, teacherOnly, async (req, res) => {
       await sequelize.query(
         `INSERT INTO questions
            (question_text, options, correct_answer, explanation, difficulty,
-            subtopic_id, type, is_active, is_ai_generated, status, created_at, updated_at)
+            subject_id, subtopic_id, type, is_active, is_ai_generated, status, created_at, updated_at)
          VALUES (:q, :o::jsonb, :c, :e, :d,
-                 :subtopicId, :type, true, true, 'pending', NOW(), NOW())`,
+                 :subjectId, :subtopicId, :type, true, true, 'pending', NOW(), NOW())`,
         {
           replacements: {
             q: q.question_text,
