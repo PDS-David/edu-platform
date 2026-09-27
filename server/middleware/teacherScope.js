@@ -57,7 +57,7 @@ async function studentInTeacherScope(teacherId, studentId, schoolId = null) {
         AND ((c.school_id = :schoolId) OR (c.school_id IS NULL AND :schoolId IS NULL))
         AND cm.student_id = :studentId
       LIMIT 1`,
-    { replacements: { teacherId, studentId }, type: QueryTypes.SELECT }
+    { replacements: { teacherId, studentId, schoolId }, type: QueryTypes.SELECT }
   ).catch(() => []);
 
   return !!classHit;
