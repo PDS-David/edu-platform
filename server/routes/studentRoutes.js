@@ -451,7 +451,13 @@ router.post('/test/:testId/submit', protect, studentOnly, async (req, res) => {
         // where 'structured' is intentionally left as self-assessment) —
         // route both through the same AI marking essay questions already
         // use elsewhere, scaled to this test's marks_allocated.
-        if (process.env.GEMINI_API_KEY && essayText.trim()) {
+        // BUG FIX: gating on GEMINI_API_KEY specifically skipped AI marking
+        // entirely in an OpenAI-only deployment, since generate() (services/
+        // ai.js) already has its own Gemini-primary/OpenAI-fallback chain
+        // and never got a chance to run it. See questionsRoutes.js's
+        // matching fix for the full rationale -- same bug, same fix, kept
+        // consistent across every AI-marking call site in this file.
+        if (essayText.trim()) {
           try {
             // Shared prompt (services/ai.js) — personalized, paragraph-style
             // feedback instead of an unstructured one-line generic response.
@@ -472,11 +478,8 @@ router.post('/test/:testId/submit', protect, studentOnly, async (req, res) => {
             feedback = 'Submitted for manual review — automated marking was unavailable.';
             needsManualReview = true;
           }
-        } else if (!essayText.trim()) {
-          feedback = 'No answer submitted.';
         } else {
-          feedback = 'Submitted for manual review.';
-          needsManualReview = true;
+          feedback = 'No answer submitted.';
         }
       } else {
         // mcq / true_false / short_answer — grade against options[].is_correct
@@ -885,7 +888,11 @@ router.post('/examination/:id/submit', protect, studentOnly, async (req, res) =>
       let feedback     = null;
 
       if (question.type === 'essay' || question.type === 'structured') {
-        if (process.env.GEMINI_API_KEY && essayText.trim()) {
+        // BUG FIX: gating on GEMINI_API_KEY specifically skipped AI marking
+        // entirely in an OpenAI-only deployment -- same bug and fix as
+        // questionsRoutes.js and this file's own /test/:id/submit above;
+        // generate() already handles provider fallback/failure internally.
+        if (essayText.trim()) {
           try {
             const prompt = buildEssayFeedbackPrompt({
               studentName:   req.user?.first_name || null,
@@ -908,11 +915,8 @@ router.post('/examination/:id/submit', protect, studentOnly, async (req, res) =>
             feedback = 'Submitted for manual review — automated marking was unavailable.';
             needsManualReview = true;
           }
-        } else if (!essayText.trim()) {
-          feedback = 'No answer submitted.';
         } else {
-          feedback = 'Submitted for manual review.';
-          needsManualReview = true;
+          feedback = 'No answer submitted.';
         }
       } else {
         // mcq / true_false / short_answer — same convention as test

@@ -434,7 +434,18 @@ router.post('/:id/answer', protect, async (req, res) => {
       // logic itself doesn't need to know which of the two types it's
       // grading — both share question_text/correct_answer/marks/
       // essay_response, so one path serves both.
-      if (process.env.GEMINI_API_KEY && essay_response?.trim()) {
+      // BUG FIX: this used to gate on `process.env.GEMINI_API_KEY` before
+      // ever attempting AI marking -- but generate() (services/ai.js)
+      // already has its own Gemini-primary/OpenAI-fallback chain built in,
+      // and throws only if NEITHER provider is configured or both fail.
+      // Gating on Gemini's key specifically meant an OpenAI-only deployment
+      // (OPENAI_API_KEY set, no GEMINI_API_KEY) would skip AI marking
+      // entirely for every structured/essay answer, never even giving
+      // generate() a chance to serve the request via OpenAI. The try/catch
+      // below already handles "no provider available at all" via the
+      // existing fallback feedback message, so no env-var gate is needed
+      // here -- just attempt marking whenever an answer was submitted.
+      if (essay_response?.trim()) {
         try {
           // BUG FIX: previously an unstructured one-line prompt with no
           // personalization or paragraph guidance — see buildEssayFeedbackPrompt
@@ -458,13 +469,10 @@ router.post('/:id/answer', protect, async (req, res) => {
           console.error(`[POST /questions/${id}/answer] AI marking failed:`, err.message);
           feedback = question.explanation || 'Submitted for review — automated marking was unavailable.';
         }
-      } else if (!essay_response?.trim()) {
+      } else {
         // No answer submitted at all — don't silently report is_correct:
         // false (implies "wrong"); this is "nothing to grade" instead.
         feedback = 'No answer submitted.';
-      } else {
-        // GEMINI_API_KEY not configured on this environment.
-        feedback = question.explanation || 'Submitted for review.';
       }
     }
 

@@ -32,7 +32,12 @@ async function buildExaminerFeedback({ studentName, accuracyPct, topicName, miss
     ? 'Good effort. Review the questions you missed and try again.'
     : 'Keep practising. Focus on the explanations for incorrect answers.';
 
-  if (!process.env.GEMINI_API_KEY) return fallback;
+  // BUG FIX: this early return skipped AI feedback entirely (silently using
+  // the generic bucketed fallback sentence) in an OpenAI-only deployment --
+  // same bug, same fix, as every other GEMINI_API_KEY-specific gate in this
+  // file. generate() already tries Gemini then OpenAI, and the catch below
+  // already returns `fallback` if both fail or neither is configured -- no
+  // env-var pre-check needed here at all.
 
   try {
     const missedList = (missedQuestions || []).slice(0, 5)
@@ -249,7 +254,14 @@ router.post('/attempt', protect, async (req, res) => {
         let marksAwarded = 0;
         let feedback     = null;
 
-        if (process.env.GEMINI_API_KEY && answerText.trim()) {
+        // BUG FIX: gating on GEMINI_API_KEY specifically skipped AI marking
+        // entirely in an OpenAI-only deployment -- same bug, same fix, as
+        // questionsRoutes.js and studentRoutes.js's two matching call
+        // sites. generate() (services/ai.js) already has a Gemini-primary/
+        // OpenAI-fallback chain built in and throws only if neither
+        // provider is configured or both fail; the try/catch below already
+        // handles that case via the existing fallback feedback message.
+        if (answerText.trim()) {
           try {
             const prompt = buildEssayFeedbackPrompt({
               studentName:   req.user?.first_name || null,
@@ -267,10 +279,8 @@ router.post('/attempt', protect, async (req, res) => {
             console.error('[POST /quizzes/attempt] essay/structured AI marking failed:', err.message);
             feedback = question.explanation || 'Submitted for review — automated marking was unavailable.';
           }
-        } else if (!answerText.trim()) {
-          feedback = 'No answer submitted.';
         } else {
-          feedback = question.explanation || 'Submitted for review.';
+          feedback = 'No answer submitted.';
         }
 
         totalScore += marksAwarded;
