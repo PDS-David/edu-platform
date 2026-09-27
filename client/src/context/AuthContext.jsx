@@ -80,11 +80,16 @@ export default function AuthProvider({ children }) {
   };
 
   const updateUser = (updates) => setUser(prev => ({ ...prev, ...updates }));
+  const switchTeacherSchool = (schoolId) => {
+    if (schoolId) sessionStorage.setItem('teacher_active_school_id', schoolId);
+    else sessionStorage.removeItem('teacher_active_school_id');
+    setUser(prev => prev ? { ...prev, school_id: schoolId || null } : prev);
+  };
 
   return (
     <AuthContext.Provider value={{
       user, loading,
-      login, register, registerForEM, logout, logoutAll, updateUser,
+      login, register, registerForEM, logout, logoutAll, updateUser, switchTeacherSchool,
       isAuthenticated: !!user,
     }}>
       {children}
