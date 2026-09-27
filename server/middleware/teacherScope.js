@@ -30,7 +30,7 @@ const audit = require('../services/auditLogger');
  * Scope = enrolled in one of the teacher's assigned subjects OR member of one
  * of the teacher's classes.
  */
-async function studentInTeacherScope(teacherId, studentId) {
+async function studentInTeacherScope(teacherId, studentId, schoolId = null) {
   // Path 1: student enrolled in a subject the teacher is assigned to
   const [subjectHit] = await db.query(
     `SELECT 1
@@ -39,6 +39,7 @@ async function studentInTeacherScope(teacherId, studentId) {
          ON ts.subject_id = ss.subject_id
         AND ts.teacher_id = :teacherId
         AND ts.is_active  = true
+        AND ((ts.school_id = :schoolId) OR (ts.school_id IS NULL AND :schoolId IS NULL))
       WHERE ss.student_id = :studentId
         AND ss.is_active  = true
       LIMIT 1`,
@@ -102,7 +103,7 @@ const requireTeacherStudentScope = async (req, res, next) => {
   try {
     const inScope = role === 'school_admin'
       ? await studentInSchoolAdminScope(req.user.school_id, studentId)
-      : await studentInTeacherScope(req.user.id, studentId);
+      : await studentInTeacherScope(req.user.id, studentId, req.user.school_id);
     if (!inScope) {
       await audit.blockIdor(req, res,
         `${role} ${req.user.id} attempted to access out-of-scope student ${studentId}`);
