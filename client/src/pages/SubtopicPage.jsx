@@ -431,7 +431,7 @@ function PracticeTab({ subtopicId, subjectId, onComplete }) {
           dismissed={dismissed}
           // BUG 2 FIX: removed localStorage.setItem — session state only
           onDismiss={() => setDismissed(true)}
-          onNext={() => handleAnswer(null)} onPrev={current > 0 ? () => setCurrent(c => c - 1) : null} />
+          onNext={handleAnswer} onPrev={current > 0 ? () => setCurrent(c => c - 1) : null} />
       ) : (
         <StructuredQuestion key={questions[current]?.id} question={questions[current]}
           questionNumber={current + 1} totalQuestions={questions.length}
@@ -769,16 +769,19 @@ function StructuredQuestion({ question, questionNumber, totalQuestions, onNext, 
   const [answers, setAnswers] = useState({});
   const [result,  setResult]  = useState(null);
   const [loading, setLoading] = useState(false);
+  const startedAtRef = useRef(Date.now());
   const parts = question.sub_parts || [{ label: '(i)', text: question.question_text, marks: question.marks || 3 }];
 
-  // BUG FIX: this component previously had no submission logic at all —
-  // "Submit" just called onNext directly, discarding every typed answer
-  // with no marking and no feedback ever shown. There's no per-sub-part
-  // correct-answer data modeled anywhere (question.sub_parts only carries
-  // label/text/marks), so — matching how OpenAnswerQuestion (Short Questions)
-  // already marks a single free-text answer via the same endpoint — every
-  // part's answer is combined into one typed_answer string and marked as
-  // one submission against the parent question.
+  useEffect(() => {
+    startedAtRef.current = Date.now();
+    setAnswers({});
+    setResult(null);
+    setLoading(false);
+  }, [question.id]);
+
+  // The current data model has no per-sub-part correct-answer field. Preserve
+  // the existing sub-part UI and submit the combined response as one
+  // structured answer to the authoritative question-answer endpoint.
   const hasAnyAnswer = Object.values(answers).some(a => a && a.trim());
 
   const handleSubmit = async () => {
@@ -788,15 +791,22 @@ function StructuredQuestion({ question, questionNumber, totalQuestions, onNext, 
       const combined = parts
         .map((part, i) => `${part.label} ${(answers[i] || '').trim()}`)
         .join('\n');
-      const r = await api.post('/ai/explain', {
-        question_id:        question.id,
-        selected_option_id: null,
-        typed_answer:       combined,
+      const timeTaken = Math.max(0, Math.round((Date.now() - startedAtRef.current) / 1000));
+      const r = await api.post(`/questions/${question.id}/answer`, {
+        essay_response: combined,
+        time_taken_seconds: timeTaken,
       });
-      setResult(r.data?.explanation ?? r.explanation ?? 'AI feedback submitted.');
-    } catch { setResult('AI marking not available. Continue to next question.'); }
-    finally  { setLoading(false); }
+      setResult(r.data || {});
+    } catch (err) {
+      console.error('[StructuredQuestion] Grading failed:', err);
+      setResult({ error: err?.message || 'Unable to mark this answer right now. Please try again.' });
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const hasError = !!result?.error;
+  const feedback = result?.feedback || result?.explanation || null;
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -826,18 +836,41 @@ function StructuredQuestion({ question, questionNumber, totalQuestions, onNext, 
           </div>
         ))}
         {result && (
-          <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
-            <p className="text-xs font-semibold text-blue-700 mb-1 flex items-center gap-1"><Sparkles size={12} /> AI Feedback</p>
-            <p className="text-xs text-blue-700 leading-relaxed whitespace-pre-line">{result}</p>
+          <div className={`rounded-xl p-3 border ${hasError ? 'bg-red-50 border-red-100' : result.is_correct ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100'}`}>
+            {hasError ? (
+              <p className="text-xs text-red-700 leading-relaxed">{result.error}</p>
+            ) : (
+              <>
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <p className={`text-xs font-bold ${result.is_correct ? 'text-green-700' : 'text-red-700'}`}>
+                    {result.is_correct ? 'Correct' : 'Incorrect'}
+                  </p>
+                  <p className="text-xs font-bold text-gray-800">
+                    Marks: {result.marks_awarded ?? 0} / {result.max_marks ?? question.marks ?? 1}
+                  </p>
+                </div>
+                {result.model_answer && (
+                  <p className="text-xs text-gray-700 mb-2 whitespace-pre-line">
+                    <span className="font-semibold">Model answer:</span> {result.model_answer}
+                  </p>
+                )}
+                {feedback && (
+                  <div>
+                    <p className="text-xs font-semibold text-blue-700 mb-1 flex items-center gap-1"><Sparkles size={12} /> Feedback</p>
+                    <p className="text-xs text-blue-700 leading-relaxed whitespace-pre-line">{feedback}</p>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
       </div>
       <div className="px-5 pb-5 flex items-center gap-3">
         {onPrev && <button onClick={onPrev} className="border-2 border-gray-200 text-gray-600 font-semibold px-4 py-2.5 rounded-xl text-sm hover:bg-gray-50">← Prev</button>}
-        <button onClick={result ? onNext : handleSubmit} disabled={loading || (!result && !hasAnyAnswer)}
+        <button onClick={result && !hasError ? () => onNext(!!result.is_correct) : handleSubmit} disabled={loading || (!result && !hasAnyAnswer)}
           className="flex-1 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-200 disabled:text-gray-400 text-white font-semibold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2">
           {loading && <Loader2 size={14} className="animate-spin" />}
-          {result ? 'Next Question' : loading ? 'Marking…' : 'Submit'}
+          {result && !hasError ? 'Next Question' : loading ? 'Marking…' : 'Submit'}
         </button>
         <span className="text-xs text-gray-400 shrink-0">{questionNumber} of {totalQuestions}</span>
       </div>
