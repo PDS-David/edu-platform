@@ -49,7 +49,7 @@ apiClient.interceptors.request.use(
     const token = getToken();
     if (token) config.headers.Authorization = `Bearer ${token}`;
     const selectedSchool = sessionStorage.getItem('teacher_active_school_id');
-    if (selectedSchool) config.headers['X-School-Id'] = selectedSchool;
+    if (selectedSchool && !config.skipSchoolContext) config.headers['X-School-Id'] = selectedSchool;
     return config;
   },
   (error) => Promise.reject(error)
