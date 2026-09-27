@@ -96,7 +96,7 @@ export default function TeacherLayout() {
           onClick={() => acceptSchool(m.school_id)} className="px-3 py-2 text-sm rounded-lg bg-indigo-600 text-white">
           Accept invitation: {m.name}</button>)}
         {schoolError && <span role="alert" className="text-sm text-red-600">{schoolError}</span>}
-      </div>
+      </div>}
       <PortalMobileNav
         roleLabel="Teacher"
         displayName={getDisplayName(user)}
