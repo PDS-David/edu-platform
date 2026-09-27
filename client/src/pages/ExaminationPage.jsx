@@ -202,7 +202,7 @@ function ResultsView({ result, examTitle, onDone }) {
         )}
         {result.already_submitted && (!result.answers || result.answers.length === 0) && (
           <p className="text-xs text-gray-400 mb-6">
-            Per-question breakdown is only available right after submitting — only your final score is kept afterward.
+            Detailed per-question feedback is not available for this older submission. New submissions keep the full breakdown for later review.
           </p>
         )}
 
@@ -250,16 +250,30 @@ export default function ExaminationPage() {
       .then(r => {
         const listEntry = (r?.data || []).find(e => e.id === id);
         if (listEntry?.submitted_at) {
-          setResult({
-            total_score: listEntry.score ?? 0,
-            max_score: listEntry.total_marks ?? 0,
-            accuracy_pct: listEntry.total_marks ? Math.round(((listEntry.score ?? 0) / listEntry.total_marks) * 100) : 0,
-            answers: [],
-            already_submitted: true,
-          });
           setExam(listEntry);
-          setLoading(false);
-          return null; // signal: don't proceed to the detail fetch below
+          // Submitted examinations now have a dedicated persisted-result
+          // endpoint. Use it so reopening the exam restores the same
+          // per-question marks/feedback shown immediately after submission.
+          return api.get(`/students/examination/${id}/result`)
+            .then(resultRes => {
+              setResult({ ...(resultRes?.data || resultRes), already_submitted: true });
+              setLoading(false);
+              return null; // signal: don't proceed to the live detail fetch
+            })
+            .catch(() => {
+              // Keep the historical aggregate result usable if a legacy
+              // deployment/database has not yet created examination_answers.
+              setResult({
+                total_score: listEntry.score ?? 0,
+                max_score: listEntry.total_marks ?? 0,
+                accuracy_pct: listEntry.total_marks ? Math.round(((listEntry.score ?? 0) / listEntry.total_marks) * 100) : 0,
+                answers: [],
+                answers_available: false,
+                already_submitted: true,
+              });
+              setLoading(false);
+              return null;
+            });
         }
         return api.get(`/students/examination/${id}`);
       })
