@@ -172,7 +172,7 @@ const requireTeacherClassOwnership = async (req, res, next) => {
 
   try {
     const [row] = await db.query(
-      `SELECT 1 FROM classes WHERE id = :classId AND teacher_id = :teacherId LIMIT 1`,
+      `SELECT 1 FROM classes WHERE id = :classId AND teacher_id = :teacherId AND ((school_id = :schoolId) OR (school_id IS NULL AND :schoolId IS NULL))`,
       { replacements: { classId, teacherId: req.user.id, schoolId: req.user.school_id || null }, type: QueryTypes.SELECT }
     );
     if (!row) {
