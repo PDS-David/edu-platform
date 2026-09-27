@@ -436,6 +436,7 @@ router.get('/classes', protect, teacherOnly, async (req, res) => {
        FROM classes c
        LEFT JOIN class_memberships cm ON cm.class_id = c.id
        WHERE c.teacher_id = :teacherId
+         AND ((c.school_id = :schoolId) OR (c.school_id IS NULL AND :schoolId IS NULL))
        GROUP BY c.id ORDER BY c.created_at DESC`,
       { replacements: { teacherId: req.user.id }, type: QueryTypes.SELECT }
     );
@@ -462,11 +463,11 @@ router.post('/classes', protect, teacherOnly, async (req, res) => {
 
   try {
     const created = await sequelize.query(
-      `INSERT INTO classes (teacher_id, name, created_at)
-       VALUES (:teacherId, :name, NOW())
-       RETURNING id, name, created_at`,
+      `INSERT INTO classes (teacher_id, school_id, name, created_at)
+       VALUES (:teacherId, :schoolId, :name, NOW())
+       RETURNING id, school_id, name, created_at`,
       {
-        replacements: { teacherId: req.user.id, name: String(name).trim() },
+        replacements: { teacherId: req.user.id, schoolId: req.user.school_id || null, name: String(name).trim() },
         type: QueryTypes.SELECT,
       }
     );
@@ -621,8 +622,8 @@ router.put('/class/:classId/members', protect, teacherOnly, async (req, res) => 
 
   try {
     const owns = await sequelize.query(
-      `SELECT 1 FROM classes WHERE id = :cid AND teacher_id = :tid`,
-      { replacements: { cid: classId, tid: req.user.id }, type: QueryTypes.SELECT }
+      `SELECT 1 FROM classes WHERE id = :cid AND teacher_id = :tid AND ((school_id = :schoolId) OR (school_id IS NULL AND :schoolId IS NULL))`,
+      { replacements: { cid: classId, tid: req.user.id, schoolId: req.user.school_id || null }, type: QueryTypes.SELECT }
     );
     if (!owns.length) {
       return res.status(403).json({ success: false, error: 'Not your class' });
@@ -682,9 +683,9 @@ router.get('/class/:classId/members', protect, teacherOnly, requireTeacherClassO
          FROM class_memberships cm
          JOIN users u ON u.id = cm.student_id
          JOIN classes c ON c.id = cm.class_id
-        WHERE cm.class_id = :cid AND c.teacher_id = :tid
+        WHERE cm.class_id = :cid AND c.teacher_id = :tid AND ((c.school_id = :schoolId) OR (c.school_id IS NULL AND :schoolId IS NULL))
         ORDER BY u.first_name, u.last_name`,
-      { replacements: { cid: classId, tid: req.user.id }, type: QueryTypes.SELECT }
+      { replacements: { cid: classId, tid: req.user.id, schoolId: req.user.school_id || null }, type: QueryTypes.SELECT }
     );
     return res.json({ success: true, data: rows });
   } catch (err) {
@@ -702,8 +703,8 @@ router.patch('/classes/:id', protect, teacherOnly, async (req, res) => {
   }
   try {
     const rows = await sequelize.query(
-      `UPDATE classes SET name = :name WHERE id = :id AND teacher_id = :teacherId RETURNING id, name`,
-      { replacements: { name: name.trim(), id, teacherId: req.user.id }, type: QueryTypes.SELECT }
+      `UPDATE classes SET name = :name WHERE id = :id AND teacher_id = :teacherId AND ((school_id = :schoolId) OR (school_id IS NULL AND :schoolId IS NULL)) RETURNING id, name`,
+      { replacements: { name: name.trim(), id, teacherId: req.user.id, schoolId: req.user.school_id || null }, type: QueryTypes.SELECT }
     );
     if (!rows.length) return res.status(404).json({ success: false, error: 'Class not found' });
     return res.json({ success: true, class: rows[0] });
@@ -721,8 +722,8 @@ router.delete('/classes/:id', protect, teacherOnly, async (req, res) => {
   const { id } = req.params;
   try {
     const rows = await sequelize.query(
-      `DELETE FROM classes WHERE id = :id AND teacher_id = :teacherId RETURNING id`,
-      { replacements: { id, teacherId: req.user.id }, type: QueryTypes.SELECT }
+      `DELETE FROM classes WHERE id = :id AND teacher_id = :teacherId AND ((school_id = :schoolId) OR (school_id IS NULL AND :schoolId IS NULL)) RETURNING id`,
+      { replacements: { id, teacherId: req.user.id, schoolId: req.user.school_id || null }, type: QueryTypes.SELECT }
     );
     if (!rows.length) return res.status(404).json({ success: false, error: 'Class not found' });
     return res.json({ success: true });
