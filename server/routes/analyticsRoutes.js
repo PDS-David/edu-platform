@@ -518,7 +518,17 @@ router.get('/cohort-gaps', protect, analyticsLimiter, requireTeacherCohortAnalyt
        JOIN subtopics  st ON st.id = q.subtopic_id
        JOIN topics     t  ON t.id  = st.topic_id
        WHERE true
-         ${subject_id ? 'AND t.subject_id = :subject_id' : ''}
+         ${subject_id
+           ? 'AND t.subject_id = :subject_id'
+           : req.user.role === 'teacher'
+             ? `AND EXISTS (
+                  SELECT 1 FROM teacher_subjects ts
+                   WHERE ts.teacher_id = :teacherId
+                     AND ts.subject_id = t.subject_id
+                     AND ts.is_active = true
+                     AND ((ts.school_id = :schoolId) OR (ts.school_id IS NULL AND :schoolId IS NULL))
+                )`
+             : ''}
        GROUP BY t.id, t.name
        HAVING COUNT(*) >= 3
        ORDER BY avg_accuracy ASC
