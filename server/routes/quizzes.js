@@ -205,6 +205,7 @@ router.post('/attempt', protect, async (req, res) => {
     // so history queries can reconstruct per-session totals.
     const { randomUUID } = require('crypto');
     const sessionId = randomUUID();
+    const persistedAttempts = [];
 
     for (const answer of answers) {
       const question = questionMap[String(answer.question_id)];
@@ -301,27 +302,17 @@ router.post('/attempt', protect, async (req, res) => {
           options:              question.options,
         });
 
-        await sequelize.query(
-          `INSERT INTO practice_attempts
-             (student_id, question_id, is_correct, marks_awarded, ai_explanation, time_taken_seconds, attempted_at, created_at, updated_at, selected_option_text, paper_type, subject_id, session_id)
-           VALUES (:studentId, :questionId, :isCorrect, :marksAwarded, :aiExplanation, :timeTaken, NOW(), NOW(), NOW(), :selectedText, :paperType, :subjectId, :sessionId)`,
-          {
-            replacements: {
-              studentId:     req.user.id,
-              questionId:    answer.question_id,
-              isCorrect,
-              marksAwarded:  marksAwarded,
-              aiExplanation: feedback || question.explanation || '',
-              timeTaken:    parseInt(answer.time_taken_seconds ?? (answer.time_taken_ms / 1000)) || 0,
-              selectedText: answerText || null,
-              paperType:    paper_type || 'quiz',
-              subjectId:    subject_id || null,
-              sessionId:    sessionId,
-            },
-            type: QueryTypes.INSERT,
-          }
-        ).catch((err) => {
-          console.error('[POST /quizzes/attempt] practice_attempts insert failed:', err.message);
+        persistedAttempts.push({
+          studentId:     req.user.id,
+          questionId:    answer.question_id,
+          isCorrect,
+          marksAwarded,
+          aiExplanation: feedback || question.explanation || '',
+          timeTaken:    parseInt(answer.time_taken_seconds ?? (answer.time_taken_ms / 1000)) || 0,
+          selectedText: answerText || null,
+          paperType:    paper_type || 'quiz',
+          subjectId:    subject_id || null,
+          sessionId,
         });
 
         continue;
@@ -409,29 +400,39 @@ router.post('/attempt', protect, async (req, res) => {
       // (which was a real, separate bug, but never the one actually
       // blocking this). Rather than rely on the column default at all,
       // both timestamps are now supplied explicitly, same as attempted_at.
-      await sequelize.query(
-        `INSERT INTO practice_attempts
-           (student_id, question_id, is_correct, marks_awarded, ai_explanation, time_taken_seconds, attempted_at, created_at, updated_at, selected_option_text, paper_type, subject_id, session_id)
-         VALUES (:studentId, :questionId, :isCorrect, :marksAwarded, :aiExplanation, :timeTaken, NOW(), NOW(), NOW(), :selectedText, :paperType, :subjectId, :sessionId)`,
-        {
-          replacements: {
-            studentId:     req.user.id,
-            questionId:    answer.question_id,
-            isCorrect,
-            marksAwarded:  marks,
-            aiExplanation: question.explanation || '',
-            timeTaken:    parseInt(answer.time_taken_seconds ?? (answer.time_taken_ms / 1000)) || 0,
-            selectedText: submittedAnswer || null,
-            paperType:    paper_type || 'quiz',
-            subjectId:    subject_id || null,
-            sessionId:    sessionId,
-          },
-          type: QueryTypes.INSERT,
-        }
-      ).catch((err) => {
-        console.error('[POST /quizzes/attempt] practice_attempts insert failed:', err.message);
+      persistedAttempts.push({
+        studentId:     req.user.id,
+        questionId:    answer.question_id,
+        isCorrect,
+        marksAwarded:  marks,
+        aiExplanation: question.explanation || '',
+        timeTaken:    parseInt(answer.time_taken_seconds ?? (answer.time_taken_ms / 1000)) || 0,
+        selectedText: submittedAnswer || null,
+        paperType:    paper_type || 'quiz',
+        subjectId:    subject_id || null,
+        sessionId,
       });
     }
+
+    // Persist the complete quiz submission atomically. Previously each
+    // practice_attempts INSERT was caught independently, so a database
+    // failure could leave only some answers stored while the API still
+    // returned success. That made the result appear valid immediately but
+    // disappear or become incomplete in historical results.
+    await sequelize.transaction(async (transaction) => {
+      for (const attempt of persistedAttempts) {
+        await sequelize.query(
+          `INSERT INTO practice_attempts
+             (student_id, question_id, is_correct, marks_awarded, ai_explanation, time_taken_seconds, attempted_at, created_at, updated_at, selected_option_text, paper_type, subject_id, session_id)
+           VALUES (:studentId, :questionId, :isCorrect, :marksAwarded, :aiExplanation, :timeTaken, NOW(), NOW(), NOW(), :selectedText, :paperType, :subjectId, :sessionId)`,
+          {
+            replacements: attempt,
+            type: QueryTypes.INSERT,
+            transaction,
+          }
+        );
+      }
+    });
 
     // Update subtopic_progress — ONLY for the single-subtopic quiz path.
     // subtopic_progress.subtopic_id is NOT NULL; a mock exam has no single
