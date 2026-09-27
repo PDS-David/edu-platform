@@ -31,6 +31,16 @@ const teacherOnly = (req, res, next) => {
   next();
 };
 
+// Question Bank classification is deliberately teacher-only. App Admin has
+// a separate unrestricted Question Bank under /admin/question-bank. School
+// admins never have either route because their role is school_admin.
+const questionBankTeacherOnly = (req, res, next) => {
+  if (req.user?.role !== 'teacher') {
+    return res.status(403).json({ success: false, error: 'Teacher Question Bank access required' });
+  }
+  next();
+};
+
 // Alias — same permissions as teacherOnly but used on routes where
 // admin bypass of ownership checks is explicitly documented.
 const teacherOrAdmin = teacherOnly;
@@ -1781,7 +1791,7 @@ router.post('/nudge/:userId', protect, teacherOnly, async (req, res) => {
 // does NOT approve the question: it moves the question to pending/inactive so
 // the normal human review queue must approve it before students can receive it.
 
-router.get('/question-bank/questions', protect, teacherOnly, async (req, res) => {
+router.get('/question-bank/questions', protect, questionBankTeacherOnly, async (req, res) => {
   try {
     const limit = Math.min(Math.max(parseInt(req.query.limit || '50', 10), 1), 100);
     const offset = Math.max(parseInt(req.query.offset || '0', 10), 0);
@@ -1806,18 +1816,28 @@ router.get('/question-bank/questions', protect, teacherOnly, async (req, res) =>
       replacements.search = '%' + search + '%';
     }
 
-    const classifiedJoin = unclassified ? '' :
-      'JOIN subtopics st ON st.id = q.subtopic_id ' +
-      'JOIN topics t ON t.id = st.topic_id ' +
-      'JOIN subjects s ON s.id = t.subject_id ' +
-      'JOIN teacher_subjects ts ON ts.subject_id = s.id ' +
-      'AND ts.teacher_id = :teacherId AND ts.is_active = true';
+    // A genuinely unclassified question has no subtopic, so its direct
+    // subject_id is now the authoritative scope for the teacher queue.
+    // Legacy orphaned questions with subject_id NULL remain App-Admin-only.
+    const scopeJoin =
+      'JOIN subjects scope_s ON scope_s.id = q.subject_id ' +
+      'JOIN teacher_subjects scope_ts ON scope_ts.subject_id = q.subject_id ' +
+      'AND scope_ts.teacher_id = :teacherId AND scope_ts.is_active = true';
+    const classifiedJoin = unclassified
+      ? scopeJoin
+      : 'JOIN subtopics st ON st.id = q.subtopic_id ' +
+        'JOIN topics t ON t.id = st.topic_id ' +
+        'JOIN subjects s ON s.id = t.subject_id ' +
+        'JOIN teacher_subjects ts ON ts.subject_id = s.id ' +
+        'AND ts.teacher_id = :teacherId AND ts.is_active = true';
 
     const rows = await sequelize.query(
       'SELECT q.id, q.question_text, q.type, q.question_type, q.difficulty, ' +
       'q.status, q.is_active, q.is_ai_generated, q.created_at, ' +
       'q.options, q.correct_answer, q.explanation, ' +
-      's.name AS subject_name, t.name AS topic_name, st.name AS subtopic_name ' +
+      'COALESCE(s.name, s2.name, scope_s.name) AS subject_name, ' +
+      'COALESCE(t.name, t2.name) AS topic_name, ' +
+      'COALESCE(st.name, st2.name) AS subtopic_name ' +
       'FROM questions q ' + classifiedJoin + ' ' +
       'LEFT JOIN subtopics st2 ON st2.id = q.subtopic_id ' +
       'LEFT JOIN topics t2 ON t2.id = st2.topic_id ' +
@@ -1840,7 +1860,7 @@ router.get('/question-bank/questions', protect, teacherOnly, async (req, res) =>
   }
 });
 
-router.put('/question-bank/questions/:id/classify', protect, teacherOnly, async (req, res) => {
+router.put('/question-bank/questions/:id/classify', protect, questionBankTeacherOnly, async (req, res) => {
   const questionId = parseInt(req.params.id, 10);
   const subtopicId = parseInt(req.body.subtopic_id, 10);
   if (!Number.isInteger(questionId) || !Number.isInteger(subtopicId)) {
@@ -1861,17 +1881,23 @@ router.put('/question-bank/questions/:id/classify', protect, teacherOnly, async 
     }
 
     const question = await sequelize.query(
-      'SELECT id, is_ai_generated FROM questions WHERE id = :questionId LIMIT 1',
+      'SELECT id, is_ai_generated, subject_id, subtopic_id FROM questions WHERE id = :questionId LIMIT 1',
       { replacements: { questionId }, type: QueryTypes.SELECT }
     );
     if (!question.length) return res.status(404).json({ success: false, error: 'Question not found.' });
     if (!question[0].is_ai_generated) {
       return res.status(400).json({ success: false, error: 'Only AI-generated questions are classified through this queue.' });
     }
+    // Unclassified teacher-visible questions carry a direct subject_id. Do
+    // not allow a teacher to move one into a different subject.
+    if (question[0].subtopic_id == null && question[0].subject_id != null &&
+        String(question[0].subject_id) !== String(target[0].subject_id)) {
+      return res.status(403).json({ success: false, error: 'Question is outside this subject scope.' });
+    }
 
     await sequelize.query(
-      "UPDATE questions SET subtopic_id = :subtopicId, status = 'pending', is_active = false, updated_at = NOW() WHERE id = :questionId",
-      { replacements: { questionId, subtopicId }, type: QueryTypes.UPDATE }
+      "UPDATE questions SET subtopic_id = :subtopicId, subject_id = :subjectId, status = 'pending', is_active = false, updated_at = NOW() WHERE id = :questionId",
+      { replacements: { questionId, subtopicId, subjectId: target[0].subject_id }, type: QueryTypes.UPDATE }
     );
 
     return res.json({
