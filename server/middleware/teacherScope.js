@@ -123,6 +123,70 @@ const requireTeacherStudentScope = async (req, res, next) => {
  * class/subject scope, or — for school_admin — the student's own school).
  * Admins always pass through.
  */
+/**
+ * Gate for cohort analytics that identify a subject.
+ * Teachers may only read cohort analytics for subjects assigned to them
+ * within their school scope. Admins bypass this check.
+ *
+ * If no subject is supplied (e.g. /cohort-gaps), the route may proceed only
+ * when the caller has at least one active subject assignment; the route must
+ * still restrict its SQL to those assigned subjects.
+ */
+const requireTeacherCohortAnalyticsScope = async (req, res, next) => {
+  const role = req.user?.role;
+  if (role === 'admin') return next();
+
+  if (role !== 'teacher') {
+    return res.status(403).json({ success: false, error: 'Teacher access required' });
+  }
+
+  const subjectId = req.params.subjectId || req.query.subject_id;
+  try {
+    const replacements = {
+      teacherId: req.user.id,
+      schoolId: req.user.school_id || null,
+    };
+
+    if (subjectId) {
+      replacements.subjectId = subjectId;
+      const rows = await db.query(
+        `SELECT 1
+           FROM teacher_subjects
+          WHERE teacher_id = :teacherId
+            AND subject_id = :subjectId
+            AND is_active = true
+            AND ((school_id = :schoolId) OR (school_id IS NULL AND :schoolId IS NULL))
+          LIMIT 1`,
+        { replacements, type: QueryTypes.SELECT }
+      );
+      if (!rows.length) {
+        await audit.blockIdor(req, res,
+          `Teacher ${req.user.id} attempted cohort analytics for out-of-scope subject ${subjectId}`);
+        return;
+      }
+      return next();
+    }
+
+    const rows = await db.query(
+      `SELECT 1
+         FROM teacher_subjects
+        WHERE teacher_id = :teacherId
+          AND is_active = true
+          AND ((school_id = :schoolId) OR (school_id IS NULL AND :schoolId IS NULL))
+        LIMIT 1`,
+      { replacements, type: QueryTypes.SELECT }
+    );
+    if (!rows.length) {
+      return res.status(403).json({ success: false, error: 'No subjects assigned' });
+    }
+
+    next();
+  } catch (err) {
+    console.error('[teacherScope] cohort analytics scope check error:', err.message);
+    return res.status(500).json({ success: false, error: 'Authorization check failed' });
+  }
+};
+
 const requireTeacherAnalyticsScope = async (req, res, next) => {
   const role = req.user?.role;
   if (role === 'admin') return next();
@@ -141,7 +205,7 @@ const requireTeacherAnalyticsScope = async (req, res, next) => {
   try {
     const inScope = role === 'school_admin'
       ? await studentInSchoolAdminScope(req.user.school_id, studentId)
-      : await studentInTeacherScope(req.user.id, studentId);
+      : await studentInTeacherScope(req.user.id, studentId, req.user.school_id);
     if (!inScope) {
       await audit.blockIdor(req, res,
         `${role} ${req.user.id} attempted analytics on out-of-scope student ${studentId}`);
@@ -191,6 +255,7 @@ const requireTeacherClassOwnership = async (req, res, next) => {
 module.exports = {
   requireTeacherStudentScope,
   requireTeacherAnalyticsScope,
+  requireTeacherCohortAnalyticsScope,
   requireTeacherClassOwnership,
   studentInTeacherScope,        // exported for use in route handlers
   studentInSchoolAdminScope,    // exported for use in route handlers
