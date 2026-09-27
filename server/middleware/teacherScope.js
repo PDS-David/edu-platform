@@ -64,6 +64,50 @@ async function studentInTeacherScope(teacherId, studentId, schoolId = null) {
 }
 
 /**
+ * Returns the subset of student IDs that are legitimately within a teacher's
+ * scope for direct assignment. A student must be an active student in the
+ * teacher's school and must be either:
+ *   1. actively enrolled in a subject assigned to the teacher, or
+ *   2. a member of one of the teacher's own classes.
+ */
+async function teacherStudentIdsInScope(teacherId, studentIds, schoolId = null) {
+  if (!Array.isArray(studentIds) || studentIds.length === 0) return [];
+
+  const rows = await db.query(
+    `SELECT DISTINCT u.id
+       FROM users u
+      WHERE u.id IN (:studentIds)
+        AND u.role = 'student'
+        AND u.is_active = true
+        AND ((u.school_id = :schoolId) OR (u.school_id IS NULL AND :schoolId IS NULL))
+        AND (
+          EXISTS (
+            SELECT 1
+              FROM student_subjects ss
+              JOIN teacher_subjects ts
+                ON ts.subject_id = ss.subject_id
+               AND ts.teacher_id = :teacherId
+               AND ts.is_active = true
+               AND ((ts.school_id = :schoolId) OR (ts.school_id IS NULL AND :schoolId IS NULL))
+             WHERE ss.student_id = u.id
+               AND ss.is_active = true
+          )
+          OR EXISTS (
+            SELECT 1
+              FROM class_memberships cm
+              JOIN classes c ON c.id = cm.class_id
+             WHERE cm.student_id = u.id
+               AND c.teacher_id = :teacherId
+               AND ((c.school_id = :schoolId) OR (c.school_id IS NULL AND :schoolId IS NULL))
+          )
+        )`,
+    { replacements: { teacherId, studentIds, schoolId }, type: QueryTypes.SELECT }
+  );
+
+  return rows.map(row => String(row.id));
+}
+
+/**
  * Returns true if the given studentId belongs to the school_admin's own
  * school. Scope = student.school_id === school_admin.school_id — a school
  * boundary, not a class/subject one (school_admin doesn't teach specific
@@ -258,5 +302,6 @@ module.exports = {
   requireTeacherCohortAnalyticsScope,
   requireTeacherClassOwnership,
   studentInTeacherScope,        // exported for use in route handlers
+  teacherStudentIdsInScope,      // batch scope check for direct teacher assignments
   studentInSchoolAdminScope,    // exported for use in route handlers
 };

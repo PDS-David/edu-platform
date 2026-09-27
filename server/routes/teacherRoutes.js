@@ -10,7 +10,7 @@ const router         = express.Router();
 const { QueryTypes } = require('sequelize');
 const sequelize      = require('../config/database');
 const { protect }    = require('../middleware/auth');
-const { requireTeacherClassOwnership } = require('../middleware/teacherScope');
+const { requireTeacherClassOwnership, teacherStudentIdsInScope } = require('../middleware/teacherScope');
 const { generate } = require('../services/ai');
 // Shared with syllabusExtractor.js's own AI-response handling and (as of
 // migration_034's remap-suggestion work) generateSyllabusRemapSuggestions.js
@@ -1065,7 +1065,22 @@ router.post('/tests/:id/assign', protect, teacherOnly, async (req, res) => {
       );
       targets = members.map(m => ({ studentId: m.student_id, classId: class_id }));
     } else {
-      const cleanIds = student_ids.filter(id => typeof id === 'string' && id.length > 10);
+      // SECURITY FIX (TEACHER-05): direct student assignment is authorized
+      // independently of the class-assignment path. A syntactically valid
+      // UUID is not enough — every target must be an active student in the
+      // teacher's school and be either in one of the teacher's classes or
+      // actively enrolled in a subject assigned to that teacher.
+      const requestedIds = Array.isArray(student_ids) ? student_ids : [];
+      const cleanIds = [...new Set(requestedIds.filter(id => typeof id === 'string' && UUID_REGEX.test(id)))];
+      if (cleanIds.length !== requestedIds.length) {
+        return res.status(400).json({ success: false, error: 'student_ids must contain valid UUIDs' });
+      }
+      const scopedIds = await teacherStudentIdsInScope(req.user.id, cleanIds, req.user.school_id || null);
+      const scopedSet = new Set(scopedIds);
+      const outOfScope = cleanIds.filter(id => !scopedSet.has(String(id)));
+      if (outOfScope.length) {
+        return res.status(403).json({ success: false, error: 'One or more students are outside your teaching scope' });
+      }
       targets = cleanIds.map(id => ({ studentId: id, classId: null }));
     }
 
@@ -1674,7 +1689,22 @@ router.post('/examinations/:id/assign', protect, teacherOnly, async (req, res) =
       );
       targets = members.map(m => ({ studentId: m.student_id, classId: class_id }));
     } else {
-      const cleanIds = student_ids.filter(id => typeof id === 'string' && id.length > 10);
+      // SECURITY FIX (TEACHER-05): direct student assignment is authorized
+      // independently of the class-assignment path. A syntactically valid
+      // UUID is not enough — every target must be an active student in the
+      // teacher's school and be either in one of the teacher's classes or
+      // actively enrolled in a subject assigned to that teacher.
+      const requestedIds = Array.isArray(student_ids) ? student_ids : [];
+      const cleanIds = [...new Set(requestedIds.filter(id => typeof id === 'string' && UUID_REGEX.test(id)))];
+      if (cleanIds.length !== requestedIds.length) {
+        return res.status(400).json({ success: false, error: 'student_ids must contain valid UUIDs' });
+      }
+      const scopedIds = await teacherStudentIdsInScope(req.user.id, cleanIds, req.user.school_id || null);
+      const scopedSet = new Set(scopedIds);
+      const outOfScope = cleanIds.filter(id => !scopedSet.has(String(id)));
+      if (outOfScope.length) {
+        return res.status(403).json({ success: false, error: 'One or more students are outside your teaching scope' });
+      }
       targets = cleanIds.map(id => ({ studentId: id, classId: null }));
     }
 
