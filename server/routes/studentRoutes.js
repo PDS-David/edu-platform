@@ -110,15 +110,34 @@ router.get('/performance', protect, studentOnly, async (req, res) => {
            CASE WHEN sp.resources_completed AND sp.practice_completed AND sp.quiz_completed
                 THEN 'complete' ELSE 'in_progress' END AS completion,
            COUNT(pa.id)::INTEGER  AS attempts,
-           ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 1) AS score_avg,
+           ROUND(AVG(
+             CASE
+               WHEN pa.marks_awarded IS NOT NULL AND q.marks IS NOT NULL AND q.marks > 0
+                 THEN (pa.marks_awarded::numeric / q.marks::numeric) * 100
+               WHEN pa.is_correct THEN 100.0
+               ELSE 0.0
+             END
+           ), 1) AS score_avg,
            MAX(pa.attempted_at) AS last_attempt,
            CASE WHEN COUNT(pa.id) >= 2 AND
-                     (SELECT ROUND(AVG(CASE WHEN pa2.is_correct THEN 100.0 ELSE 0 END),1)
+                     (SELECT ROUND(AVG(
+                         CASE
+                           WHEN pa2.marks_awarded IS NOT NULL AND q2.marks IS NOT NULL AND q2.marks > 0
+                             THEN (pa2.marks_awarded::numeric / q2.marks::numeric) * 100
+                           WHEN pa2.is_correct THEN 100.0 ELSE 0.0
+                         END
+                       ),1)
                       FROM practice_attempts pa2
                       JOIN questions q2 ON q2.id = pa2.question_id
                       WHERE pa2.student_id = sp.student_id AND q2.subtopic_id = st.id
                       ORDER BY pa2.attempted_at DESC LIMIT 3) >
-                     (SELECT ROUND(AVG(CASE WHEN pa3.is_correct THEN 100.0 ELSE 0 END),1)
+                     (SELECT ROUND(AVG(
+                         CASE
+                           WHEN pa3.marks_awarded IS NOT NULL AND q3.marks IS NOT NULL AND q3.marks > 0
+                             THEN (pa3.marks_awarded::numeric / q3.marks::numeric) * 100
+                           WHEN pa3.is_correct THEN 100.0 ELSE 0.0
+                         END
+                       ),1)
                       FROM practice_attempts pa3
                       JOIN questions q3 ON q3.id = pa3.question_id
                       WHERE pa3.student_id = sp.student_id AND q3.subtopic_id = st.id
@@ -521,14 +540,18 @@ router.post('/test/:testId/submit', protect, studentOnly, async (req, res) => {
         // supplied here — same root cause confirmed via live production
         // logs in quizzes.js's POST /attempt. Identical insert shape, was
         // almost certainly failing silently the same way.
-        `INSERT INTO practice_attempts (student_id, question_id, is_correct, time_taken_seconds, attempted_at, created_at, updated_at)
-         VALUES (:studentId, :questionId, :isCorrect, :timeTaken, NOW(), NOW(), NOW())`,
+        `INSERT INTO practice_attempts
+           (student_id, question_id, is_correct, marks_awarded, ai_explanation, time_taken_seconds, attempted_at, created_at, updated_at, selected_option_text)
+         VALUES (:studentId, :questionId, :isCorrect, :marksAwarded, :aiExplanation, :timeTaken, NOW(), NOW(), NOW(), :selectedText)`,
         {
           replacements: {
-            studentId:  req.user.id,
-            questionId: answer.question_id,
-            isCorrect:  !!isCorrect,
-            timeTaken:  Math.round((answer.time_taken_ms || 0) / 1000),
+            studentId:     req.user.id,
+            questionId:    answer.question_id,
+            isCorrect:     !!isCorrect,
+            marksAwarded:  marksAwarded,
+            aiExplanation: feedback || null,
+            timeTaken:     Math.round((answer.time_taken_ms || 0) / 1000),
+            selectedText:  (answer.essay_response ?? answer.selected_answer ?? answer.selected_option_id ?? null),
           },
           type: QueryTypes.INSERT,
         }
@@ -955,14 +978,18 @@ router.post('/examination/:id/submit', protect, studentOnly, async (req, res) =>
       // submission, for streak/analytics consistency across every place a
       // student answers a real questions-table row.
       sequelize.query(
-        `INSERT INTO practice_attempts (student_id, question_id, is_correct, time_taken_seconds, attempted_at, created_at, updated_at)
-         VALUES (:studentId, :questionId, :isCorrect, :timeTaken, NOW(), NOW(), NOW())`,
+        `INSERT INTO practice_attempts
+           (student_id, question_id, is_correct, marks_awarded, ai_explanation, time_taken_seconds, attempted_at, created_at, updated_at, selected_option_text)
+         VALUES (:studentId, :questionId, :isCorrect, :marksAwarded, :aiExplanation, :timeTaken, NOW(), NOW(), NOW(), :selectedText)`,
         {
           replacements: {
-            studentId:  req.user.id,
-            questionId: answer.question_id,
-            isCorrect:  !!isCorrect,
-            timeTaken:  Math.round((answer.time_taken_ms || 0) / 1000),
+            studentId:     req.user.id,
+            questionId:    answer.question_id,
+            isCorrect:     !!isCorrect,
+            marksAwarded:  marksAwarded,
+            aiExplanation: feedback || null,
+            timeTaken:     Math.round((answer.time_taken_ms || 0) / 1000),
+            selectedText:  (answer.essay_response ?? answer.selected_answer ?? answer.selected_option_id ?? null),
           },
           type: QueryTypes.INSERT,
         }
