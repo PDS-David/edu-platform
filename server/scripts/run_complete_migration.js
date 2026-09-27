@@ -814,23 +814,6 @@ async function run() {
     );
     CREATE INDEX IF NOT EXISTS idx_eq_examination_id ON examination_questions(examination_id)`],
 
-    ['examination_answers', `CREATE TABLE IF NOT EXISTS examination_answers (
-      id                 UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-      assignment_id      UUID        NOT NULL REFERENCES examination_assignments(id) ON DELETE CASCADE,
-      question_id        INTEGER     NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
-      selected_answer    TEXT,
-      is_correct         BOOLEAN     NOT NULL DEFAULT false,
-      marks_awarded      INTEGER     NOT NULL DEFAULT 0,
-      max_marks          INTEGER     NOT NULL DEFAULT 0,
-      feedback           TEXT,
-      time_taken_seconds INTEGER     NOT NULL DEFAULT 0,
-      created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE(assignment_id, question_id)
-    );
-    CREATE INDEX IF NOT EXISTS idx_examination_answers_assignment_id ON examination_answers(assignment_id);
-    CREATE INDEX IF NOT EXISTS idx_examination_answers_question_id ON examination_answers(question_id)`],
-
     ['examination_assignments', `CREATE TABLE IF NOT EXISTS examination_assignments (
       id             UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
       examination_id UUID        NOT NULL REFERENCES examinations(id) ON DELETE CASCADE,
@@ -849,6 +832,24 @@ async function run() {
     -- column's comment for the full rationale.
     ALTER TABLE examination_assignments
       ADD COLUMN IF NOT EXISTS needs_manual_review BOOLEAN NOT NULL DEFAULT false`],
+
+    ['examination_answers', `CREATE TABLE IF NOT EXISTS examination_answers (
+      id                 UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+      assignment_id      UUID        NOT NULL REFERENCES examination_assignments(id) ON DELETE CASCADE,
+      question_id        INTEGER     NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+      selected_answer    TEXT,
+      is_correct         BOOLEAN     NOT NULL DEFAULT false,
+      marks_awarded      INTEGER     NOT NULL DEFAULT 0,
+      max_marks          INTEGER     NOT NULL DEFAULT 0,
+      feedback           TEXT,
+      time_taken_seconds INTEGER     NOT NULL DEFAULT 0,
+      created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(assignment_id, question_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_examination_answers_assignment_id ON examination_answers(assignment_id);
+    CREATE INDEX IF NOT EXISTS idx_examination_answers_question_id ON examination_answers(question_id)`],
+
 
     // Syllabus-driven topic mapping, Prompt 1 of 4: schema + storage
     // plumbing only. Full design rationale: database/migration_031_syllabus_documents.sql
