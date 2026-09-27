@@ -95,6 +95,154 @@ const adminOnly = (req, res, next) => {
 };
 
 // ─────────────────────────────────────────────
+// MAIN QUESTION BANK — APP ADMIN ONLY
+// School admins are role='school_admin' and are deliberately excluded.
+// App Admin (role='admin') has unrestricted visibility across every exam
+// type/board, subject, topic and subtopic.
+// ─────────────────────────────────────────────
+
+router.get('/question-bank/structure', protect, adminOnly, async (req, res) => {
+  try {
+    const rows = await sequelize.query(
+      `SELECT eb.id AS exam_type_id, eb.name AS exam_type_name, eb.code AS exam_type_code,
+              s.id AS subject_id, s.name AS subject_name, s.code AS subject_code,
+              t.id AS topic_id, t.name AS topic_name,
+              st.id AS subtopic_id, st.name AS subtopic_name
+         FROM subjects s
+         LEFT JOIN exam_boards eb ON eb.id = s.exam_board_id
+         LEFT JOIN topics t ON t.subject_id = s.id AND t.is_active = true
+         LEFT JOIN subtopics st ON st.topic_id = t.id AND st.is_active = true
+        WHERE s.is_active = true
+        ORDER BY eb.name NULLS LAST, s.name, t.order_index ASC NULLS LAST,
+                 t.name, st.order_index ASC NULLS LAST, st.name`,
+      { type: QueryTypes.SELECT }
+    );
+    return res.json({ success: true, data: rows });
+  } catch (err) {
+    console.error('[GET /admin/question-bank/structure]', err.message);
+    return res.status(500).json({ success: false, error: 'Could not load the main Question Bank structure.' });
+  }
+});
+
+router.get('/question-bank/questions', protect, adminOnly, async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(parseInt(req.query.limit || '50', 10), 1), 100);
+    const offset = Math.max(parseInt(req.query.offset || '0', 10), 0);
+    const search = String(req.query.search || '').trim();
+    const unclassified = String(req.query.unclassified || '') === 'true';
+    const subtopicId = req.query.subtopic_id ? parseInt(req.query.subtopic_id, 10) : null;
+    const aiOnly = String(req.query.ai_only || '') === 'true';
+
+    const clauses = [];
+    const replacements = { limit, offset };
+
+    if (unclassified) {
+      clauses.push('q.subtopic_id IS NULL');
+      clauses.push('q.is_ai_generated = true');
+    } else if (Number.isInteger(subtopicId)) {
+      clauses.push('q.subtopic_id = :subtopicId');
+      replacements.subtopicId = subtopicId;
+    } else {
+      return res.status(400).json({ success: false, error: 'Choose a subtopic or the unclassified AI queue.' });
+    }
+
+    if (aiOnly) clauses.push('q.is_ai_generated = true');
+    if (search) {
+      clauses.push('q.question_text ILIKE :search');
+      replacements.search = '%' + search + '%';
+    }
+
+    const where = clauses.join(' AND ');
+    const rows = await sequelize.query(
+      `SELECT q.id, q.question_text, q.type, q.difficulty, q.status, q.is_active,
+              q.is_ai_generated, q.subject_id, q.subtopic_id, q.created_at,
+              q.options, q.correct_answer, q.explanation,
+              eb.name AS exam_type_name, s.name AS subject_name,
+              t.name AS topic_name, st.name AS subtopic_name
+         FROM questions q
+         LEFT JOIN subtopics st ON st.id = q.subtopic_id
+         LEFT JOIN topics t ON t.id = st.topic_id
+         LEFT JOIN subjects s ON s.id = COALESCE(q.subject_id, t.subject_id)
+         LEFT JOIN exam_boards eb ON eb.id = s.exam_board_id
+        WHERE ${where}
+        ORDER BY q.created_at DESC, q.id DESC
+        LIMIT :limit OFFSET :offset`,
+      { replacements, type: QueryTypes.SELECT }
+    );
+
+    const countRows = await sequelize.query(
+      `SELECT COUNT(*)::INTEGER AS count
+         FROM questions q
+         LEFT JOIN subtopics st ON st.id = q.subtopic_id
+         LEFT JOIN topics t ON t.id = st.topic_id
+         WHERE ${where}`,
+      { replacements, type: QueryTypes.SELECT }
+    );
+
+    return res.json({ success: true, data: rows, total: countRows[0]?.count || 0 });
+  } catch (err) {
+    console.error('[GET /admin/question-bank/questions]', err.message);
+    return res.status(500).json({ success: false, error: 'Could not load the main Question Bank.' });
+  }
+});
+
+router.put('/question-bank/questions/:id/classify', protect, adminOnly, async (req, res) => {
+  const questionId = parseInt(req.params.id, 10);
+  const subtopicId = parseInt(req.body.subtopic_id, 10);
+  if (!Number.isInteger(questionId) || !Number.isInteger(subtopicId)) {
+    return res.status(400).json({ success: false, error: 'question_id and subtopic_id are required.' });
+  }
+
+  try {
+    const target = await sequelize.query(
+      `SELECT st.id, t.id AS topic_id, t.subject_id
+         FROM subtopics st
+         JOIN topics t ON t.id = st.topic_id
+        WHERE st.id = :subtopicId AND st.is_active = true AND t.is_active = true
+        LIMIT 1`,
+      { replacements: { subtopicId }, type: QueryTypes.SELECT }
+    );
+    if (!target.length) return res.status(404).json({ success: false, error: 'Subtopic not found.' });
+
+    const question = await sequelize.query(
+      'SELECT id, is_ai_generated FROM questions WHERE id = :questionId LIMIT 1',
+      { replacements: { questionId }, type: QueryTypes.SELECT }
+    );
+    if (!question.length) return res.status(404).json({ success: false, error: 'Question not found.' });
+    if (!question[0].is_ai_generated) {
+      return res.status(400).json({ success: false, error: 'Only AI-generated questions use this classification workflow.' });
+    }
+
+    await sequelize.query(
+      `UPDATE questions
+          SET subject_id = :subjectId,
+              subtopic_id = :subtopicId,
+              status = 'pending',
+              is_active = false,
+              updated_at = NOW()
+        WHERE id = :questionId`,
+      {
+        replacements: {
+          questionId,
+          subtopicId,
+          subjectId: target[0].subject_id,
+        },
+        type: QueryTypes.UPDATE,
+      }
+    );
+
+    return res.json({
+      success: true,
+      data: { question_id: questionId, subject_id: target[0].subject_id, subtopic_id: subtopicId, status: 'pending', is_active: false },
+      message: 'Question classified and returned to review.',
+    });
+  } catch (err) {
+    console.error('[PUT /admin/question-bank/questions/:id/classify]', err.message);
+    return res.status(500).json({ success: false, error: 'Could not classify the question.' });
+  }
+});
+
+// ─────────────────────────────────────────────
 // POST /api/admin/create-teacher
 // Admin-only. Creates a teacher account directly (no email verification required).
 // Body: { email, password, first_name, last_name }
@@ -862,15 +1010,16 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
         await sequelize.query(
           `INSERT INTO questions
              (question_text, options, correct_answer, explanation, difficulty,
-              subtopic_id, type, marks, is_active, is_ai_generated, status, created_at, updated_at)
+              subject_id, subtopic_id, type, marks, is_active, is_ai_generated, status, created_at, updated_at)
            VALUES (:q, NULL, :c, :e, :d,
-                   :subtopicId, :type, :marks, true, true, 'pending', NOW(), NOW())`,
+                   :subjectId, :subtopicId, :type, :marks, true, true, 'pending', NOW(), NOW())`,
           {
             replacements: {
               q: q.question_text,
               c: modelAnswer,
               e: q.explanation || null,
               d: difficulty,
+              subjectId: subject_id,
               subtopicId: resolvedSubtopicId,
               type: question_type,
               marks: generatedMarks,
@@ -939,9 +1088,9 @@ router.post('/generate-questions', protect, adminOnly, async (req, res) => {
       await sequelize.query(
         `INSERT INTO questions
            (question_text, options, correct_answer, explanation, difficulty,
-            subtopic_id, type, is_active, is_ai_generated, status, created_at, updated_at)
+            subject_id, subtopic_id, type, is_active, is_ai_generated, status, created_at, updated_at)
          VALUES (:q, :o::jsonb, :c, :e, :d,
-                 :subtopicId, :type, true, true, 'pending', NOW(), NOW())`,
+                 :subjectId, :subtopicId, :type, true, true, 'pending', NOW(), NOW())`,
         {
           replacements: {
             q: q.question_text,
