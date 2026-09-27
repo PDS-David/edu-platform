@@ -50,6 +50,7 @@ const { ENROLLMENT_SOURCE, ENROLLMENT_STATUS } = require('../constants/enrollmen
 // on its very first real use. Calling the same idempotent function
 // defensively here closes the gap regardless of migration/deploy order.
 const { ensureEnrollmentColumns } = require('./studentRoutes');
+const { sendSchoolInvitationEmail, sendSchoolMemberWelcomeEmail } = require('../services/emailService');
 
 // Single-file, image-only, small size cap — a logo isn't a document upload.
 // Same validation pipeline (magic-byte check + AV scan) as every other
@@ -330,7 +331,11 @@ router.delete('/me/roster/:userId', protect, requireSchoolAdmin, async (req, res
 
   try {
     const target = await q(
-      `SELECT id, role, first_name, last_name FROM users WHERE id = $1 AND school_id = $2`,
+      `SELECT id, role, first_name, last_name, school_id FROM users
+        WHERE id = $1 AND (school_id = $2 OR (role = 'teacher' AND EXISTS (
+          SELECT 1 FROM teacher_school_memberships m
+          WHERE m.teacher_id = users.id AND m.school_id = $2 AND m.status = 'active'
+        )))`,
       [userId, req.user.school_id]
     );
     if (!target.length) {
@@ -344,10 +349,29 @@ router.delete('/me/roster/:userId', protect, requireSchoolAdmin, async (req, res
 
     const t = await sequelize.transaction();
     try {
-      await sequelize.query(
-        `UPDATE users SET school_id = NULL WHERE id = $1`,
+      if (role === 'teacher') {
+        await sequelize.query(
+          `UPDATE teacher_school_memberships SET status = 'inactive', updated_at = NOW()
+            WHERE teacher_id = $1 AND school_id = $2`,
+          { bind: [userId, req.user.school_id], type: sequelize.QueryTypes.UPDATE, transaction: t }
+        );
+        if (target[0].school_id === req.user.school_id) {
+          const remaining = await sequelize.query(
+            `SELECT school_id FROM teacher_school_memberships
+              WHERE teacher_id = $1 AND status = 'active' ORDER BY created_at LIMIT 1`,
+            { bind: [userId], type: sequelize.QueryTypes.SELECT, transaction: t }
+          );
+          await sequelize.query(
+            `UPDATE users SET school_id = $2 WHERE id = $1`,
+            { bind: [userId, remaining[0]?.school_id || null], type: sequelize.QueryTypes.UPDATE, transaction: t }
+          );
+        }
+      } else {
+        await sequelize.query(
+          `UPDATE users SET school_id = NULL WHERE id = $1`,
         { bind: [userId], type: sequelize.QueryTypes.UPDATE, transaction: t }
-      );
+        );
+      }
 
       if (role === 'student') {
         await sequelize.query(
@@ -360,8 +384,8 @@ router.delete('/me/roster/:userId', protect, requireSchoolAdmin, async (req, res
         );
       } else {
         await sequelize.query(
-          `UPDATE teacher_subjects SET is_active = false WHERE teacher_id = $1`,
-          { bind: [userId], type: sequelize.QueryTypes.UPDATE, transaction: t }
+          `UPDATE teacher_subjects SET is_active = false WHERE teacher_id = $1 AND school_id = $2`,
+          { bind: [userId, req.user.school_id], type: sequelize.QueryTypes.UPDATE, transaction: t }
         );
       }
 
@@ -790,8 +814,6 @@ router.post('/me/invite', protect, requireSchoolAdmin, async (req, res) => {
   }
   const emailCheck = validateEmail(email);
   if (!emailCheck.valid) return res.status(400).json({ success: false, error: emailCheck.error });
-  const passCheck = validatePassword(password);
-  if (!passCheck.valid) return res.status(400).json({ success: false, error: passCheck.error });
   const fnCheck = validateName(first_name, 'First name');
   if (!fnCheck.valid) return res.status(400).json({ success: false, error: fnCheck.error });
 
@@ -808,9 +830,21 @@ router.post('/me/invite', protect, requireSchoolAdmin, async (req, res) => {
           SET status = CASE WHEN teacher_school_memberships.status = 'active' THEN 'active' ELSE 'pending' END,
               invited_by = EXCLUDED.invited_by, updated_at = NOW()
           RETURNING status`, [existing[0].id, req.user.school_id, req.user.id]);
-        return res.status(202).json({ success: true, data: { invited: true, status: membership[0].status } });
+        if (membership[0].status === 'pending') {
+          const schoolRows = await q(`SELECT name FROM schools WHERE id = $1`, [req.user.school_id]);
+          await sendSchoolInvitationEmail({
+            email,
+            first_name: first_name || 'Teacher',
+            school_name: schoolRows[0]?.name || 'your school',
+          });
+        }
+        return res.status(membership[0].status === 'active' ? 200 : 202).json({
+          success: true, data: { invited: membership[0].status === 'pending', status: membership[0].status }
+        });
       }
     }
+    const passCheck = validatePassword(password);
+    if (!passCheck.valid) return res.status(400).json({ success: false, error: passCheck.error });
     const hashed = await bcrypt.hash(password, await bcrypt.genSalt(12));
     const verificationToken        = crypto2.randomBytes(32).toString('hex');
     const verificationTokenExpires = new Date(Date.now() + 86400000);
@@ -1481,9 +1515,9 @@ router.get('/me/teachers/:teacherId/subjects', protect, requireSchoolAdmin, asyn
       `SELECT s.id, s.name, s.code
          FROM teacher_subjects ts
          JOIN subjects s ON s.id = ts.subject_id
-        WHERE ts.teacher_id = $1 AND ts.is_active = true
+        WHERE ts.teacher_id = $1 AND ts.school_id = $2 AND ts.is_active = true
         ORDER BY s.name ASC`,
-      [teacherId]
+      [teacherId, req.user.school_id]
     );
     return res.json({ success: true, data: rows });
   } catch (err) {
@@ -1534,13 +1568,13 @@ router.post('/me/teachers/:teacherId/subjects', protect, requireSchoolAdmin, asy
     // Single set-based statement — exam_board_id flows straight from
     // subjects in the same query, never touched in JS.
     await sequelize.query(
-      `INSERT INTO teacher_subjects (teacher_id, subject_id, exam_board_id, assigned_by, assigned_at, is_active)
-       SELECT $1, s.id, s.exam_board_id, $2, NOW(), true
+      `INSERT INTO teacher_subjects (teacher_id, school_id, subject_id, exam_board_id, assigned_by, assigned_at, is_active)
+       SELECT $1, $3, s.id, s.exam_board_id, $2, NOW(), true
          FROM subjects s
-        WHERE s.id = ANY($3::int[]) AND s.is_active = true
-       ON CONFLICT (teacher_id, subject_id) DO UPDATE
+        WHERE s.id = ANY($4::int[]) AND s.is_active = true
+       ON CONFLICT (teacher_id, subject_id, school_id) DO UPDATE
          SET is_active = true, assigned_by = EXCLUDED.assigned_by, assigned_at = NOW()`,
-      { bind: [teacherId, req.user.id, subjectIds], type: sequelize.QueryTypes.INSERT }
+      { bind: [teacherId, req.user.id, req.user.school_id, subjectIds], type: sequelize.QueryTypes.INSERT }
     );
 
     return res.status(201).json({ success: true, data: { assigned: subjectIds.length } });
@@ -1562,8 +1596,8 @@ router.delete('/me/teachers/:teacherId/subjects/:subjectId', protect, requireSch
       return res.status(404).json({ success: false, error: 'Teacher not found in your school' });
     }
     await sequelize.query(
-      `UPDATE teacher_subjects SET is_active = false WHERE teacher_id = $1 AND subject_id = $2`,
-      { bind: [teacherId, subjectId], type: sequelize.QueryTypes.UPDATE }
+      `UPDATE teacher_subjects SET is_active = false WHERE teacher_id = $1 AND school_id = $3 AND subject_id = $2`,
+      { bind: [teacherId, subjectId, req.user.school_id], type: sequelize.QueryTypes.UPDATE }
     );
     return res.json({ success: true });
   } catch (err) {

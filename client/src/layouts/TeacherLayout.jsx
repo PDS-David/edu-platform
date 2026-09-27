@@ -39,12 +39,12 @@ export default function TeacherLayout() {
   const [memberships, setMemberships] = useState([]);
   const [schoolError, setSchoolError] = useState('');
   useEffect(() => {
-    api.get('/schools/my-memberships').then(r => setMemberships(r.data || [])).catch(() => setSchoolError('Could not load school memberships'));
+    api.get('/schools/my-memberships', { skipSchoolContext: true }).then(r => setMemberships(r.data || [])).catch(() => setSchoolError('Could not load school memberships'));
   }, []);
   const acceptSchool = async (schoolId) => {
     try {
-      await api.post(`/schools/my-memberships/${schoolId}/accept`);
-      const r = await api.get('/schools/my-memberships');
+      await api.post(`/schools/my-memberships/${schoolId}/accept`, {}, { skipSchoolContext: true });
+      const r = await api.get('/schools/my-memberships', { skipSchoolContext: true });
       setMemberships(r.data || []);
     } catch (err) { setSchoolError(err.message || 'Could not accept invitation'); }
   };

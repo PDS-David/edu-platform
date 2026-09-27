@@ -54,8 +54,8 @@ router.get('/', protect, async (req, res) => {
     }
   } else if (subjectId && req.user.role === 'teacher') {
     const assigned = await sequelize.query(
-      `SELECT subject_id FROM teacher_subjects WHERE teacher_id = :teacherId AND is_active = true`,
-      { replacements: { teacherId: req.user.id }, type: QueryTypes.SELECT }
+      `SELECT subject_id FROM teacher_subjects WHERE teacher_id = :teacherId AND is_active = true AND ((school_id = :schoolId) OR (school_id IS NULL AND :schoolId IS NULL))`,
+      { replacements: { teacherId: req.user.id, schoolId: req.user.school_id }, type: QueryTypes.SELECT }
     );
     const assignedIds = assigned.map(r => String(r.subject_id));
     // Fail-closed: zero assignments on record means zero access, not
@@ -338,7 +338,7 @@ router.get('/:id', protect, async (req, res) => {
       }
     } else if (req.user.role === 'teacher') {
       const assigned = await sequelize.query(
-        `SELECT subject_id FROM teacher_subjects WHERE teacher_id = :teacherId AND is_active = true`,
+        `SELECT subject_id FROM teacher_subjects WHERE teacher_id = :teacherId AND is_active = true AND ((school_id = :schoolId) OR (school_id IS NULL AND :schoolId IS NULL))`,
         { replacements: { teacherId: req.user.id }, type: QueryTypes.SELECT }
       );
       const assignedIds = assigned.map(r => String(r.subject_id));

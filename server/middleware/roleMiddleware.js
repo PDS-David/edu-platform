@@ -169,9 +169,10 @@ const checkSubjectAccess = async (req, res, next) => {
       `SELECT id FROM teacher_subjects
        WHERE teacher_id = :teacherId
          AND subject_id = :subjectId
-         AND is_active  = true`,
+         AND is_active  = true
+         AND ((school_id = :schoolId) OR (school_id IS NULL AND :schoolId IS NULL))`,
       {
-        replacements: { teacherId: req.user.id, subjectId },
+        replacements: { teacherId: req.user.id, subjectId, schoolId: req.user.school_id || null },
         type: QueryTypes.SELECT,
       }
     );
@@ -215,8 +216,9 @@ const getTeacherSubjects = async (teacherId) => {
   const rows = await db.query(
     `SELECT subject_id FROM teacher_subjects
      WHERE teacher_id = :teacherId
-       AND is_active  = true`,
-    { replacements: { teacherId }, type: QueryTypes.SELECT }
+       AND is_active  = true
+       AND ((school_id = :schoolId) OR (school_id IS NULL AND :schoolId IS NULL))`,
+    { replacements: { teacherId, schoolId: req.user?.school_id || null }, type: QueryTypes.SELECT }
   );
   return rows.map(r => r.subject_id);
 };

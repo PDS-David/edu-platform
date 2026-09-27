@@ -45,23 +45,53 @@ const protect = async (req, res, next) => {
     }
 
     req.user = users[0];
-    // Per-request school context avoids mutating users.school_id globally,
-    // which would leak context between a teacher's concurrent sessions.
-    if (req.user.role === 'teacher' && req.headers['x-school-id']) {
-      const requestedSchool = req.headers['x-school-id'];
-      if (!/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(requestedSchool)) {
-        return res.status(400).json({ success: false, error: 'Invalid school identifier' });
+    // Teachers may carry multiple active school memberships. An explicit
+    // X-School-Id is fail-closed; without one, prefer the legacy primary
+    // school when it is still active, otherwise select the first active
+    // membership so a revoked primary school cannot lock the teacher out.
+    const membershipRoute = req.originalUrl?.includes('/api/schools/my-memberships');
+    if (req.user.role === 'teacher') {
+      if (membershipRoute) {
+        req.user.school_id = null;
+      } else {
+        const requestedSchool = req.headers['x-school-id'] || null;
+        if (requestedSchool) {
+          if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestedSchool)) {
+            return res.status(400).json({ success: false, error: 'Invalid school identifier' });
+          }
+          const membership = await db.query(
+            `SELECT 1 FROM teacher_school_memberships
+             WHERE teacher_id = :teacherId AND school_id = :schoolId AND status = 'active'`,
+            { replacements: { teacherId: req.user.id, schoolId: requestedSchool }, type: QueryTypes.SELECT }
+          );
+          if (!membership.length) {
+            return res.status(403).json({ success: false, error: 'No active membership for this school' });
+          }
+          req.user.school_id = requestedSchool;
+        } else {
+          let schoolId = req.user.school_id;
+          if (schoolId) {
+            const primary = await db.query(
+              `SELECT 1 FROM teacher_school_memberships
+               WHERE teacher_id = :teacherId AND school_id = :schoolId AND status = 'active'`,
+              { replacements: { teacherId: req.user.id, schoolId }, type: QueryTypes.SELECT }
+            );
+            if (!primary.length) schoolId = null;
+          }
+          if (!schoolId) {
+            const active = await db.query(
+              `SELECT school_id FROM teacher_school_memberships
+               WHERE teacher_id = :teacherId AND status = 'active'
+               ORDER BY created_at ASC LIMIT 1`,
+              { replacements: { teacherId: req.user.id }, type: QueryTypes.SELECT }
+            );
+            schoolId = active[0]?.school_id || null;
+          }
+          req.user.school_id = schoolId;
+        }
       }
-      const membership = await db.query(
-        `SELECT 1 FROM teacher_school_memberships
-         WHERE teacher_id = :teacherId AND school_id = :schoolId AND status = 'active'`,
-        { replacements: { teacherId: req.user.id, schoolId: requestedSchool }, type: QueryTypes.SELECT }
-      );
-      if (!membership.length) {
-        return res.status(403).json({ success: false, error: 'No active membership for this school' });
-      }
-      req.user.school_id = requestedSchool;
     }
+
 
     // ── Additive: registeredLanguages from the new join table ──────────────
     // Does not replace em_registered_at/french_registered_at/german_registered_at

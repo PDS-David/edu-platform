@@ -39,7 +39,7 @@ async function studentInTeacherScope(teacherId, studentId, schoolId = null) {
          ON ts.subject_id = ss.subject_id
         AND ts.teacher_id = :teacherId
         AND ts.is_active  = true
-        AND ((:schoolId IS NULL AND ts.school_id IS NULL) OR ts.school_id = :schoolId)
+        AND ((ts.school_id = :schoolId) OR (ts.school_id IS NULL AND :schoolId IS NULL))
       WHERE ss.student_id = :studentId
         AND ss.is_active  = true
       LIMIT 1`,
@@ -54,6 +54,7 @@ async function studentInTeacherScope(teacherId, studentId, schoolId = null) {
        FROM class_memberships cm
        JOIN classes c ON c.id = cm.class_id
       WHERE c.teacher_id  = :teacherId
+        AND ((c.school_id = :schoolId) OR (c.school_id IS NULL AND :schoolId IS NULL))
         AND cm.student_id = :studentId
       LIMIT 1`,
     { replacements: { teacherId, studentId }, type: QueryTypes.SELECT }
@@ -172,8 +173,8 @@ const requireTeacherClassOwnership = async (req, res, next) => {
 
   try {
     const [row] = await db.query(
-      `SELECT 1 FROM classes WHERE id = :classId AND teacher_id = :teacherId LIMIT 1`,
-      { replacements: { classId, teacherId: req.user.id }, type: QueryTypes.SELECT }
+      `SELECT 1 FROM classes WHERE id = :classId AND teacher_id = :teacherId AND ((school_id = :schoolId) OR (school_id IS NULL AND :schoolId IS NULL))`,
+      { replacements: { classId, teacherId: req.user.id, schoolId: req.user.school_id || null }, type: QueryTypes.SELECT }
     );
     if (!row) {
       await audit.blockIdor(req, res,
