@@ -122,27 +122,10 @@ export default function VideoPlayer({ videoId, onComplete }) {
       setNotEnrolled(false);
       setFallbackSrc(null);
 
-      // A resources.id (uuid) can never be a real videos.id (integer) --
-      // skip the guaranteed-to-fail /videos/:id call entirely and go
-      // straight to the resources-download fallback. Anything NOT
-      // uuid-shaped is assumed to be a genuine integer videos.id and goes
-      // through the normal path below.
       if (UUID_RE.test(String(videoId))) {
-        try {
-          const dl = await api.get(`/resources/${videoId}/download`, { params: { viewer: '1' } });
-          if (dl?.data?.url) {
-            setFallbackSrc(dl.data.url);
-          } else {
-            setError('This video could not be loaded.');
-          }
-        } catch (dlErr) {
-          const dlStatus = dlErr?.response?.status;
-          if (dlStatus === 403) setAccessDenied(true);
-          else setError(dlErr?.response?.data?.error || 'This video could not be loaded.');
-        } finally {
-          setLoading(false);
-        }
-        return;
+        try { const tokenRes=await api.get(`/resources/video/${videoId}/token`); const data=tokenRes?.data?.data; if(!data?.streamUrl)throw new Error('Video stream is unavailable'); setVideoData({id:videoId,title:data.title,duration_seconds:data.durationSeconds||0,resourceVideo:true}); }
+        catch(err){const status=err?.response?.status;if(status===403)setAccessDenied(true);else setError(err?.response?.data?.error||'This video could not be loaded.');}
+        finally{setLoading(false);} return;
       }
 
       let video;
@@ -191,7 +174,7 @@ export default function VideoPlayer({ videoId, onComplete }) {
   // HLS init — handles both hls.js and Safari native
   // ─────────────────────────────────────────────
   useEffect(() => {
-    if (!videoData || !videoRef.current || fallbackSrc) return;
+    if (!videoData || !videoRef.current) return;
 
     const video   = videoRef.current;
     const apiBase = getApiBase();
@@ -248,7 +231,7 @@ export default function VideoPlayer({ videoId, onComplete }) {
       // Safari / iOS native HLS: fetch a short-lived streaming token,
       // embed it as ?tok= so no Authorization header is needed.
       try {
-        const tokenRes = await api.get(`/videos/token?videoId=${videoId}`);
+        const tokenRes = await api.get(isResourceVideo?`/resources/video/${videoId}/token`:`/videos/token?videoId=${videoId}`);
         const { streamUrl } = tokenRes.data;
         video.src = `${apiBase}${streamUrl}`;
         setQualityLabel('Auto');
@@ -257,8 +240,9 @@ export default function VideoPlayer({ videoId, onComplete }) {
       }
     };
 
-    const streamPath = `/api/videos/stream/${videoId}/master.m3u8`;
-    const streamUrl  = `${apiBase}${streamPath}`;
+    const isResourceVideo=UUID_RE.test(String(videoId));
+    const streamPath=isResourceVideo?`/api/resources/video/stream/${videoId}/master.m3u8`:`/api/videos/stream/${videoId}/master.m3u8`;
+    const streamUrl=`${apiBase}${streamPath}`;
 
     if (Hls.isSupported()) {
       initHlsJs(streamUrl);
@@ -279,7 +263,7 @@ export default function VideoPlayer({ videoId, onComplete }) {
   // Save progress
   // ─────────────────────────────────────────────
   const saveProgress = useCallback(async (pos, dur) => {
-    if (!videoId || !dur || fallbackSrc) return;
+    if (!videoId || !dur || UUID_RE.test(String(videoId))) return;
     const pct = Math.min((pos / dur) * 100, 100);
 
     try {
@@ -467,28 +451,6 @@ export default function VideoPlayer({ videoId, onComplete }) {
       <div className="aspect-video bg-gray-900 flex flex-col items-center justify-center text-white gap-2">
         <AlertTriangle size={32} />
         <p>{error}</p>
-      </div>
-    );
-  }
-
-  // Fallback render: a plain resources-table video with no HLS renditions,
-  // no progress tracking, no quality ladder -- just native browser controls
-  // against a direct (signed, time-limited) file URL. See the fallbackSrc
-  // comment above for why this path exists at all.
-  if (fallbackSrc) {
-    return (
-      <div className="space-y-3">
-        <div className="relative aspect-video bg-black rounded-xl overflow-hidden">
-          <video
-            className="w-full h-full"
-            controls
-            controlsList="nodownload noremoteplayback"
-            disablePictureInPicture
-            onContextMenu={(e) => e.preventDefault()}
-            playsInline
-            src={fallbackSrc}
-          />
-        </div>
       </div>
     );
   }
