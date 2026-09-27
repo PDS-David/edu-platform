@@ -608,7 +608,7 @@ router.get('/attempt/:attemptId', protect, async (req, res) => {
     // resolve.
     const sessionRows = session_id
       ? await sequelize.query(
-          `SELECT pa.id, pa.question_id, pa.is_correct,
+          `SELECT pa.id, pa.question_id, pa.is_correct, pa.marks_awarded, pa.ai_explanation,
                   pa.time_taken_seconds, pa.attempted_at,
                   pa.selected_option_text,
                   q.question_text, q.correct_answer, q.explanation, q.marks, q.options, q.type
@@ -620,7 +620,7 @@ router.get('/attempt/:attemptId', protect, async (req, res) => {
           { replacements: { studentId: req.user.id, sessionId: session_id }, type: QueryTypes.SELECT }
         )
       : await sequelize.query(
-          `SELECT pa.id, pa.question_id, pa.is_correct,
+          `SELECT pa.id, pa.question_id, pa.is_correct, pa.marks_awarded, pa.ai_explanation,
                   pa.time_taken_seconds, pa.attempted_at,
                   pa.selected_option_text,
                   q.question_text, q.correct_answer, q.explanation, q.marks, q.options, q.type
