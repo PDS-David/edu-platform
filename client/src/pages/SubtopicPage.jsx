@@ -431,7 +431,7 @@ function PracticeTab({ subtopicId, subjectId, onComplete }) {
           dismissed={dismissed}
           // BUG 2 FIX: removed localStorage.setItem — session state only
           onDismiss={() => setDismissed(true)}
-          onNext={() => handleAnswer(null)} onPrev={current > 0 ? () => setCurrent(c => c - 1) : null} />
+          onNext={handleAnswer} onPrev={current > 0 ? () => setCurrent(c => c - 1) : null} />
       ) : (
         <StructuredQuestion key={questions[current]?.id} question={questions[current]}
           questionNumber={current + 1} totalQuestions={questions.length}
