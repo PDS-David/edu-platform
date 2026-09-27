@@ -12,7 +12,7 @@ const sequelize      = require('../config/database');
 const { protect }    = require('../middleware/auth');
 const { analyticsLimiter } = require('../middleware/rateLimiter');
 const { ENROLLMENT_STATUS } = require('../constants/enrollmentConstants');
-const { requireTeacherAnalyticsScope } = require('../middleware/teacherScope');
+const { requireTeacherAnalyticsScope, requireTeacherCohortAnalyticsScope } = require('../middleware/teacherScope');
 
 // Safe wrapper — returns fallback on any DB error.
 // Classifies errors into three categories for actionable log output:
@@ -497,7 +497,7 @@ router.get('/daily-study', protect, analyticsLimiter, async (req, res) => {
 
 // ── GET /api/analytics/cohort-gaps ───────────────────────────────────────────
 // MUST stay before /cohort/:subjectId/topics to avoid Express matching 'gaps' as :subjectId
-router.get('/cohort-gaps', protect, analyticsLimiter, async (req, res) => {
+router.get('/cohort-gaps', protect, analyticsLimiter, requireTeacherCohortAnalyticsScope, async (req, res) => {
   if (!['teacher', 'admin'].includes(req.user.role)) {
     return res.status(403).json({ success: false, error: 'Teacher access required' });
   }
@@ -523,7 +523,11 @@ router.get('/cohort-gaps', protect, analyticsLimiter, async (req, res) => {
        HAVING COUNT(*) >= 3
        ORDER BY avg_accuracy ASC
        LIMIT 15`,
-      subject_id ? { subject_id } : {}
+      subject_id
+        ? { subject_id }
+        : req.user.role === 'teacher'
+          ? { teacherId: req.user.id, schoolId: req.user.school_id || null }
+          : {}
     );
     const gaps = rows.map(r => ({
       topic:          r.topic,
@@ -669,7 +673,7 @@ router.get('/student/:studentId/summary', protect, requireTeacherAnalyticsScope,
 });
 
 // ── GET /api/analytics/cohort/:subjectId/topics ──────────────────────────────
-router.get('/cohort/:subjectId/topics', protect, analyticsLimiter, async (req, res) => {
+router.get('/cohort/:subjectId/topics', protect, analyticsLimiter, requireTeacherCohortAnalyticsScope, async (req, res) => {
   if (!['teacher', 'admin'].includes(req.user.role)) {
     return res.status(403).json({ success: false, error: 'Access denied' });
   }
