@@ -303,13 +303,15 @@ router.post('/attempt', protect, async (req, res) => {
 
         await sequelize.query(
           `INSERT INTO practice_attempts
-             (student_id, question_id, is_correct, time_taken_seconds, attempted_at, created_at, updated_at, selected_option_text, paper_type, subject_id, session_id)
-           VALUES (:studentId, :questionId, :isCorrect, :timeTaken, NOW(), NOW(), NOW(), :selectedText, :paperType, :subjectId, :sessionId)`,
+             (student_id, question_id, is_correct, marks_awarded, ai_explanation, time_taken_seconds, attempted_at, created_at, updated_at, selected_option_text, paper_type, subject_id, session_id)
+           VALUES (:studentId, :questionId, :isCorrect, :marksAwarded, :aiExplanation, :timeTaken, NOW(), NOW(), NOW(), :selectedText, :paperType, :subjectId, :sessionId)`,
           {
             replacements: {
-              studentId:    req.user.id,
-              questionId:   answer.question_id,
+              studentId:     req.user.id,
+              questionId:    answer.question_id,
               isCorrect,
+              marksAwarded:  marksAwarded,
+              aiExplanation: feedback || question.explanation || '',
               timeTaken:    parseInt(answer.time_taken_seconds ?? (answer.time_taken_ms / 1000)) || 0,
               selectedText: answerText || null,
               paperType:    paper_type || 'quiz',
@@ -409,13 +411,15 @@ router.post('/attempt', protect, async (req, res) => {
       // both timestamps are now supplied explicitly, same as attempted_at.
       await sequelize.query(
         `INSERT INTO practice_attempts
-           (student_id, question_id, is_correct, time_taken_seconds, attempted_at, created_at, updated_at, selected_option_text, paper_type, subject_id, session_id)
-         VALUES (:studentId, :questionId, :isCorrect, :timeTaken, NOW(), NOW(), NOW(), :selectedText, :paperType, :subjectId, :sessionId)`,
+           (student_id, question_id, is_correct, marks_awarded, ai_explanation, time_taken_seconds, attempted_at, created_at, updated_at, selected_option_text, paper_type, subject_id, session_id)
+         VALUES (:studentId, :questionId, :isCorrect, :marksAwarded, :aiExplanation, :timeTaken, NOW(), NOW(), NOW(), :selectedText, :paperType, :subjectId, :sessionId)`,
         {
           replacements: {
-            studentId:    req.user.id,
-            questionId:   answer.question_id,
+            studentId:     req.user.id,
+            questionId:    answer.question_id,
             isCorrect,
+            marksAwarded:  marks,
+            aiExplanation: question.explanation || '',
             timeTaken:    parseInt(answer.time_taken_seconds ?? (answer.time_taken_ms / 1000)) || 0,
             selectedText: submittedAnswer || null,
             paperType:    paper_type || 'quiz',
@@ -490,8 +494,13 @@ router.post('/attempt', protect, async (req, res) => {
       try {
         const bRows = await sequelize.query(
           `SELECT
-             ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 1) AS avg_score,
-             AVG(NULLIF(pa.time_taken_seconds, 0))                          AS avg_time_s
+             ROUND(AVG(CASE
+                WHEN pa.marks_awarded IS NOT NULL AND q.marks IS NOT NULL AND q.marks > 0
+                  THEN (pa.marks_awarded::numeric / q.marks::numeric) * 100
+                WHEN pa.is_correct THEN 100.0
+                ELSE 0.0
+              END), 1) AS avg_score,
+             AVG(NULLIF(pa.time_taken_seconds, 0)) AS avg_time_s
            FROM practice_attempts pa
            JOIN questions q ON q.id = pa.question_id
            WHERE q.subtopic_id = :subtopicId::integer`,
@@ -602,7 +611,7 @@ router.get('/attempt/:attemptId', protect, async (req, res) => {
           `SELECT pa.id, pa.question_id, pa.is_correct,
                   pa.time_taken_seconds, pa.attempted_at,
                   pa.selected_option_text,
-                  q.question_text, q.correct_answer, q.explanation, q.marks, q.options
+                  q.question_text, q.correct_answer, q.explanation, q.marks, q.options, q.type
            FROM practice_attempts pa
            JOIN questions q ON q.id = pa.question_id
            WHERE pa.student_id = :studentId
@@ -614,7 +623,7 @@ router.get('/attempt/:attemptId', protect, async (req, res) => {
           `SELECT pa.id, pa.question_id, pa.is_correct,
                   pa.time_taken_seconds, pa.attempted_at,
                   pa.selected_option_text,
-                  q.question_text, q.correct_answer, q.explanation, q.marks, q.options
+                  q.question_text, q.correct_answer, q.explanation, q.marks, q.options, q.type
            FROM practice_attempts pa
            JOIN questions q ON q.id = pa.question_id
            WHERE pa.student_id = :studentId
@@ -626,29 +635,27 @@ router.get('/attempt/:attemptId', protect, async (req, res) => {
         );
 
     const answers = sessionRows.map(row => {
-      // Find which option text was selected — stored in options JSONB
       const opts = Array.isArray(row.options) ? row.options : [];
-      const correctOpt = opts.find(o => o.is_correct);
+      const correctOpt = opts.find(o => o && o.is_correct === true);
+      const maxMarks = row.marks || 1;
+      const marksAwarded = row.marks_awarded != null ? Number(row.marks_awarded) : (row.is_correct ? maxMarks : 0);
+      const aiExplanation = row.ai_explanation || row.explanation || '';
+      const isFreeText = row.type === 'structured' || row.type === 'essay' || row.type === 'short_answer';
       return {
-        question_id:         row.question_id,
-        question_text:       row.question_text,
-        is_correct:          row.is_correct,
-        marks_awarded:       row.is_correct ? (row.marks || 1) : 0,
-        max_marks:           row.marks || 1,
-        correct_answer:      row.correct_answer,
-        explanation:         row.explanation,
+        question_id: row.question_id, question_text: row.question_text, is_correct: row.is_correct,
+        marks_awarded: marksAwarded, max_marks: maxMarks, correct_answer: row.correct_answer,
         selected_option_text: row.selected_option_text ?? null,
-        correct_options: correctOpt
-          ? [{ id: correctOpt.option_text, option_text: correctOpt.option_text }]
-          : [],
-        ai_marking_scheme: row.explanation ? {
-          status:         row.is_correct ? 'correct' : 'incorrect',
-          whyExplanation: row.explanation,
+        correct_options: correctOpt ? [{ id: correctOpt.option_text, option_text: correctOpt.option_text }]
+          : (row.correct_answer ? [{ id: row.correct_answer, option_text: row.correct_answer }] : []),
+        explanation: aiExplanation || null, ai_explanation: aiExplanation,
+        ai_marking_scheme: aiExplanation ? {
+          status: marksAwarded === 0 ? 'incorrect' : (marksAwarded < maxMarks ? 'partial' : 'correct'),
+          whyExplanation: aiExplanation,
+          ...(isFreeText && row.correct_answer ? { modelAnswer: row.correct_answer } : {}),
         } : {},
-        ai_explanation: row.explanation || '',
+        model_answer: isFreeText ? (row.correct_answer || null) : null,
       };
     });
-
     const totalScore  = answers.reduce((s, a) => s + a.marks_awarded, 0);
     const maxScore    = answers.reduce((s, a) => s + a.max_marks, 0);
     const accuracyPct = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
