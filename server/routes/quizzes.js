@@ -677,7 +677,12 @@ router.get('/attempt/:attemptId', protect, async (req, res) => {
       try {
         const bRows = await sequelize.query(
           `SELECT
-             ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 1) AS avg_score,
+             ROUND(AVG(CASE
+                WHEN pa.marks_awarded IS NOT NULL AND q.marks IS NOT NULL AND q.marks > 0
+                  THEN (pa.marks_awarded::numeric / q.marks::numeric) * 100
+                WHEN pa.is_correct THEN 100.0
+                ELSE 0.0
+              END), 1) AS avg_score,
              AVG(NULLIF(pa.time_taken_seconds, 0))                          AS avg_time_s
            FROM practice_attempts pa
            JOIN questions q ON q.id = pa.question_id
@@ -747,7 +752,12 @@ router.get('/all-history', protect, async (req, res) => {
          DATE_TRUNC('minute', pa.attempted_at)                                AS session_start,
          COUNT(*)::INTEGER                                                     AS questions_total,
          SUM(CASE WHEN pa.is_correct THEN 1 ELSE 0 END)::INTEGER              AS questions_correct,
-         ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 0)::INTEGER AS accuracy_pct,
+         ROUND(AVG(CASE
+           WHEN pa.marks_awarded IS NOT NULL AND q.marks IS NOT NULL AND q.marks > 0
+             THEN (pa.marks_awarded::numeric / q.marks::numeric) * 100
+           WHEN pa.is_correct THEN 100.0
+           ELSE 0.0
+         END), 0)::INTEGER AS accuracy_pct,
          SUM(pa.time_taken_seconds)::INTEGER                                  AS total_time_secs,
          MIN(pa.attempted_at)                                                  AS attempted_at
        FROM practice_attempts pa
@@ -782,7 +792,12 @@ router.get('/history/:studentId/:subtopicId', protect, async (req, res) => {
     const rows = await sequelize.query(
       `SELECT DATE(pa.attempted_at) AS date,
               COUNT(*)::INTEGER AS attempts,
-              ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END),1) AS accuracy_pct
+              ROUND(AVG(CASE
+               WHEN pa.marks_awarded IS NOT NULL AND q.marks IS NOT NULL AND q.marks > 0
+                 THEN (pa.marks_awarded::numeric / q.marks::numeric) * 100
+               WHEN pa.is_correct THEN 100.0
+               ELSE 0.0
+             END),1) AS accuracy_pct
        FROM practice_attempts pa
        JOIN questions q ON q.id = pa.question_id
        WHERE pa.student_id = :studentId AND q.subtopic_id = :subtopicId
@@ -808,7 +823,12 @@ router.get('/history', protect, async (req, res) => {
     const rows = await sequelize.query(
       `SELECT DATE(pa.attempted_at) AS date,
               COUNT(*)::INTEGER AS attempts,
-              ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END),1) AS accuracy_pct
+              ROUND(AVG(CASE
+               WHEN pa.marks_awarded IS NOT NULL AND q.marks IS NOT NULL AND q.marks > 0
+                 THEN (pa.marks_awarded::numeric / q.marks::numeric) * 100
+               WHEN pa.is_correct THEN 100.0
+               ELSE 0.0
+             END),1) AS accuracy_pct
        FROM practice_attempts pa
        JOIN questions q ON q.id = pa.question_id
        WHERE pa.student_id = :studentId ${subtopic_id ? 'AND q.subtopic_id = :subtopicId' : ''}
@@ -843,7 +863,12 @@ router.get('/mock-history', protect, async (req, res) => {
           COALESCE(s.name, 'Mock Exam')                               AS subject_name,
           COUNT(*)::INTEGER                                            AS total,
           SUM(CASE WHEN pa.is_correct THEN 1 ELSE 0 END)::INTEGER     AS correct,
-          ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END),1) AS accuracy_pct,
+          ROUND(AVG(CASE
+               WHEN pa.marks_awarded IS NOT NULL AND q.marks IS NOT NULL AND q.marks > 0
+                 THEN (pa.marks_awarded::numeric / q.marks::numeric) * 100
+               WHEN pa.is_correct THEN 100.0
+               ELSE 0.0
+             END),1) AS accuracy_pct,
           SUM(pa.time_taken_seconds)::INTEGER                          AS time_taken_seconds,
           pa.paper_type
        FROM practice_attempts pa
