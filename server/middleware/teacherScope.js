@@ -42,7 +42,7 @@ async function studentInTeacherScope(teacherId, studentId) {
       WHERE ss.student_id = :studentId
         AND ss.is_active  = true
       LIMIT 1`,
-    { replacements: { teacherId, studentId }, type: QueryTypes.SELECT }
+    { replacements: { teacherId, studentId, schoolId }, type: QueryTypes.SELECT }
   ).catch(() => []);
 
   if (subjectHit) return true;
@@ -53,6 +53,7 @@ async function studentInTeacherScope(teacherId, studentId) {
        FROM class_memberships cm
        JOIN classes c ON c.id = cm.class_id
       WHERE c.teacher_id  = :teacherId
+        AND ((c.school_id = :schoolId) OR (c.school_id IS NULL AND :schoolId IS NULL))
         AND cm.student_id = :studentId
       LIMIT 1`,
     { replacements: { teacherId, studentId }, type: QueryTypes.SELECT }
@@ -172,7 +173,7 @@ const requireTeacherClassOwnership = async (req, res, next) => {
   try {
     const [row] = await db.query(
       `SELECT 1 FROM classes WHERE id = :classId AND teacher_id = :teacherId LIMIT 1`,
-      { replacements: { classId, teacherId: req.user.id }, type: QueryTypes.SELECT }
+      { replacements: { classId, teacherId: req.user.id, schoolId: req.user.school_id || null }, type: QueryTypes.SELECT }
     );
     if (!row) {
       await audit.blockIdor(req, res,
