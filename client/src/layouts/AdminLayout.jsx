@@ -25,6 +25,7 @@ const ADMIN_NAV_ITEMS = [
   { id: "teachers",   kind: "tab",  icon: UserCheck,     label: "Teachers"    },
   { id: "aigenerate", kind: "tab",  icon: Sparkles,      label: "AI Generate" },
   { id: "review",     kind: "link", icon: ClipboardCheck, label: "Question Review", link: "/admin/questions/review" },
+  { id: "questionbank", kind: "link", icon: BookOpen, label: "Question Bank", link: "/admin/question-bank" },
   { id: "syllabus",   kind: "link", icon: FileSearch,    label: "Syllabus Review", link: "/admin/syllabus" },
   { id: "bulkupload", kind: "tab",  icon: Upload,        label: "Bulk Upload" },
   { id: "pastpapers", kind: "tab",  icon: BookOpen,      label: "Past Papers" },
