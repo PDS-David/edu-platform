@@ -76,8 +76,8 @@ function generateEncryptionKey(videoId) {
 // Writes a temporary .keyinfo file for FFmpeg. Returns its temp path.
 // The caller is responsible for deleting this file after the encode.
 // ─────────────────────────────────────────────────────────────────────────────
-function writeKeyInfoFile(keyId, keyPath, serverBaseUrl) {
-  const keyUrl      = `${serverBaseUrl}/api/videos/key/${keyId}`;
+function writeKeyInfoFile(keyId, keyPath, serverBaseUrl, keyRouteBase = '/api/videos/key') {
+  const keyUrl      = `${serverBaseUrl}${keyRouteBase}/${keyId}`;
   const tmpPath     = path.join(os.tmpdir(), `keyinfo_${keyId}_${Date.now()}`);
   const content     = `${keyUrl}\n${keyPath}\n`;
 
@@ -129,8 +129,8 @@ function encodeRendition({ inputPath, rendition, outputDir, keyInfoPath, serverB
 // Constructs a multi-variant HLS master playlist referencing authenticated
 // variant playlist URLs (not filesystem paths).
 // ─────────────────────────────────────────────────────────────────────────────
-function buildMasterPlaylist(videoId, serverBaseUrl) {
-  const base = `${serverBaseUrl}/api/videos/stream/${videoId}`;
+function buildMasterPlaylist(videoId, serverBaseUrl, streamRouteBase = '/api/videos/stream') {
+  const base = `${serverBaseUrl}${streamRouteBase}/${videoId}`;
 
   const lines = ['#EXTM3U', '#EXT-X-VERSION:3', ''];
 
@@ -150,9 +150,9 @@ function buildMasterPlaylist(videoId, serverBaseUrl) {
 // authenticated absolute API URLs instead of bare relative paths.
 // This is what fixes FUNC-01 and the Safari segment-delivery bug.
 // ─────────────────────────────────────────────────────────────────────────────
-function rewriteVariantPlaylist(playlistPath, videoId, renditionName, serverBaseUrl) {
+function rewriteVariantPlaylist(playlistPath, videoId, renditionName, serverBaseUrl, streamRouteBase = '/api/videos/stream', keyRouteBase = '/api/videos/key', keyId = null) {
   const raw  = fs.readFileSync(playlistPath, 'utf8');
-  const base = `${serverBaseUrl}/api/videos/stream/${videoId}/${renditionName}`;
+  const base = `${serverBaseUrl}${streamRouteBase}/${videoId}/${renditionName}`;
 
   const rewritten = raw.split('\n').map(line => {
     // Segment lines: bare filename like segment_000.ts
@@ -162,7 +162,7 @@ function rewriteVariantPlaylist(playlistPath, videoId, renditionName, serverBase
     // Key URI: rewrite localhost → production SERVER_BASE_URL (already correct
     // because writeKeyInfoFile() used serverBaseUrl, but guard against mismatches)
     if (line.startsWith('#EXT-X-KEY:')) {
-      return line.replace(/URI="[^"]*"/, `URI="${serverBaseUrl}/api/videos/key/${path.basename(playlistPath).replace('playlist.m3u8', '')}"`);
+      return line.replace(/URI="[^"]*"/, `URI="${serverBaseUrl}${keyRouteBase}/${keyId}"`);
       // NOTE: we leave the key URI as-is — it was already written correctly by writeKeyInfoFile
     }
     return line;
@@ -176,7 +176,7 @@ function rewriteVariantPlaylist(playlistPath, videoId, renditionName, serverBase
 // Main entry: produces ABR HLS with AES-128 encryption.
 // Returns { playlistUrl, keyId, outputDir, renditions }
 // ─────────────────────────────────────────────────────────────────────────────
-async function encryptVideo({ inputPath, videoId, serverBaseUrl }) {
+async function encryptVideo({ inputPath, videoId, serverBaseUrl, streamRouteBase = '/api/videos/stream', keyRouteBase = '/api/videos/key' }) {
   // 1. Create per-video output directory
   const outputDir = path.join(HLS_SECURE_BASE, String(videoId));
   if (!fs.existsSync(outputDir)) {
@@ -187,7 +187,7 @@ async function encryptVideo({ inputPath, videoId, serverBaseUrl }) {
   const { keyId, keyPath } = generateEncryptionKey(videoId);
 
   // 3. Write temp keyinfo (deleted after encode)
-  const keyInfoPath = writeKeyInfoFile(keyId, keyPath, serverBaseUrl);
+  const keyInfoPath = writeKeyInfoFile(keyId, keyPath, serverBaseUrl, keyRouteBase);
 
   const renditionResults = [];
 
@@ -208,14 +208,14 @@ async function encryptVideo({ inputPath, videoId, serverBaseUrl }) {
 
       // Rewrite variant playlist so all segment URIs are authenticated API URLs
       const variantPlaylist = path.join(rendDir, 'playlist.m3u8');
-      rewriteVariantPlaylist(variantPlaylist, videoId, rendition.name, serverBaseUrl);
+      rewriteVariantPlaylist(variantPlaylist, videoId, rendition.name, serverBaseUrl, streamRouteBase, keyRouteBase, keyId);
 
       renditionResults.push({ name: rendition.name, segments: segCount });
       console.log(`[VideoEncryption] ${rendition.name} done — ${segCount} segments`);
     }
 
     // 5. Write master playlist (authenticated URLs only, no filesystem paths)
-    const masterContent  = buildMasterPlaylist(videoId, serverBaseUrl);
+    const masterContent  = buildMasterPlaylist(videoId, serverBaseUrl, streamRouteBase);
     const masterPath     = path.join(outputDir, 'master.m3u8');
     fs.writeFileSync(masterPath, masterContent, { mode: 0o600 });
 
@@ -223,7 +223,7 @@ async function encryptVideo({ inputPath, videoId, serverBaseUrl }) {
     fs.unlinkSync(keyInfoPath);
 
     // The "playlist URL" stored in the DB points to the authenticated API route
-    const playlistUrl = `/api/videos/stream/${videoId}/master.m3u8`;
+    const playlistUrl = `${streamRouteBase}/${videoId}/master.m3u8`;
 
     console.log(`[VideoEncryption] Video ${videoId} complete — ${renditionResults.length} renditions`);
     return { playlistUrl, keyId, outputDir, renditions: renditionResults };
