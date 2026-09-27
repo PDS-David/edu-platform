@@ -1504,9 +1504,9 @@ router.get('/me/teachers/:teacherId/subjects', protect, requireSchoolAdmin, asyn
       `SELECT s.id, s.name, s.code
          FROM teacher_subjects ts
          JOIN subjects s ON s.id = ts.subject_id
-        WHERE ts.teacher_id = $1 AND ts.is_active = true
+        WHERE ts.teacher_id = $1 AND ts.school_id = $2 AND ts.is_active = true
         ORDER BY s.name ASC`,
-      [teacherId]
+      [teacherId, req.user.school_id]
     );
     return res.json({ success: true, data: rows });
   } catch (err) {
@@ -1557,13 +1557,13 @@ router.post('/me/teachers/:teacherId/subjects', protect, requireSchoolAdmin, asy
     // Single set-based statement — exam_board_id flows straight from
     // subjects in the same query, never touched in JS.
     await sequelize.query(
-      `INSERT INTO teacher_subjects (teacher_id, subject_id, exam_board_id, assigned_by, assigned_at, is_active)
-       SELECT $1, s.id, s.exam_board_id, $2, NOW(), true
+      `INSERT INTO teacher_subjects (teacher_id, school_id, subject_id, exam_board_id, assigned_by, assigned_at, is_active)
+       SELECT $1, $3, s.id, s.exam_board_id, $2, NOW(), true
          FROM subjects s
         WHERE s.id = ANY($3::int[]) AND s.is_active = true
-       ON CONFLICT (teacher_id, subject_id) DO UPDATE
+       ON CONFLICT (teacher_id, subject_id, school_id) DO UPDATE
          SET is_active = true, assigned_by = EXCLUDED.assigned_by, assigned_at = NOW()`,
-      { bind: [teacherId, req.user.id, subjectIds], type: sequelize.QueryTypes.INSERT }
+      { bind: [teacherId, req.user.id, req.user.school_id, subjectIds], type: sequelize.QueryTypes.INSERT }
     );
 
     return res.status(201).json({ success: true, data: { assigned: subjectIds.length } });
@@ -1585,8 +1585,8 @@ router.delete('/me/teachers/:teacherId/subjects/:subjectId', protect, requireSch
       return res.status(404).json({ success: false, error: 'Teacher not found in your school' });
     }
     await sequelize.query(
-      `UPDATE teacher_subjects SET is_active = false WHERE teacher_id = $1 AND subject_id = $2`,
-      { bind: [teacherId, subjectId], type: sequelize.QueryTypes.UPDATE }
+      `UPDATE teacher_subjects SET is_active = false WHERE teacher_id = $1 AND school_id = $3 AND subject_id = $2`,
+      { bind: [teacherId, subjectId, req.user.school_id], type: sequelize.QueryTypes.UPDATE }
     );
     return res.json({ success: true });
   } catch (err) {
