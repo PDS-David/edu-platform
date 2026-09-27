@@ -900,8 +900,8 @@ router.put('/:id/assign-users', authorize('admin', 'teacher', 'school_admin'), a
     if (req.user.role === 'teacher') {
       if (!meta.subject_id) return res.status(403).json({ success: false, error: 'No subject assigned.' });
       const teacherRows = await sequelize.query(
-        `SELECT 1 FROM teacher_subjects WHERE teacher_id = :tid AND subject_id = :sid AND is_active = true LIMIT 1`,
-        { replacements: { tid: req.user.id, sid: meta.subject_id }, type: QueryTypes.SELECT }
+        `SELECT 1 FROM teacher_subjects WHERE teacher_id = :tid AND subject_id = :sid AND is_active = true AND ((school_id = :schoolId) OR (school_id IS NULL AND :schoolId IS NULL)) LIMIT 1`,
+        { replacements: { tid: req.user.id, sid: meta.subject_id, schoolId: req.user.school_id }, type: QueryTypes.SELECT }
       );
       if (!teacherRows.length) return res.status(403).json({ success: false, error: 'You are not assigned to this subject.' });
     }
