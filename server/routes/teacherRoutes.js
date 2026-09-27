@@ -723,7 +723,12 @@ router.get('/class/:classId/analytics', protect, teacherOnly, requireTeacherClas
       `SELECT u.id, u.first_name||' '||u.last_name AS name, u.email,
               COALESCE(u.study_streak_days,0) AS streak,
               COUNT(pa.id)::INTEGER AS attempts,
-              ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END),1) AS accuracy_pct,
+              ROUND(AVG(CASE
+                WHEN pa.marks_awarded IS NOT NULL AND q.marks > 0
+                  THEN (pa.marks_awarded * 100.0 / q.marks)
+                WHEN pa.is_correct THEN 100.0
+                ELSE 0.0
+              END),1) AS accuracy_pct,
               MAX(pa.attempted_at) AS last_active
        FROM users u
        JOIN class_memberships cm ON cm.student_id=u.id AND cm.class_id=:classId
