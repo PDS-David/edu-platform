@@ -31,7 +31,23 @@ const audit = require('../services/auditLogger');
  * of the teacher's classes.
  */
 async function studentInTeacherScope(teacherId, studentId, schoolId = null) {
-  // Path 1: student enrolled in a subject the teacher is assigned to
+  // The student must first be a real, active student in the requesting
+  // teacher's school. This prevents cross-school access through a matching
+  // subject/class relationship.
+  const [student] = await db.query(
+    `SELECT 1
+       FROM users
+      WHERE id = :studentId
+        AND role = 'student'
+        AND is_active = true
+        AND ((school_id = :schoolId) OR (school_id IS NULL AND :schoolId IS NULL))
+      LIMIT 1`,
+    { replacements: { studentId, schoolId }, type: QueryTypes.SELECT }
+  ).catch(() => []);
+
+  if (!student) return false;
+
+  // Path 1: student enrolled in a subject the teacher is assigned to.
   const [subjectHit] = await db.query(
     `SELECT 1
        FROM student_subjects ss
@@ -48,7 +64,7 @@ async function studentInTeacherScope(teacherId, studentId, schoolId = null) {
 
   if (subjectHit) return true;
 
-  // Path 2: student is a member of one of the teacher's classes
+  // Path 2: student is a member of one of the teacher's classes.
   const [classHit] = await db.query(
     `SELECT 1
        FROM class_memberships cm
