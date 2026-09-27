@@ -1560,7 +1560,7 @@ router.post('/me/teachers/:teacherId/subjects', protect, requireSchoolAdmin, asy
       `INSERT INTO teacher_subjects (teacher_id, school_id, subject_id, exam_board_id, assigned_by, assigned_at, is_active)
        SELECT $1, $3, s.id, s.exam_board_id, $2, NOW(), true
          FROM subjects s
-        WHERE s.id = ANY($3::int[]) AND s.is_active = true
+        WHERE s.id = ANY($4::int[]) AND s.is_active = true
        ON CONFLICT (teacher_id, subject_id, school_id) DO UPDATE
          SET is_active = true, assigned_by = EXCLUDED.assigned_by, assigned_at = NOW()`,
       { bind: [teacherId, req.user.id, req.user.school_id, subjectIds], type: sequelize.QueryTypes.INSERT }
