@@ -306,6 +306,29 @@ async function sendTeacherWelcomeEmail({ email, first_name, password }) {
 // copy (that one always says "Teacher Account", which would be wrong and
 // confusing for a student invited by their school_admin) and mentions the
 // school by name so the recipient knows who set this account up for them.
+async function sendSchoolInvitationEmail({ email, first_name, school_name }) {
+  const name = first_name || 'Teacher';
+  await send(email, `You have been invited to teach at ${school_name || 'a school'} on AISchoolonair`, `
+    <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px">
+      <h1 style="color:#0a4a3f;font-size:22px;margin-bottom:8px">School invitation for ${name}</h1>
+      <p style="color:#555;line-height:1.6">
+        ${school_name || 'A school'}'s administrator has invited you to join the school
+        as a teacher on AISchoolonair.
+      </p>
+      <p style="color:#555;line-height:1.6">
+        Sign in with your existing AISchoolonair account, then open your teacher dashboard
+        to review and accept the invitation. Your existing password and other school
+        memberships are unchanged.
+      </p>
+      <a href="${APP_URL}/login"
+         style="display:inline-block;background:#14b8a6;color:#fff;text-decoration:none;
+                font-weight:600;padding:12px 24px;border-radius:12px;font-size:14px">
+        Sign in →
+      </a>
+    </div>
+  `);
+}
+
 async function sendSchoolMemberWelcomeEmail({ email, first_name, password, role, school_name }) {
   const name = first_name || (role === 'teacher' ? 'Teacher' : 'Student');
   const roleLabel = role === 'teacher' ? 'Teacher' : 'Student';
@@ -347,6 +370,7 @@ module.exports = {
   sendWelcomeEmail,
   sendTeacherWelcomeEmail,
   sendSchoolMemberWelcomeEmail,
+  sendSchoolInvitationEmail,
   sendWeeklyDigest,
   sendStreakNudge,
   sendPaymentConfirmation,
