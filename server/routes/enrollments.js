@@ -26,6 +26,7 @@ const router         = express.Router();
 const { QueryTypes } = require('sequelize');
 const db             = require('../config/database');
 const { protect, authorize } = require('../middleware/auth');
+const { studentInTeacherScope } = require('../middleware/teacherScope');
 const {
   requireEnrollment,
   validateEnrollmentIntegrity,
@@ -34,6 +35,16 @@ const {
 } = require('../middleware/enrollmentAccess');
 const logger = require('../config/logger');
 
+
+// Teacher enrollment scope: a teacher may manage enrollments only for a course they created or a course whose subject they are assigned to, and only for students within their class/subject teaching scope.
+async function teacherEnrollmentScope(teacherId, schoolId, courseId, studentId) {
+  const [courseHit] = await db.query(
+    `SELECT 1 FROM courses c WHERE c.id = :courseId AND (c.created_by = :teacherId OR EXISTS (SELECT 1 FROM course_subjects cs JOIN teacher_subjects ts ON ts.subject_id = cs.subject_id WHERE cs.course_id = c.id AND ts.teacher_id = :teacherId AND ts.is_active = true AND ((ts.school_id = :schoolId) OR (ts.school_id IS NULL AND :schoolId IS NULL)))) LIMIT 1`,
+    { replacements: { teacherId, schoolId, courseId }, type: QueryTypes.SELECT }
+  );
+  if (!courseHit) return false;
+  return studentInTeacherScope(teacherId, studentId, schoolId);
+}
 // ── Valid lifecycle transitions ───────────────────────────────────────────────
 const TRANSITIONS = {
   pending:   ['active', 'cancelled'],
@@ -60,6 +71,15 @@ router.get('/', protect, validateEnrollmentIntegrity, async (req, res) => {
       // Students only see their own
       conditions.push('(e.student_id = :userId OR e.user_id = :userId)');
       replacements.userId = userId;
+    } else if (req.user.role === 'teacher') {
+      conditions.push(`EXISTS (SELECT 1 FROM courses ec WHERE ec.id = e.course_id AND (ec.created_by = :teacherId OR EXISTS (SELECT 1 FROM course_subjects ecs JOIN teacher_subjects ets ON ets.subject_id = ecs.subject_id WHERE ecs.course_id = ec.id AND ets.teacher_id = :teacherId AND ets.is_active = true AND ((ets.school_id = :teacherSchoolId) OR (ets.school_id IS NULL AND :teacherSchoolId IS NULL)))))`);
+      conditions.push(`EXISTS (SELECT 1 FROM users eu WHERE eu.id = COALESCE(e.student_id, e.user_id) AND eu.role = 'student' AND (EXISTS (SELECT 1 FROM student_subjects ess JOIN teacher_subjects ets2 ON ets2.subject_id = ess.subject_id WHERE ess.student_id = eu.id AND ess.is_active = true AND ets2.teacher_id = :teacherId AND ets2.is_active = true AND ((ets2.school_id = :teacherSchoolId) OR (ets2.school_id IS NULL AND :teacherSchoolId IS NULL))) OR EXISTS (SELECT 1 FROM class_memberships ecm JOIN classes ec2 ON ec2.id = ecm.class_id WHERE ecm.student_id = eu.id AND ec2.teacher_id = :teacherId AND ((ec2.school_id = :teacherSchoolId) OR (ec2.school_id IS NULL AND :teacherSchoolId IS NULL)))))`);
+      replacements.teacherId = userId;
+      replacements.teacherSchoolId = req.user.school_id || null;
+      if (student_id) {
+        conditions.push('(e.student_id = :studentId OR e.user_id = :studentId)');
+        replacements.studentId = student_id;
+      }
     } else if (student_id) {
       conditions.push('(e.student_id = :studentId OR e.user_id = :studentId)');
       replacements.studentId = student_id;
@@ -182,6 +202,11 @@ router.post('/', protect, validateEnrollmentIntegrity, async (req, res) => {
     if (isStaff) validStatuses.push('suspended', 'expired', 'cancelled');
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ success: false, error: `Invalid status: ${status}` });
+    }
+
+    if (req.user.role === 'teacher') {
+      const allowed = await teacherEnrollmentScope(req.user.id, req.user.school_id || null, course_id, targetStudentId);
+      if (!allowed) return res.status(403).json({ success: false, error: 'Teacher is not authorized for this course or student', code: 'TEACHER_ENROLLMENT_SCOPE_DENIED' });
     }
 
     // Check for existing enrollment
@@ -310,6 +335,13 @@ router.patch('/:id/status', protect, authorize('admin', 'teacher'), async (req, 
     }
 
     const enrollment = rows[0];
+
+    if (req.user.role === 'teacher') {
+      const ownerId = enrollment.student_id || enrollment.user_id;
+      const allowed = await teacherEnrollmentScope(req.user.id, req.user.school_id || null, enrollment.course_id, ownerId);
+      if (!allowed) return res.status(403).json({ success: false, error: 'Teacher is not authorized for this enrollment', code: 'TEACHER_ENROLLMENT_SCOPE_DENIED' });
+    }
+
     const currentStatus = enrollment.status;
 
     // Validate transition
