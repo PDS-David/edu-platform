@@ -49,12 +49,13 @@ function isMissingTableError(err) {
 //   { allowed: false, status: 403 }                                  — not assigned
 //   { allowed: false, status: 503, code: ASSIGNMENT_TABLE_MISSING }  — table missing
 //   { allowed: false, status: 500 }                                  — other DB error
-async function teacherOwnsSubject(teacherId, subjectId) {
+async function teacherOwnsSubject(teacherId, subjectId, schoolId = null) {
   try {
     const rows = await sequelize.query(
       `SELECT id FROM teacher_subjects
-        WHERE teacher_id = :teacherId AND subject_id = :subjectId AND is_active = true`,
-      { replacements: { teacherId, subjectId }, type: QueryTypes.SELECT }
+        WHERE teacher_id = :teacherId AND subject_id = :subjectId AND is_active = true
+          AND ((:schoolId IS NULL AND school_id IS NULL) OR school_id = :schoolId)`,
+      { replacements: { teacherId, subjectId, schoolId }, type: QueryTypes.SELECT }
     );
     return rows.length > 0 ? { allowed: true } : { allowed: false, status: 403 };
   } catch (err) {
@@ -91,7 +92,7 @@ const requireSubjectOwnership = async (req, res, next) => {
   const subjectId = req.body?.subject_id || req.params?.subjectId || req.params?.subject_id || null;
   if (!subjectId) return sendError(res, 'subject_id is required', 400);
 
-  const result = await teacherOwnsSubject(req.user.id, subjectId);
+  const result = await teacherOwnsSubject(req.user.id, subjectId, req.user.school_id);
   if (!result.allowed) return denyForResult(req, res, result, 'SUBJECT_NOT_ASSIGNED', { subjectId });
 
   req.verifiedSubjectId = subjectId;
@@ -162,7 +163,7 @@ const requireTopicOwnership = async (req, res, next) => {
   }
   if (!rows.length) return sendError(res, 'Topic not found', 404);
 
-  const result = await teacherOwnsSubject(req.user.id, rows[0].subject_id);
+  const result = await teacherOwnsSubject(req.user.id, rows[0].subject_id, req.user.school_id);
   if (!result.allowed) return denyForResult(req, res, result, 'TOPIC_SUBJECT_NOT_ASSIGNED', { topicId, subjectId: rows[0].subject_id });
 
   req.verifiedSubjectId = rows[0].subject_id;
