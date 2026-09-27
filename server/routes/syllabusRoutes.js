@@ -209,7 +209,7 @@ router.post(
 // a teacher with zero teacher_subjects rows cannot write to any subject.
 async function teacherCanWriteSubject(teacherId, subjectId) {
   const assigned = await sequelize.query(
-    `SELECT subject_id FROM teacher_subjects WHERE teacher_id = :teacherId AND is_active = true`,
+    `SELECT subject_id FROM teacher_subjects WHERE teacher_id = :teacherId AND is_active = true AND ((school_id = :schoolId) OR (school_id IS NULL AND :schoolId IS NULL))`,
     { replacements: { teacherId }, type: QueryTypes.SELECT }
   );
   return assigned.some(r => String(r.subject_id) === String(subjectId));
