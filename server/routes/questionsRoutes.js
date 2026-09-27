@@ -342,7 +342,7 @@ router.post('/:id/answer', protect, async (req, res) => {
 
   try {
     const questions = await sequelize.query(
-      `SELECT q.id, q.question_text, q.marks, q.explanation, q.correct_answer, q.options, q.type
+      `SELECT q.id, q.question_text, q.marks, q.explanation, q.correct_answer, q.options, q.type, q.question_sub_type
        FROM questions q WHERE q.id = :id AND q.is_active = true`,
       { replacements: { id }, type: QueryTypes.SELECT }
     );
@@ -484,14 +484,18 @@ router.post('/:id/answer', protect, async (req, res) => {
       // silently with "null value in column created_at"). This insert has
       // the identical shape and was almost certainly failing the same way.
       `INSERT INTO practice_attempts
-         (student_id, question_id, is_correct, time_taken_seconds, attempted_at, created_at, updated_at)
-       VALUES (:studentId, :questionId, :isCorrect, :timeTaken, NOW(), NOW(), NOW())`,
+         (student_id, question_id, is_correct, marks_awarded, ai_explanation, time_taken_seconds, attempted_at, created_at, updated_at)
+       VALUES (:studentId, :questionId, :isCorrect, :marksAwarded, :aiExplanation, :timeTaken, NOW(), NOW(), NOW())`,
       {
         replacements: {
-          studentId:  req.user.id,
-          questionId: id,
+          studentId:     req.user.id,
+          questionId:    id,
           isCorrect,
-          timeTaken:  parseInt(time_taken_seconds) || 0,
+          marksAwarded:  marksAwarded,
+          aiExplanation: (question.question_sub_type === 'short_answer')
+            ? (feedback || question.explanation || null)
+            : feedback,
+          timeTaken:     parseInt(time_taken_seconds) || 0,
         },
         type: QueryTypes.INSERT,
       }
