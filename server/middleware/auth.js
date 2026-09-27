@@ -45,22 +45,26 @@ const protect = async (req, res, next) => {
     }
 
     req.user = users[0];
-    // Per-request school context avoids mutating users.school_id globally,
-    // which would leak context between a teacher's concurrent sessions.
-    if (req.user.role === 'teacher' && req.headers['x-school-id']) {
-      const requestedSchool = req.headers['x-school-id'];
-      if (!/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(requestedSchool)) {
-        return res.status(400).json({ success: false, error: 'Invalid school identifier' });
+    // Validate both explicitly selected and legacy primary-school context.
+    // Fail closed: never silently fall back to another school on invalid input.
+    if (req.user.role === 'teacher') {
+      const requestedSchool = req.headers['x-school-id'] || req.user.school_id;
+      if (requestedSchool) {
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestedSchool)) {
+          return res.status(400).json({ success: false, error: 'Invalid school identifier' });
+        }
+        const membership = await db.query(
+          `SELECT 1 FROM teacher_school_memberships
+           WHERE teacher_id = :teacherId AND school_id = :schoolId AND status = 'active'`,
+          { replacements: { teacherId: req.user.id, schoolId: requestedSchool }, type: QueryTypes.SELECT }
+        );
+        if (!membership.length) {
+          return res.status(403).json({ success: false, error: 'No active membership for this school' });
+        }
+        req.user.school_id = requestedSchool;
+      } else {
+        req.user.school_id = null;
       }
-      const membership = await db.query(
-        `SELECT 1 FROM teacher_school_memberships
-         WHERE teacher_id = :teacherId AND school_id = :schoolId AND status = 'active'`,
-        { replacements: { teacherId: req.user.id, schoolId: requestedSchool }, type: QueryTypes.SELECT }
-      );
-      if (!membership.length) {
-        return res.status(403).json({ success: false, error: 'No active membership for this school' });
-      }
-      req.user.school_id = requestedSchool;
     }
 
     // ── Additive: registeredLanguages from the new join table ──────────────
