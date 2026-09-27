@@ -59,7 +59,12 @@ async function teacherOwnsSubject(teacherId, subjectId) {
       { replacements: { teacherId, subjectId }, type: QueryTypes.SELECT }
     );
     return r.length > 0;
-  } catch { return true; } // if table missing, allow — admin will fix
+  } catch {
+    // Fail CLOSED for authorization. If teacher_subjects is unavailable,
+    // a teacher must not gain cross-subject access as a side effect of a
+    // database/schema failure.
+    return false;
+  }
 }
 
 // ── GET /api/teacher/my-subjects ──────────────────────────────────────────────
