@@ -53,6 +53,8 @@ const express    = require('express');
 const router     = express.Router();
 const path       = require('path');
 const fs         = require('fs');
+const os         = require('os');
+const { pipeline } = require('stream/promises');
 const { QueryTypes } = require('sequelize');
 
 const sequelize  = require('../config/database');
@@ -62,6 +64,8 @@ const r2         = require('../utils/r2Storage');
 const { getSignedDownloadUrl } = r2;
 const { ENROLLMENT_STATUS } = require('../constants/enrollmentConstants');
 const logger     = require('../config/logger');
+const jwt        = require('jsonwebtoken');
+const { encryptVideo, getEncryptionKey, HLS_SECURE_BASE } = require('../utils/videoEncryption');
 
 /* ================================
    UPLOAD DIRECTORY (local fallback)
@@ -99,6 +103,9 @@ async function ensureExtraColumns() {
     // New: SHA-256 hash for deduplication and integrity
     `ALTER TABLE resources ADD COLUMN IF NOT EXISTS sha256 CHAR(64)`,
     `ALTER TABLE resources ADD COLUMN IF NOT EXISTS stored_filename VARCHAR(255)`,
+    `ALTER TABLE resources ADD COLUMN IF NOT EXISTS encrypted_playlist_url TEXT`,
+    `ALTER TABLE resources ADD COLUMN IF NOT EXISTS encryption_key_id UUID`,
+    `ALTER TABLE resources ADD COLUMN IF NOT EXISTS video_upload_status VARCHAR(20) NOT NULL DEFAULT 'n/a'`,
   ];
   for (const sql of alters) {
     try { await sequelize.query(sql); } catch (err) { logger.warn('[ensureExtraColumns]', err.message); }
@@ -215,6 +222,16 @@ router.get('/health', (_req, res) => res.json({ success: true }));
    ================================================================ */
 
 /* ================================
+   ENCRYPTED RESOURCE VIDEO PIPELINE
+   ================================ */
+const RESOURCE_STREAM_TTL=15*60;
+function issueResourceStreamToken(userId,resourceId){return jwt.sign({sub:userId,rid:resourceId,scope:'resource_stream'},process.env.JWT_SECRET,{expiresIn:RESOURCE_STREAM_TTL,issuer:'edu-platform'});}
+async function authorizeResourceVideo(req,resourceId){const rows=await sequelize.query('SELECT id,title,subject_id,resource_type,is_active,video_upload_status,encrypted_playlist_url,encryption_key_id,r2_key,file_url,stored_filename FROM resources WHERE id=:id AND resource_type=\'video\' LIMIT 1',{replacements:{id:resourceId},type:QueryTypes.SELECT});if(!rows.length||!rows[0].is_active){const e=new Error('Resource video not found');e.status=404;throw e;}const resource=rows[0];if(req.user.role!=='student')return resource;const access=await sequelize.query('SELECT 1 FROM resources r WHERE r.id=:id AND (EXISTS (SELECT 1 FROM resource_assignments ra WHERE ra.resource_id=r.id AND ra.student_id=:uid) OR EXISTS (SELECT 1 FROM resource_user_assignments rua WHERE rua.resource_id=r.id AND rua.user_id=:uid) OR EXISTS (SELECT 1 FROM resource_assignments ra JOIN class_memberships cm ON cm.class_id=ra.class_id WHERE ra.resource_id=r.id AND cm.student_id=:uid AND (r.subject_id IS NULL OR EXISTS (SELECT 1 FROM student_subjects ss WHERE ss.student_id=cm.student_id AND ss.subject_id=r.subject_id AND (ss.status=\'approved\' OR ss.status IS NULL) AND (ss.is_active=true OR ss.is_active IS NULL))))) LIMIT 1',{replacements:{id:resourceId,uid:req.user.id},type:QueryTypes.SELECT});if(!access.length){const e=new Error('Access denied');e.status=403;throw e;}return resource;}
+async function resourceStreamAuth(req,res,next){const tok=req.query.tok;if(tok){try{const p=jwt.verify(tok,process.env.JWT_SECRET,{issuer:'edu-platform'});if(p.scope!=='resource_stream'||p.rid!==req.params.id)throw new Error();const users=await sequelize.query('SELECT id,email,first_name,last_name,role,is_active FROM users WHERE id=:id AND is_active=true LIMIT 1',{replacements:{id:p.sub},type:QueryTypes.SELECT});if(!users.length)return res.status(401).json({success:false,error:'User not found'});req.user=users[0];req.resourceStreamToken=tok;}catch{return res.status(401).json({success:false,error:'Invalid or expired streaming token'});}}else return protect(req,res,async()=>{try{req.resourceVideo=await authorizeResourceVideo(req,req.params.id);next();}catch(e){res.status(e.status||500).json({success:false,error:e.message});}});if(req.resourceVideo)return;try{req.resourceVideo=await authorizeResourceVideo(req,req.params.id);next();}catch(e){return res.status(e.status||500).json({success:false,error:e.message});}}
+function appendStreamToken(url,tok){return tok?`${url}${url.includes('?')?'&':'?'}tok=${encodeURIComponent(tok)}`:url;}
+const resourceVideoJobs=new Map();
+async function ensureResourceVideoEncrypted(resource){if(resource.video_upload_status==='ready'&&resource.encrypted_playlist_url)return resource;if(resourceVideoJobs.has(resource.id))return resourceVideoJobs.get(resource.id);const job=(async()=>{const rawPath=path.join(os.tmpdir,`resource-video-${resource.id}.mp4`);try{await sequelize.query("UPDATE resources SET video_upload_status='processing',updated_at=NOW() WHERE id=:id",{replacements:{id:resource.id},type:QueryTypes.UPDATE});if(r2.isR2Enabled()){const key=resource.r2_key||r2.keyFromUrl(resource.file_url);if(!key)throw new Error('Raw video storage key is unavailable');const obj=await r2.getObjectByKey(key);await pipeline(obj.body,fs.createWriteStream(rawPath,{mode:0o600}));}else{const local=path.join(UPLOADS_DIR,resource.stored_filename||path.basename(resource.file_url||''));if(!fs.existsSync(local))throw new Error('Raw video file is unavailable');fs.copyFileSync(local,rawPath);}const result=await encryptVideo({inputPath:rawPath,videoId:resource.id,serverBaseUrl:process.env.SERVER_BASE_URL||'http://localhost:5000',streamRouteBase:'/api/resources/video/stream',keyRouteBase:'/api/resources/video/key'});await sequelize.query("UPDATE resources SET encrypted_playlist_url=:url,encryption_key_id=:keyId,video_upload_status='ready',updated_at=NOW() WHERE id=:id",{replacements:{id:resource.id,url:result.playlistUrl,keyId:result.keyId},type:QueryTypes.UPDATE});if(r2.isR2Enabled())await r2.deleteByUrl(resource.file_url).catch(()=>{});else fs.unlink(path.join(UPLOADS_DIR,resource.stored_filename||path.basename(resource.file_url||'')),()=>{});return {...resource,video_upload_status:'ready',encrypted_playlist_url:result.playlistUrl,encryption_key_id:result.keyId};}catch(e){await sequelize.query("UPDATE resources SET video_upload_status='failed',updated_at=NOW() WHERE id=:id",{replacements:{id:resource.id},type:QueryTypes.UPDATE}).catch(()=>{});throw e;}finally{fs.unlink(rawPath,()=>{});resourceVideoJobs.delete(resource.id);}})();resourceVideoJobs.set(resource.id,job);return job;}
+/* ================================
    BULK UPLOAD  (POST /api/resources/bulk-upload)
    ================================ */
 router.post(
@@ -321,7 +338,9 @@ router.post(
               },
             }
           );
-          inserted.push(rows[0]);
+          const saved=rows[0];
+          if(resourceType==='video'){const rawPath=path.join(UPLOADS_DIR,f.storedName);try{if(r2.isR2Enabled())fs.writeFileSync(rawPath,f.buffer,{mode:0o600});await sequelize.query("UPDATE resources SET video_upload_status='processing',updated_at=NOW() WHERE id=:id",{replacements:{id:saved.id},type:QueryTypes.UPDATE});const result=await encryptVideo({inputPath:rawPath,videoId:saved.id,serverBaseUrl:process.env.SERVER_BASE_URL||'http://localhost:5000',streamRouteBase:'/api/resources/video/stream',keyRouteBase:'/api/resources/video/key'});await sequelize.query("UPDATE resources SET encrypted_playlist_url=:url,encryption_key_id=:keyId,video_upload_status='ready',updated_at=NOW() WHERE id=:id",{replacements:{id:saved.id,url:result.playlistUrl,keyId:result.keyId},type:QueryTypes.UPDATE});if(r2.isR2Enabled())await r2.deleteByUrl(fileUrl).catch(()=>{});fs.unlink(rawPath,()=>{});saved.video_upload_status='ready';saved.encrypted_playlist_url=result.playlistUrl;}catch(videoErr){await sequelize.query("UPDATE resources SET video_upload_status='failed',updated_at=NOW() WHERE id=:id",{replacements:{id:saved.id},type:QueryTypes.UPDATE}).catch(()=>{});fs.unlink(rawPath,()=>{});if(r2.isR2Enabled())await r2.deleteByUrl(fileUrl).catch(()=>{});throw videoErr;}}
+          inserted.push(saved);
 
         } catch (err) {
           logger.error('[bulk-upload insert]', err.message);
@@ -655,6 +674,11 @@ router.put('/:id/assign-meta', authorize('admin', 'teacher', 'school_admin'), as
    It streams the file directly after the entitlement check passes.
    This prevents permanent public access to files via the static mount.
    ================================ */
+router.get('/video/:id/token',protect,async(req,res)=>{try{let resource=await authorizeResourceVideo(req,req.params.id);resource=await ensureResourceVideoEncrypted(resource);const token=issueResourceStreamToken(req.user.id,req.params.id);return res.json({success:true,data:{token,expiresIn:RESOURCE_STREAM_TTL,streamUrl:`${process.env.SERVER_BASE_URL||'http://localhost:5000'}${resource.encrypted_playlist_url}?tok=${encodeURIComponent(token)}`,title:resource.title,durationSeconds:0}});}catch(e){return res.status(e.status||500).json({success:false,error:e.message});}});
+router.get('/video/stream/:id/master.m3u8',resourceStreamAuth,async(req,res)=>{try{const p=path.join(HLS_SECURE_BASE,String(req.params.id),'master.m3u8');if(!fs.existsSync(p))return res.status(404).end();const base=`${process.env.SERVER_BASE_URL||''}/api/resources/video/stream`;const tok=req.resourceStreamToken;const content=fs.readFileSync(p,'utf8').split('\n').map(line=>line&&!line.startsWith('#')&&line.endsWith('/playlist.m3u8')?appendStreamToken(`${base}/${req.params.id}/${line}`,tok):line).join('\n');res.type('application/vnd.apple.mpegurl').set('Cache-Control','private,no-store').send(content);}catch(e){res.status(500).json({success:false,error:'Failed to load video playlist'});}});
+router.get('/video/stream/:id/:rendition/playlist.m3u8',resourceStreamAuth,async(req,res)=>{try{const p=path.join(HLS_SECURE_BASE,String(req.params.id),req.params.rendition,'playlist.m3u8');if(!fs.existsSync(p))return res.status(404).end();const tok=req.resourceStreamToken;const base=`${process.env.SERVER_BASE_URL||''}/api/resources/video/stream/${req.params.id}/${req.params.rendition}`;const key=`${process.env.SERVER_BASE_URL||''}/api/resources/video/key/${req.params.id}`;const content=fs.readFileSync(p,'utf8').split('\n').map(line=>line&&!line.startsWith('#')?appendStreamToken(`${base}/${line.trim()}`,tok):line.startsWith('#EXT-X-KEY:')?line.replace(/URI="[^"]*"/,`URI="${appendStreamToken(key,tok)}"`):line).join('\n');res.type('application/vnd.apple.mpegurl').set('Cache-Control','private,no-store').send(content);}catch(e){res.status(500).json({success:false,error:'Failed to load video rendition'});}});
+router.get('/video/stream/:id/:rendition/:segment',resourceStreamAuth,async(req,res)=>{try{if(!/^[0-9a-z]+$/i.test(req.params.rendition)||!/^segment_\d+\.ts$/i.test(req.params.segment))return res.status(400).end();const p=path.join(HLS_SECURE_BASE,String(req.params.id),req.params.rendition,req.params.segment);if(!fs.existsSync(p))return res.status(404).end();res.type('video/mp2t').set('Cache-Control','private,no-store').sendFile(p);}catch{res.status(500).end();}});
+router.get('/video/key/:id',resourceStreamAuth,async(req,res)=>{try{const key=getEncryptionKey(req.params.id);if(!key)return res.status(404).end();res.type('application/octet-stream').set('Cache-Control','private,no-store').send(key);}catch{res.status(500).end();}});
 router.get('/:id/download', protect, async (req, res) => {
   try {
     const { id }  = req.params;
@@ -721,9 +745,9 @@ router.get('/:id/download', protect, async (req, res) => {
     // VideoPlayer.jsx's fallback path always passes ?viewer=1. Reject
     // anything else for videos outright. Scoped to resource_type='video'
     // only — documents/audio keep their existing behavior unchanged.
-    if (resource.resource_type === 'video' && req.query.viewer !== '1') {
+    if (resource.resource_type === 'video') {
       logger.warn('[download] video download attempt rejected', { resourceId: id, userId });
-      return res.status(403).json({ success: false, error: 'Videos can only be streamed in the app, not downloaded.' });
+      return res.status(403).json({ success: false, error: 'Videos are streamed through the encrypted HLS player only.' });
     }
 
     // ── 4. Resolve the R2 object key ───────────────────────────────────────
