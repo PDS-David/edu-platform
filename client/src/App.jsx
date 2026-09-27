@@ -79,6 +79,7 @@ import TeacherResourcesPage from "./pages/TeacherResourcesPage";
 import ContributeQuestion from "./pages/ContributeQuestion";
 import QuestionReview from "./pages/QuestionReview";
 import OrphanedQuestionsPage from "./pages/OrphanedQuestionsPage";
+import AdminQuestionBankPage from "./pages/AdminQuestionBankPage";
 import TeacherAddQuestionPage from "./pages/TeacherAddQuestionPage";
 import TeacherExaminationsPage from "./pages/TeacherExaminationsPage";
 import TeacherResultsPage from "./pages/TeacherResultsPage";
@@ -242,7 +243,9 @@ export default function App() {
             <Route path="pending-questions" element={<TeacherPendingQuestions />} />
             <Route path="resources" element={<TeacherResourcesPage />} />
             <Route path="review" element={<QuestionReview />} />
-            <Route path="question-bank" element={<TeacherQuestionBankPage />} />
+            <Route element={<PrivateRoute allowedRoles={["teacher"]} />}>
+              <Route path="question-bank" element={<TeacherQuestionBankPage />} />
+            </Route>
             <Route path="syllabus" element={<SyllabusListPage />} />
             <Route path="syllabus/:id" element={<SyllabusReviewPage />} />
             <Route path="syllabus/:id/remap" element={<SyllabusRemapPage />} />
@@ -265,6 +268,7 @@ export default function App() {
             <Route path="students" element={<AdminStudents />} />
             <Route path="students/:studentId" element={<SchoolAdminStudentReport />} />
             <Route path="questions/review" element={<QuestionReview />} />
+            <Route path="question-bank" element={<AdminQuestionBankPage />} />
             <Route path="questions/orphaned" element={<OrphanedQuestionsPage />} />
             <Route path="syllabus" element={<SyllabusListPage />} />
             <Route path="syllabus/:id" element={<SyllabusReviewPage />} />
