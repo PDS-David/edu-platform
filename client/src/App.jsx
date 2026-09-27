@@ -243,7 +243,9 @@ export default function App() {
             <Route path="pending-questions" element={<TeacherPendingQuestions />} />
             <Route path="resources" element={<TeacherResourcesPage />} />
             <Route path="review" element={<QuestionReview />} />
-            <Route path="question-bank" element={<TeacherQuestionBankPage />} />
+            <Route element={<PrivateRoute allowedRoles={["teacher"]} />}>
+              <Route path="question-bank" element={<TeacherQuestionBankPage />} />
+            </Route>
             <Route path="syllabus" element={<SyllabusListPage />} />
             <Route path="syllabus/:id" element={<SyllabusReviewPage />} />
             <Route path="syllabus/:id/remap" element={<SyllabusRemapPage />} />
