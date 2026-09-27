@@ -217,7 +217,7 @@ router.get('/summary', protect, analyticsLimiter, async (req, res) => {
            -- Multiply by 100.0 (not 100) to keep ROUND precise to 1 decimal place.
            COALESCE(
              ROUND(
-               AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0.0 END),
+               AVG(CASE WHEN pa.marks_awarded IS NOT NULL AND q.marks IS NOT NULL AND q.marks > 0 THEN (pa.marks_awarded::numeric / q.marks::numeric) * 100.0 WHEN pa.is_correct THEN 100.0 ELSE 0.0 END),
                1
              ),
              0
@@ -303,7 +303,7 @@ router.get('/weak-topics', protect, analyticsLimiter, async (req, res) => {
          st.id  AS subtopic_id,
          s.name AS subject_name,
          COUNT(*)::INTEGER AS attempt_count,
-         ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 1) AS accuracy_pct
+         ROUND(AVG(CASE WHEN pa.marks_awarded IS NOT NULL AND q.marks IS NOT NULL AND q.marks > 0 THEN (pa.marks_awarded::numeric / q.marks::numeric) * 100.0 WHEN pa.is_correct THEN 100.0 ELSE 0.0 END), 1) AS accuracy_pct
        FROM practice_attempts pa
        JOIN questions  q  ON q.id  = pa.question_id
        JOIN subtopics  st ON st.id = q.subtopic_id
@@ -332,7 +332,7 @@ router.get('/score-trend', protect, analyticsLimiter, async (req, res) => {
   const rows = await safeQuery(
     `SELECT
        DATE(pa.attempted_at) AS date,
-       ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 1) AS avg_score
+       ROUND(AVG(CASE WHEN pa.marks_awarded IS NOT NULL AND q.marks IS NOT NULL AND q.marks > 0 THEN (pa.marks_awarded::numeric / q.marks::numeric) * 100.0 WHEN pa.is_correct THEN 100.0 ELSE 0.0 END), 1) AS avg_score
      FROM practice_attempts pa
      WHERE pa.student_id = :userId
        AND pa.attempted_at > NOW() - (:days * INTERVAL '1 day')
@@ -364,7 +364,7 @@ router.get('/subject-breakdown', protect, analyticsLimiter, async (req, res) => 
          s.name AS subject_name,
          COALESCE(COUNT(pa.id), 0)::INTEGER AS attempts,
          COALESCE(
-           ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 1),
+           ROUND(AVG(CASE WHEN pa.marks_awarded IS NOT NULL AND q.marks IS NOT NULL AND q.marks > 0 THEN (pa.marks_awarded::numeric / q.marks::numeric) * 100.0 WHEN pa.is_correct THEN 100.0 ELSE 0.0 END), 1),
            0
          ) AS accuracy_pct,
          COALESCE(ROUND(AVG(pa.time_taken_seconds), 1), 0) AS avg_time_seconds
@@ -444,7 +444,7 @@ router.get('/leaderboard', protect, analyticsLimiter, async (req, res) => {
          COALESCE(SUBSTRING(u.first_name, 1, 3), '?') || '***' AS display_name,
          (u.id = :userId)::BOOLEAN AS is_me,
          COALESCE(u.xp_points, 0) AS xp_points,
-         ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 1) AS accuracy_pct,
+         ROUND(AVG(CASE WHEN pa.marks_awarded IS NOT NULL AND q.marks IS NOT NULL AND q.marks > 0 THEN (pa.marks_awarded::numeric / q.marks::numeric) * 100.0 WHEN pa.is_correct THEN 100.0 ELSE 0.0 END), 1) AS accuracy_pct,
          COUNT(pa.id)::INTEGER AS attempts
        FROM users u
        JOIN practice_attempts pa ON pa.student_id = u.id
@@ -511,7 +511,7 @@ router.get('/cohort-gaps', protect, analyticsLimiter, async (req, res) => {
        SELECT
          t.id   AS topic_id,
          t.name AS topic,
-         ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 1) AS avg_accuracy,
+         ROUND(AVG(CASE WHEN pa.marks_awarded IS NOT NULL AND q.marks IS NOT NULL AND q.marks > 0 THEN (pa.marks_awarded::numeric / q.marks::numeric) * 100.0 WHEN pa.is_correct THEN 100.0 ELSE 0.0 END), 1) AS avg_accuracy,
          COUNT(DISTINCT pa.student_id)::INTEGER AS student_count
        FROM practice_attempts pa
        JOIN questions  q  ON q.id  = pa.question_id
@@ -558,7 +558,7 @@ router.get('/student/:studentId/topics', protect, requireTeacherAnalyticsScope, 
          t.name AS topic,
          s.name AS subject_name,
          COUNT(pa.id)::INTEGER AS attempt_count,
-         ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 1) AS accuracy_pct,
+         ROUND(AVG(CASE WHEN pa.marks_awarded IS NOT NULL AND q.marks IS NOT NULL AND q.marks > 0 THEN (pa.marks_awarded::numeric / q.marks::numeric) * 100.0 WHEN pa.is_correct THEN 100.0 ELSE 0.0 END), 1) AS accuracy_pct,
          COALESCE(ROUND(AVG(pa.time_taken_seconds), 1), 0) AS avg_time_seconds
        FROM practice_attempts pa
        JOIN questions  q  ON q.id  = pa.question_id
@@ -597,9 +597,11 @@ router.get('/student/:studentId/summary', protect, requireTeacherAnalyticsScope,
       safeQuery(
         `SELECT
            COUNT(*)::INTEGER AS total_attempts,
-           COALESCE(ROUND(AVG(CASE WHEN is_correct THEN 100 ELSE 0 END))::INTEGER,0) AS accuracy_pct,
+           COALESCE(ROUND(AVG(CASE WHEN pa.marks_awarded IS NOT NULL AND q.marks IS NOT NULL AND q.marks > 0 THEN (pa.marks_awarded::numeric / q.marks::numeric) * 100.0 WHEN pa.is_correct THEN 100.0 ELSE 0.0 END))::INTEGER,0) AS accuracy_pct,
            COALESCE(SUM(time_taken_seconds),0)::BIGINT AS total_time_seconds
-         FROM practice_attempts WHERE student_id = :studentId`,
+         FROM practice_attempts pa
+         JOIN questions q ON q.id = pa.question_id
+         WHERE pa.student_id = :studentId`,
         { studentId }, [{}]
       ),
       // AISchoolonair (practice_attempts, above) and English Masterclass
@@ -683,7 +685,7 @@ router.get('/cohort/:subjectId/topics', protect, analyticsLimiter, async (req, r
          t.name AS topic,
          COUNT(DISTINCT pa.student_id)::INTEGER AS student_count,
          COUNT(pa.id)::INTEGER AS attempt_count,
-         ROUND(AVG(CASE WHEN pa.is_correct THEN 100.0 ELSE 0 END), 1) AS avg_accuracy,
+         ROUND(AVG(CASE WHEN pa.marks_awarded IS NOT NULL AND q.marks IS NOT NULL AND q.marks > 0 THEN (pa.marks_awarded::numeric / q.marks::numeric) * 100.0 WHEN pa.is_correct THEN 100.0 ELSE 0.0 END), 1) AS avg_accuracy,
          COALESCE(ROUND(AVG(pa.time_taken_seconds), 1), 0) AS avg_time_seconds
        FROM practice_attempts pa
        JOIN questions  q  ON q.id  = pa.question_id
