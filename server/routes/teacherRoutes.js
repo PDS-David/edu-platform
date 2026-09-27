@@ -1805,7 +1805,7 @@ router.get('/question-bank/questions', protect, questionBankTeacherOnly, async (
     const unclassified = String(req.query.unclassified || '') === 'true';
     const subtopicId = req.query.subtopic_id ? parseInt(req.query.subtopic_id, 10) : null;
 
-    const replacements = { teacherId: req.user.id, limit, offset };
+    const replacements = { teacherId: req.user.id, schoolId: req.user.school_id, limit, offset };
     const clauses = ['q.is_ai_generated = true'];
 
     if (unclassified) {
@@ -1827,7 +1827,7 @@ router.get('/question-bank/questions', protect, questionBankTeacherOnly, async (
     // Legacy orphaned questions with subject_id NULL remain App-Admin-only.
     const scopeJoin =
       'JOIN teacher_subjects scope_ts ON scope_ts.subject_id = q.subject_id AND ((scope_ts.school_id = :schoolId) OR (scope_ts.school_id IS NULL AND :schoolId IS NULL)) ' +
-      'AND scope_ts.teacher_id = :teacherId AND scope_ts.is_active = true AND ((ts.school_id = :schoolId) OR (ts.school_id IS NULL AND :schoolId IS NULL))';
+      'AND scope_ts.teacher_id = :teacherId AND scope_ts.is_active = true';
     const classifiedJoin = unclassified
       ? scopeJoin
       : 'JOIN subtopics st ON st.id = q.subtopic_id ' +
@@ -2114,7 +2114,7 @@ router.post('/generate-questions', protect, teacherOnly, async (req, res) => {
     // parallel reimplementation.
     const assignedSubjects = await sequelize.query(
       `SELECT 1 FROM teacher_subjects WHERE teacher_id = :teacherId AND subject_id = :subjectId AND is_active = true LIMIT 1`,
-      { replacements: { teacherId: req.user.id, subjectId: subject_id }, type: QueryTypes.SELECT }
+      { replacements: { teacherId: req.user.id, subjectId: subject_id, schoolId: req.user.school_id }, type: QueryTypes.SELECT }
     );
     if (!assignedSubjects.length) {
       return error(res, 'You are not assigned to this subject', 403);
