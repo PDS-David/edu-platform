@@ -35,7 +35,19 @@ function getDisplayName(user) {
 }
 
 export default function TeacherLayout() {
-  const { user } = useAuth();
+  const { user, switchTeacherSchool } = useAuth();
+  const [memberships, setMemberships] = useState([]);
+  const [schoolError, setSchoolError] = useState('');
+  useEffect(() => {
+    api.get('/schools/my-memberships').then(r => setMemberships(r.data || [])).catch(() => setSchoolError('Could not load school memberships'));
+  }, []);
+  const acceptSchool = async (schoolId) => {
+    try {
+      await api.post(`/schools/my-memberships/${schoolId}/accept`);
+      const r = await api.get('/schools/my-memberships');
+      setMemberships(r.data || []);
+    } catch (err) { setSchoolError(err.message || 'Could not accept invitation'); }
+  };
   const [assignedSubjects, setAssignedSubjects] = useState(null);
 
   useEffect(() => {
@@ -72,6 +84,19 @@ export default function TeacherLayout() {
   return (
     <div className="min-h-screen bg-[#f9f7f4] text-[#1a1a1a]">
       <TopNav />
+      {memberships.length > 0 && <div className="px-4 py-3 bg-white border-b flex flex-wrap items-center gap-3">
+        <label htmlFor="teacher-school-select" className="text-sm font-medium">Working in</label>
+        <select id="teacher-school-select" value={user?.school_id || ''}
+          onChange={e => { switchTeacherSchool(e.target.value); window.location.assign('/teacher/dashboard'); }}
+          className="border rounded-lg px-3 py-2 text-sm">
+          <option value="">Standalone account</option>
+          {memberships.filter(m => m.status === 'active').map(m => <option key={m.school_id} value={m.school_id}>{m.name}</option>)}
+        </select>
+        {memberships.filter(m => m.status === 'pending').map(m => <button key={m.school_id}
+          onClick={() => acceptSchool(m.school_id)} className="px-3 py-2 text-sm rounded-lg bg-indigo-600 text-white">
+          Accept invitation: {m.name}</button>)}
+        {schoolError && <span role="alert" className="text-sm text-red-600">{schoolError}</span>}
+      </div>
       <PortalMobileNav
         roleLabel="Teacher"
         displayName={getDisplayName(user)}
