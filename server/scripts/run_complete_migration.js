@@ -7,6 +7,32 @@
 // Safe to re-run — all statements use IF NOT EXISTS / ON CONFLICT DO NOTHING.
 
 'use strict';
+
+const fs = require('fs');
+const path = require('path');
+const sequelize = require('../config/database');
+
+async function bootstrapModelSchema() {
+  const modelsDir = path.join(__dirname, '..', 'models');
+  const files = fs
+    .readdirSync(modelsDir)
+    .filter((f) => f.endsWith('.js') && f !== 'associations.js');
+
+  for (const f of files) {
+    const mod = require(path.join(modelsDir, f));
+    if (typeof mod === 'function' && !mod.tableName && !mod.rawAttributes) {
+      mod(sequelize);
+    }
+  }
+
+  const associate = require('../models/associations');
+  associate(sequelize);
+
+  console.log('  🔧  Bootstrapping Sequelize model schema (alter: false) ...');
+  await sequelize.sync({ alter: false });
+  console.log('  ✅  Foundational model tables are present');
+}
+
 const { Pool } = require('pg');
 
 const pool = new Pool({
@@ -126,6 +152,12 @@ function LANGUAGE_LABEL(code) {
 
 async function run() {
   console.log('\n🔧 AISchoolonair — Complete DB Migration\n');
+
+  // A completely fresh database has no foundational tables yet. The SQL
+  // reconciliation steps below intentionally use ALTER TABLE, so they cannot
+  // bootstrap an empty database by themselves. Create the Sequelize-defined
+  // base tables first, without altering existing production schemas.
+  await bootstrapModelSchema();
 
   // ── ENUMS ─────────────────────────────────────────────────────────────────
   await exec('enum: free_trial subscription status', `
