@@ -293,6 +293,10 @@ router.get('/me/roster', protect, requireSchoolAdmin, async (req, res) => {
               em_registered_at IS NOT NULL AS uses_english_masterclass
          FROM users
         WHERE school_id = $1
+           OR (role = 'teacher' AND EXISTS (
+             SELECT 1 FROM teacher_school_memberships m
+             WHERE m.teacher_id = users.id AND m.school_id = $1 AND m.status = 'active'
+           ))
         ORDER BY role, created_at DESC`,
       [req.user.school_id]
     );
@@ -891,7 +895,7 @@ router.post('/me/classes', protect, requireSchoolAdmin, async (req, res) => {
   try {
     if (teacher_id) {
       const teacherCheck = await q(
-        `SELECT id FROM users WHERE id = $1 AND role = 'teacher' AND school_id = $2`,
+        `SELECT id FROM users WHERE id = $1 AND role = 'teacher' AND (school_id = $2 OR EXISTS (SELECT 1 FROM teacher_school_memberships m WHERE m.teacher_id = users.id AND m.school_id = $2 AND m.status = 'active'))`,
         [teacher_id, req.user.school_id]
       );
       if (!teacherCheck.length) {
@@ -980,7 +984,7 @@ router.patch('/me/classes/:id', protect, requireSchoolAdmin, async (req, res) =>
 
     if (teacherIdProvided && teacher_id) {
       const teacherCheck = await q(
-        `SELECT id FROM users WHERE id = $1 AND role = 'teacher' AND school_id = $2`,
+        `SELECT id FROM users WHERE id = $1 AND role = 'teacher' AND (school_id = $2 OR EXISTS (SELECT 1 FROM teacher_school_memberships m WHERE m.teacher_id = users.id AND m.school_id = $2 AND m.status = 'active'))`,
         [teacher_id, req.user.school_id]
       );
       if (!teacherCheck.length) {
@@ -1466,7 +1470,7 @@ router.get('/me/teachers/:teacherId/subjects', protect, requireSchoolAdmin, asyn
   const { teacherId } = req.params;
   try {
     const owned = await q(
-      `SELECT id FROM users WHERE id = $1 AND school_id = $2 AND role = 'teacher'`,
+      `SELECT id FROM users WHERE id = $1 AND role = 'teacher' AND (school_id = $2 OR EXISTS (SELECT 1 FROM teacher_school_memberships m WHERE m.teacher_id = users.id AND m.school_id = $2 AND m.status = 'active'))`,
       [teacherId, req.user.school_id]
     );
     if (!owned.length) {
@@ -1506,7 +1510,7 @@ router.post('/me/teachers/:teacherId/subjects', protect, requireSchoolAdmin, asy
 
   try {
     const owned = await q(
-      `SELECT id FROM users WHERE id = $1 AND school_id = $2 AND role = 'teacher'`,
+      `SELECT id FROM users WHERE id = $1 AND role = 'teacher' AND (school_id = $2 OR EXISTS (SELECT 1 FROM teacher_school_memberships m WHERE m.teacher_id = users.id AND m.school_id = $2 AND m.status = 'active'))`,
       [teacherId, req.user.school_id]
     );
     if (!owned.length) {
@@ -1551,7 +1555,7 @@ router.delete('/me/teachers/:teacherId/subjects/:subjectId', protect, requireSch
   const { teacherId, subjectId } = req.params;
   try {
     const owned = await q(
-      `SELECT id FROM users WHERE id = $1 AND school_id = $2 AND role = 'teacher'`,
+      `SELECT id FROM users WHERE id = $1 AND role = 'teacher' AND (school_id = $2 OR EXISTS (SELECT 1 FROM teacher_school_memberships m WHERE m.teacher_id = users.id AND m.school_id = $2 AND m.status = 'active'))`,
       [teacherId, req.user.school_id]
     );
     if (!owned.length) {
