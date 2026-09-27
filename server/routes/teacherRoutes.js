@@ -1038,6 +1038,27 @@ router.post('/tests/:id/assign', protect, teacherOnly, async (req, res) => {
 
     let targets = [];
     if (class_id) {
+      // SECURITY FIX (TEACHER-03): a teacher may only assign a test to
+      // classes they own in their active school. Previously the supplied
+      // class_id was trusted and its entire membership was loaded, so a
+      // teacher could assign their own test to another teacher's class by
+      // submitting that class UUID directly.
+      const ownedClass = await safeQuery(
+        `SELECT id FROM classes
+         WHERE id = :classId
+           AND teacher_id = :teacherId
+           AND ((school_id = :schoolId) OR (school_id IS NULL AND :schoolId IS NULL))
+         LIMIT 1`,
+        {
+          classId: class_id,
+          teacherId: req.user.id,
+          schoolId: req.user.school_id || null,
+        }
+      );
+      if (!ownedClass.length) {
+        return res.status(403).json({ success: false, error: 'Not your class' });
+      }
+
       const members = await safeQuery(
         `SELECT student_id FROM class_memberships WHERE class_id = :classId`,
         { classId: class_id }
