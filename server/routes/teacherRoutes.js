@@ -438,7 +438,7 @@ router.get('/classes', protect, teacherOnly, async (req, res) => {
        WHERE c.teacher_id = :teacherId
          AND ((c.school_id = :schoolId) OR (c.school_id IS NULL AND :schoolId IS NULL))
        GROUP BY c.id ORDER BY c.created_at DESC`,
-      { replacements: { teacherId: req.user.id }, type: QueryTypes.SELECT }
+      { replacements: { teacherId: req.user.id, schoolId: req.user.school_id || null }, type: QueryTypes.SELECT }
     );
     return res.json({ success: true, data: rows });
   } catch (err) {
