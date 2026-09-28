@@ -33,7 +33,7 @@ router.get('/search', protect, async (req, res) => {
          NULL       AS topic_id,
          NULL       AS subtopic_id
        FROM subjects s
-       JOIN exam_boards eb ON eb.id = s.exam_board_id
+       JOIN exam_boards eb ON eb.id::text = s.exam_board_id::text
        JOIN student_subjects ss ON ss.subject_id = s.id
          AND ss.student_id = :userId AND ss.is_active = true
        WHERE s.is_active = true
@@ -52,7 +52,7 @@ router.get('/search', protect, async (req, res) => {
          NULL       AS subtopic_id
        FROM topics t
        JOIN subjects s  ON s.id  = t.subject_id
-       JOIN exam_boards eb ON eb.id = s.exam_board_id
+       JOIN exam_boards eb ON eb.id::text = s.exam_board_id::text
        JOIN student_subjects ss ON ss.subject_id = s.id
          AND ss.student_id = :userId AND ss.is_active = true
        WHERE t.is_active = true AND s.is_active = true

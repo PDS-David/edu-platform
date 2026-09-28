@@ -63,7 +63,7 @@ const getSubjects = async (req, res) => {
 
     const join =
       `LEFT JOIN exam_boards eb
-       ON eb.id = s.exam_board_id`;
+       ON eb.id::text = s.exam_board_id::text`;
 
     let where =
       `WHERE s.is_active = true`;
@@ -80,7 +80,7 @@ const getSubjects = async (req, res) => {
 
     if (exam_board_id) {
       params.push(exam_board_id);
-      where += ` AND s.exam_board_id = $${pIdx++}`;
+      where += ` AND s.exam_board_id::text = $${pIdx++}::text`;
     }
 
     if (exam_board_code) {
@@ -134,7 +134,7 @@ const getSubject = async (req, res) => {
          eb.name AS exam_board_name
        FROM subjects s
        LEFT JOIN exam_boards eb
-         ON eb.id = s.exam_board_id
+         ON eb.id::text = s.exam_board_id::text
        WHERE s.id = $1`,
       {
         bind: [req.params.id],
@@ -183,7 +183,7 @@ const createSubject = async (req, res) => {
     // message; the DB constraint below is the actual guarantee (defense
     // in depth, same pattern used for em_categories).
     const existing = await sequelize.query(
-      `SELECT id FROM subjects WHERE name = :name AND exam_board_id = :exam_board_id AND is_active = true`,
+      `SELECT id FROM subjects WHERE name = :name AND exam_board_id::text = :exam_board_id::text AND is_active = true`,
       { replacements: { name, exam_board_id }, type: QueryTypes.SELECT }
     );
     if (existing.length) {

@@ -92,7 +92,7 @@ router.get('/types', optionalAuth, async (req, res) => {
          eb.created_at, eb.updated_at,
          COUNT(s.id)::INTEGER AS subject_count
        FROM exam_boards eb
-       LEFT JOIN subjects s ON s.exam_board_id = eb.id AND s.is_active = true
+       LEFT JOIN subjects s ON s.exam_board_id::text = eb.id::text AND s.is_active = true
        WHERE (:includeInactive OR eb.is_active = true)
        GROUP BY eb.id
        ORDER BY eb.display_order ASC NULLS LAST, eb.name ASC`,

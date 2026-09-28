@@ -76,7 +76,7 @@ router.get('/:code/subjects', async (req, res) => {
     const subjects = await sequelize.query(
       `SELECT s.id, s.name, s.code, s.level, s.description, s.icon_emoji
        FROM subjects s
-       JOIN exam_boards eb ON s.exam_board_id = eb.id
+       JOIN exam_boards eb ON s.exam_board_id::text = eb.id::text
        WHERE UPPER(eb.code) = UPPER(:code)
          AND s.is_active  = true
          AND eb.is_active = true
