@@ -174,7 +174,7 @@ async function resolveMeta(scope, scopeId) {
          eb.code                                       AS exam_board_code
        FROM   topics      t
        LEFT JOIN subjects    s  ON s.id  = t.subject_id
-       LEFT JOIN exam_boards eb ON eb.id = s.exam_board_id
+       LEFT JOIN exam_boards eb ON eb.id::text = s.exam_board_id::text
        WHERE  t.id = :id`,
       { replacements: { id: scopeId }, type: QueryTypes.SELECT }
     );
@@ -191,7 +191,7 @@ async function resolveMeta(scope, scopeId) {
        FROM   subtopics   st
        LEFT JOIN topics      t  ON t.id  = st.topic_id
        LEFT JOIN subjects    s  ON s.id  = st.subject_id
-       LEFT JOIN exam_boards eb ON eb.id = s.exam_board_id
+       LEFT JOIN exam_boards eb ON eb.id::text = s.exam_board_id::text
        WHERE  st.id = :id`,
       { replacements: { id: scopeId }, type: QueryTypes.SELECT }
     );
