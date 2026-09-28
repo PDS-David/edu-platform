@@ -156,14 +156,14 @@ router.get('/question-bank/questions', protect, adminOnly, async (req, res) => {
     const where = clauses.join(' AND ');
     const rows = await sequelize.query(
       `SELECT q.id, q.question_text, q.type, q.difficulty, q.status, q.is_active,
-              q.is_ai_generated, q.subject_id, q.subtopic_id, q.created_at,
+              q.is_ai_generated, q.subject_id_uuid AS subject_id, q.subtopic_id, q.created_at,
               q.options, q.correct_answer, q.explanation,
               eb.name AS exam_type_name, s.name AS subject_name,
               t.name AS topic_name, st.name AS subtopic_name
          FROM questions q
          LEFT JOIN subtopics st ON st.id = q.subtopic_id
          LEFT JOIN topics t ON t.id = st.topic_id
-         LEFT JOIN subjects s ON s.id = COALESCE(q.subject_id, t.subject_id)
+         LEFT JOIN subjects s ON s.id = COALESCE(q.subject_id_uuid, t.subject_id)
          LEFT JOIN exam_boards eb ON eb.id::text = s.exam_board_id::text
         WHERE ${where}
         ORDER BY q.created_at DESC, q.id DESC
