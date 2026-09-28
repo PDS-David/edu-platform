@@ -101,7 +101,7 @@ async function generateQuizByTopic({
        eb.code                                        AS exam_board_code
      FROM topics t
      LEFT JOIN subjects    s  ON s.id  = t.subject_id
-     LEFT JOIN exam_boards eb ON eb.id = s.exam_board_id
+     LEFT JOIN exam_boards eb ON eb.id::text = s.exam_board_id::text
      WHERE t.id = :topicId`,
     { replacements: { topicId: topic_id }, type: QueryTypes.SELECT }
   );

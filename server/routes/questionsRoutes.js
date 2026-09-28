@@ -150,7 +150,7 @@ router.get('/random', protect, async (req, res) => {
   let boardJoin = '';
   if (board) {
     boardJoin = `JOIN subjects s_b ON s_b.id = t.subject_id
-                 JOIN exam_boards eb_b ON eb_b.id = s_b.exam_board_id
+                 JOIN exam_boards eb_b ON eb_b.id::text = s_b.exam_board_id::text
                    AND UPPER(eb_b.code) = UPPER(:board)`;
     replacements.board = board;
   }
@@ -231,7 +231,7 @@ router.get('/random', protect, async (req, res) => {
        LEFT JOIN subtopics  st ON st.id = q.subtopic_id
        LEFT JOIN topics     t  ON t.id  = st.topic_id
        LEFT JOIN subjects   s  ON s.id  = t.subject_id
-       LEFT JOIN exam_boards eb ON eb.id = s.exam_board_id
+       LEFT JOIN exam_boards eb ON eb.id::text = s.exam_board_id::text
        ${boardJoin}
        ${where}
        ORDER BY RANDOM()

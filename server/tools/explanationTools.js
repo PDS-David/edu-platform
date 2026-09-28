@@ -83,7 +83,7 @@ async function explainConcept(question = {}) {
            ao.option_text AS correct_answer_text
          FROM questions q
          LEFT JOIN subjects      s  ON s.id  = q.subject_id_uuid
-         LEFT JOIN exam_boards   eb ON eb.id = s.exam_board_id
+         LEFT JOIN exam_boards   eb ON eb.id::text = s.exam_board_id::text
          LEFT JOIN answer_options ao
            ON ao.question_id = q.id AND ao.is_correct = true
          WHERE q.id = :questionId
@@ -189,7 +189,7 @@ async function getHint(questionId, hintLevel = 1) {
            ORDER BY ao.order_index) AS options
        FROM questions q
        LEFT JOIN subjects       s  ON s.id  = q.subject_id_uuid
-       LEFT JOIN exam_boards    eb ON eb.id = s.exam_board_id
+       LEFT JOIN exam_boards    eb ON eb.id::text = s.exam_board_id::text
        LEFT JOIN answer_options ao ON ao.question_id = q.id
        WHERE q.id = :questionId
        GROUP BY q.id, q.question_text, q.topic, s.name, eb.name`,

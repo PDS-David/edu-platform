@@ -164,7 +164,7 @@ router.get('/question-bank/questions', protect, adminOnly, async (req, res) => {
          LEFT JOIN subtopics st ON st.id = q.subtopic_id
          LEFT JOIN topics t ON t.id = st.topic_id
          LEFT JOIN subjects s ON s.id = COALESCE(q.subject_id, t.subject_id)
-         LEFT JOIN exam_boards eb ON eb.id = s.exam_board_id
+         LEFT JOIN exam_boards eb ON eb.id::text = s.exam_board_id::text
         WHERE ${where}
         ORDER BY q.created_at DESC, q.id DESC
         LIMIT :limit OFFSET :offset`,
@@ -612,7 +612,7 @@ router.get('/questions/pending', protect, adminOnly, async (req, res) => {
        LEFT JOIN subtopics  st ON q.subtopic_id   = st.id
        LEFT JOIN subjects   s  ON st.subject_id   = s.id
        LEFT JOIN topics     t  ON st.topic_id     = t.id
-       LEFT JOIN exam_boards eb ON s.exam_board_id = eb.id
+       LEFT JOIN exam_boards eb ON s.exam_board_id::text = eb.id::text
        WHERE COALESCE(q.status, 'pending') NOT IN ('approved', 'active', 'rejected')
        ${filterSql}
        ORDER BY eb.name NULLS LAST, s.name NULLS LAST, t.name NULLS LAST, q.created_at DESC
@@ -631,7 +631,7 @@ router.get('/questions/pending', protect, adminOnly, async (req, res) => {
     const countJoins = (exam_type_id || subject_id || topic_id)
       ? `LEFT JOIN subtopics st ON q.subtopic_id = st.id
          LEFT JOIN subjects  s  ON st.subject_id = s.id
-         LEFT JOIN exam_boards eb ON s.exam_board_id = eb.id
+         LEFT JOIN exam_boards eb ON s.exam_board_id::text = eb.id::text
          LEFT JOIN topics    t  ON st.topic_id   = t.id`
       : '';
     const [countRow] = await sequelize.query(

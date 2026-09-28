@@ -165,7 +165,7 @@ async function predictGrade(userId, subjectId) {
       sequelize.query(
         `SELECT s.name AS subject_name, eb.name AS exam_board
          FROM subjects s
-         LEFT JOIN exam_boards eb ON eb.id = s.exam_board_id
+         LEFT JOIN exam_boards eb ON eb.id::text = s.exam_board_id::text
          WHERE s.id = :subjectId`,
         { replacements: { subjectId }, type: QueryTypes.SELECT }
       ),

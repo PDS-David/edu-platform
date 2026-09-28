@@ -276,7 +276,7 @@ router.post('/notes/generate', protect, aiLimiter, async (req, res) => {
     if (subject_id) {
       const subjects = await sequelize.query(
         `SELECT s.name, eb.code AS board_code
-         FROM subjects s LEFT JOIN exam_boards eb ON s.exam_board_id = eb.id
+         FROM subjects s LEFT JOIN exam_boards eb ON s.exam_board_id::text = eb.id::text
          WHERE s.id = :subjectId`,
         { replacements: { subjectId: subject_id }, type: QueryTypes.SELECT }
       );

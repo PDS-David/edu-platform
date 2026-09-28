@@ -76,7 +76,7 @@ router.get('/my-subjects', protect, teacherOnly, async (req, res) => {
               eb.code AS exam_board_code, eb.name AS exam_board_name
        FROM teacher_subjects ts
        JOIN subjects    s  ON s.id  = ts.subject_id
-       LEFT JOIN exam_boards eb ON eb.id = s.exam_board_id
+       LEFT JOIN exam_boards eb ON eb.id::text = s.exam_board_id::text
        WHERE ts.teacher_id = :teacherId AND ts.is_active = true AND ((ts.school_id = :schoolId) OR (ts.school_id IS NULL AND :schoolId IS NULL))
        ORDER BY s.name ASC`,
       { teacherId: req.user.id, schoolId: req.user.school_id }
@@ -2023,7 +2023,7 @@ router.get('/questions', protect, teacherOnly, async (req, res) => {
            JOIN subtopics  st ON st.id = q.subtopic_id
            JOIN topics      t ON t.id  = st.topic_id
            JOIN subjects    s ON s.id  = t.subject_id
-           LEFT JOIN exam_boards eb ON s.exam_board_id = eb.id
+           LEFT JOIN exam_boards eb ON s.exam_board_id::text = eb.id::text
            JOIN teacher_subjects ts ON ts.subject_id = s.id AND ts.teacher_id = :teacherId AND ts.is_active = true AND ((ts.school_id = :schoolId) OR (ts.school_id IS NULL AND :schoolId IS NULL))
            WHERE q.is_active = true
              AND COALESCE(q.status, 'pending') IN ('approved', 'active')
@@ -2478,7 +2478,7 @@ router.get('/questions/pending', protect, teacherOnly, async (req, res) => {
        JOIN      subtopics  st ON q.subtopic_id   = st.id
        JOIN      subjects   s  ON st.subject_id   = s.id
        JOIN      topics     t  ON st.topic_id     = t.id
-       LEFT JOIN exam_boards eb ON s.exam_board_id = eb.id
+       LEFT JOIN exam_boards eb ON s.exam_board_id::text = eb.id::text
        JOIN      teacher_subjects ts ON ts.subject_id = s.id AND ts.teacher_id = :teacherId AND ts.is_active = true AND ((ts.school_id = :schoolId) OR (ts.school_id IS NULL AND :schoolId IS NULL))
        WHERE COALESCE(q.status, 'pending') NOT IN ('approved', 'active', 'rejected')
        ${filterSql}
@@ -2497,7 +2497,7 @@ router.get('/questions/pending', protect, teacherOnly, async (req, res) => {
        JOIN subtopics st ON q.subtopic_id = st.id
        JOIN subjects  s  ON st.subject_id = s.id
        JOIN topics    t  ON st.topic_id   = t.id
-       LEFT JOIN exam_boards eb ON s.exam_board_id = eb.id
+       LEFT JOIN exam_boards eb ON s.exam_board_id::text = eb.id::text
        JOIN teacher_subjects ts ON ts.subject_id = s.id AND ts.teacher_id = :teacherId AND ts.is_active = true AND ((ts.school_id = :schoolId) OR (ts.school_id IS NULL AND :schoolId IS NULL))
        WHERE COALESCE(q.status, 'pending') NOT IN ('approved', 'active', 'rejected')
        ${filterSql}`,

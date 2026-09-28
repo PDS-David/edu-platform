@@ -57,7 +57,7 @@ async function loadContext(resource) {
     const [s] = await sequelize.query(
       `SELECT s.id, s.name, s.level, eb.name AS exam_name, eb.code AS exam_code
          FROM subjects s
-         LEFT JOIN exam_boards eb ON eb.id = s.exam_board_id
+         LEFT JOIN exam_boards eb ON eb.id::text = s.exam_board_id::text
         WHERE s.id = :id`,
       { replacements: { id: resource.subject_id }, type: QueryTypes.SELECT }
     );

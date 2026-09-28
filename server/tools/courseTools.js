@@ -60,7 +60,7 @@ async function getCourses(userId) {
            eb.name             AS exam_board,
            eb.code             AS exam_board_code
          FROM subjects    s
-         JOIN exam_boards eb ON eb.id = s.exam_board_id
+         JOIN exam_boards eb ON eb.id::text = s.exam_board_id::text
          WHERE s.is_active  = true
            AND eb.is_active = true
          ORDER BY eb.display_order ASC, s.name ASC`,
