@@ -798,7 +798,7 @@ exports.getMe = async (req, res, next) => {
               phone, subscription_status, subscription_expires_at,
               is_verified, onboarding_complete, xp_points,
               study_streak_days, daily_goal, last_login,
-              em_registered_at, created_at, updated_at
+              em_registered_at, pending_exam_board_ids, created_at, updated_at
        FROM users WHERE id = :id LIMIT 1`,
       { replacements: { id: req.user.id }, type: QueryTypes.SELECT }
     );
