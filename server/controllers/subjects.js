@@ -170,10 +170,36 @@ const createSubject = async (req, res) => {
   try {
     const { name, code, description, level, exam_board_id } = req.body;
 
-    if (!name || !code || !exam_board_id) {
+    if (!name || !code || exam_board_id === undefined || exam_board_id === null || exam_board_id === '') {
       return res.status(400).json({
         success: false,
         error:   'name, code, and exam_board_id are required',
+      });
+    }
+
+    // subjects.exam_board_id is an INTEGER FK to exam_boards.id.
+    // Validate before touching PostgreSQL so malformed/UUID values cannot
+    // surface as an opaque 500 database error.
+    const parsedExamBoardId = Number(exam_board_id);
+    if (!Number.isInteger(parsedExamBoardId) || parsedExamBoardId <= 0) {
+      return res.status(400).json({
+        success: false,
+        error:   'exam_board_id must be a valid examination type ID',
+      });
+    }
+
+    const board = await sequelize.query(
+      `SELECT id FROM exam_boards WHERE id = :exam_board_id AND is_active = true`,
+      {
+        replacements: { exam_board_id: parsedExamBoardId },
+        type: QueryTypes.SELECT,
+      }
+    );
+
+    if (!board.length) {
+      return res.status(404).json({
+        success: false,
+        error:   'Examination type not found',
       });
     }
 
