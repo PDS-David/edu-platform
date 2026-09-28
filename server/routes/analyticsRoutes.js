@@ -562,6 +562,38 @@ router.get('/student/:studentId/topics', protect, requireTeacherAnalyticsScope, 
     return res.status(403).json({ success: false, error: 'Access denied' });
   }
   const { subject_id } = req.query;
+
+  // A teacher may filter this report only to subjects currently assigned to
+  // them in the active school. Student/admin behavior remains unchanged.
+  if (req.user.role === 'teacher' && subject_id) {
+    try {
+      const [subjectScope] = await sequelize.query(
+        `SELECT 1
+           FROM teacher_subjects
+          WHERE teacher_id = :teacherId
+            AND subject_id = :subjectId
+            AND is_active = true
+            AND ((school_id = :schoolId) OR (school_id IS NULL AND :schoolId IS NULL))
+          LIMIT 1`,
+        {
+          replacements: {
+            teacherId: req.user.id,
+            subjectId: subject_id,
+            schoolId: req.user.school_id || null,
+          },
+          type: QueryTypes.SELECT,
+        }
+      );
+
+      if (!subjectScope) {
+        return res.status(403).json({ success: false, error: 'Subject is outside your teaching scope' });
+      }
+    } catch (err) {
+      console.error('[GET /analytics/student/:studentId/topics] subject scope check failed:', err.message);
+      return res.status(500).json({ success: false, error: 'Authorization check failed' });
+    }
+  }
+
   try {
     const rows = await safeQuery(
       `-- topic name + id come from the join chain:
