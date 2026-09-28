@@ -521,7 +521,7 @@ router.post('/teachers/:teacherId/assign', protect, authorize('admin'), async (r
       await sequelize.query(
         `INSERT INTO teacher_subjects (teacher_id, subject_id, exam_board_id, assigned_by, assigned_at, is_active)
          VALUES (:teacherId, :subjectId, :examBoardId, :adminId, NOW(), true)
-         ON CONFLICT (teacher_id, subject_id) DO UPDATE SET is_active = true, assigned_by = EXCLUDED.assigned_by, assigned_at = NOW()`,
+         ON CONFLICT (teacher_id, subject_id) WHERE school_id IS NULL DO UPDATE SET is_active = true, assigned_by = EXCLUDED.assigned_by, assigned_at = NOW()`,
         { replacements: { teacherId, subjectId, examBoardId: sub[0].exam_board_id || null, adminId: req.user.id }, type: QueryTypes.INSERT }
       );
       assigned++;
