@@ -49,7 +49,7 @@ router.get('/all-subjects', async (req, res) => {
          eb.code AS exam_board_code,
          eb.name AS exam_board_name
        FROM subjects s
-       LEFT JOIN exam_boards eb ON eb.id = s.exam_board_id
+       LEFT JOIN exam_boards eb ON eb.id::text = s.exam_board_id::text
        WHERE s.is_active = true
        ORDER BY eb.name ASC NULLS LAST, s.name ASC`,
       { type: QueryTypes.SELECT }
