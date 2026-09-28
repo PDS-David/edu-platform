@@ -30,8 +30,10 @@ export default function PrivateRoute({ allowedRoles = [], skipOnboardingCheck = 
   // dashboard to manage roster/settings regardless of the content toggle.
   // user.school is only present for tenant accounts.
   if (
-    user.school &&
-    !user.school.enable_aischoolonair &&
+    (
+      (user.school && !user.school.enable_aischoolonair) ||
+      (user.role === 'student' && user.hasAISchoolonairAccess === false)
+    ) &&
     ['student', 'teacher'].includes(user.role)
   ) {
     return (
