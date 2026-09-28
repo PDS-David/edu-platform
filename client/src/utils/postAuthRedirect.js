@@ -20,15 +20,14 @@
 /**
  * Which product(s) a student/teacher account has access to.
  * - Tenant accounts (user.school present): the school's own toggles.
- * - Standalone accounts: AISchoolonair is the default platform anyone
- *   registers into; English Masterclass access is its own explicit signup
- *   (user.em_registered_at set), never assumed.
+ * - Standalone accounts: the server supplies hasAISchoolonairAccess so an
+ *   English-Masterclass-only account is not treated as AISchoolonair by default.
  */
 export function getProductAccess(user) {
   if (!user) return { aischoolonair: false, em: false };
   const school = user.school;
   return {
-    aischoolonair: school ? !!school.enable_aischoolonair : true,
+    aischoolonair: school ? !!school.enable_aischoolonair : user.hasAISchoolonairAccess !== false,
     em:            school ? !!school.enable_em            : !!user.em_registered_at,
   };
 }
