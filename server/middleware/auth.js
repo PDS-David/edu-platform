@@ -33,7 +33,8 @@ const protect = async (req, res, next) => {
     const users = await db.query(
       `SELECT id, email, first_name, last_name, role, school_id,
               is_active, subscription_status, subscription_expires_at,
-              daily_goal, em_registered_at, french_registered_at, german_registered_at
+              daily_goal, em_registered_at, french_registered_at, german_registered_at,
+              pending_exam_board_ids
        FROM users
        WHERE id = :id AND is_active = true
        LIMIT 1`,
@@ -45,6 +46,43 @@ const protect = async (req, res, next) => {
     }
 
     req.user = users[0];
+
+    // Standalone EM-only students have no school_id, so school service flags
+    // cannot protect them. Distinguish them from standalone AISchoolonair
+    // students using the existing registration-state signature.
+    req.user.isEmOnlyStandalone = false;
+    if (req.user.role === 'student' && !req.user.school_id && req.user.em_registered_at) {
+      try {
+        const examTypeRows = await db.query(
+          `SELECT 1 FROM student_exam_types WHERE student_id = :studentId LIMIT 1`,
+          { replacements: { studentId: req.user.id }, type: QueryTypes.SELECT }
+        );
+        const pendingBoards = Array.isArray(req.user.pending_exam_board_ids)
+          ? req.user.pending_exam_board_ids
+          : [];
+        req.user.isEmOnlyStandalone = pendingBoards.length === 0 && examTypeRows.length === 0;
+      } catch (scopeErr) {
+        console.error('[protect] standalone product-scope check failed:', scopeErr.message);
+      }
+    }
+
+    if (req.user.isEmOnlyStandalone) {
+      const url = req.originalUrl || req.url || '';
+      const alwaysExempt =
+        url.startsWith('/api/english-masterclass') ||
+        url.startsWith('/api/language-masterclass') ||
+        url.startsWith('/api/auth') ||
+        url.startsWith('/api/users') ||
+        url.startsWith('/api/schools') ||
+        url.startsWith('/api/notifications');
+      if (!alwaysExempt) {
+        return res.status(403).json({
+          success: false,
+          error: 'This account is registered for English Masterclass only. AISchoolonair access is not enabled for this account.',
+          code: 'AISCHOOLONAIR_NOT_ENABLED',
+        });
+      }
+    }
     // Teachers may carry multiple active school memberships. An explicit
     // X-School-Id is fail-closed; without one, prefer the legacy primary
     // school when it is still active, otherwise select the first active
