@@ -1296,7 +1296,7 @@ router.post('/teacher-subjects', protect, adminOnly, async (req, res) => {
     await sequelize.query(
       `INSERT INTO teacher_subjects (teacher_id, subject_id, exam_board_id, is_active)
        VALUES (:t, :s, :examBoardId, true)
-       ON CONFLICT (teacher_id, subject_id) DO UPDATE SET is_active = true, exam_board_id = EXCLUDED.exam_board_id`,
+       ON CONFLICT (teacher_id, subject_id) WHERE school_id IS NULL DO UPDATE SET is_active = true, exam_board_id = EXCLUDED.exam_board_id`,
       { replacements: { t: teacher_id, s: subject_id, examBoardId: sub[0].exam_board_id || null }, type: QueryTypes.INSERT }
     );
     return success(res, { message: 'Assignment saved' });
@@ -1551,7 +1551,7 @@ router.get('/health', protect, adminOnly, async (req, res) => {
         `INSERT INTO teacher_subjects (teacher_id, subject_id, exam_board_id,
             assigned_by, assigned_at, is_active)
          VALUES (:t, :s, :b, :a, NOW(), true)
-         ON CONFLICT (teacher_id, subject_id) DO UPDATE SET is_active = true`,
+         ON CONFLICT (teacher_id, subject_id) WHERE school_id IS NULL DO UPDATE SET is_active = true`,
         { replacements: { t: teacher.id, s: created.subjectId,
                           b: created.boardId, a: adminId }, type: QueryTypes.INSERT });
       w('4. assign teacher → subject', true, `teacher=${teacher.id}`);
