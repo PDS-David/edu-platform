@@ -1181,7 +1181,7 @@ router.post('/teacher-assignments', protect, adminOnly, async (req, res) => {
     await sequelize.query(
       `INSERT INTO teacher_subjects (teacher_id, subject_id, exam_board_id, is_active)
        VALUES (:t, :s, :examBoardId, true)
-       ON CONFLICT (teacher_id, subject_id) DO UPDATE SET is_active = true, exam_board_id = EXCLUDED.exam_board_id`,
+       ON CONFLICT (teacher_id, subject_id) WHERE school_id IS NULL DO UPDATE SET is_active = true, exam_board_id = EXCLUDED.exam_board_id`,
       { replacements: { t: teacher_id, s: subject_id, examBoardId: sub[0].exam_board_id || null }, type: QueryTypes.INSERT }
     );
     return success(res, { message: 'Assignment saved' });
