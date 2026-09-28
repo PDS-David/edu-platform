@@ -117,6 +117,25 @@ async function safeUser(row) {
   // language unlocks all 8, per Da's confirmed decision, so this is just
   // "has at least one row," not language-specific.
   safe.hasLanguageMasterclass = safe.registeredLanguages.length > 0;
+
+  // Standalone EM-only student accounts have no school service flags.
+  // Mirror the server middleware's existing registration-state discriminator
+  // so the client never treats them as AISchoolonair accounts by default.
+  safe.hasAISchoolonairAccess = true;
+  if (safe.role === 'student' && !safe.school_id && safe.em_registered_at) {
+    try {
+      const examTypeRows = await db.query(
+        `SELECT 1 FROM student_exam_types WHERE student_id = :studentId LIMIT 1`,
+        { replacements: { studentId: safe.id }, type: QueryTypes.SELECT }
+      );
+      const pendingBoards = Array.isArray(safe.pending_exam_board_ids)
+        ? safe.pending_exam_board_ids
+        : [];
+      safe.hasAISchoolonairAccess = !(pendingBoards.length === 0 && examTypeRows.length === 0);
+    } catch {
+      safe.hasAISchoolonairAccess = true;
+    }
+  }
   return safe;
 }
 
