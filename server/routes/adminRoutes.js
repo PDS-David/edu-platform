@@ -1334,7 +1334,7 @@ router.post('/generate-topics', protect, adminOnly, async (req, res) => {
   // Check if topics already exist
   const existing = await sequelize.query(
     `SELECT COUNT(*)::int AS cnt FROM topics WHERE subject_id = :subjectId AND is_active = true`,
-    { replacements: { subjectId: parseInt(subject_id) }, type: QueryTypes.SELECT }
+    { replacements: { subjectId: subject_id }, type: QueryTypes.SELECT }
   );
   if (existing[0]?.cnt > 0) {
     return res.json({ success: true, message: 'Topics already exist', already_exists: true });
@@ -1390,7 +1390,7 @@ Rules:
         `INSERT INTO topics (subject_id, name, order_index, is_active, created_at, updated_at)
          VALUES (:subjectId, :name, :order, true, NOW(), NOW())
          RETURNING id`,
-        { replacements: { subjectId: parseInt(subject_id), name: t.name, order: i }, type: QueryTypes.SELECT }
+        { replacements: { subjectId: subject_id, name: t.name, order: i }, type: QueryTypes.SELECT }
       );
       const topicId = topicRow?.id;
       if (!topicId) continue;
@@ -1399,7 +1399,7 @@ Rules:
         await sequelize.query(
           `INSERT INTO subtopics (topic_id, subject_id, name, order_index, is_active, created_at, updated_at)
            VALUES (:topicId, :subjectId, :name, :order, true, NOW(), NOW())`,
-          { replacements: { topicId, subjectId: parseInt(subject_id), name: t.subtopics[j], order: j }, type: QueryTypes.INSERT }
+          { replacements: { topicId, subjectId: subject_id, name: t.subtopics[j], order: j }, type: QueryTypes.INSERT }
         ).catch(() => {}); // ignore subtopic insert errors
       }
       created++;
