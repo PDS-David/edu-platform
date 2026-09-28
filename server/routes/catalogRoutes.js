@@ -355,21 +355,15 @@ router.put('/subjects/:id', protect, authorize('admin'), async (req, res) => {
       const transaction = await sequelize.transaction();
       try {
         await sequelize.query(
-          `UPDATE student_exam_types SET is_active = false WHERE exam_board_id = :id`,
+          `UPDATE student_subjects SET is_active = false WHERE subject_id = :id`,
           { replacements: { id }, type: QueryTypes.UPDATE, transaction }
         );
         await sequelize.query(
-          `UPDATE student_subjects SET is_active = false
-           WHERE subject_id IN (SELECT id FROM subjects WHERE exam_board_id = :id)`,
+          `UPDATE class_subjects SET is_active = false WHERE subject_id = :id`,
           { replacements: { id }, type: QueryTypes.UPDATE, transaction }
         );
         await sequelize.query(
-          `UPDATE class_subjects SET is_active = false
-           WHERE subject_id IN (SELECT id FROM subjects WHERE exam_board_id = :id)`,
-          { replacements: { id }, type: QueryTypes.UPDATE, transaction }
-        );
-        await sequelize.query(
-          `UPDATE subjects SET is_active = false, updated_at = NOW() WHERE exam_board_id = :id`,
+          `UPDATE subjects SET is_active = false, updated_at = NOW() WHERE id = :id`,
           { replacements: { id }, type: QueryTypes.UPDATE, transaction }
         );
         await transaction.commit();
