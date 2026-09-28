@@ -490,7 +490,7 @@ exports.login = async (req, res, next) => {
          is_active, is_verified, subscription_status,
          subscription_expires_at, onboarding_complete,
          xp_points, study_streak_days, last_login,
-         avatar_url, daily_goal, em_registered_at,
+         avatar_url, daily_goal, em_registered_at, pending_exam_board_ids,
          failed_login_count, locked_until
        FROM users
        WHERE email = :email
