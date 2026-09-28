@@ -253,19 +253,40 @@ async function run() {
   await exec('teacher_subjects: ensure exam_board_id column exists as INTEGER', `
     ALTER TABLE teacher_subjects ADD COLUMN IF NOT EXISTS exam_board_id INTEGER REFERENCES exam_boards(id) ON DELETE SET NULL`);
 
-  // teacher_subjects: add UNIQUE(teacher_id, subject_id) if not already present
-  // Needed for ON CONFLICT upsert in POST /admin/teacher-assignments
-  await exec('teacher_subjects: add UNIQUE(teacher_id, subject_id) constraint', `
-    DO $$ BEGIN
-      IF NOT EXISTS (
-        SELECT 1 FROM pg_constraint
-        WHERE conname = 'teacher_subjects_teacher_id_subject_id_key'
-          AND conrelid = 'teacher_subjects'::regclass
-      ) THEN
-        ALTER TABLE teacher_subjects ADD CONSTRAINT teacher_subjects_teacher_id_subject_id_key
-          UNIQUE (teacher_id, subject_id);
-      END IF;
-    EXCEPTION WHEN others THEN NULL; END $$`);
+  // Teacher subject assignments are school-scoped. The old global
+  // UNIQUE(teacher_id, subject_id) constraint conflicts with multi-school
+  // teachers and also prevents schoolRoutes.js from using the school-scoped
+  // upsert. Migrate legacy rows to the teacher's current school where known,
+  // then keep separate uniqueness rules for school-scoped and standalone
+  // assignments. This is the idempotent equivalent of
+  // database/migration_036_teacher_subject_school_scope.sql.
+  await exec('teacher_subjects: migrate to school-scoped uniqueness', `
+    ALTER TABLE teacher_subjects
+      ADD COLUMN IF NOT EXISTS school_id UUID REFERENCES schools(id) ON DELETE CASCADE;
+
+    UPDATE teacher_subjects ts
+    SET school_id = u.school_id
+    FROM users u
+    WHERE u.id = ts.teacher_id
+      AND ts.school_id IS NULL
+      AND u.school_id IS NOT NULL;
+
+    ALTER TABLE teacher_subjects
+      DROP CONSTRAINT IF EXISTS teacher_subjects_teacher_id_subject_id_key;
+
+    DROP INDEX IF EXISTS teacher_subjects_teacher_id_subject_id_key;
+
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_teacher_subjects_teacher_subject_school
+      ON teacher_subjects (teacher_id, subject_id, school_id)
+      WHERE school_id IS NOT NULL;
+
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_teacher_subjects_standalone
+      ON teacher_subjects (teacher_id, subject_id)
+      WHERE school_id IS NULL;
+
+    CREATE INDEX IF NOT EXISTS idx_teacher_subjects_teacher_school_active
+      ON teacher_subjects (teacher_id, school_id, is_active);
+  `);
 
   // past_papers: add columns the code expects
   await exec('past_papers: add exam_board, paper_type, file_size_bytes, created_by', `
