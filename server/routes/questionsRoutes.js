@@ -19,7 +19,7 @@ try { awardXP = require('../middleware/xpMiddleware').awardXP; } catch {}
 
 // ── GET /api/questions/random ─────────────────────────────────────────────────
 router.get('/random', protect, async (req, res) => {
-  const { count = '10', subject_id, subtopic_id, board, difficulty, type, question_sub_type } = req.query;
+  const { count = '10', subject_id, subtopic_id, board, difficulty, type, question_sub_type, mode } = req.query;
   const limit = Math.min(Math.max(parseInt(count) || 10, 1), 50);
 
   // Phase 5: whitelist against the actual questions.type enum values.
@@ -69,7 +69,17 @@ router.get('/random', protect, async (req, res) => {
   // admin review). If a future insert path forgets to set status, this
   // COALESCE must fail SAFE (excluded from students) rather than fail OPEN
   // (silently treated as approved and served to students unreviewed).
-  const filters      = ["q.is_active = true", "COALESCE(q.status, 'pending') IN ('approved', 'active')"];
+  // Practice mode intentionally includes pending AI-generated questions. The PracticeMode
+  // client already sends mode=practice for the Test Yourself tiles, but this
+  // route previously ignored that flag and therefore applied the student-live
+  // approval filter to everything. AI-generated short_answer/structured
+  // questions are created as pending for admin review, so they could never
+  // reach Practice Mode even though the UI and grading paths support them.
+  // Pending human submissions remain excluded; only AI-generated practice
+  // content is allowed through this path.
+  const filters = mode === 'practice'
+    ? ["q.is_active = true", "(COALESCE(q.status, 'pending') IN ('approved', 'active') OR (COALESCE(q.status, 'pending') = 'pending' AND q.is_ai_generated = true))"]
+    : ["q.is_active = true", "COALESCE(q.status, 'pending') IN ('approved', 'active')"];
   const replacements = { limit };
 
   if (subtopic_id) {
