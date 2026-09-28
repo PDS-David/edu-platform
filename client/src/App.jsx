@@ -117,8 +117,11 @@ export default function App() {
         <Route path="/terms" element={<TermsOfService />} />
         <Route path="/past-papers" element={<PastPapersPage />} />
         <Route path="/subjects" element={<SubjectCatalog />} />
-        {/* English Masterclass public entry — goes to the dedicated EM login */}
-        <Route path="/english-masterclass" element={<Navigate to="/login" replace />} />
+        {/* Language Masterclass public entry — new students see the dedicated
+            standalone registration page first. Existing students can use the
+            Login link on that page; registration itself remains separate from
+            AISchoolonair and never creates an exam-board enrolment. */}
+        <Route path="/english-masterclass" element={<Navigate to="/em/signup" replace />} />
 
         {/* LANGUAGE MASTERCLASS unification — /language/english/* uses the
             same URL shape as every other language, but redirects to the
