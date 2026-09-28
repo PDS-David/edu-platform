@@ -110,7 +110,7 @@ router.get('/question-bank/structure', protect, adminOnly, async (req, res) => {
               st.id AS subtopic_id, st.name AS subtopic_name
          FROM exam_boards eb
          LEFT JOIN subjects s ON s.exam_board_id::text = eb.id::text AND s.is_active = true
-         LEFT JOIN topics t ON t.subject_id = s.id AND t.is_active = true
+         LEFT JOIN topics t ON t.subject_id::text = s.id::text AND t.is_active = true
          LEFT JOIN subtopics st ON st.topic_id = t.id AND st.is_active = true
         WHERE eb.is_active = true
         ORDER BY eb.display_order ASC NULLS LAST, eb.name,
