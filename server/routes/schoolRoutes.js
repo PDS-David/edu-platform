@@ -1572,7 +1572,7 @@ router.post('/me/teachers/:teacherId/subjects', protect, requireSchoolAdmin, asy
        SELECT $1, $3, s.id, s.exam_board_id, $2, NOW(), true
          FROM subjects s
         WHERE s.id = ANY($4::int[]) AND s.is_active = true
-       ON CONFLICT (teacher_id, subject_id, school_id) DO UPDATE
+       ON CONFLICT (teacher_id, subject_id, school_id) WHERE school_id IS NOT NULL DO UPDATE
          SET is_active = true, assigned_by = EXCLUDED.assigned_by, assigned_at = NOW()`,
       { bind: [teacherId, req.user.id, req.user.school_id, subjectIds], type: sequelize.QueryTypes.INSERT }
     );
